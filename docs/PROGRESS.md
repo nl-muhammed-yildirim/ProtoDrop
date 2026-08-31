@@ -18,7 +18,7 @@ This file is the **rolling state of the build**. A fresh AI session has no memor
 |---|---|
 | **Current task** | T-004 (first non-`done` task in `Milestone-Backlog.md`) |
 | **Milestone** | M0 — Foundation |
-| **In progress** | — (T-003 closed 2026-08-31. Next: T-004 — domain model + TA-3.2 DDL as EF migrations.) |
+| **In progress** | T-004 (1/4) — T-004a: wa.domain POCOs (15 tables, TA-3.2, BCL-only) done 2026-08-31. Build + format + domain.unit green. |
 | **Environment** | local: `C:\Users\myild\source\repos\ProtoDrop` (docs say `workspace\ProtoDrop` — repo was moved; treat `source\repos\ProtoDrop` as current). All planning/operating docs live under `docs/`. |
 | **Git** | initialized on branch `main`; baseline commit 2026-08-31 (this session). "Dubious ownership" warning (NT AUTHORITY/SYSTEM vs `myild`) safe → use `safe.directory` exception. |
 | **Open escalations** | see `ESCALATIONS.md` |
