@@ -16,9 +16,9 @@ This file is the **rolling state of the build**. A fresh AI session has no memor
 
 | Field | Value |
 |---|---|
-| **Current task** | T-002 (first non-`done` task in `Milestone-Backlog.md`) |
+| **Current task** | T-003 (first non-`done` task in `Milestone-Backlog.md`) |
 | **Milestone** | M0 — Foundation |
-| **In progress** | T-002 — local tooling: `docker-compose.local.yml` (AGENT.md §5.1), `wa.api` Local launchSettings (§5.2), `GET /health` pinging SQL, Serilog wiring. (T-001 scaffold done: `src/wa.web` created + aligned, esproj, port 5173, vitest, landing.) |
+| **In progress** | — (T-002 closed 2026-08-31. Next: T-003 CI — PR gate + ACR push dev, per TA-12.1.) |
 | **Environment** | local: `C:\Users\myild\source\repos\ProtoDrop` (docs say `workspace\ProtoDrop` — repo was moved; treat `source\repos\ProtoDrop` as current). All planning/operating docs live under `docs/`. |
 | **Git** | initialized on branch `main`; baseline commit 2026-08-31 (this session). "Dubious ownership" warning (NT AUTHORITY/SYSTEM vs `myild`) safe → use `safe.directory` exception. |
 | **Open escalations** | see `ESCALATIONS.md` |
@@ -29,10 +29,18 @@ This file is the **rolling state of the build**. A fresh AI session has no memor
 |---|---|---|
 | — | | *no code tasks completed yet* |
 | T-001 (web part) | 2026-08-31 | `src/wa.web` created via VS (create-vite react-ts) + aligned to requirements: `wa.web.esproj` (Vitest, build-on-build, dist output), dev port 5173 (was VS-generated 54184), vitest + jsdom + @testing-library/react dev deps + smoke test, `tsconfig.app.json` strict + `@/*` alias, landing UI per UI-Reference (tokens.css, DropZone, wordmark top bar), Vite scaffold removed. Gate green: `npm run lint` / `test:run` (1/1) / `build` (60.5 kB gz). `package.json` has `test: vitest` + `test:run: vitest run` (watch vs one-shot). |
+| T-002 | 2026-08-31 | Local tooling per AGENT.md §5: `docker-compose.local.yml` (§5.1 verbatim except Azurite image — E-002: doc's `azure-storage:latest` 404s on MCR, used real `mcr.microsoft.com/azure-storage/azurite:latest`, command kept), `Properties/launchSettings.json` `Local` profile (port 8080, all §5.2 env vars incl. fixed 64-hex JWT secret, dev Zip key, empty SB/Hub), `Program.cs` rewrite: Serilog console wiring (TA-10.5 levels; `Microsoft.*`→Warning) + `GET /health` with REAL DB ping (`SELECT 1`; auto-creates missing `wa` db via `master`, 503 on fail; `sb: "skipped"` when SB unset per §5.2). Exit check green: 200 `{"status":"ok","db":"ok","sb":"skipped"}`, Serilog INF lines in terminal. Full §4 gate green. |
 
 ## 3. This session / last session
 
-**Session 2026-08-31 (T-001 closed / T-002 in progress):**
+**Session 2026-08-31 (T-002 closed):**
+- **T-002 → done** (2026-08-31), committed as `feat: T-002`. Deliverables: `docker-compose.local.yml` (repo root, §5.1; Azurite image corrected → **E-002** filed, proceeded with real image name), `wa.api` `Local` launchSettings profile (port 8080, all §5.2 vars — dev Zip key + 64-hex JWT secret generated locally, recorded here instead of in Open-Decisions Part 2), `Program.cs`: Serilog (`UseSerilog`, TA-10.5 levels) + `GET /health` (real `SELECT 1` ping, auto-creates missing `wa` db via `master` until T-004 migrations; `sb: "skipped"` when `Wa:ServiceBus:ConnectionString` empty per §5.2; 503 on db fail).
+- Exit check (backlog): with `docker compose -f docker-compose.local.yml up -d` (SQL 2022 + Azurite), `GET /health` → 200 `{"status":"ok","db":"ok","sb":"skipped"}`; Serilog `INF` lines visible in terminal.
+- Full §4 gate green: domain 1/1, application 1/1, api.integration 1/1 (placeholder), wa.web lint + test:run 1/1 + build (60.5 kB gz).
+- Environment notes: local `wa` database auto-created by health (transient, T-004 formalizes via EF migrations); SABnzbd had squatted :8080 — killed, worth re-checking on this box before runs.
+- **Next: T-003** — CI (`.github/workflows`, PR gate + ACR push dev, no deploy to `dev`, per TA-12.1).
+
+**Session 2026-08-31 (T-001 closed / T-002 started):**
 - **T-001 → done** (2026-08-31): marked in `Milestone-Backlog.md`. Scaffold + `src/wa.web` aligned to requirements (web gate green from prior session); `global.json` pins .NET 10; all 5 src + 3 test projects exist.
 - **Docs now live under `docs/`**: `Milestone-Backlog.md`, `PROGRESS.md`, `Open-Decisions-and-Constants.md`, `ESCALATIONS.md`, etc. (repo was moved to `source\repos\ProtoDrop`; earlier docs referenced `workspace\ProtoDrop`).
 - **Git**: repo initialized (was "not initialized") on branch `main`, zero commits in the prior state; this session adds the baseline commit. Box shows a "dubious ownership" warning (`NT AUTHORITY/SYSTEM` vs `myild`) — safe, handled with `safe.directory`.

@@ -10,13 +10,24 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
-    "https": {
+    "Local": {
       "commandName": "Project",
       "dotnetRunMessages": true,
-      "launchBrowser": true,
-      "applicationUrl": "https://localhost:7157;http://localhost:5211",
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:8080",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Local",
+        "ConnectionStrings__WaDb": "Server=localhost,1433;User Id=sa;Password=YourStrong!Passw0rd;Database=wa;TrustServerCertificate=True",
+        "Wa:Blob:AccountUrl": "http://127.0.0.1:10000/devstoreaccount1",
+        "Wa:Blob:AccountKey": "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==",
+        "Wa:ServiceBus:ConnectionString": "",
+        "Wa:CommunicationHub:Connection": "",
+        "Wa:Jwt:Secret": "c5e9d55e195064760e4c38c3899416d4a2c15c5c444e7e85c43c0e90656f9de3",
+        "Wa:Url:Public": "http://localhost:5173",
+        "Wa:Url:Api": "http://localhost:8080",
+        "Wa:Cors:AllowedOrigins": "http://localhost:5173",
+        "Wa:AdminEmails": "dev@example.com",
+        "Wa:Zip:SignKey": "proto-drop-dev-zip-sign-key-0123456789"
       }
     }
   }

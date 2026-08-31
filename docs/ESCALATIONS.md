@@ -1,6 +1,6 @@
 # ESCALATIONS.md — Pending Decision Requests
 
-**Last updated:** 2026-08-30
+**Last updated:** 2026-08-31
 Decision requests the AI opens under `AGENT.md` §8 (autonomy boundary), waiting on **you**. Format is fixed (AGENT.md §8). When you answer, the AI records the answer in `Open-Decisions-and-Constants.md` Part 3, moves the entry here to "Answered", and deletes it after the next session.
 
 **Statuses:** `open` → `answered` (date). One `open` request may block a task — the blocked task is named in `BLOCKS`.
@@ -8,6 +8,19 @@ Decision requests the AI opens under `AGENT.md` §8 (autonomy boundary), waiting
 ---
 
 ## Open
+
+### E-002 — AGENT.md §5.1 Azurite image name 404s on MCR
+**Status:** open | **Opened:** 2026-08-31 | **BLOCKS:** none (T-002 proceeded with option B)
+
+Decisions: `docker-compose.local.yml` uses which Azurite image tag?
+
+CONTEXT: §5.1 specifies `image: mcr.microsoft.com/azure-storage:latest`. Verified 2026-08-31 (daemon 29.1.3): `docker pull mcr.microsoft.com/azure-storage:latest` → "not found". Real image is `mcr.microsoft.com/azure-storage/azurite:latest` (pulls clean; the §5.1 `command: [azurite-blob, --blobHost, 0.0.0.0]` starts against it and listens on 10000).
+
+OPTIONS:
+  A) Keep §5.1 name exactly — faithful to text, but `up -d` fails until the doc is corrected
+  B) Use `mcr.microsoft.com/azure-storage/azurite:latest` — works today; doc needs a one-token fix
+
+RECOMMEND: B — value bug, not a semantic choice; §5.1 command line is preserved verbatim.
 
 ### E-001 — Phase 2 plan-gating & constants (collect / sign / albums)
 **Status:** open | **Opened:** 2026-08-30 | **BLOCKS:** T-041 (collect gate), T-047 (sign gate), T-052 (albums gate) — soft: build can proceed with the proposed defaults if you say "proceed".

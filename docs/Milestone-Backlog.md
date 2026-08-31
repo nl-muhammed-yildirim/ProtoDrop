@@ -12,7 +12,7 @@ Status: `pending` → `done` (date). `CURRENT` = first non-done task.
 | ID | Scope | Spec links | Exit check | Status |
 |---|---|---|---|---|
 | T-001 | Solution + project scaffold per TA-2.1 (wa.domain, wa.application, wa.infrastructure, wa.api, wa.workers, tests, src/wa.web Vite+React+TS stub, `global.json` pinning .NET 10) | TA-2, TA-2.6, ADR-015/016 | `dotnet build` green on VS 2026; all 5 src projects + 2 test projects exist; web builds | done 2026-08-31 |
-| T-002 | Local tooling: `docker-compose.local.yml` (SQL 2022 + Azurite), launchSettings with §5.2 env vars, `Program.cs` health endpoint (DB + SB ping), Serilog wiring | AGENT.md §5, TA-4.2#— | `GET /health` green with Docker up; Serilog lines visible | pending |
+| T-002 | Local tooling: `docker-compose.local.yml` (SQL 2022 + Azurite), launchSettings with §5.2 env vars, `Program.cs` health endpoint (DB + SB ping), Serilog wiring | AGENT.md §5, TA-4.2#— | `GET /health` green with Docker up; Serilog lines visible | done 2026-08-31 |
 | T-003 | CI: PR gate (build, unit, integration placeholder, web lint/test/build), ACR push for dev | TA-12.1 | PR gate runs green on a sample PR | pending |
 | T-004 | Domain model + full TA-3.2 DDL as EF migrations in `wa.infrastructure/Persistence`; seed `Plan` (free/pro/business per Part 2 constants) + default `FeatureFlag` rows; `WaDbContext` | TA-3.2, TA-3.4, TA-3.7, ADR-015 | `dotnet ef database update` creates all tables on Azurite/SQL; seed rows verifiable; wa.domain has zero external refs | pending |
 | T-005 | Limits Registry: `LimitsRecord`, `ILimitsProvider`, `PlansCache` + `FlagsCache` (30 s TTL), flag override mechanics | TA-3.4, F-TRF-007 | Unit tests: resolution per plan, flag override wins, TTL expiry honored | pending |
