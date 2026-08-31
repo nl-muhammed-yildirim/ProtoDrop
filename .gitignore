@@ -1,0 +1,45 @@
+# ---- .NET / Visual Studio ----
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstate
+.vs/
+.vscode/
+.idea/
+*.swp
+*.bak
+*.orig
+
+# Build results
+[Tt]est[Rr]esults/
+artifacts/
+coverage/
+*.coverage
+*.coverage.*
+*.trx
+
+# ---- Node / Vite (web/wa-web) ----
+node_modules/
+dist/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+
+# Local dev state (never commit secrets)
+.env
+.env.local
+.env.*.local
+*.local
+
+# Azurite local blob store
+azurite/
+
+# ---- OS / editor noise ----
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+
+# Note: global.json is COMMITTED (pins .NET 10 per TA-2.6) — do not ignore.

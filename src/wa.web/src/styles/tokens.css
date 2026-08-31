@@ -1,0 +1,174 @@
+/* ProtoDrop design tokens — UI-Reference.md §1-3 (single source of truth: docs/UI-Reference.md) */
+:root {
+  /* Colors (UI-Reference §1) */
+  --bg: #ffffff;
+  --bg-subtle: #f5f6f8;
+  --bg-elevated: #ffffff;
+  --fg: #101418;
+  --fg-muted: #5f6b7a;
+  --fg-faint: #98a2b3;
+  --accent: #4185f4;
+  --accent-hover: #2f6fd8;
+  --accent-soft: #eaf1fd;
+  --border: #dde2e8;
+  --success: #2e9e5b;
+  --warning: #c77c11;
+  --danger: #d6453d;
+  --danger-soft: #fbeae8;
+
+  /* Type scale (UI-Reference §2) */
+  --fs-display: 40px;
+  --fs-h1: 28px;
+  --fs-h2: 20px;
+  --fs-body: 16px;
+  --fs-small: 14px;
+  --fs-tiny: 12px;
+
+  /* Spacing / radii / elevation (UI-Reference §3) */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  /* Motion (UI-Reference §3) */
+  --dur-hover: 120ms;
+  --dur-modal: 200ms;
+  --elevation: 0 1px 2px rgba(0, 0, 0, 0.06);
+
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+  font-size: var(--fs-body);
+  line-height: 1.5;
+  color: var(--fg);
+  background: var(--bg);
+  color-scheme: light dark;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Dark theme (UI-Reference §1 dark column) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115;
+    --bg-subtle: #171a21;
+    --bg-elevated: #1c2028;
+    --fg: #e8eaed;
+    --fg-muted: #8a94a3;
+    --fg-faint: #5c6675;
+    --accent: #5a9bf7;
+    --accent-hover: #74acf9;
+    --accent-soft: #1b2a44;
+    --border: #2a2f3a;
+    --success: #43b978;
+    --warning: #e0a43c;
+    --danger: #e3645c;
+    --danger-soft: #3a211f;
+    --elevation: 0 0 0 1px var(--border);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  *,
+  *::before,
+  *::after {
+    transition:
+      background-color var(--dur-hover) ease-out,
+      border-color var(--dur-hover) ease-out,
+      color var(--dur-hover) ease-out,
+      box-shadow var(--dur-hover) ease-out;
+  }
+}
+
+body {
+  margin: 0;
+}
+
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Focus ring (UI-Reference §3): 2 px solid --accent, offset 2 px, every focusable element */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+h1,
+h2 {
+  margin: 0;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+h1 {
+  font-size: var(--fs-h1);
+  line-height: 1.2;
+}
+
+h2 {
+  font-size: var(--fs-h2);
+  line-height: 1.3;
+}
+
+p {
+  margin: 0;
+}
+
+/* Buttons (UI-Reference §4.5) */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  font-family: inherit;
+  font-size: var(--fs-body);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btn-secondary {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--fg);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--fg-muted);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  color: var(--fg);
+}

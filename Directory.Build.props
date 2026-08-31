@@ -1,0 +1,13 @@
+<!--
+  Directory.Build.props — auto-imported by every project under this folder.
+
+  Central NuGet package versions live in packages.props (TA-2.6 / TA-17).
+  The SDK imports whatever file DirectoryPackagesPropsPath points at
+  (its default name is Directory.Packages.props); we point it at
+  packages.props instead, so versions stay in one file.
+-->
+<Project>
+  <PropertyGroup>
+    <DirectoryPackagesPropsPath>$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)', 'packages.props'))</DirectoryPackagesPropsPath>
+  </PropertyGroup>
+</Project>
