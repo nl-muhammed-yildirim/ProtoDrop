@@ -1,0 +1,15 @@
+# LF for everything, except:
+*.diff      text
+*.patch     text
+*.md        text
+
+# CRLF on Windows
+*.cs        text eol=crlf
+*.csproj    text eol=crlf
+*.props     text eol=crlf
+*.targets   text eol=crlf
+*.slnx      text eol=crlf
+*.json      text eol=crlf
+*.esproj    text eol=crlf
+*.yml       text eol=crlf
+*.yaml      text eol=crlf

@@ -1,0 +1,120 @@
+# T-003 / TA-12.1 — PR gate.
+#
+#   1. lint      web eslint (+prettier per step); .NET `dotnet format --verify-no-changes`
+#   2. unit      wa.domain.unit + wa.application.unit — 100% pass required
+#   3. integration  wa.api.integration — Testcontainers SQL + Azurite (Docker on the runner)
+#   4. web       typecheck + eslint + vitest + build
+#   5. docker    build wa-api image (no push yet — ACR dev is Preflight P-03; see ESCALATIONS E-003)
+#
+# Secrets: none so far. When dev ACR lands (Preflight P-03, TA-12.2 "Key Vault via OIDC"),
+# add a push step gated on `AZURE_CONTAINER_REGISTRY` — never hardcode a service principal.
+name: ci
+
+on:
+  pull_request:
+    branches: [ main ]
+  # Allow `gh run`-style manual dry-runs
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Step 1 — web: eslint (+ prettier). test/build run in the `web` job below.
+  lint-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: src/wa.web/package-lock.json
+      - name: npm install (ci)
+        working-directory: src/wa.web
+        run: npm ci
+      - name: eslint
+        working-directory: src/wa.web
+        run: npm run lint
+      # Prettier is part of the TA-12.1 lint step. No prettier dev-dep yet;
+      # this is an explicit no-op marker until prose/style tooling lands.
+      - name: prettier (no-op until tooling lands)
+        if: false
+        working-directory: src/wa.web
+        run: npx prettier --check .
+
+  # Step 1 — .NET: `dotnet format --verify-no-changes`.
+  # No .editorconfig in the repo yet → this is currently a structural
+  # no-op guard (exit 0 on clean tree); it becomes a real gate the moment
+  # a .editorconfig lands. Style/3rd-party passes excluded.
+  lint-dotnet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.x"
+      - name: dotnet format --verify-no-changes
+        run: dotnet format src/wa.slnx --verify-no-changes
+
+  # Step 2 — unit gate: 100% pass required.
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.x"
+      - name: dotnet test wa.domain.unit
+        run: dotnet test tests/wa.domain.unit --nologo
+      - name: dotnet test wa.application.unit
+        run: dotnet test tests/wa.application.unit --nologo
+
+  # Step 3 — integration (Testcontainers SQL + Azurite; Docker ships with runners).
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.x"
+      - name: dotnet test wa.api.integration
+        run: dotnet test tests/wa.api.integration --nologo
+
+  # Step 4 — web: typecheck + eslint + vitest + build.
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: src/wa.web/package-lock.json
+      - name: npm install (ci)
+        working-directory: src/wa.web
+        run: npm ci
+      - name: typecheck + lint + vitest + build
+        working-directory: src/wa.web
+        # `npm run build` = `tsc -b && vite build` (typecheck + build).
+        # eslint and vitest are the rest of TA-12.1 step 4.
+        run: |
+          npm run lint
+          npm run test:run
+          npm run build
+
+  # Step 5 — build the wa-api Docker image (ACR push is Preflight P-03 / E-003).
+  # Context = repo root so the shared .NET projects sit outside wa.api.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build wa-api image
+        run: |
+          docker build \
+            --file src/wa.api/Dockerfile \
+            --tag wa-api:ci-${GITHUB_SHA} \
+            .
+      - name: Show image
+        run: docker images | head -5

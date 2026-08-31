@@ -9,6 +9,17 @@ Decision requests the AI opens under `AGENT.md` §8 (autonomy boundary), waiting
 
 ## Open
 
+### E-003 — T-003 "ACR push for dev": no dev ACR / no IaC exists yet
+**Status:** open | **Opened:** 2026-08-31 | **BLOCKS:** none (T-003 PR gate shipped; the *push* sub-step waits on your call)
+
+DECISION: Where and how is the **dev** ACR for T-003 step 5 created, and when does the `ci.yml` push step activate?
+CONTEXT: T-003 backlog scopes "ACR push for dev" and TA-12.1 step 5 says "docker build wa-api → push ACR (dev)". As of 2026-08-31: no `infra/bicep/` folder, no Azure login on this box, no dev subscription resources (Preflight **P-03** is owner "you + AI", needed *by* T-003, and its plan is "Bicep creates it; you click 'give Azure OIDC' once" — i.e. the ACR is expected to come from IaC that doesn't exist yet). Per TA-12.2 secrets arrive via OIDC, so the push step must not hardcode a service principal. T-003 shipped the gate with **build-only** step 5 (`ci.yml` docker job) on this assumption.
+OPTIONS:
+  A) You create/confirm the dev subscription + ACR (`wa-dev-acr` per TA-11.1) manually or via a later IaC task and set the `AZURE_CONTAINER_REGISTRY` repo var — CI gains a `deploy: azure/container-registry-login@v1` + push step then
+  B) Add `infra/bicep/main/dev.bicep` (TA-11.4 layout) inside T-003 scope — pulls Preflight P-03's IaC forward; needs the ACR line + OIDC scope granted before the push step can work
+RECOMMEND: A — T-003 stays a gate; the ACR/IaC work is P-03's own job and the push step stays behind the `AZURE_CONTAINER_REGISTRY` guard (commented in `ci.yml`), so nothing blocks on a guessed resource.
+BLOCKS: none (the "ACR push dev" sub-step of T-003)
+
 ### E-002 — AGENT.md §5.1 Azurite image name 404s on MCR
 **Status:** open | **Opened:** 2026-08-31 | **BLOCKS:** none (T-002 proceeded with option B)
 

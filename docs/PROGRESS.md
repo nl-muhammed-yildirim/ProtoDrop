@@ -16,9 +16,9 @@ This file is the **rolling state of the build**. A fresh AI session has no memor
 
 | Field | Value |
 |---|---|
-| **Current task** | T-003 (first non-`done` task in `Milestone-Backlog.md`) |
+| **Current task** | T-004 (first non-`done` task in `Milestone-Backlog.md`) |
 | **Milestone** | M0 — Foundation |
-| **In progress** | — (T-002 closed 2026-08-31. Next: T-003 CI — PR gate + ACR push dev, per TA-12.1.) |
+| **In progress** | — (T-003 closed 2026-08-31. Next: T-004 — domain model + TA-3.2 DDL as EF migrations.) |
 | **Environment** | local: `C:\Users\myild\source\repos\ProtoDrop` (docs say `workspace\ProtoDrop` — repo was moved; treat `source\repos\ProtoDrop` as current). All planning/operating docs live under `docs/`. |
 | **Git** | initialized on branch `main`; baseline commit 2026-08-31 (this session). "Dubious ownership" warning (NT AUTHORITY/SYSTEM vs `myild`) safe → use `safe.directory` exception. |
 | **Open escalations** | see `ESCALATIONS.md` |
@@ -30,8 +30,16 @@ This file is the **rolling state of the build**. A fresh AI session has no memor
 | — | | *no code tasks completed yet* |
 | T-001 (web part) | 2026-08-31 | `src/wa.web` created via VS (create-vite react-ts) + aligned to requirements: `wa.web.esproj` (Vitest, build-on-build, dist output), dev port 5173 (was VS-generated 54184), vitest + jsdom + @testing-library/react dev deps + smoke test, `tsconfig.app.json` strict + `@/*` alias, landing UI per UI-Reference (tokens.css, DropZone, wordmark top bar), Vite scaffold removed. Gate green: `npm run lint` / `test:run` (1/1) / `build` (60.5 kB gz). `package.json` has `test: vitest` + `test:run: vitest run` (watch vs one-shot). |
 | T-002 | 2026-08-31 | Local tooling per AGENT.md §5: `docker-compose.local.yml` (§5.1 verbatim except Azurite image — E-002: doc's `azure-storage:latest` 404s on MCR, used real `mcr.microsoft.com/azure-storage/azurite:latest`, command kept), `Properties/launchSettings.json` `Local` profile (port 8080, all §5.2 env vars incl. fixed 64-hex JWT secret, dev Zip key, empty SB/Hub), `Program.cs` rewrite: Serilog console wiring (TA-10.5 levels; `Microsoft.*`→Warning) + `GET /health` with REAL DB ping (`SELECT 1`; auto-creates missing `wa` db via `master`, 503 on fail; `sb: "skipped"` when SB unset per §5.2). Exit check green: 200 `{"status":"ok","db":"ok","sb":"skipped"}`, Serilog INF lines in terminal. Full §4 gate green. |
+| T-003 | 2026-08-31 | CI per TA-12.1: `.github/workflows/ci.yml` PR gate, 6 jobs — `lint-web` (eslint; prettier step gated `if: false`, no prettier dev-dep yet), `lint-dotnet` (`dotnet format src/wa.slnx --verify-no-changes`; structural no-op until an `.editorconfig` lands), `unit` (domain.unit + application.unit, 100% pass), `integration` (api.integration, Testcontainers), `web` (tsc + eslint + `test:run` + build per TA-12.1), `docker` (multi-stage publish→aspnet:10.0, tag `wa-api:ci-<sha>`, **no push**). Supporting: `src/wa.api/Dockerfile`, `.dockerignore` (repo-root context stays ~3 MB), `.gitattributes` (locks line endings so `dotnet format` is deterministic across Windows local / Linux CI). **E-003** filed: ACR push dev sub-step (Preflight P-03 owner "you") — no dev ACR/IaC yet; push step commented in `ci.yml`, gated on a repo variable `AZURE_CONTAINER_REGISTRY`. Exit check: full §4 gate green locally (domain 1/1, application 1/1, api.integration 1/1, web lint + test:run 1/1 + build 60.5 kB gz; `docker build` `wa-api:local-check` green). |
 
 ## 3. This session / last session
+
+**Session 2026-08-31 (T-003 closed):**
+- **T-003 → done** (2026-08-31), committed as `feat: T-003`. Deliverables: `.github/workflows/ci.yml` (6-job PR gate per TA-12.1: `lint-web`, `lint-dotnet`, `unit`, `integration`, `web`, `docker`), `src/wa.api/Dockerfile` (multi-stage publish→`aspnet:10.0`; local `docker build` of `wa-api:local-check` green, context ~3 MB via `.dockerignore`), `.gitattributes` (line-endings pinned so `dotnet format --verify-no-changes` is deterministic across Windows-local / Linux-CI), `ESCALATIONS.md` **E-003**.
+- **E-003** (ACR push dev, TA-12.1 step 5, Preflight P-03 owner "you"): no dev ACR/IaC on this box yet; push step commented in `ci.yml`, gated on repo variable `AZURE_CONTAINER_REGISTRY` (OIDC per TA-12.2, so no SP secret lands in repo).
+- Exit check: full §4 gate green locally — domain 1/1, application 1/1, api.integration 1/1 (Testcontainers), web lint + `test:run` 1/1 + build 60.51 kB gz; `dotnet format src/wa.slnx --verify-no-changes` exit 0.
+- **Scratch-PR verification step** (TA-12.3) parked on GitHub credentials (Preflight P-02, owner "you"): no `GITHUB_TOKEN`/`gh` CLI/PAT in the non-interactive shell; empty `origin/*` until first push. Sequence: user pushes `main`, opens a scratch `feat/...` PR → confirm all 6 jobs green → squash-merge.
+- **Next: T-004** — domain model + TA-3.2 DDL as EF migrations.
 
 **Session 2026-08-31 (T-002 closed):**
 - **T-002 → done** (2026-08-31), committed as `feat: T-002`. Deliverables: `docker-compose.local.yml` (repo root, §5.1; Azurite image corrected → **E-002** filed, proceeded with real image name), `wa.api` `Local` launchSettings profile (port 8080, all §5.2 vars — dev Zip key + 64-hex JWT secret generated locally, recorded here instead of in Open-Decisions Part 2), `Program.cs`: Serilog (`UseSerilog`, TA-10.5 levels) + `GET /health` (real `SELECT 1` ping, auto-creates missing `wa` db via `master` until T-004 migrations; `sb: "skipped"` when `Wa:ServiceBus:ConnectionString` empty per §5.2; 503 on db fail).

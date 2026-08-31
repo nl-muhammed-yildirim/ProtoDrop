@@ -1,0 +1,19 @@
+# Build context is the repo root (src/wa.api/Dockerfile needs the sibling
+# projects). Keep it as small as possible: mirror .gitignore.
+.git
+.vs
+docs/
+tests/
+azurite/
+[Oo]bj/
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+*.log
+*.user
+*.suo
+Thumbs.db
+.gitattributes
+.gitignore
+docker-compose.local.yml
