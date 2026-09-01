@@ -35,6 +35,7 @@ Escalate per AGENT.md §8 when a value is missing — do not invent.
 - [ ] `cd C:\Users\myild\workspace\ProtoDrop`
 - [ ] `git init && git add . && git commit -m "docs: planning + operating docs (T-000)"`
 - [ ] Machine tools from `Getting-Started-VS2026.md` §1 (VS 2026, .NET 10 SDK, Node 20, Docker Desktop)
+- [ ] Push + open a scratch PR: `git push -u origin main`, `git push --no-ff main feat/ci-probe -m "chore: CI gate verification probe" --no-verify` (throwaway branch), then open the **feat/ci-probe → main** PR in the GitHub UI, watch all jobs in `.github/workflows/ci.yml` go green, squash-merge (T-003 exit check — the ACR *push* sub-step is separate, see `ESCALATIONS.md` E-003)
 - [ ] Answer `ESCALATIONS.md` open entries (E-001) if you want Phase 2 defaults frozen — not blocking for M0.
 
 ## 4. If anything conflicts
