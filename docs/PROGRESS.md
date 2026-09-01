@@ -16,9 +16,9 @@ This file is the **rolling state of the build**. A fresh AI session has no memor
 
 | Field | Value |
 |---|---|
-| **Current task** | T-004 (3/4) |
+| **Current task** | T-005 (CURRENT) |
 | **Milestone** | M0 — Foundation |
-| **In progress** | T-004 (3/4): (a) wa.domain POCOs 15 tables; (b) TA-3.2 DDL migration `InitialCreate`; (c) seed migration `SeedPlansAndFeatureFlags` (Plans free/pro/business per Open-Decisions Part 2 + all TA-13.2 `FeatureFlag` keys; D-07 stand-in Pro `MAX_TRANSFER_SIZE` = 10 GB per **E-004**) + unit test `SeedValuesUnitTest` (Part-2 values parsed from seed, full flag-key coverage) + `SeedDataIntegrationTest` 10 GB fix. What remains: **T-004 (4/4)**, then **T-005** (Limits Registry: `LimitsRecord`, `ILimitsProvider`, `PlansCache`+`FlagsCache` 30 s TTL, flag override; TA-3.4, F-TRF-007). |
+| **In progress** | T-005 — Limits Registry: `LimitsRecord`, `ILimitsProvider`, `PlansCache` + `FlagsCache` (30 s TTL), flag override mechanics (TA-3.4, F-TRF-007). Unit tests: resolution per plan, flag override wins, TTL expiry honored. T-004 is done (all 4 parts; seed verified on the local SQL). |
 | **Environment** | local: `C:\Users\myild\source\repos\ProtoDrop` (docs say `workspace\ProtoDrop` — repo was moved; treat `source\repos\ProtoDrop` as current). All planning/operating docs live under `docs/`. |
 | **Git** | initialized on branch `main`; baseline commit 2026-08-31 (this session). "Dubious ownership" warning (NT AUTHORITY/SYSTEM vs `myild`) safe → use `safe.directory` exception. |
 | **Open escalations** | see `ESCALATIONS.md` |
@@ -35,6 +35,12 @@ This file is the **rolling state of the build**. A fresh AI session has no memor
 | T-004 seed | 2026-09-01 | Seed `Plan` (free/pro/business via `HasData`, fixed GUIDs, `LimitsJson`/`FeaturesJson` per Part 2) + `FeatureFlag` seed (12 `feature.*` gates `false` per D-14; 3×14 `limits.<plan>.*` keys). Migration `SeedPlansAndFeatureFlags` applied to local SQL (wa db verified: 3 plans, 54 flags). Integration test `SeedDataIntegrationTest` (Testcontainers) asserts seeds end-to-end (4/4 pass incl. vacuous stub). Gate green: build 0 warn/0 err, `dotnet format` 0, unit 1/1 ×2, web lint + test:run 1/1 + build. |
 
 ## 3. This session / last session
+
+**Session 2026-09-01 (T-004 part 4 / 4 — seed verified, T-004 closed):**
+- **T-004 (4/4) → done** (2026-09-01), closing T-004 (a POCOs, b DDL, c seed, d verified seed). `docker compose -f docker-compose.local.yml up -d` (SQL 2022 + Azurite), then `dotnet ef database update --project src/wa.infrastructure` re-applied `InitialCreate` + `SeedPlansAndFeatureFlags` to a fresh `wa` db (the local dev db predated the part-3 commit and held a stale Pro 21.47 GB; dropped + re-migrated so the live seed matches the committed migration). AGENT.md §5.3 command (`--startup-project src/wa.api`) needs `wa.api` + `wa.infrastructure` to both resolve the `wa.infrastructure` Design asset; the design-time factory `WaDbContextFactory` makes `--project src/wa.infrastructure` alone sufficient (no startup project required) — same effect.
+- **Seed verification (queried on the live local SQL):** `SELECT COUNT(*) FROM dbo.Plan;` → **3**; `SELECT Code, LimitsJson FROM dbo.Plan;` → free `5.37 GB/7d/100dl/20emails/5.37GB-quot`, pro `10 GB (10737418240, D-07 stand-in)/30d/1000dl`, business `100 GB/90d/unlimited`; `SELECT COUNT(*) FROM dbo.FeatureFlag;` → **54**; **15** domain tables created (15 POCOs / 15 `IEntityTypeConfiguration`s; `sys.tables` reports 16 = 15 + `__EFMigrationsHistory`, which EF adds automatically).
+- Full §4 gate green (Docker running): solution build 0 warn/0 err; `dotnet format --verify-no-changes` 0; `wa.domain.unit` 11/11, `wa.application.unit` 1/1, `wa.api.integration` 4/4 (Testcontainers); web `lint` 0 + `test:run` 1/1 + `build` (60.51 kB gz).
+- T-004 marked **done 2026-09-01** in `Milestone-Backlog.md` and **E-004 (D-07)** present in `ESCALATIONS.md` (both landed in the part-3 commit `bb5663c`); moved CURRENT to **T-005** here.
 
 **Session 2026-09-01 (T-004 part 3 / 4 — seed values + unit tests):**
 - **T-004 (3/4)**: seed migration values aligned to Open-Decisions-and-Constants.md Part 2 exactly; Pro `MAX_TRANSFER_SIZE` = **10737418240 (10 GB)** stand-in for D-07 "TBD" (Part 2 Pro `STORAGE_QUOTA` = 100 GB conflicts with D-07 "20/50 GB" — see **E-004**). Pro `LimitsJson`, `PlanConfiguration` + `FeatureFlagConfiguration` rows, and the `limits.pro.maxTransferSize` flag all carry the stand-in; Free/Business untouched from Part 2.
