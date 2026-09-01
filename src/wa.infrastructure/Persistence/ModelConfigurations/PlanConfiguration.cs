@@ -58,14 +58,16 @@ public class PlanConfiguration : IEntityTypeConfiguration<Plan>
     //   FeaturesJson — F-BIL-001 feature gates: ads, scheduling, analytics, branding,
     //                 sso_scim (F-BIL-001 shape; note snake_case key).
     // Values per Open-Decisions-and-Constants.md Part 2 (Appendix A / D-06 frozen).
-    // Bytes: 5GB=5368709120, 20GB=21474836480, 100GB=107374182400, 1TB=1099511627776,
-    // 4GB=4294967296. Pro maxTransferSize 20 GB is the Appendix-A placeholder pending D-07.
+    // Bytes: 5GB=5368709120, 10GB=10737418240, 100GB=107374182400, 1TB=1099511627776,
+    // 4GB=4294967296. D-07 known hole: Pro MAX_TRANSFER_SIZE is "TBD (D-07)" in
+    // Part 2 and D-07's 20/50 GB placeholder conflicts with Part 2's 100 GB Pro
+    // STORAGE_QUOTA; seeded 10 GB (10737418240) as stand-in — see ESCALATIONS.md E-004.
     private const string LimitsFree =
         "{\"maxTransferSize\":5368709120,\"maxSingleFile\":5368709120,\"maxZipSize\":4294967296,\"retentionDays\":7,\"graceDays\":3,\"maxDownloads\":100,\"maxEmails\":20,\"storageQuota\":5368709120,\"activeTransfersMax\":20}";
     private const string FeaturesFree =
         "{\"ads\":false,\"scheduling\":false,\"analytics\":false,\"branding\":false,\"sso_scim\":false}";
     private const string LimitsPro =
-        "{\"maxTransferSize\":21474836480,\"maxSingleFile\":21474836480,\"maxZipSize\":9223372036854775807,\"retentionDays\":30,\"graceDays\":3,\"maxDownloads\":1000,\"maxEmails\":100,\"storageQuota\":107374182400,\"activeTransfersMax\":200}";
+        "{\"maxTransferSize\":10737418240,\"maxSingleFile\":10737418240,\"maxZipSize\":9223372036854775807,\"retentionDays\":30,\"graceDays\":3,\"maxDownloads\":1000,\"maxEmails\":100,\"storageQuota\":107374182400,\"activeTransfersMax\":200}";
     private const string FeaturesPro =
         "{\"ads\":false,\"scheduling\":true,\"analytics\":true,\"branding\":true,\"sso_scim\":false}";
     private const string LimitsBusiness =

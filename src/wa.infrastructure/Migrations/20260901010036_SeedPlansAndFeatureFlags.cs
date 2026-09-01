@@ -66,8 +66,10 @@ namespace wa.infrastructure.Migrations
                     { "limits.pro.graceDays", "Plan limits override (TA-3.4); values per Open-Decisions Part 2", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "3" },
                     { "limits.pro.maxDownloads", "Plan limits override (TA-3.4); values per Open-Decisions Part 2", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "1000" },
                     { "limits.pro.maxEmails", "Plan limits override (TA-3.4); values per Open-Decisions Part 2", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "100" },
-                    { "limits.pro.maxSingleFile", "Plan limits override (TA-3.4); values per Open-Decisions Part 2", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "21474836480" },
-                    { "limits.pro.maxTransferSize", "Plan limits override (TA-3.4); values per Open-Decisions Part 2", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "21474836480" },
+                    // D-07 stand-in (ESCALATIONS.md E-004): Part-2 Pro MAX_TRANSFER_SIZE is
+                    // "TBD (D-07)"; 10 GB seeded pending the D-07 answer.
+                    { "limits.pro.maxSingleFile", "Plan limits override (TA-3.4); values per Open-Decisions Part 2", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "10737418240" },
+                    { "limits.pro.maxTransferSize", "Plan limits override (TA-3.4); values per Open-Decisions Part 2", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "10737418240" },
                     { "limits.pro.maxZipSize", "Plan limits override (TA-3.4); values per Open-Decisions Part 2", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "9223372036854775807" },
                     { "limits.pro.retentionDays", "Plan limits override (TA-3.4); values per Open-Decisions Part 2", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "30" },
                     { "limits.pro.scheduling", "Plan limits override (TA-3.4); values per Open-Decisions Part 2", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "true" },
@@ -82,7 +84,8 @@ namespace wa.infrastructure.Migrations
                 values: new object[,]
                 {
                     { new Guid("11111111-0000-4000-8000-000000000001"), "free", "{\"ads\":false,\"scheduling\":false,\"analytics\":false,\"branding\":false,\"sso_scim\":false}", "{\"maxTransferSize\":5368709120,\"maxSingleFile\":5368709120,\"maxZipSize\":4294967296,\"retentionDays\":7,\"graceDays\":3,\"maxDownloads\":100,\"maxEmails\":20,\"storageQuota\":5368709120,\"activeTransfersMax\":20}", "Free", 1 },
-                    { new Guid("11111111-0000-4000-8000-000000000002"), "pro", "{\"ads\":false,\"scheduling\":true,\"analytics\":true,\"branding\":true,\"sso_scim\":false}", "{\"maxTransferSize\":21474836480,\"maxSingleFile\":21474836480,\"maxZipSize\":9223372036854775807,\"retentionDays\":30,\"graceDays\":3,\"maxDownloads\":1000,\"maxEmails\":100,\"storageQuota\":107374182400,\"activeTransfersMax\":200}", "Pro", 2 },
+                    // D-07 stand-in (ESCALATIONS.md E-004): maxTransferSize 10 GB until D-07 is answered.
+                    { new Guid("11111111-0000-4000-8000-000000000002"), "pro", "{\"ads\":false,\"scheduling\":true,\"analytics\":true,\"branding\":true,\"sso_scim\":false}", "{\"maxTransferSize\":10737418240,\"maxSingleFile\":10737418240,\"maxZipSize\":9223372036854775807,\"retentionDays\":30,\"graceDays\":3,\"maxDownloads\":1000,\"maxEmails\":100,\"storageQuota\":107374182400,\"activeTransfersMax\":200}", "Pro", 2 },
                     { new Guid("11111111-0000-4000-8000-000000000003"), "business", "{\"ads\":false,\"scheduling\":true,\"analytics\":true,\"branding\":true,\"sso_scim\":true}", "{\"maxTransferSize\":107374182400,\"maxSingleFile\":107374182400,\"maxZipSize\":9223372036854775807,\"retentionDays\":90,\"graceDays\":3,\"maxDownloads\":-1,\"maxEmails\":500,\"storageQuota\":1099511627776,\"activeTransfersMax\":-1}", "Business", 3 }
                 });
         }

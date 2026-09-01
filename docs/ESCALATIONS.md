@@ -1,6 +1,6 @@
 # ESCALATIONS.md — Pending Decision Requests
 
-**Last updated:** 2026-08-31
+**Last updated:** 2026-09-01
 Decision requests the AI opens under `AGENT.md` §8 (autonomy boundary), waiting on **you**. Format is fixed (AGENT.md §8). When you answer, the AI records the answer in `Open-Decisions-and-Constants.md` Part 3, moves the entry here to "Answered", and deletes it after the next session.
 
 **Statuses:** `open` → `answered` (date). One `open` request may block a task — the blocked task is named in `BLOCKS`.
@@ -8,6 +8,17 @@ Decision requests the AI opens under `AGENT.md` §8 (autonomy boundary), waiting
 ---
 
 ## Open
+
+### E-004 — D-07 known hole: Pro `MAX_TRANSFER_SIZE` TBD while Pro `STORAGE_QUOTA` (100 GB) conflicts with D-07 "20/50 GB"
+**Status:** open | **Opened:** 2026-09-01 | **BLOCKS:** none (T-004 shipped with the 10 GB stand-in; billing confirms before charge)
+
+DECISION: What is the actual Pro `MAX_TRANSFER_SIZE`? Part 2 (frozen constants) says "TBD (D-07)", but the same Part 2 row set freezes Pro `STORAGE_QUOTA` = 107374182400 (100 GB), which conflicts with D-07's own "20/50 GB & 100 GB tiers, TBD" — one of them must move.
+CONTEXT: T-004c seeds from Part 2 "no invented numbers" allowed, but a single TBD cell forces a stand-in. Seed decision (noted in `docs/PROGRESS.md` §4):
+OPTIONS:
+  A) Keep the 10 GB stand-in in the seed and resolve the whole D-07 row (`MAX_TRANSFER_SIZE` + `MAX_SINGLE_FILE`) together with billing confirmation — one decision flips both cells; seed values stay frozen-Part-2 otherwise
+  B) Backfill `MAX_TRANSFER_SIZE` = 100 GB now (aligning with `STORAGE_QUOTA`) and let billing confirm D-07 — Pro gets transfer-size headroom today, but a 200–500 GB transfer could still be plausible, so a change here is itself a limit change (re-escalate per AGENT.md §7)
+RECOMMEND: A — cheapest and safest: 10 GB ≤ any D-07 reading, and D-07 stays a single decision (transfer size, tiers, prices) instead of two half-decisions.
+BLOCKS: none (billing confirmation of D-07 before T-chargeable; T-004 itself is not blocked)
 
 ### E-003 — T-003 "ACR push for dev": no dev ACR / no IaC exists yet
 **Status:** open | **Opened:** 2026-08-31 | **BLOCKS:** none (T-003 PR gate shipped; the *push* sub-step waits on your call)

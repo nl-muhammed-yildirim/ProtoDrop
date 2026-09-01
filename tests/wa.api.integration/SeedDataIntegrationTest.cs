@@ -41,7 +41,8 @@ public class SeedDataIntegrationTest
         // Part-2 hard limits embedded per plan (never literals; TA-3.4).
         Assert.Contains("\"maxTransferSize\":5368709120", byCode["free"].LimitsJson);
         Assert.Contains("\"maxDownloads\":100", byCode["free"].LimitsJson);
-        Assert.Contains("\"maxTransferSize\":21474836480", byCode["pro"].LimitsJson);
+        // D-07 stand-in 10 GB (ESCALATIONS.md E-004) — Part 2 says "TBD (D-07)".
+        Assert.Contains("\"maxTransferSize\":10737418240", byCode["pro"].LimitsJson);
         Assert.Contains("\"maxDownloads\":-1", byCode["business"].LimitsJson);
         Assert.Contains("\"retentionDays\":90", byCode["business"].LimitsJson);
 
@@ -91,7 +92,7 @@ public class SeedDataIntegrationTest
         // TA-13.2: one flag per Part-2 constant per plan (14 constants × 3 plans = 42).
         Assert.Equal(42, limits.Count);
         Assert.Equal("5368709120", Value(limits, "limits.free.maxTransferSize"));
-        Assert.Equal("21474836480", Value(limits, "limits.pro.maxTransferSize"));
+        Assert.Equal("10737418240", Value(limits, "limits.pro.maxTransferSize"));
         Assert.Equal("107374182400", Value(limits, "limits.business.maxTransferSize"));
         Assert.Equal("7", Value(limits, "limits.free.retentionDays"));
         Assert.Equal("30", Value(limits, "limits.pro.retentionDays"));

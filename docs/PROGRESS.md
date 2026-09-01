@@ -16,9 +16,9 @@ This file is the **rolling state of the build**. A fresh AI session has no memor
 
 | Field | Value |
 |---|---|
-| **Current task** | T-005 (first non-`done` task in `Milestone-Backlog.md`) |
+| **Current task** | T-004 (3/4) |
 | **Milestone** | M0 — Foundation |
-| **In progress** | T-004 closed 2026-09-01 (a: wa.domain POCOs 15 tables; b: TA-3.2 DDL migration `InitialCreate`; seed: `SeedPlansAndFeatureFlags` Plan+FeatureFlag + seed-verification integration test). Full gate green. Next: **T-005** (Limits Registry: `LimitsRecord`, `ILimitsProvider`, `PlansCache`+`FlagsCache` 30 s TTL, flag override; TA-3.4, F-TRF-007). |
+| **In progress** | T-004 (3/4): (a) wa.domain POCOs 15 tables; (b) TA-3.2 DDL migration `InitialCreate`; (c) seed migration `SeedPlansAndFeatureFlags` (Plans free/pro/business per Open-Decisions Part 2 + all TA-13.2 `FeatureFlag` keys; D-07 stand-in Pro `MAX_TRANSFER_SIZE` = 10 GB per **E-004**) + unit test `SeedValuesUnitTest` (Part-2 values parsed from seed, full flag-key coverage) + `SeedDataIntegrationTest` 10 GB fix. What remains: **T-004 (4/4)**, then **T-005** (Limits Registry: `LimitsRecord`, `ILimitsProvider`, `PlansCache`+`FlagsCache` 30 s TTL, flag override; TA-3.4, F-TRF-007). |
 | **Environment** | local: `C:\Users\myild\source\repos\ProtoDrop` (docs say `workspace\ProtoDrop` — repo was moved; treat `source\repos\ProtoDrop` as current). All planning/operating docs live under `docs/`. |
 | **Git** | initialized on branch `main`; baseline commit 2026-08-31 (this session). "Dubious ownership" warning (NT AUTHORITY/SYSTEM vs `myild`) safe → use `safe.directory` exception. |
 | **Open escalations** | see `ESCALATIONS.md` |
@@ -35,6 +35,13 @@ This file is the **rolling state of the build**. A fresh AI session has no memor
 | T-004 seed | 2026-09-01 | Seed `Plan` (free/pro/business via `HasData`, fixed GUIDs, `LimitsJson`/`FeaturesJson` per Part 2) + `FeatureFlag` seed (12 `feature.*` gates `false` per D-14; 3×14 `limits.<plan>.*` keys). Migration `SeedPlansAndFeatureFlags` applied to local SQL (wa db verified: 3 plans, 54 flags). Integration test `SeedDataIntegrationTest` (Testcontainers) asserts seeds end-to-end (4/4 pass incl. vacuous stub). Gate green: build 0 warn/0 err, `dotnet format` 0, unit 1/1 ×2, web lint + test:run 1/1 + build. |
 
 ## 3. This session / last session
+
+**Session 2026-09-01 (T-004 part 3 / 4 — seed values + unit tests):**
+- **T-004 (3/4)**: seed migration values aligned to Open-Decisions-and-Constants.md Part 2 exactly; Pro `MAX_TRANSFER_SIZE` = **10737418240 (10 GB)** stand-in for D-07 "TBD" (Part 2 Pro `STORAGE_QUOTA` = 100 GB conflicts with D-07 "20/50 GB" — see **E-004**). Pro `LimitsJson`, `PlanConfiguration` + `FeatureFlagConfiguration` rows, and the `limits.pro.maxTransferSize` flag all carry the stand-in; Free/Business untouched from Part 2.
+- Added `tests/wa.domain.unit/SeedValuesUnitTest.cs` (11/11 green — 3 plan value sets parsed via EF design-time model, full TA-13.2 flag-key exact-coverage, 42 `limits.*` flag values, features.json gates); fixed both 21.47 GB remnants in `tests/wa.api.integration/SeedDataIntegrationTest.cs`.
+- **ESCALATIONS.md E-004** filed (D-07 hole; AGENT.md §8 format); last-updated 2026-09-01.
+- Gate: `dotnet build` green + `dotnet test` pending on `dotnet test` for unit (11/11) — full-gate re-run at commit time.
+- **Remaining (4/4)**: T-004 wrap-up — full §4 gate re-run, `Milestone-Backlog.md` T-004 → done, commit `feat: T-004c plan/flag seeds + tests`.
 
 **Session 2026-09-01 (T-004 seed closed):**
 - **T-004 seed → done** (2026-09-01). `Plan` seed via `HasData` (free/pro/business, fixed GUIDs `11111111-…-00000000000x`, `LimitsJson`/`FeaturesJson` per Open-Decisions Part 2: free 5.37 GB/7d/100dl/20emails, pro 21.47 GB/30d/1000dl, business 107.37 GB/90d/−1) + `FeatureFlag` seed (12 `feature.*` gates all `false`, D-14 ads off; 3×14 `limits.<plan>.*` overrides = 42 keys, `limits.business.ssoScim=true`).
@@ -99,6 +106,7 @@ This file is the **rolling state of the build**. A fresh AI session has no memor
 
 ## 4. Known open items (not escalations)
 
-- Phase 2 open decisions D-21/D-22/D-23 (collect/sign/albums plan gating, grace days, conversion/thumbnail choices) — consolidated proposal in `ESCALATIONS.md` **E-001**; answer there, record in `Open-Decisions-and-Constants.md` Part 3.
+- **D-07 stand-in (T-004c):** Part 2 Pro `MAX_TRANSFER_SIZE` is "TBD (D-07)" while Part 2 Pro `STORAGE_QUOTA` = 100 GB conflicts with D-07 "20/50 GB". Seed uses Pro `MAX_TRANSFER_SIZE` = **10737418240 (10 GB)** stand-in (`PlanConfiguration.cs`, `20260901010036_SeedPlansAndFeatureFlags.cs` + `.Designer.cs`, `WaDbContextModelSnapshot.cs`, and `limits.pro.maxTransferSize` flag). Full escalation in **ESCALATIONS.md E-004**; flip both `MAX_TRANSFER_SIZE` + `MAX_SINGLE_FILE` when D-07 is answered.
+- Phase 2 open decisions D-21/D-22/D-23
 - `docs/adr/` folder does not exist yet — TA-17 table is canonical until ADR files are written.
 - Git not initialized yet: `.gitignore` exists; run the one-time steps in `START-HERE.md` §3 before T-001.

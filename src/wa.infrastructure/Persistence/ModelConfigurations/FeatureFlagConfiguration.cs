@@ -39,8 +39,9 @@ public class FeatureFlagConfiguration : IEntityTypeConfiguration<FeatureFlag>
 
         // limits.{plan}.{constant} — per TA-13.2, one key per Open-Decisions-and-
         // Constants.md Part-2 constant per plan. Values mirror Part 2 ("∞" = -1);
-        // Pro maxTransferSize is the Appendix-A placeholder pending D-07,
-        // Pro/Business retention 30/90 days pending D-19.
+        // Pro maxTransferSize is "TBD (D-07)" in Part 2 — seeded 10 GB (10737418240)
+        // as D-07 stand-in (ESCALATIONS.md E-004); Pro/Business retention 30/90 days
+        // pending D-19.
         const string limitsNote = "Plan limits override (TA-3.4); values per Open-Decisions Part 2";
         void Limits(string plan, params (string, object? Value)[] parts)
         {
@@ -56,7 +57,8 @@ public class FeatureFlagConfiguration : IEntityTypeConfiguration<FeatureFlag>
             ("scheduling", false), ("branding", false), ("analytics", false),
             ("ads", false), ("ssoScim", false));
         Limits("pro",
-            ("maxTransferSize", 21474836480), ("maxSingleFile", 21474836480), ("maxZipSize", 9223372036854775807L),
+            // D-07 stand-in: 10 GB (Part 2 is "TBD (D-07)"); see ESCALATIONS.md E-004.
+            ("maxTransferSize", 10737418240), ("maxSingleFile", 10737418240), ("maxZipSize", 9223372036854775807L),
             ("retentionDays", 30), ("graceDays", 3), ("maxDownloads", 1000),
             ("maxEmails", 100), ("storageQuota", 107374182400), ("activeTransfersMax", 200),
             ("scheduling", true), ("branding", true), ("analytics", true),

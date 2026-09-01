@@ -543,14 +543,14 @@ namespace wa.infrastructure.Migrations
                             Key = "limits.pro.maxTransferSize",
                             Description = "Plan limits override (TA-3.4); values per Open-Decisions Part 2",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Value = "21474836480"
+                            Value = "10737418240"
                         },
                         new
                         {
                             Key = "limits.pro.maxSingleFile",
                             Description = "Plan limits override (TA-3.4); values per Open-Decisions Part 2",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Value = "21474836480"
+                            Value = "10737418240"
                         },
                         new
                         {
@@ -895,7 +895,7 @@ namespace wa.infrastructure.Migrations
                             Id = new Guid("11111111-0000-4000-8000-000000000002"),
                             Code = "pro",
                             FeaturesJson = "{\"ads\":false,\"scheduling\":true,\"analytics\":true,\"branding\":true,\"sso_scim\":false}",
-                            LimitsJson = "{\"maxTransferSize\":21474836480,\"maxSingleFile\":21474836480,\"maxZipSize\":9223372036854775807,\"retentionDays\":30,\"graceDays\":3,\"maxDownloads\":1000,\"maxEmails\":100,\"storageQuota\":107374182400,\"activeTransfersMax\":200}",
+                            LimitsJson = "{\"maxTransferSize\":10737418240,\"maxSingleFile\":10737418240,\"maxZipSize\":9223372036854775807,\"retentionDays\":30,\"graceDays\":3,\"maxDownloads\":1000,\"maxEmails\":100,\"storageQuota\":107374182400,\"activeTransfersMax\":200}",
                             Name = "Pro",
                             SortOrder = 2
                         },
