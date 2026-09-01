@@ -18,7 +18,7 @@ This file is the **rolling state of the build**. A fresh AI session has no memor
 |---|---|
 | **Current task** | T-005 (CURRENT) |
 | **Milestone** | M0 — Foundation |
-| **In progress** | T-005 — Limits Registry: `LimitsRecord`, `ILimitsProvider`, `PlansCache` + `FlagsCache` (30 s TTL), flag override mechanics (TA-3.4, F-TRF-007). Unit tests: resolution per plan, flag override wins, TTL expiry honored. T-004 is done (all 4 parts; seed verified on the local SQL). |
+| **In progress** | T-005 (A of B done) — Limits Registry: `LimitsRecord` POCO + `ILimitsProvider` (wa.domain, BCL-only); `PlansCache` + `FlagsCache` (30 s TTL, injectable clock) and `LimitsProvider` (wa.application) — plan `LimitsJson` is the base, a matching `limits.{plan}.*` `FeatureFlag` OVERRIDES that one value. Remaining (part B): unit tests — resolution per plan, flag override wins, TTL expiry honored. T-006 not started. |
 | **Environment** | local: `C:\Users\myild\source\repos\ProtoDrop` (docs say `workspace\ProtoDrop` — repo was moved; treat `source\repos\ProtoDrop` as current). All planning/operating docs live under `docs/`. |
 | **Git** | initialized on branch `main`; baseline commit 2026-08-31 (this session). "Dubious ownership" warning (NT AUTHORITY/SYSTEM vs `myild`) safe → use `safe.directory` exception. |
 | **Open escalations** | see `ESCALATIONS.md` |
@@ -35,6 +35,13 @@ This file is the **rolling state of the build**. A fresh AI session has no memor
 | T-004 seed | 2026-09-01 | Seed `Plan` (free/pro/business via `HasData`, fixed GUIDs, `LimitsJson`/`FeaturesJson` per Part 2) + `FeatureFlag` seed (12 `feature.*` gates `false` per D-14; 3×14 `limits.<plan>.*` keys). Migration `SeedPlansAndFeatureFlags` applied to local SQL (wa db verified: 3 plans, 54 flags). Integration test `SeedDataIntegrationTest` (Testcontainers) asserts seeds end-to-end (4/4 pass incl. vacuous stub). Gate green: build 0 warn/0 err, `dotnet format` 0, unit 1/1 ×2, web lint + test:run 1/1 + build. |
 
 ## 3. This session / last session
+
+**Session 2026-09-01 (T-005 part A / B — Limits Registry code):**
+- **T-005 (A/B)**: Limits Registry, NO TESTS yet (part B remains).
+  - `wa.domain/LimitsRecord.cs`: BCL-only POCO (14 fields, camelCase `JsonPropertyName`s matching the seeded `LimitsJson`, `ssoScim` for the SPoL flag) + `ILimitsProvider` (`Resolve(planCode)`, `ResolveAsync`). Zero new project/NuGet references.
+  - `wa.application/Limits/`: `PlansCache` + `FlagsCache` (30 s TTL per TA-3.4 technical constant, injectable `Func<DateTimeOffset>` clock, `public static readonly TimeSpan Ttl`, `IPlansStore`/`IFlagsStore` — DB reads stay on the application/infrastructure boundary per TA-0.2 rule 7: no `DbContext` in domain), plus `LimitsProvider`: plan `LimitsJson` deserialized as the base, each `limits.{plan}.*` `FeatureFlag` replaces ONLY its one field (closed segment map; `feature.*` keys ignored), `feature.*` gates left to the flag service (T-065).
+  - Gate: `dotnet build src\wa.slnx` green (0 warn / 0 err).
+  - **Remaining (B):** unit tests — resolution per plan, flag override wins, TTL expiry honored. T-006 not started.
 
 **Session 2026-09-01 (T-004 part 4 / 4 — seed verified, T-004 closed):**
 - **T-004 (4/4) → done** (2026-09-01), closing T-004 (a POCOs, b DDL, c seed, d verified seed). `docker compose -f docker-compose.local.yml up -d` (SQL 2022 + Azurite), then `dotnet ef database update --project src/wa.infrastructure` re-applied `InitialCreate` + `SeedPlansAndFeatureFlags` to a fresh `wa` db (the local dev db predated the part-3 commit and held a stale Pro 21.47 GB; dropped + re-migrated so the live seed matches the committed migration). AGENT.md §5.3 command (`--startup-project src/wa.api`) needs `wa.api` + `wa.infrastructure` to both resolve the `wa.infrastructure` Design asset; the design-time factory `WaDbContextFactory` makes `--project src/wa.infrastructure` alone sufficient (no startup project required) — same effect.
