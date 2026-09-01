@@ -24,6 +24,7 @@ public class WaDbContext : DbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<JobRun> JobRuns => Set<JobRun>();
     public DbSet<IdempotencyKey> IdempotencyKeys => Set<IdempotencyKey>();
+    public DbSet<EventOutbox> EventOutboxes => Set<EventOutbox>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -44,5 +45,6 @@ public class WaDbContext : DbContext
         modelBuilder.ApplyConfiguration(new AuditLogConfiguration());
         modelBuilder.ApplyConfiguration(new JobRunConfiguration());
         modelBuilder.ApplyConfiguration(new IdempotencyKeyConfiguration());
+        modelBuilder.ApplyConfiguration(new EventOutboxConfiguration());
     }
 }

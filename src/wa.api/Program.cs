@@ -1,8 +1,12 @@
 using Microsoft.Data.SqlClient;
 using Serilog;
+using wa.infrastructure.Events;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// T-006b: event backbone (EF outbox + Service Bus publisher). No new packages.
+builder.Services.AddEventPublishing(builder.Configuration);
 
 builder.Host.UseSerilog((_, config) =>
 {
