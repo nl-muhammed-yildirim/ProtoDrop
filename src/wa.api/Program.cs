@@ -1,5 +1,6 @@
 using Microsoft.Data.SqlClient;
 using Serilog;
+using wa.infrastructure.Blob;
 using wa.infrastructure.Events;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 
@@ -7,6 +8,10 @@ var builder = WebApplication.CreateBuilder(args);
 
 // T-006b: event backbone (EF outbox + Service Bus publisher). No new packages.
 builder.Services.AddEventPublishing(builder.Configuration);
+
+// T-007a: blob foundation (TA-3.5): staging/transfers containers on ONE
+// storage account (Azurite locally per AGENT.md §5.2). No new packages.
+builder.Services.AddBlobStore(builder.Configuration);
 
 builder.Host.UseSerilog((_, config) =>
 {
