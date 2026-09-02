@@ -1,6 +1,6 @@
 # Open Decisions & Constants
 
-**Last updated:** 2026-08-23
+**Last updated:** 2026-09-02
 Part 1: decisions awaiting the human (**TBD-you**). Part 2: frozen constants code reads. Part 3: append-only decision log (AI + human).
 
 ---
@@ -62,6 +62,7 @@ These are the *current* values of the Limits Registry (TA-3.4 / Feature Plan App
 | Link ID alphabet | Crockford base32, 8 chars | `0O1I` excluded |
 | SAS TTL draft upload | 7200 s | TA-3.6 |
 | SAS TTL download | 1800 s | TA-3.6 |
+| SAS version token | `2024-08-04` | TA-3.6 "Version 2024" — see ADR in Part 3 |
 | Unlock JWT TTL | 7 d | TA-9.1 |
 | Magic link TTL | 600 s, single-use | TA-9.1 |
 | Session TTL | 30 d rolling | TA-9.1 |
@@ -84,3 +85,4 @@ These are the *current* values of the Limits Registry (TA-3.4 / Feature Plan App
 | 2026-08-28 | Phase X speccing | F-XCT-001…005 fully specced (FR/AC/EC + US-044…048); new flag keys `feature.search`/`feature.dataExport`/`feature.emailSettings`; new Problem codes `FEATURE_DISABLED`, `FLAG_UNKNOWN`, `FLAG_INVALID`, `Q_TOO_LONG`, `EXPORT_IN_FLIGHT` | cross-cutting features need gates + audit before any phase feature ships | AI (cross-cutting spec request) |
 | 2026-08-31 | Frontend test tooling | `vitest` 4 + `jsdom` + `@testing-library/react` as wa.web devDependencies; scripts `test` (watch) + `test:run` (one-shot gate); `wa.web.esproj` `JavaScriptTestFramework = Vitest` | TA-8.1 lists `vitest` as the web test tooling and AGENT.md §4 gate includes `npm run test`; versions pinned at install, no runtime deps added | AI (T-001 web stub) |
 | 2026-09-01 | Outbox table added per T-006/TA-5.2 | Migration `20260901170311_AddEventOutbox`: `dbo.EventOutbox` (Id, EventId UNIQUE, EventType, PayloadJson, PartitionKey, CorrelationId, SentAtUtc NULL) | Known gap: TA-3.2 DDL has no outbox table, but T-006/TA-5.2 require "outbox row" + TA-4.1.7 "write to local outbox table" on publish failure — TA-3.2 needs the row added | AI (T-006b) |
+| 2026-09-02 | ADR — SAS version token `2024-08-04` (T-007b) | TA-3.6 "Version 2024" = `sv` line frozen to `2024-08-04` (latest public 2024-era blob API release). Frozen 12.29.2 `BlobSasBuilder` stamps its internal build date (`2026-06-06`) into both the query and the string-to-sign; `GenerateSasUri` also re-normalizes permissions (`cwr` → `rcw`). `BlobSasMinter` uses `ToSasQueryParameters(cred, out stringToSign)`, swaps the bare `yyyy-MM-dd` version line, re-signs HMAC-SHA256 with the account key, emits the SDK query with only `sv`/`sig` overridden. | No new packages; key from `Wa:Blob:AccountKey` (Key Vault unwrap = prod deploy concern); absolute URL form per TA-3.6. Unit-asserted in `BlobSasMinterTest` (sp/sr/sv/se/st, absolute URL, independent re-sign). | AI (T-007b) |

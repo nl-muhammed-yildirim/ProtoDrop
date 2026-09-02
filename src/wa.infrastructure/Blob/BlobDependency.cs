@@ -45,6 +45,11 @@ public static class BlobDependency
             new AzureBlobStore(sp.GetRequiredService<BlobServiceClient>(),
                 sp.GetRequiredService<ILogger<AzureBlobStore>>()));
 
+        // TA-3.6: shared-key ("Version 2024") SAS for browser
+        // uploads/downloads, signed from the same account key in config.
+        services.AddSingleton<BlobSasMinter>(sp =>
+            new BlobSasMinter(new Uri(accountUrl), accountKey!));
+
         // One-time-at-startup: create staging/transfers + apply the
         // SDK-expressible lifecycle bits (TA-3.5).
         services.AddHostedService<BlobContainerBootstrap>();
