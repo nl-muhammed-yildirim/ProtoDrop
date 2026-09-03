@@ -1,4 +1,5 @@
 using Microsoft.Data.SqlClient;
+using wa.api.Pipeline;
 using Serilog;
 using wa.infrastructure.Blob;
 using wa.infrastructure.Events;
@@ -13,6 +14,10 @@ builder.Services.AddEventPublishing(builder.Configuration);
 // storage account (Azurite locally per AGENT.md §5.2). No new packages.
 builder.Services.AddBlobStore(builder.Configuration);
 
+// T-008a: W3C correlation context (TA-4.1.3 / TA-10.1), populated
+// by CorrelationMiddleware on every request.
+builder.Services.AddScoped<CorrelationContext>();
+
 builder.Host.UseSerilog((_, config) =>
 {
     // TA-10.5: Information for request/transfer lifecycle,
@@ -25,6 +30,12 @@ builder.Host.UseSerilog((_, config) =>
 });
 
 var app = builder.Build();
+
+// T-008a: correlation middleware first (populates context + sets
+// response header), error mapping next (catches everything
+// downstream into Problem+JSON, TA-4.1.3).
+app.UseMiddleware<CorrelationMiddleware>();
+app.UseMiddleware<GlobalErrorMiddleware>();
 var cfg = app.Configuration;
 
 // TA-12.2: health = DB ping + SB ping (Front Door health probe target).

@@ -1,0 +1,23 @@
+namespace wa.api.Pipeline;
+
+/// <summary>Closed list of machine-readable Problem <c>code</c> values (TA-4.1.3).</summary>
+public enum ErrorCode
+{
+    VALIDATION,
+    UNAUTHENTICATED,
+    FORBIDDEN,
+    NOT_FOUND,
+    TRANSFER_NOT_FINALIZED,
+    TRANSFER_SIZE_EXCEEDED,
+    STORAGE_QUOTA_EXCEEDED,
+    MAX_DOWNLOADS_REACHED,
+    WRONG_PASSWORD,
+    TRANSFER_EXPIRED,
+    TRANSFER_DELETED,
+    FILES_GONE,
+    IDEMPOTENCY_CONFLICT,
+    RATE_LIMITED,
+    STRIPE_WEBHOOK_MISMATCH,
+    EMAIL_UNSUBSCRIBED,
+    INTERNAL,
+}
