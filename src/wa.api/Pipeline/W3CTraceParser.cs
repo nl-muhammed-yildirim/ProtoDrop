@@ -51,13 +51,17 @@ internal static class W3CTraceParser
     {
         Span<byte> random = stackalloc byte[24];
         RandomNumberGenerator.Fill(random);
+        // trace-id (16 bytes) + span-id (8 bytes): neither may be all-zero
         for (int i = 0; i < 16; i++)
         {
             if (random[i] == 0x00)
             {
                 random[i] = 0x01;
             }
+        }
 
+        for (int i = 0; i < 8; i++)
+        {
             if (random[i + 16] == 0x00)
             {
                 random[i + 16] = 0x01;

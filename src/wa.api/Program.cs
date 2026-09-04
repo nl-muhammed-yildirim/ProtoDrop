@@ -1,3 +1,4 @@
+using AspNetCoreRateLimit;
 using Microsoft.Data.SqlClient;
 using wa.api.Pipeline;
 using Serilog;
@@ -18,6 +19,65 @@ builder.Services.AddBlobStore(builder.Configuration);
 // by CorrelationMiddleware on every request.
 builder.Services.AddScoped<CorrelationContext>();
 
+// T-008b: CORS (TA-4.1.6) — allowed origins from config
+// `Wa:Cors:AllowedOrigins`; preflight cached 1 h. AllowCredentials
+// because the browser auth scheme is an httpOnly same-site cookie
+// (TA-4.1.2).
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("wa", policy =>
+    {
+        string[] origins = (builder.Configuration["Wa:Cors:AllowedOrigins"] ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        policy.WithOrigins(origins)
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials()
+            .SetPreflightMaxAge(TimeSpan.FromHours(1)); // TA-4.1.6: preflight cached 1 h
+    });
+});
+
+// T-008b: rate limiting (TA-9.5) — the in-memory API second layer
+// (Front Door WAF is the 10/min first layer) for /auth: 5/min per IP.
+// AspNetCoreRateLimit is already pinned (TA-2.6); in-memory stores,
+// no new packages. The 5.0.0 startup requires MemoryCache +
+// IRateLimitConfiguration besides AddInMemoryRateLimiting.
+string apiBaseUrlForLimits = builder.Configuration["Wa:Url:Api"] ?? string.Empty;
+builder.Services.AddMemoryCache();
+builder.Services.AddInMemoryRateLimiting();
+builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
+builder.Services.Configure<IpRateLimitOptions>(o =>
+{
+    o.EnableEndpointRateLimiting = true;
+    o.GeneralRules = new List<RateLimitRule>
+    {
+        new RateLimitRule { Endpoint = "*:/api/v1/auth/*", Period = "1m", Limit = 5 }
+    };
+    // The library emits the 429 as text/plain by default. This hook
+    // runs before the library writes the response; it points the
+    // shared QuotaExceededResponse at a per-request Problem+JSON
+    // body (TA-4.1.3: closed-list code RATE_LIMITED + correlation id).
+    // Literal braces in Content are doubled — the library runs
+    // string.Format(content, limit, period, retryAfter).
+    o.RequestBlockedBehaviorAsync = (context, _, _, _) =>
+    {
+        string correlationId = context.RequestServices
+            .GetRequiredService<CorrelationContext>().CorrelationId;
+        o.QuotaExceededResponse = new QuotaExceededResponse
+        {
+            StatusCode = 429,
+            ContentType = "application/problem+json",
+            Content =
+                "{{\"type\":\"" + ProblemWriter.BuildTypeUri(apiBaseUrlForLimits, ErrorCode.RATE_LIMITED) + "\","
+                + "\"title\":\"" + ProblemWriter.BuildTitle(ErrorCode.RATE_LIMITED) + "\","
+                + "\"status\":429,\"code\":\"RATE_LIMITED\","
+                + "\"details\":\"Limit {0} per {1}. Retry after {2}s.\","
+                + "\"correlationId\":\"" + correlationId + "\"}}"
+        };
+        return Task.CompletedTask;
+    };
+});
+
 builder.Host.UseSerilog((_, config) =>
 {
     // TA-10.5: Information for request/transfer lifecycle,
@@ -36,6 +96,17 @@ var app = builder.Build();
 // downstream into Problem+JSON, TA-4.1.3).
 app.UseMiddleware<CorrelationMiddleware>();
 app.UseMiddleware<GlobalErrorMiddleware>();
+
+// T-008b: CORS (TA-4.1.6) after error mapping so a 400/500 from
+// any downstream endpoint still carries the CORS headers a preflight
+// would need to observe the response.
+app.UseCors("wa");
+
+// T-008b: rate limiting (TA-9.5) after CORS so a 429 carries the
+// CORS headers, and after correlation so the blocked response can
+// echo the request correlation id.
+app.UseIpRateLimiting();
+
 var cfg = app.Configuration;
 
 // TA-12.2: health = DB ping + SB ping (Front Door health probe target).
