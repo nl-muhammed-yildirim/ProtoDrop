@@ -1,6 +1,7 @@
 using AspNetCoreRateLimit;
 using Microsoft.Data.SqlClient;
 using wa.api.Pipeline;
+using wa.api.Telemetry;
 using Serilog;
 using wa.infrastructure.Blob;
 using wa.infrastructure.Events;
@@ -88,6 +89,12 @@ builder.Host.UseSerilog((_, config) =>
         .Enrich.FromLogContext()
         .WriteTo.Console();
 });
+
+// T-008c: typed TA-10.2 telemetry helper. The Serilog UseSerilog hook
+// registers the Serilog ILogger in DI, so the reporter reaches the
+// TA-10.5 pipeline (locally console; App Insights sink in T-008 part 4).
+// Singleton because the underlying Serilog ILogger is a singleton.
+builder.Services.AddSingleton<WaTelemetryReporter>();
 
 var app = builder.Build();
 
