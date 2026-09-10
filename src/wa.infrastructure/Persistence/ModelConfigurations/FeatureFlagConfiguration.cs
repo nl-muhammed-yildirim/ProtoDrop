@@ -1,6 +1,6 @@
-using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using System.Globalization;
 
 namespace wa.infrastructure.Persistence.ModelConfigurations;
 

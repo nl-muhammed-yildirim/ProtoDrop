@@ -1,9 +1,9 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
-using Microsoft.Extensions.Logging.Abstractions;
 using Testcontainers.Azurite;
 using wa.domain;
 using wa.infrastructure.Blob;

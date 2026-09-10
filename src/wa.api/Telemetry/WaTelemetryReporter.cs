@@ -1,7 +1,7 @@
-using System.Globalization;
 using Serilog;
 using Serilog.Events;
 using Serilog.Parsing;
+using System.Globalization;
 using ILogger = Serilog.ILogger;
 
 namespace wa.api.Telemetry;

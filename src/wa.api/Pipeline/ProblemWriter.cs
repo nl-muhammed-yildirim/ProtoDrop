@@ -8,7 +8,7 @@ namespace wa.api.Pipeline;
 /// camelCase keys, closed list <c>code</c>, <c>errors[]</c> when present,
 /// and the <c>correlationId</c> (W3C trace-id, first 8 hex chars — TA-10.1).
 /// </summary>
-internal static class ProblemWriter
+public static class ProblemWriter
 {
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {

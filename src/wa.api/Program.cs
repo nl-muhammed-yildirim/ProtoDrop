@@ -1,8 +1,8 @@
 using AspNetCoreRateLimit;
 using Microsoft.Data.SqlClient;
+using Serilog;
 using wa.api.Pipeline;
 using wa.api.Telemetry;
-using Serilog;
 using wa.infrastructure.Blob;
 using wa.infrastructure.Events;
 using ILogger = Microsoft.Extensions.Logging.ILogger;

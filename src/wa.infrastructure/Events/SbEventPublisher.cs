@@ -1,7 +1,7 @@
-using System.Text.Json;
 using Azure.Messaging.ServiceBus;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
 using wa.domain;
 using wa.infrastructure.Persistence;
 
