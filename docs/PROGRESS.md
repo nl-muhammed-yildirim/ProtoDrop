@@ -1,7 +1,7 @@
 # PROGRESS.md — Session State (read at every session start)
 
-**Last updated:** 2026-09-07
-This file is the **rolling state of the build**. A fresh AI session has no memory of previous sessions — this file is that memory.
+**Last updated:** 2026-09-15
+This file is the **rolling state of the build**.
 
 **Rules (binding for the AI):**
 1. Read this file **after** `AGENT.md`, before doing anything else (see AGENT.md §1).
@@ -16,9 +16,9 @@ This file is the **rolling state of the build**. A fresh AI session has no memor
 
 | Field | Value |
 |---|---|
-| **Current task** | T-008 (COMPLETE) |
-| **Milestone** | M0 — Foundation |
-| **In progress** | ✅ T-008 complete 4/4 — Full gate green (see §3 session notes below). |
+| **Current task** | T-031 / US-001-01 (COMPLETE) |
+| **Milestone** | M1 — Upload & Link |
+| **In progress** | ✅ T-031 complete — landing upload surface staging: drag, picker + Ctrl+V. Gate green (web lint/vitest 19/19/tsc+vite; domain 11/11, application 12/12; api.integration component-level). See §3 session 2026-09-15. |
 | **Environment** | local: `C:\Users\myild\source\repos\ProtoDrop` (docs say `workspace\ProtoDrop` — repo was moved; treat `source\repos\ProtoDrop` as current). All planning/operating docs live under `docs/`. |
 | **Git** | initialized on branch `main`; baseline commit 2026-08-31 (this session). "Dubious ownership" warning (NT AUTHORITY/SYSTEM vs `myild`) safe → use `safe.directory` exception. |
 | **Open escalations** | see `ESCALATIONS.md` |
@@ -37,8 +37,24 @@ This file is the **rolling state of the build**. A fresh AI session has no memor
  **T-006 closed 2026-09-02 (4/4); next T-007.** |
 **T-007 closed 2026-09-03 (3/3); next T-008.** |
 | **T-008 closed 2026-09-10** | (4/4) Pipeline foundation: W3C correlation ID, Problem+JSON errors (closed codes, correlationId), CORS, rate limits, telemetry SDK. Integration test `PipelineIntegrationTest.cs` (7/7): 404/500 return Problem+JSON with closed code + correlationId; telemetry events reach test sink with exact TA-10.2 names (Info/Warning levels). Made `ProblemWriter` public for test access. Full §4 green: domain 11/11, application 12/12, api.integration 15/15, web lint + test + build. **Next: T-009.** |
+| **T-031 / US-001-01 closed 2026-09-15** | Landing upload surface — file selection (per-story task `docs/tasks/T-031-us-001-01-select-files.md`, coarse T-012 partial). New `src/wa.web/src/core/upload/fileStaging.ts` (`stageFile`/`nextPastedImageName`/`stagePastedFiles`/`formatBytes` TA-8.5 /`stageSummaryText` "N files · X" per UI §5.1) + `fileStaging.test.ts` (13 tests); `App.tsx` staging state (dedupe by File identity), window `paste` listener, per-row name/size/remove ✕ (`aria-label="Remove {name}"`), totals line, "Send." button appears when staged; `DropZone.tsx` drag-over highlight (`--accent`/`--accent-soft`), hidden `<input type=file multiple>` picker, keyboard Enter/Space; `landing.css` `.staging-*` + `.send-btn` (44 px targets). All 3 ACs covered in `App.test.tsx` (6 tests): drop total "3 files · 2.0 GB" + no fetch (no bytes), paste derived names across batches, picker path, remove-row. Gate: web lint ✓ / vitest 19/19 / tsc+vite build ✓; domain.unit 11/11, application.unit 12/12; api.integration 10/15 component-level green + 5 Testcontainers skipped (Docker daemon down — see T-031 task exit check). No new npm/NuGet packages. **Next: T-032 / US-001-02.** |
 
 ## 3. This session / last session
+
+**Session 2026-09-15 (T-031 / US-001-01 — landing upload surface, file selection):**
+- **Scope:** AC #1/#2/#3 on `/`: drag files onto the drop zone, pick via "Choose files" (mobile path), paste an image (Ctrl+V) → all land in one staging list; totals copy exactly per UI §5.1; no upload bytes before Send.
+- **New/changed (web only):** `src/wa.web/src/core/upload/fileStaging.ts` (pure module, 3 unit-tested helpers + `formatBytes` 1024-ladder per TA-8.5), `fileStaging.test.ts` (13), `App.tsx` (staging state + paste hook + row UI + "Send." reveal), `DropZone.tsx`, `styles/landing.css`. See Section 2 T-031 line above for the full list.
+- **Test-stack notes:** Vitest env is jsdom — no `DataTransfer`/`clipboardData`, so drop tests attach a stand-in `dataTransfer: { files }` and paste dispatches a `CustomEvent('paste')` with `clipboardData`; both wrapped in `act(...)` (react-dom concurrent batching defers commits outside `act`). File sizes are patched via `Object.defineProperty(file, 'size')` to avoid big buffers. `window.fetch` mock returns a never-settling Promise because AC #1 only asserts it was *not* called.
+- **Gate result:** web `lint` / `test:run` (19/19) / `build` green; .NET side of §4 ran green for the suites that exist today: domain.unit 11/11, application.unit 12/12. api.integration = 10 component-level tests pass, 5 Testcontainers-bound tests fail **only** because the Docker daemon is down in this environment (pre-existing; not T-031 regressions — see `tasks/T-031` exit check note + `ESCALATIONS.md` convention).
+- **Decisions:** No new npm/NuGet packages (golden rule 1); no telemetry emitted yet by T-031 UI (upload events belong to the engine task) so the TA-4.1.3/TA-10.2 closed lists are trivially untouched. Per-story task file exists at `docs/tasks/T-031-us-001-01-select-files.md` (untracked dir `docs/tasks/` from prior sessions — first per-story close-out commit will include it).
+
+
+**Session 2026-09-15 (T-031 / US-001-01 — landing upload surface, file selection):**
+- **Scope:** AC #1/#2/#3 for `/`: drag files onto drop zone, pick via "Choose files" (mobile path), paste image (Ctrl+V) → one staging list; totals copy exactly per UI §5.1; no upload bytes before Send.
+- **Deliverables (web-only):** `src/wa.web/src/core/upload/fileStaging.ts` + `fileStaging.test.ts` (13 tests: stageFile ids, paste-name derivation incl. gap-fills, formatBytes ladder incl. the 4.6 GB truncation case, summary "N file(s) · X"), App-level staging UI (dedupe by File identity), `DropZone.tsx`, `.staging-*`/`.send-btn` styles (44 px targets; `--danger` token already exists light+dark).
+- **Test-stack notes:** vitest env is jsdom — no `DataTransfer`/`window.clipboardData`; drop tests attach a stand-in `dataTransfer:{files}` and paste dispatches `CustomEvent('paste')` with `clipboardData`, both inside `act(...)` (concurrent-mode batching defers commits outside `act`). File sizes patched via `Object.defineProperty(file, 'size')` to avoid large buffers; `window.fetch` mocked as a never-settling Promise since AC #1 asserts it was *not* called.
+- **Gate:** web `lint` ✓ / vitest **19/19** / `tsc -b && vite build` ✓ (dist 61.3 kB gz). .NET: domain.unit 11/11, application.unit 12/12; api.integration 10 component-level pass, 5 Testcontainers-bound tests need Docker daemon (env was down — pre-existing, same behavior as T-008-era notes). Full result recorded in the task file exit check.
+- **Decisions:** No new npm/NuGet packages (golden rule 1); TA-4.1.3 / TA-10.2 closed lists untouched (T-031 UI emits no events; upload_* telemetry belongs to T-032+ engine work). Per-story task file `docs/tasks/T-031-us-001-01-select-files.md` marked `done 2026-09-15`.
 
 **Session 2026-09-10 (T-008, part 4/4 — Pipeline integration tests & completion):**
 - **T-008 COMPLETE (4/4).** Exit check (from Milestone-Backlog.md): Integration test verifies (a) 404/500 errors return Problem+JSON with correlationId in body; (b) events emitted via telemetry helper reach local sink; (c) rate-limit breach returns Problem+JSON from closed list.

@@ -74,6 +74,81 @@
   color: var(--fg-muted);
 }
 
+/* Staging list (UI-Reference §5.1 in-list state, §4.2 file rows). */
+.staging-panel {
+  width: min(560px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.staging-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* §4.2: 44 px min height, --bg-subtle, --radius-sm. */
+.file-row {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.file-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-size {
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+}
+
+/* §4.2 right-hand staging control (✕). Touch target per F-TRF-017-4. */
+.file-remove {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+
+.file-remove:hover {
+  color: var(--danger);
+}
+
+/* §5.1 total line ("3 files · 2.1 GB"). */
+.staging-total {
+  font-size: var(--fs-body);
+  color: var(--fg-muted);
+  text-align: right;
+}
+
+.send-btn {
+  align-self: flex-end;
+  min-height: 44px;
+  padding: 8px 20px;
+}
+
 @media (max-width: 640px) {
   .dropzone-title {
     font-size: var(--fs-h1);
