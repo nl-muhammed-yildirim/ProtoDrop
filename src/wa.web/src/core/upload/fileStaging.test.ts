@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildSendPayload,
+  canSend,
   formatBytes,
   nextPastedImageName,
+  removeStagedFiles,
   stageFile,
   stagePastedFiles,
   stageSummaryText,
@@ -81,5 +84,43 @@ describe('formatBytes (TA-8.5: base 1024, one decimal above bytes)', () => {
     [37 * (1_024 ** 3) / 8, '4.6 GB'],
   ] as const)('%i bytes -> %s', (input, expected) => {
     expect(formatBytes(input)).toBe(expected);
+  });
+});
+
+describe('US-001-02 send payload and list rules', () => {
+  it('buildSendPayload preserves selection order and keeps duplicate names distinct (AC #2)', () => {
+    const f1 = file('report.pdf', GB / 8);
+    const f2 = file('report.pdf', GB / 8);
+    const staged = [stageFile(f1), stageFile(f2)];
+
+    const payload = buildSendPayload(staged);
+
+    expect(payload).toHaveLength(2);
+    expect(payload.map(item => item.name)).toEqual(['report.pdf', 'report.pdf']);
+    // Both names survive distinct because each `File` keeps its identity.
+    expect(payload[0].file).toBe(f1);
+    expect(payload[1].file).toBe(f2);
+  });
+
+  it('canSend is false while the list is empty, true when non-empty pre-send', () => {
+    const one = [stageFile(file('a.png', 10))];
+    expect(canSend([], false)).toBe(false);
+    expect(canSend(one, false)).toBe(true);
+    // Once sent, even a full list is locked (edge case 2).
+    expect(canSend(one, true)).toBe(false);
+    expect(canSend([], true)).toBe(false);
+  });
+
+  it('removeStagedFiles removes by id, keeps a new array (incl. the last entry -> empty)', () => {
+    const a = stageFile(file('a.png', 10));
+    const b = stageFile(file('b.png', 20));
+    const list = [a, b];
+
+    const remaining = removeStagedFiles(list, a.id);
+    expect(remaining.map(e => e.id)).toEqual([b.id]);
+    expect(remaining).not.toBe(list); // caller's array is not mutated in place
+
+    // Removing the last file returns an empty list -> empty drop-zone state.
+    expect(removeStagedFiles([b], b.id)).toHaveLength(0);
   });
 });

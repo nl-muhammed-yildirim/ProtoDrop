@@ -120,3 +120,74 @@ describe('App landing (US-001-01)', () => {
     expect(screen.getByText('two.png')).toBeDefined();
   });
 });
+
+describe('App staging list (US-001-02)', () => {
+  it('removing one of two staged files updates the total and keeps "Send." available (AC #1)', () => {
+    render(<App />);
+    const zone = screen.getByRole('button', { name: 'Upload files' });
+    simulateDrop(zone, [makeFile('one.mp4', GB), makeFile('two.png', GB / 2)]);
+
+    expect(screen.getByText('2 files · 1.5 GB')).toBeDefined();
+    const sendBefore = screen.getByRole('button', { name: 'Send.' });
+    expect((sendBefore as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove one.mp4' }));
+
+    expect(screen.queryByText('one.mp4')).toBeNull();
+    expect(screen.getByText('two.png')).toBeDefined();
+    expect(screen.getByText('1 file · 512.0 MB')).toBeDefined();
+    const sendAfter = screen.getByRole('button', { name: 'Send.' });
+    expect((sendAfter as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('pressing "Send." locks the list into upload state with both duplicate names preserved (AC #2)', () => {
+    render(<App />);
+    const zone = screen.getByRole('button', { name: 'Upload files' });
+    simulateDrop(
+      zone,
+      [makeFile('report.pdf', GB / 8), makeFile('report.pdf', GB / 8)],
+    );
+
+    expect(screen.getAllByText('report.pdf')).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send.' }));
+
+    // The transfer keeps both same-named files; their remove controls lock.
+    expect(screen.getAllByText('report.pdf')).toHaveLength(2);
+    const removes = screen.getAllByRole('button', {
+      name: 'Remove report.pdf',
+    });
+    for (const remove of removes) {
+      expect((remove as HTMLButtonElement).disabled).toBe(true);
+    }
+    // Lock also disables "Send." so the frozen payload is not re-selected.
+    const send = screen.getByRole('button', { name: 'Send.' });
+    expect((send as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('removing the last file returns to the empty drop-zone state', () => {
+    render(<App />);
+    const zone = screen.getByRole('button', { name: 'Upload files' });
+    simulateDrop(zone, [makeFile('only.png', GB / 16)]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove only.png' }));
+
+    expect(screen.queryByText('only.png')).toBeNull();
+    // No staged panel -> combined total and the "Send." control are both gone.
+    expect(screen.queryByRole('button', { name: 'Send.' })).toBeNull();
+  });
+
+  it('ignores further drops once "Send." has locked the list (edge case 2)', () => {
+    render(<App />);
+    const zone = screen.getByRole('button', { name: 'Upload files' });
+    simulateDrop(zone, [makeFile('one.png', GB / 8)]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send.' }));
+
+    // A second drop after Send must not append — the list is in upload state.
+    simulateDrop(zone, [makeFile('latter.mp4', GB)]);
+
+    expect(screen.queryByText('latter.mp4')).toBeNull();
+    expect(screen.getByText('one.png')).toBeDefined();
+  });
+});

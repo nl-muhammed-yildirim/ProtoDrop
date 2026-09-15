@@ -26,17 +26,24 @@ const uploadIcon = (
 export interface DropZoneProps {
   /** Fired with every file the visitor dropped or picked (FR-001-1/2). */
   onFilesSelected: (files: File[]) => void;
+  /** True once "Send." has started — drops/picks are ignored until a new staging session (US-001-02 edge case 2). */
+  locked?: boolean;
 }
 
-export function DropZone({ onFilesSelected }: DropZoneProps) {
+export function DropZone({ onFilesSelected, locked = false }: DropZoneProps) {
   const [dragOver, setDragOver] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const openPicker = () => inputRef.current?.click();
+  const openPicker = () => {
+    if (!locked) {
+      inputRef.current?.click();
+    }
+  };
 
   const onDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setDragOver(false);
+    if (locked) return; // list is in upload state — drop was suppressed, not ignored
     const dropped = Array.from(event.dataTransfer?.files ?? []);
     if (dropped.length > 0) {
       onFilesSelected(dropped);
@@ -79,6 +86,7 @@ export function DropZone({ onFilesSelected }: DropZoneProps) {
       <button
         type="button"
         className="btn btn-primary"
+        disabled={locked}
         onClick={(event) => {
           event.stopPropagation();
           openPicker();

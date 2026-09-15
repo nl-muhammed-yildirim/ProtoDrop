@@ -1,10 +1,15 @@
 /**
- * US-001-01 / T-031 — staging model for the landing upload surface (FR-001-1/2, EC-001-*).
+ * US-001-01 / US-001-02 (T-031, T-032) — staging model for the landing upload
+ * surface (FR-001-1/2, EC-001-*).
  *
  * Mirrors the TA-8.3 `StageEntry` contract so the Zustand upload store can consume
  * it unchanged later: an entry carries the public data ({id, name, size}) and keeps
- * the browser `File` attached for UploadEngine to consume in T-032+ — no bytes are
+ * the browser `File` attached for UploadEngine to consume in T-034 — no bytes are
  * written while files sit here (happy path AC #1, "no upload has started yet").
+ *
+ * T-032 adds the stable **Send.** surface: `buildSendPayload` snapshots the list in
+ * selection order without de-duping names; `removeStagedFiles`/`canSend` drive the
+ * pre-send remove/availability rules incl. the post-"Send." lock (edge case 2).
  */
 
 export interface StagedFile {
@@ -72,7 +77,44 @@ export function stagePastedFiles(
 const BYTE_LADDER = ['B', 'KB', 'MB', 'GB', 'TB'] as const;
 
 /**
- * Human-friendly bytes, base 1024 with one decimal for units above bytes
+ * Selection-order snapshot of everything staged (the stable "Send." payload, T-032
+ * US-001-02 AC #2) — names repeat verbatim and entries keep list order; no de-duping.
+ */
+export function buildSendPayload(stagedFiles: readonly StagedFile[]): SendItem[] {
+  return stagedFiles.map(entry => ({ name: entry.name, size: entry.size, file: entry.file }));
+}
+
+/**
+ * One entry of the "Send." payload (stable, T-032 AC #2): what UploadEngine will
+ * upload later in T-034. Names arrive verbatim from the staging list — duplicates
+ * stay distinct because each `File` keeps its identity here.
+ */
+export interface SendItem {
+  /** Exact staged file name, repeated verbatim for duplicate names. */
+  readonly name: string;
+  /** Size in bytes as staged. */
+  readonly size: number;
+  /** Underlying `File` consumed by the upload engine in T-034. */
+  readonly file: File;
+}
+
+/**
+ * Remove one staged entry by id (✕ button). Pure and allocation-cheap; removing the
+ * last entry naturally returns the caller to the empty drop-zone state.
+ */
+export function removeStagedFiles(
+  staged: readonly StagedFile[],
+  id: string,
+): StagedFile[] {
+  return staged.filter(entry => entry.id !== id);
+}
+
+/** "Send." availability (UI note on US-001-02): usable iff the list is non-empty and nothing has been sent yet. */
+export function canSend(staged: readonly StagedFile[], alreadySent: boolean): boolean {
+  return staged.length > 0 && !alreadySent;
+}
+
+/** Human-friendly bytes, base 1024 with one decimal for units above bytes
  * (TA-8.5; total line copy is defined by UI §5.1, e.g. "3 files · 2.1 GB").
  */
 export function formatBytes(sizeInBytes: number): string {
