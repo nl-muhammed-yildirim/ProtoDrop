@@ -9,6 +9,17 @@ Decision requests the AI opens under `AGENT.md` §8 (autonomy boundary), waiting
 
 ## Open
 
+### E-005 — M0 exit check "CI green on main" has no run to be green; `ci.yml` triggers only on `pull_request`, all of M0 pushed direct to main
+**Status:** open | **Opened:** 2026-09-10 (M0 verification) | **BLOCKS:** none (verification passes with caveat; local §4 gate is the de-facto evidence for `unit`/`integration`/`web`; `lint-*` not covered locally — see CONTEXT)
+
+DECISION: How do we get a green CI run against M0 head, and should pushes to main also run the pipeline from now on?
+CONTEXT: GitHub API (unauthenticated check 2026-09-10): repo shows **0 workflow runs ever**. `ci.yml` (`on:`) fires only on `pull_request → [main]` + manual dispatch; M0 was implemented as direct pushes to main, so no run has ever executed. Remote `origin/main` is at 6b22e0c (pre-T-008d); local is ahead by 2 commits (incl. the "chnages" move of `wa.slnx` from `src/wa.slnx` to root — which will break CI's `lint-dotnet` step `dotnet format src/wa.slnx ...` once pushed, an unverified latent path bug). The T-003 exit check ("PR gate runs green on a sample PR") was verified by local §4 + `docker build`, not by an actual Actions run.
+OPTIONS:
+  A) Push a branch (e.g. `m0-verify` at current head, with `ci.yml`'s path fixed to root-level `wa.slnx`) and open one PR → first real gate run proves every stage end-to-end — costs nothing; also exposes the slnx path bug before it bites on future PRs
+  B) Additionally add `push: [main]` as a trigger in `ci.yml` so main is permanently gated, not only PR-gated — protects against direct pushes (which have been the actual workflow so far), but doubles runner usage on every push to main and changes TA-12.1 wording ("PR gate")
+RECOMMEND: A now; pair it with B if you want main itself gated going forward (it's a one-line diff, but it does change the "gate" semantics from PR-only).
+BLOCKS: none — M0 verdict stands on local evidence (`unit` 11+12/23, `integration` 15/15, `web` lint/test/build all green pre- and post-M0; `lint-*` stages are structural no-op guards per T-003 notes until the first real format drift lands)
+
 ### E-004 — D-07 known hole: Pro `MAX_TRANSFER_SIZE` TBD while Pro `STORAGE_QUOTA` (100 GB) conflicts with D-07 "20/50 GB"
 **Status:** open | **Opened:** 2026-09-01 | **BLOCKS:** none (T-004 shipped with the 10 GB stand-in; billing confirms before charge)
 

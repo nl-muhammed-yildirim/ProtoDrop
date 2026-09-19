@@ -1,0 +1,163 @@
+.probe\investigation-notes.md -> T-008
+docs\02-feature-plan.md -> T-069, T-065, T-056, T-031, T-006, T-005, T-004, T-003, T-002, T-001
+docs\03-technical-architecture.md -> T-001
+docs\04-production-plan.md -> T-065, T-056, T-041, T-031, T-030, T-029, T-026, T-025, T-021, T-020, T-019, T-014, T-013, T-009, T-008, T-004, T-001
+docs\ESCALATIONS.md -> T-052, T-051, T-047, T-041, T-008, T-004, T-003, T-002
+docs\Getting-Started-VS2026.md -> T-008, T-004, T-002, T-001, T-000
+docs\M0-VERIFICATION.md -> T-009, T-008
+docs\Milestone-Backlog.md -> T-069, T-068, T-067, T-066, T-065, T-064, T-063, T-062, T-061, T-060, T-059, T-058, T-057, T-056, T-055, T-054, T-053, T-052, T-051, T-050, T-049, T-048, T-047, T-046, T-045, T-044, T-043, T-042, T-041, T-040, T-039, T-038, T-037, T-036, T-035, T-034, T-033, T-032, T-031, T-030, T-029, T-028, T-027, T-026, T-025, T-024, T-023, T-022, T-021, T-020, T-019, T-018, T-017, T-016, T-015, T-014, T-013, T-012, T-011, T-010, T-009, T-008, T-007, T-006, T-005, T-004, T-003, T-002, T-001
+docs\Open-Decisions-and-Constants.md -> T-007, T-006, T-004, T-002, T-001
+docs\PROGRESS.md -> T-065, T-055, T-041, T-011, T-009, T-008, T-007, T-006, T-005, T-004, T-003, T-002, T-001
+docs\Preflight-Checklist.md -> T-029, T-028, T-019, T-003, T-002
+docs\QA-SCRIPTS.md -> T-038, T-027, T-026, T-021, T-020, T-017, T-016, T-015, T-014, T-013, T-012
+docs\README.md -> T-004, T-001
+docs\START-HERE.md -> T-003, T-000
+docs\features\Phase 0-MVP\F-TRF-001\F-TRF-001-upload-surface.md -> T-012, T-010, T-009
+docs\features\Phase 0-MVP\F-TRF-001\US-001-01-select-files.md -> T-012
+docs\features\Phase 0-MVP\F-TRF-001\US-001-02-stage-files.md -> T-012
+docs\features\Phase 0-MVP\F-TRF-001\US-001-03-size-validation.md -> T-012, T-009
+docs\features\Phase 0-MVP\F-TRF-001\US-001-04-upload-progress.md -> T-012
+docs\features\Phase 0-MVP\F-TRF-001\US-001-05-retry-upload.md -> T-012
+docs\features\Phase 0-MVP\F-TRF-002\F-TRF-002-transfer-link.md -> T-013, T-011, T-010
+docs\features\Phase 0-MVP\F-TRF-002\US-002-01-unique-link.md -> T-013, T-010
+docs\features\Phase 0-MVP\F-TRF-002\US-002-02-send-by-email.md -> T-013, T-011
+docs\features\Phase 0-MVP\F-TRF-002\US-002-03-password.md -> T-015, T-011
+docs\features\Phase 0-MVP\F-TRF-002\US-002-04-sender-note.md -> T-013, T-011
+docs\features\Phase 0-MVP\F-TRF-002\US-002-05-link-only.md -> T-013, T-011
+docs\features\Phase 0-MVP\F-TRF-003\F-TRF-003-recipient-page.md -> T-016, T-015, T-014
+docs\features\Phase 0-MVP\F-TRF-003\US-003-01-open-link.md -> T-014
+docs\features\Phase 0-MVP\F-TRF-003\US-003-02-download-all.md -> T-017, T-016
+docs\features\Phase 0-MVP\F-TRF-003\US-003-03-download-individual.md -> T-016
+docs\features\Phase 0-MVP\F-TRF-003\US-003-04-unlock-password.md -> T-015
+docs\features\Phase 0-MVP\F-TRF-003\US-003-05-remaining-expired.md -> T-014
+docs\features\Phase 0-MVP\F-TRF-003\US-003-06-mobile-download.md -> T-027, T-014
+docs\features\Phase 0-MVP\F-TRF-003\US-003-07-growth-loop.md -> T-014
+docs\features\Phase 0-MVP\F-TRF-004\F-TRF-004-download-zip.md -> T-017
+docs\features\Phase 0-MVP\F-TRF-004\US-004-01-generate-zip.md -> T-017
+docs\features\Phase 0-MVP\F-TRF-004\US-004-02-cached-zip.md -> T-017
+docs\features\Phase 0-MVP\F-TRF-004\US-004-03-zip-cap.md -> T-017
+docs\features\Phase 0-MVP\F-TRF-005\F-TRF-005-expiry-deletion.md -> T-018
+docs\features\Phase 0-MVP\F-TRF-005\US-005-01-auto-expiry.md -> T-018
+docs\features\Phase 0-MVP\F-TRF-005\US-005-02-auto-deletion.md -> T-018
+docs\features\Phase 0-MVP\F-TRF-005\US-005-03-download-limit.md -> T-018, T-016
+docs\features\Phase 0-MVP\F-TRF-006\F-TRF-006-email.md -> T-019
+docs\features\Phase 0-MVP\F-TRF-006\US-006-01-recipient-email.md -> T-019
+docs\features\Phase 0-MVP\F-TRF-006\US-006-02-retry-delivery.md -> T-019
+docs\features\Phase 0-MVP\F-TRF-006\US-006-03-unsubscribe.md -> T-019
+docs\features\Phase 0-MVP\F-TRF-006\US-006-04-reply-branding.md -> T-019
+docs\features\Phase 0-MVP\F-TRF-006\US-006-05-localized-email.md -> T-026, T-019
+docs\features\Phase 0-MVP\F-TRF-007\F-TRF-007-limits.md -> T-020, T-005
+docs\features\Phase 0-MVP\F-TRF-007\US-007-01-free-limits.md -> T-020
+docs\features\Phase 0-MVP\F-TRF-007\US-007-02-storage-quota.md -> T-020
+docs\features\Phase 0-MVP\F-TRF-007\US-007-03-server-enforcement.md -> T-020, T-009
+docs\features\Phase 0-MVP\F-TRF-007\US-007-04-flag-limits.md -> T-024, T-005
+docs\features\Phase 0-MVP\F-TRF-008\F-TRF-008-accounts.md -> T-022, T-021
+docs\features\Phase 0-MVP\F-TRF-008\US-008-01-signup-password.md -> T-021
+docs\features\Phase 0-MVP\F-TRF-008\US-008-02-magic-link.md -> T-021
+docs\features\Phase 0-MVP\F-TRF-008\US-008-03-forgot-password.md -> T-021
+docs\features\Phase 0-MVP\F-TRF-008\US-008-04-profile.md -> T-021
+docs\features\Phase 0-MVP\F-TRF-008\US-008-05-attribution.md -> T-022, T-021
+docs\features\Phase 0-MVP\F-TRF-008\US-008-06-delete-account.md -> T-021, T-004
+docs\features\Phase 0-MVP\F-TRF-009\F-TRF-009-my-files.md -> T-028, T-022
+docs\features\Phase 0-MVP\F-TRF-009\US-009-01-history-list.md -> T-022
+docs\features\Phase 0-MVP\F-TRF-009\US-009-02-filters.md -> T-022
+docs\features\Phase 0-MVP\F-TRF-009\US-009-03-resend.md -> T-023
+docs\features\Phase 0-MVP\F-TRF-009\US-009-04-delete.md -> T-022
+docs\features\Phase 0-MVP\F-TRF-010\F-TRF-010-resend.md -> T-023
+docs\features\Phase 0-MVP\F-TRF-010\US-010-01-resend-click.md -> T-023
+docs\features\Phase 0-MVP\F-TRF-010\US-010-02-edit-prefill.md -> T-023
+docs\features\Phase 0-MVP\F-TRF-010\US-010-03-shared-blobs.md -> T-023
+docs\features\Phase 0-MVP\F-TRF-011\F-TRF-011-admin.md -> T-024
+docs\features\Phase 0-MVP\F-TRF-011\US-011-01-overview.md -> T-024
+docs\features\Phase 0-MVP\F-TRF-011\US-011-02-transfers-admin.md -> T-024
+docs\features\Phase 0-MVP\F-TRF-011\US-011-03-users-admin.md -> T-024
+docs\features\Phase 0-MVP\F-TRF-011\US-011-04-flags-audit.md -> T-024
+docs\features\Phase 0-MVP\F-TRF-012\F-TRF-012-telemetry.md -> T-025, T-008, T-006
+docs\features\Phase 0-MVP\F-TRF-012\US-012-01-correlation.md -> T-025, T-008
+docs\features\Phase 0-MVP\F-TRF-012\US-012-02-dashboards.md -> T-025
+docs\features\Phase 0-MVP\F-TRF-012\US-012-03-alerts.md -> T-025
+docs\features\Phase 0-MVP\F-TRF-013\F-TRF-013-errors.md -> T-025, T-008
+docs\features\Phase 0-MVP\F-TRF-013\US-013-01-error-screens.md -> T-025, T-008
+docs\features\Phase 0-MVP\F-TRF-013\US-013-02-degraded-storage.md -> T-025
+docs\features\Phase 0-MVP\F-TRF-013\US-013-03-degraded-email.md -> T-025, T-019
+docs\features\Phase 0-MVP\F-TRF-014\F-TRF-014-i18n.md -> T-026, T-019
+docs\features\Phase 0-MVP\F-TRF-014\US-014-01-localized-ui.md -> T-026
+docs\features\Phase 0-MVP\F-TRF-014\US-014-02-locale-detection.md -> T-026
+docs\features\Phase 0-MVP\F-TRF-014\US-014-03-localized-email.md -> T-026, T-019
+docs\features\Phase 0-MVP\F-TRF-015\F-TRF-015-dark-mode.md -> T-027
+docs\features\Phase 0-MVP\F-TRF-015\US-015-01-theme-choice.md -> T-027
+docs\features\Phase 0-MVP\F-TRF-015\US-015-02-theme-parity.md -> T-027
+docs\features\Phase 0-MVP\F-TRF-016\F-TRF-016-a11y.md -> T-027
+docs\features\Phase 0-MVP\F-TRF-016\US-016-01-keyboard.md -> T-027
+docs\features\Phase 0-MVP\F-TRF-016\US-016-02-screen-reader.md -> T-027
+docs\features\Phase 0-MVP\F-TRF-016\US-016-03-contrast-focus.md -> T-027
+docs\features\Phase 0-MVP\F-TRF-017\F-TRF-017-mobile.md -> T-027
+docs\features\Phase 0-MVP\F-TRF-017\US-017-01-mobile-upload.md -> T-027
+docs\features\Phase 0-MVP\F-TRF-017\US-017-02-mobile-download.md -> T-027
+docs\features\Phase 0-MVP\F-TRF-017\US-017-03-touch-ui.md -> T-027
+docs\features\Phase 1-Pro\F-BIL-001\F-BIL-001-plan-catalog.md -> T-005, T-004
+docs\features\Phase 1-Pro\F-BIL-001\US-018-01-plans-are-data.md -> T-004
+docs\features\Phase 1-Pro\F-BIL-001\US-018-02-resolve-plan-limits.md -> T-005
+docs\features\Phase 1-Pro\F-PRF-003\US-023-03-privacy-note.md -> T-005
+docs\features\Phase 2-Collect-Sign-Albums\F-ALB-001\F-ALB-001-create-album.md -> T-052
+docs\features\Phase 2-Collect-Sign-Albums\F-ALB-002\F-ALB-002-share-album.md -> T-053
+docs\features\Phase 2-Collect-Sign-Albums\F-ALB-003\F-ALB-003-contribute-album.md -> T-054
+docs\features\Phase 2-Collect-Sign-Albums\F-ALB-004\F-ALB-004-mobile-album.md -> T-055
+docs\features\Phase 2-Collect-Sign-Albums\F-COL-001\F-COL-001-create-collection.md -> T-042, T-041
+docs\features\Phase 2-Collect-Sign-Albums\F-COL-002\F-COL-002-submission.md -> T-043
+docs\features\Phase 2-Collect-Sign-Albums\F-COL-003\F-COL-003-submissions-dashboard.md -> T-044
+docs\features\Phase 2-Collect-Sign-Albums\F-COL-003\US-027-04-find-submission.md -> T-002
+docs\features\Phase 2-Collect-Sign-Albums\F-COL-004\F-COL-004-due-date.md -> T-045
+docs\features\Phase 2-Collect-Sign-Albums\F-COL-005\F-COL-005-completion.md -> T-046
+docs\features\Phase 2-Collect-Sign-Albums\F-SGN-001\F-SGN-001-send-document.md -> T-048, T-047
+docs\features\Phase 2-Collect-Sign-Albums\F-SGN-002\F-SGN-002-sign.md -> T-049
+docs\features\Phase 2-Collect-Sign-Albums\F-SGN-003\F-SGN-003-audit-trail.md -> T-050
+docs\features\Phase 2-Collect-Sign-Albums\F-SGN-004\F-SGN-004-final-document.md -> T-051
+docs\features\Phase 3-Enterprise\F-ENT-001\F-ENT-001-sso.md -> T-058, T-057, T-002, T-001
+docs\features\Phase 3-Enterprise\F-ENT-001\US-038-01-connect-entra.md -> T-003, T-002, T-001
+docs\features\Phase 3-Enterprise\F-ENT-001\US-038-02-sso-sign-in.md -> T-002, T-001
+docs\features\Phase 3-Enterprise\F-ENT-001\US-038-03-saml.md -> T-001
+docs\features\Phase 3-Enterprise\F-ENT-001\US-038-04-enforce-sso.md -> T-003, T-001
+docs\features\Phase 3-Enterprise\F-ENT-001\US-038-05-group-entitlement.md -> T-003, T-001
+docs\features\Phase 3-Enterprise\F-ENT-001\US-038-06-sso-logout.md -> T-001
+docs\features\Phase 3-Enterprise\F-ENT-002\F-ENT-002-scim.md -> T-060, T-003, T-002, T-001
+docs\features\Phase 3-Enterprise\F-ENT-002\US-039-01-scim-users.md -> T-003, T-002, T-001
+docs\features\Phase 3-Enterprise\F-ENT-002\US-039-02-scim-groups.md -> T-002, T-001
+docs\features\Phase 3-Enterprise\F-ENT-002\US-039-03-scim-secret.md -> T-003, T-002
+docs\features\Phase 3-Enterprise\F-ENT-003\F-ENT-003-org-admin.md -> T-056, T-006, T-004, T-003, T-002, T-001
+docs\features\Phase 3-Enterprise\F-ENT-003\US-040-01-create-org.md -> T-006, T-004, T-003
+docs\features\Phase 3-Enterprise\F-ENT-003\US-040-02-manage-members.md -> T-006, T-003
+docs\features\Phase 3-Enterprise\F-ENT-003\US-040-03-audit-log.md -> T-003, T-001
+docs\features\Phase 3-Enterprise\F-ENT-003\US-040-04-org-plan.md -> T-006, T-003
+docs\features\Phase 3-Enterprise\F-ENT-004\F-ENT-004-data-residency.md -> T-059, T-004, T-003
+docs\features\Phase 3-Enterprise\F-ENT-004\US-041-01-choose-region.md -> T-004, T-003
+docs\features\Phase 3-Enterprise\F-ENT-004\US-041-02-residency-report.md -> T-004
+docs\features\Phase 3-Enterprise\F-ENT-004\US-041-03-nightly-check.md -> T-004
+docs\features\Phase 3-Enterprise\F-ENT-005\F-ENT-005-custom-subdomain.md -> T-061, T-005, T-003
+docs\features\Phase 3-Enterprise\F-ENT-005\US-042-01-claim-domain.md -> T-005
+docs\features\Phase 3-Enterprise\F-ENT-005\US-042-02-verify-dns.md -> T-005
+docs\features\Phase 3-Enterprise\F-ENT-005\US-042-03-canonical-links.md -> T-005
+docs\features\Phase 3-Enterprise\F-ENT-006\F-ENT-006-workspaces.md -> T-062, T-006, T-003
+docs\features\Phase 3-Enterprise\F-ENT-006\US-043-01-create-workspace.md -> T-006, T-003
+docs\features\Phase 3-Enterprise\F-ENT-006\US-043-02-workspace-limits.md -> T-006
+docs\features\Phase 3-Enterprise\F-ENT-006\US-043-03-send-from-workspace.md -> T-006
+docs\features\Phase 3-Enterprise\F-ENT-006\US-043-04-workspace-usage.md -> T-006
+docs\features\Phase X-Cross-Cutting\F-XCT-001\F-XCT-001-feature-flags.md -> T-068, T-065, T-004, T-003, T-002, T-001
+docs\features\Phase X-Cross-Cutting\F-XCT-001\US-044-01-edit-limits.md -> T-068, T-065, T-001
+docs\features\Phase X-Cross-Cutting\F-XCT-001\US-044-02-gate-feature.md -> T-065, T-004, T-001
+docs\features\Phase X-Cross-Cutting\F-XCT-002\F-XCT-002-search.md -> T-066, T-002, T-001
+docs\features\Phase X-Cross-Cutting\F-XCT-002\US-045-01-find-transfer.md -> T-066, T-002, T-001
+docs\features\Phase X-Cross-Cutting\F-XCT-003\F-XCT-003-email-settings.md -> T-067, T-003, T-001
+docs\features\Phase X-Cross-Cutting\F-XCT-003\US-046-01-turn-off.md -> T-067, T-003, T-001
+docs\features\Phase X-Cross-Cutting\F-XCT-003\US-046-02-recipients-unaffected.md -> T-067, T-003
+docs\features\Phase X-Cross-Cutting\F-XCT-004\F-XCT-004-gdpr-export-erasure.md -> T-068, T-004, T-001
+docs\features\Phase X-Cross-Cutting\F-XCT-004\US-047-01-download-my-data.md -> T-068, T-004, T-001
+docs\features\Phase X-Cross-Cutting\F-XCT-004\US-047-02-erase-telemetry.md -> T-068, T-004
+docs\features\Phase X-Cross-Cutting\F-XCT-004\US-047-03-erasure-report.md -> T-068, T-004, T-003
+docs\features\Phase X-Cross-Cutting\F-XCT-005\F-XCT-005-pii-policy.md -> T-069, T-005, T-004
+docs\features\Phase X-Cross-Cutting\F-XCT-005\US-048-01-anonymous-telemetry.md -> T-069, T-005
+docs\features\Phase X-Cross-Cutting\F-XCT-005\US-048-02-ci-gate.md -> T-069, T-005
+docs\features\Phase X-Cross-Cutting\F-XCT-005\US-048-03-cite-policy.md -> T-069, T-005, T-004
+docs\features\README.md -> T-006, T-005, T-004, T-003, T-002, T-001
+src\wa.web\CHANGELOG.md -> T-001
+src\wa.web\README.md -> T-004

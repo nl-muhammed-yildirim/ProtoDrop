@@ -1,0 +1,100 @@
+
+== F-TRF-001
+  US-001-01-select-files.md US-001-01
+  US-001-02-stage-files.md US-001-02
+  US-001-03-size-validation.md US-001-03
+  US-001-04-upload-progress.md US-001-04
+  US-001-05-retry-upload.md US-001-05
+
+== F-TRF-002
+  US-002-01-unique-link.md US-002-01
+  US-002-02-send-by-email.md US-002-02
+  US-002-03-password.md US-002-03
+  US-002-04-sender-note.md US-002-04
+  US-002-05-link-only.md US-002-05
+
+== F-TRF-003
+  US-003-01-open-link.md US-003-01
+  US-003-02-download-all.md US-003-02
+  US-003-03-download-individual.md US-003-03
+  US-003-04-unlock-password.md US-003-04
+  US-003-05-remaining-expired.md US-003-05
+  US-003-06-mobile-download.md US-003-06
+  US-003-07-growth-loop.md US-003-07
+
+== F-TRF-004
+  US-004-01-generate-zip.md US-004-01
+  US-004-02-cached-zip.md US-004-02
+  US-004-03-zip-cap.md US-004-03
+
+== F-TRF-005
+  US-005-01-auto-expiry.md US-005-01
+  US-005-02-auto-deletion.md US-005-02
+  US-005-03-download-limit.md US-005-03
+
+== F-TRF-006
+  US-006-01-recipient-email.md US-006-01
+  US-006-02-retry-delivery.md US-006-02
+  US-006-03-unsubscribe.md US-006-03
+  US-006-04-reply-branding.md US-006-04
+  US-006-05-localized-email.md US-006-05
+
+== F-TRF-007
+  US-007-01-free-limits.md US-007-01
+  US-007-02-storage-quota.md US-007-02
+  US-007-03-server-enforcement.md US-007-03
+  US-007-04-flag-limits.md US-007-04
+
+== F-TRF-008
+  US-008-01-signup-password.md US-008-01
+  US-008-02-magic-link.md US-008-02
+  US-008-03-forgot-password.md US-008-03
+  US-008-04-profile.md US-008-04
+  US-008-05-attribution.md US-008-05
+  US-008-06-delete-account.md US-008-06
+
+== F-TRF-009
+  US-009-01-history-list.md US-009-01
+  US-009-02-filters.md US-009-02
+  US-009-03-resend.md US-009-03
+  US-009-04-delete.md US-009-04
+
+== F-TRF-010
+  US-010-01-resend-click.md US-010-01
+  US-010-02-edit-prefill.md US-010-02
+  US-010-03-shared-blobs.md US-010-03
+
+== F-TRF-011
+  US-011-01-overview.md US-011-01
+  US-011-02-transfers-admin.md US-011-02
+  US-011-03-users-admin.md US-011-03
+  US-011-04-flags-audit.md US-011-04
+
+== F-TRF-012
+  US-012-01-correlation.md US-012-01
+  US-012-02-dashboards.md US-012-02
+  US-012-03-alerts.md US-012-03
+
+== F-TRF-013
+  US-013-01-error-screens.md US-013-01
+  US-013-02-degraded-storage.md US-013-02
+  US-013-03-degraded-email.md US-013-03
+
+== F-TRF-014
+  US-014-01-localized-ui.md US-014-01
+  US-014-02-locale-detection.md US-014-02
+  US-014-03-localized-email.md US-014-03
+
+== F-TRF-015
+  US-015-01-theme-choice.md US-015-01
+  US-015-02-theme-parity.md US-015-02
+
+== F-TRF-016
+  US-016-01-keyboard.md US-016-01
+  US-016-02-screen-reader.md US-016-02
+  US-016-03-contrast-focus.md US-016-03
+
+== F-TRF-017
+  US-017-01-mobile-upload.md US-017-01
+  US-017-02-mobile-download.md US-017-02
+  US-017-03-touch-ui.md US-017-03
