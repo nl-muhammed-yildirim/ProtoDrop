@@ -1,16 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import './styles/tokens.css';
 import './styles/landing.css';
 import { DropZone } from './features/landing/DropZone';
 import {
-  buildSendPayload,
-  canSend,
   formatBytes,
-  removeStagedFiles,
   stageFile,
   stagePastedFiles,
   stageSummaryText,
-  type SendItem,
   type StagedFile,
 } from './core/upload/fileStaging';
 
@@ -27,22 +23,14 @@ function pastedImageFiles(rawEvent: Event): File[] {
 /**
  * Landing page (UI-Reference §3). T-031 / US-001-01: drop, picker, and Ctrl+V paste
  * all feed one shared staging list; total line shows "N files · X" per UI §5.1.
- *
- * T-032 / US-001-02: the list stays editable until "Send." — afterwards it locks into
- * upload state (edge case 2) so adds/removes/drops/paste are ignored; Send freezes the
- * selection-ordered payload (duplicate names preserved, AC #2) for T-034's engine.
+ * Files remain staged here — upload starts later with the Send action (T-032).
  */
 function App() {
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
-  // Post-"Send." flag drives the lock; refs mirror it for the `[]`-deps handlers
-  // and hold the ordered payload frozen at send time (duplicates preserved, AC #2).
-  const [sent, setSent] = useState(false);
-  const sentRef = useRef(false);
-  const sendPayloadRef = useRef<SendItem[]>([]);
 
-  /** Shared selection entry point; duplicate `File`s are kept once; locked post-"Send." */
+  /** Shared selection entry point; duplicate `File`s are kept once. */
   const addFiles = (incoming: File[]) => {
-    if (sent || incoming.length === 0) return;
+    if (incoming.length === 0) return;
     setStagedFiles(previous => {
       const known = new Set<File>(previous.map(entry => entry.file));
       const additions = incoming.flatMap(file =>
@@ -54,7 +42,6 @@ function App() {
 
   useEffect(() => {
     const onWindowPaste = (event: Event) => {
-      if (sentRef.current) return; // locked list post-"Send." (US-001-02 edge case 2)
       const images = pastedImageFiles(event);
       if (images.length === 0) return;
       setStagedFiles(previous => [
@@ -67,16 +54,7 @@ function App() {
   }, []);
 
   const removeFile = (id: string) => {
-    if (sent) return;
-    setStagedFiles(previous => removeStagedFiles(previous, id));
-  };
-
-  /** "Send.": capture the selection-ordered payload (duplicates preserved), then lock. */
-  const handleSend = () => {
-    if (!canSend(stagedFiles, sent)) return;
-    sendPayloadRef.current = buildSendPayload(stagedFiles);
-    sentRef.current = true;
-    setSent(true);
+    setStagedFiles(previous => previous.filter(entry => entry.id !== id));
   };
 
   const totalLine = stageSummaryText(stagedFiles);
@@ -92,7 +70,7 @@ function App() {
         </div>
       </header>
       <main className="dropzone">
-        <DropZone onFilesSelected={addFiles} locked={sent} />
+        <DropZone onFilesSelected={addFiles} />
 
         {stagedFiles.length > 0 && (
           <section className="staging-panel" aria-label="Selected files">
@@ -109,7 +87,6 @@ function App() {
                     type="button"
                     className="file-remove"
                     aria-label={`Remove ${entry.name}`}
-                    disabled={sent}
                     onClick={() => removeFile(entry.id)}
                   >
                     ✕
@@ -120,12 +97,7 @@ function App() {
 
             <div className="staging-total">{totalLine}</div>
 
-            <button
-              type="button"
-              className="btn btn-primary send-btn"
-              onClick={handleSend}
-              disabled={!canSend(stagedFiles, sent)}
-            >
+            <button type="button" className="btn btn-primary send-btn">
               Send.
             </button>
           </section>
