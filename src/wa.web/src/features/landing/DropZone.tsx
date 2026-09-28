@@ -1,9 +1,4 @@
-import {
-  useRef,
-  useState,
-  type ChangeEvent,
-  type DragEvent,
-} from 'react';
+import { useRef, useState, type DragEvent } from 'react';
 import './../../styles/landing.css';
 
 const uploadIcon = (
@@ -23,12 +18,7 @@ const uploadIcon = (
   </svg>
 );
 
-export interface DropZoneProps {
-  /** Fired with every file the visitor dropped or picked (FR-001-1/2). */
-  onFilesSelected: (files: File[]) => void;
-}
-
-export function DropZone({ onFilesSelected }: DropZoneProps) {
+export function DropZone() {
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -37,19 +27,7 @@ export function DropZone({ onFilesSelected }: DropZoneProps) {
   const onDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setDragOver(false);
-    const dropped = Array.from(event.dataTransfer?.files ?? []);
-    if (dropped.length > 0) {
-      onFilesSelected(dropped);
-    }
-  };
-
-  const onPickerChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const picked = Array.from(event.target.files ?? []);
-    if (picked.length > 0) {
-      onFilesSelected(picked);
-    }
-    // Reset so re-picking the same file fires change again.
-    event.target.value = '';
+    // Files arrive here once the UploadEngine (T-004+) takes over staging.
   };
 
   return (
@@ -91,7 +69,7 @@ export function DropZone({ onFilesSelected }: DropZoneProps) {
         type="file"
         multiple
         aria-label="Choose files"
-        onChange={onPickerChange}
+        onChange={() => undefined}
         style={{ display: 'none' }}
       />
     </div>
