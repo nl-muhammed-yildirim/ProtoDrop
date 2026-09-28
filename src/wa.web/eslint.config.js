@@ -15,8 +15,10 @@ export default defineConfig([
       reactHooks.configs.flat.recommended,
       reactRefresh.configs.vite,
     ],
-    languageOptions: {
-      globals: globals.browser,
+    rules: {
+      // tsconfig.app.json noUnusedParameters already honors the leading-underscore
+      // convention; keep ESLint in sync for stubbed parameters (e.g. UploadEngine.start).
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
   },
 ])

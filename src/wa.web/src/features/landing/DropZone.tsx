@@ -1,5 +1,18 @@
-import { useRef, useState, type DragEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import './../../styles/landing.css';
+import { useUploadEngine } from '../../core/upload/UploadEngine';
+import { showToast } from '../../core/ui/Toast';
+
+// US-001-01: clipboard images often arrive named "image.png" or with no name — stage them
+// under a deterministic name that never collides with already-staged files.
+const PASTED_IMAGE_NAME = 'pasted-image.png';
+
+function nextPastedName(takenNames: string[]): string {
+  if (!takenNames.includes(PASTED_IMAGE_NAME)) return PASTED_IMAGE_NAME;
+  let index = 2;
+  while (takenNames.includes(`pasted-image-${index}.png`)) index += 1;
+  return `pasted-image-${index}.png`;
+}
 
 const uploadIcon = (
   <svg
@@ -21,13 +34,44 @@ const uploadIcon = (
 export function DropZone() {
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const addFiles = useUploadEngine((state) => state.addFiles);
 
   const openPicker = () => inputRef.current?.click();
+
+  // US-001-01: Ctrl+V anywhere on the landing page stages clipboard images.
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      const source = event.clipboardData?.files;
+      if (!source || source.length === 0) return;
+      const takenNames = useUploadEngine.getState().files.map((file) => file.name);
+      addFiles(
+        Array.from(source).map((file) => {
+          if (file.name && file.name !== 'image.png') return file;
+          const name = nextPastedName(takenNames);
+          takenNames.push(name);
+          return new File([file], name, { type: file.type });
+        }),
+      );
+    };
+    document.addEventListener('paste', onPaste);
+    return () => document.removeEventListener('paste', onPaste);
+  }, [addFiles]);
 
   const onDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setDragOver(false);
-    // Files arrive here once the UploadEngine (T-004+) takes over staging.
+    const dropped = Array.from(event.dataTransfer?.files ?? []);
+    if (dropped.length === 0) {
+      // EC-001-4: an empty folder or unsupported payload must not disappear silently.
+      showToast('info', 'Some files were skipped');
+      return;
+    }
+    addFiles(dropped);
+  };
+
+  const onInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    addFiles(Array.from(event.target.files ?? []));
+    event.target.value = ''; // let the same file be picked again after removal
   };
 
   return (
@@ -69,7 +113,7 @@ export function DropZone() {
         type="file"
         multiple
         aria-label="Choose files"
-        onChange={() => undefined}
+        onChange={onInputChange}
         style={{ display: 'none' }}
       />
     </div>

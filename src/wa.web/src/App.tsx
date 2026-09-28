@@ -1,6 +1,8 @@
 import './styles/tokens.css';
 import './styles/landing.css';
+import { Toaster } from './core/ui/Toast';
 import { DropZone } from './features/landing/DropZone';
+import { StagingList } from './features/landing/StagingList';
 
 function App() {
   return (
@@ -15,7 +17,9 @@ function App() {
       </header>
       <main className="dropzone">
         <DropZone />
+        <StagingList />
       </main>
+      <Toaster />
     </div>
   );
 }

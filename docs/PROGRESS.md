@@ -1,6 +1,6 @@
 # PROGRESS.md — Session State (read at every session start)
 
-**Last updated:** 2026-09-07
+**Last updated:** 2026-09-28
 This file is the **rolling state of the build**. A fresh AI session has no memory of previous sessions — this file is that memory.
 
 **Rules (binding for the AI):**
@@ -16,11 +16,11 @@ This file is the **rolling state of the build**. A fresh AI session has no memor
 
 | Field | Value |
 |---|---|
-| **Current task** | T-008 (COMPLETE) |
+| **Current task** | T-012 (IN PROGRESS — web upload surface, F-TRF-001) |
 | **Milestone** | M0 — Foundation |
-| **In progress** | ✅ T-008 complete 4/4 — Full gate green (see §3 session notes below). |
+| **In progress** | ✅ US-001-01 + US-001-02 web parts done 2026-09-28 — full gate green (see §3). Remaining T-012 scope: pre-checks, "Send." button + US-001-03 draft→finalize flow, progress UI during real upload, Playwright manual pass AC-001-1…4. |
 | **Environment** | local: `C:\Users\myild\source\repos\ProtoDrop` (docs say `workspace\ProtoDrop` — repo was moved; treat `source\repos\ProtoDrop` as current). All planning/operating docs live under `docs/`. |
-| **Git** | initialized on branch `main`; baseline commit 2026-08-31 (this session). "Dubious ownership" warning (NT AUTHORITY/SYSTEM vs `myild`) safe → use `safe.directory` exception. |
+| **Git** | branch `main`; latest revert point `995cc5c` ("revert to foundation") — the first US-001 web attempt (old T-03x numbering) was reverted and redone under current backlog numbering as **T-012**. "Dubious ownership" warning (NT AUTHORITY/SYSTEM vs `myild`) safe → use `safe.directory` exception. |
 | **Open escalations** | see `ESCALATIONS.md` |
 
 ## 2. Completed tasks (append-only)
@@ -37,8 +37,24 @@ This file is the **rolling state of the build**. A fresh AI session has no memor
  **T-006 closed 2026-09-02 (4/4); next T-007.** |
 **T-007 closed 2026-09-03 (3/3); next T-008.** |
 | **T-008 closed 2026-09-10** | (4/4) Pipeline foundation: W3C correlation ID, Problem+JSON errors (closed codes, correlationId), CORS, rate limits, telemetry SDK. Integration test `PipelineIntegrationTest.cs` (7/7): 404/500 return Problem+JSON with closed code + correlationId; telemetry events reach test sink with exact TA-10.2 names (Info/Warning levels). Made `ProblemWriter` public for test access. Full §4 green: domain 11/11, application 12/12, api.integration 15/15, web lint + test + build. **Next: T-009.** |
+| T-012 web part (US-001-01 select files + US-001-02 stage/remove) | 2026-09-28 | `src/wa.web`: `core/ui/Toast.tsx` (zustand store + module-level `showToast` + `<Toaster/>`, UI-Reference §4.3), `core/upload/UploadEngine.ts` (TA-8.3 zustand engine — addFiles/remove/reset live; `start(draft)`/`retry(fileId)` stubbed for US-001-03 block upload) + `formatBytes`; DropZone (drop / file picker / Ctrl+V paste, clipboard-image rename, empty-drop toast EC-001-4), StagingList (§4.2 rows + total line, remove ✕); wired into App. Web 22/22 tests incl. all 7 US-001-01 ACs (picker re-selection reset). Gate green: web lint/test/build (gzip 62.2 kB, TA-8.4 OK), domain 11/11, application 12/12, api.integration 15/15. |
 
 ## 3. This session / last session
+
+**Session 2026-09-28 (T-012 web part — US-001-01 select files + US-001-02 stage/remove):**
+- **Scope:** `src/wa.web` upload-surface foundation per F-TRF-001 / UI-Reference screen 1 + §4.2/§4.3 (redone after the T-03x revert, now under current backlog numbering = T-012).
+- **Deliverables:**
+  - `core/ui/Toast.tsx` — zustand micro-store `useToasts` + module-level `showToast(kind, message)` for non-React call sites (DropZone handlers) + `<Toaster/>` (UI-Reference §4.3).
+  - `core/upload/UploadEngine.ts` — TA-8.3 engine as a zustand store: `addFiles`/`remove`/`reset` live; `start(draft)` + `retry(fileId)` deliberately stubbed (block upload — 8 MiB blocks, parallelism 4 per file, stop after 5 retries F-TRF-001-6 — lands with US-001-03). EC-001-1: original `File` handles kept in a module-level Map so the later block upload continues on the real objects; folder flattening via `webkitRelativePath`; duplicates allowed (EC-001-2); `overall.sentBytes` stays 0 until `start()` ("no bytes written before Send." AC).
+  - `core/upload/formatBytes.ts` — human-readable sizes for staging rows/total.
+  - `features/landing/DropZone.tsx` — drop / file picker / Ctrl+V paste anywhere on landing; clipboard images arrive unnamed or as "image.png" → renamed deterministically (`pasted-image.png`, `-2`, …) so pastes never collide with staged names (US-001-01); empty drop → info toast "Some files were skipped" (EC-001-4); `role=button` + Enter/Space opens the picker; hidden `<input type=file multiple>` whose value is reset after each pick so the same file can be re-selected.
+  - `features/landing/StagingList.tsx` — UI-Reference §4.2 rows (icon, truncated name with title attr, size via formatBytes, remove ✕) + "N files · X" total line; renders nothing when empty so the drop zone is the whole UI again (US-001-02 stage/remove).
+  - `App.tsx` — top bar (wordmark + Sign in) + DropZone + StagingList + Toaster.
+  - Tests: `DropZone.test.tsx` encodes all 7 US-001-01 ACs (drag, picker incl. re-selection reset, paste rename/collision, folder flattening, duplicates EC-001-2, empty-drop toast, a11y role/aria); `UploadEngine.test.ts` ×6; `formatBytes.test.ts` ×8 → **web 22/22**.
+- **ESLint sync (kept the gate green with no new deps):** `@typescript-eslint/no-unused-vars: ['error', { argsIgnorePattern: '^_' }]` in `eslint.config.js` — tsconfig's `noUnusedParameters` already honors the `_` prefix for the stubbed params, ESLint now matches; two targeted `react-refresh/only-export-components` disables on Toast.tsx (store + action ship with the component per §4.3). Directive gotcha: the reason must use the canonical `-- reason` separator — an em-dash makes ESLINT parse the whole tail as one rule name.
+- **Gate:** web `lint` ✓ / `test:run` 22/22 / `build` ✓ (JS 196.4 kB, gzip 62.2 kB — TA-8.4 OK); .NET files unchanged but all suites re-run green: domain.unit 11/11, application.unit 12/12, api.integration 15/15 (Docker/Testcontainers).
+- **Env gotchas:** PowerShell 5.1 has no top-level `&&` → wrap composite npm gates in `cmd /c "…"`; npm stderr notices trigger a NativeCommandError on the composite even when every stage passes (judge by per-stage output, not the wrapper exit code); Docker daemon was down at session start — Testcontainers had come up by the api.integration run.
+- **Next:** T-012 remainder — pre-checks + "Send." button + US-001-03 draft→finalize flow (needs T-009 endpoint 1 for per-file `cwr` SAS), progress UI during real upload, then Playwright manual pass AC-001-1…4.
 
 **Session 2026-09-10 (T-008, part 4/4 — Pipeline integration tests & completion):**
 - **T-008 COMPLETE (4/4).** Exit check (from Milestone-Backlog.md): Integration test verifies (a) 404/500 errors return Problem+JSON with correlationId in body; (b) events emitted via telemetry helper reach local sink; (c) rate-limit breach returns Problem+JSON from closed list.
@@ -216,6 +232,7 @@ This file is the **rolling state of the build**. A fresh AI session has no memor
 
 ## 4. Known open items (not escalations)
 
+- **T-012 partial (this session):** `UploadEngine.start(draft)` / `retry(fileId)` are deliberate stubs — the block upload (8 MiB blocks, parallelism 4 per file, stop after 5 retries F-TRF-001-6), pre-checks and the "Send." button land with US-001-03 once T-009 endpoint 1 provides draft creation + per-file `cwr` SAS.
 - **T-007a blob lifecycle limitation (Azure.Storage.Blobs 12.29.2):** per TA-3.5 the two containers need per-prefix lifecycle rules (`staging/*` expire 24 h, `transfers/*` 30 d), `transfers` versioning **OFF**, and GRS (prod). The frozen 12.29.2 package exposes the **service-level** `BlobRetentionPolicy` (soft-delete 14 d — applied at startup by `BlobContainerBootstrap`) but **no container-level lifecycle API** and **no versioning toggle** on `BlobServiceProperties`; those three bits are **logged at startup, not applied** (don't stall, T-007). Revisit if a package upgrade or a REST round-trip is ever ADR'd. Azurite (local) likewise: container creation supported; service soft-delete may 404 → caught + logged, bootstrap still succeeds.
 - **D-07 stand-in (T-004c):** Part 2 Pro `MAX_TRANSFER_SIZE` is "TBD (D-07)" while Part 2 Pro `STORAGE_QUOTA` = 100 GB conflicts with D-07 "20/50 GB". Seed uses Pro `MAX_TRANSFER_SIZE` = **10737418240 (10 GB)** stand-in (`PlanConfiguration.cs`, `20260901010036_SeedPlansAndFeatureFlags.cs` + `.Designer.cs`, `WaDbContextModelSnapshot.cs`, and `limits.pro.maxTransferSize` flag). Full escalation in **ESCALATIONS.md E-004**; flip both `MAX_TRANSFER_SIZE` + `MAX_SINGLE_FILE` when D-07 is answered.
 - Phase 2 open decisions D-21/D-22/D-23

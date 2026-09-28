@@ -74,6 +74,113 @@
   color: var(--fg-muted);
 }
 
+/* Staging list — UI-Reference §4.2 (rows min-height 44 px, name truncated + title attr) */
+.staging {
+  width: min(560px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.staging-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.file-row {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.file-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--fg-muted);
+}
+
+.file-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-size {
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+  flex-shrink: 0;
+}
+
+.file-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.file-remove:hover {
+  background: var(--bg-elevated);
+  color: var(--danger);
+}
+
+.file-remove-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.staging-total {
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+  text-align: center;
+}
+
+/* Toasts — UI-Reference §4.3 (top-center, auto-dismiss 5 s) */
+.toast-container {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 100;
+}
+
+.toast {
+  padding: 10px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--elevation);
+  font-size: var(--fs-small);
+}
+
+.toast-warning {
+  border-left-color: var(--warning);
+}
+
+.toast-error {
+  border-left-color: var(--danger);
+}
+
 @media (max-width: 640px) {
   .dropzone-title {
     font-size: var(--fs-h1);
