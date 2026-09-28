@@ -1,0 +1,24 @@
+{
+  "id": "edb4b2cb",
+  "baseDir": "C:\\Users\\myild\\source\\repos\\ProtoDrop",
+  "name": "Analyze solution structure",
+  "archived": false,
+  "aiderTotalCost": 0,
+  "agentTotalCost": 0,
+  "mainModel": "",
+  "currentMode": "agent",
+  "weakModelLocked": false,
+  "parentId": null,
+  "lastAgentProviderMetadata": {
+    "openai-compatible": {}
+  },
+  "agentProfileId": "default",
+  "provider": "openai-compatible",
+  "model": "Qwen 3.8 Coder (Qwen3.8 27B 131K)",
+  "workingMode": "local",
+  "state": "DONE",
+  "updatedAt": "2026-09-28T08:18:42.434Z",
+  "createdAt": "2026-09-28T07:52:28.919Z",
+  "startedAt": "2026-09-28T07:52:28.921Z",
+  "completedAt": "2026-09-28T07:56:56.808Z"
+}
