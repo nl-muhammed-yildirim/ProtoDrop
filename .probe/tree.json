@@ -1,0 +1,526 @@
+{
+  "sha": "d920ae63286c06db5e7bbae83b73d7b99c75131c",
+  "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/trees/d920ae63286c06db5e7bbae83b73d7b99c75131c",
+  "tree": [
+    {
+      "path": ".editorconfig",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4146ccc95fe665250badf52f0e86aeef7fce2797",
+      "size": 1831,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/4146ccc95fe665250badf52f0e86aeef7fce2797"
+    },
+    {
+      "path": ".gitattributes",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b84a08fff42759e027b58a254995daf5fe8e87dd",
+      "size": 67,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/b84a08fff42759e027b58a254995daf5fe8e87dd"
+    },
+    {
+      "path": ".github",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "3657e9adc82cae82e1a7ccac30f20425d8768eb7",
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/trees/3657e9adc82cae82e1a7ccac30f20425d8768eb7"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "87c09232f3247b436df0fb6ecbddeb306d9e0b85",
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/trees/87c09232f3247b436df0fb6ecbddeb306d9e0b85"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/bug_report.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "13efc8190cfece830e5068a84140f7dbd39173c4",
+      "size": 1038,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/13efc8190cfece830e5068a84140f7dbd39173c4"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/config.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ee427f8414c05d725d02284503fecbfd133c5664",
+      "size": 169,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/ee427f8414c05d725d02284503fecbfd133c5664"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/feature_request.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f27f6ca98c4b13b1405cfe397ec22168fd9d09e5",
+      "size": 605,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/f27f6ca98c4b13b1405cfe397ec22168fd9d09e5"
+    },
+    {
+      "path": ".github/workflows",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "a97472e76d6db669aacde429ae713dffe7c1c2e6",
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/trees/a97472e76d6db669aacde429ae713dffe7c1c2e6"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a676b65838ae42564a260e85df94022a467b3f04",
+      "size": 1031,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/a676b65838ae42564a260e85df94022a467b3f04"
+    },
+    {
+      "path": ".gitignore",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ad9c585810fa760c8066c1d0b8c016de545af646",
+      "size": 5612,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/ad9c585810fa760c8066c1d0b8c016de545af646"
+    },
+    {
+      "path": "Build.ps1",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e798284915c30d1a78a07ba97f2bb52ae032e2f5",
+      "size": 2948,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/e798284915c30d1a78a07ba97f2bb52ae032e2f5"
+    },
+    {
+      "path": "Directory.Build.props",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4b21a3655b190c5bb41dad6fbbe7e96c146f2334",
+      "size": 1281,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/4b21a3655b190c5bb41dad6fbbe7e96c146f2334"
+    },
+    {
+      "path": "Directory.Version.props",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d6de0cdcec92e31e358c18e3a2c5d9980ef231e0",
+      "size": 99,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/d6de0cdcec92e31e358c18e3a2c5d9980ef231e0"
+    },
+    {
+      "path": "LICENSE",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e06d2081865a766a8668acc12878f98b27fc9ea0",
+      "size": 11325,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/e06d2081865a766a8668acc12878f98b27fc9ea0"
+    },
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1ea3d8f10d7cb58dbeae12ac51ababadb2b6bd63",
+      "size": 19313,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/1ea3d8f10d7cb58dbeae12ac51ababadb2b6bd63"
+    },
+    {
+      "path": "assets",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "44a9adc79e6181ef25da9b0fae2e3acd0d259acf",
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/trees/44a9adc79e6181ef25da9b0fae2e3acd0d259acf"
+    },
+    {
+      "path": "assets/Serilog.snk",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6d662e5cdc929e43c71cfc64514bb410395bec97",
+      "size": 596,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/6d662e5cdc929e43c71cfc64514bb410395bec97"
+    },
+    {
+      "path": "assets/icon.png",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9bf45a319eec8b1a6a2641c282739944d100c9c1",
+      "size": 20352,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/9bf45a319eec8b1a6a2641c282739944d100c9c1"
+    },
+    {
+      "path": "global.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "21186753f1a4b26e1c49895ae66d7df85bd50290",
+      "size": 123,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/21186753f1a4b26e1c49895ae66d7df85bd50290"
+    },
+    {
+      "path": "serilog-sinks-applicationinsights.sln",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a752a2331df5a5eec04046b702cfd4d54e4d8afc",
+      "size": 2554,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/a752a2331df5a5eec04046b702cfd4d54e4d8afc"
+    },
+    {
+      "path": "src",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "63fff30a9bec2ff5a7629413f8b9ae84fb29ca63",
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/trees/63fff30a9bec2ff5a7629413f8b9ae84fb29ca63"
+    },
+    {
+      "path": "src/Serilog.Sinks.ApplicationInsights",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "ba9b205fbaa161b1af5722ea5c681125a11a3d43",
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/trees/ba9b205fbaa161b1af5722ea5c681125a11a3d43"
+    },
+    {
+      "path": "src/Serilog.Sinks.ApplicationInsights/LoggerConfigurationApplicationInsightsExtensions.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "56436584a1fa8791ae7b91574b1d157128a915b5",
+      "size": 6422,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/56436584a1fa8791ae7b91574b1d157128a915b5"
+    },
+    {
+      "path": "src/Serilog.Sinks.ApplicationInsights/LoggerEnrichmentConfigurationExtensions.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d884068748f01584663090f0cb85361c7339a1c3",
+      "size": 926,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/d884068748f01584663090f0cb85361c7339a1c3"
+    },
+    {
+      "path": "src/Serilog.Sinks.ApplicationInsights/Serilog.Sinks.ApplicationInsights.csproj",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d93a0145912d3fa38f4eef7882de94e78804fcd1",
+      "size": 1748,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/d93a0145912d3fa38f4eef7882de94e78804fcd1"
+    },
+    {
+      "path": "src/Serilog.Sinks.ApplicationInsights/Sinks",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "1c838476fa7c4c0c4a9f5c28488a427ad3bf934b",
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/trees/1c838476fa7c4c0c4a9f5c28488a427ad3bf934b"
+    },
+    {
+      "path": "src/Serilog.Sinks.ApplicationInsights/Sinks/ApplicationInsights",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "cc78602f11419d4e0ee88c5bad55ec6ef976ae8a",
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/trees/cc78602f11419d4e0ee88c5bad55ec6ef976ae8a"
+    },
+    {
+      "path": "src/Serilog.Sinks.ApplicationInsights/Sinks/ApplicationInsights/ApplicationInsightsSink.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3eda2f3fd4a7222b3fd961c90008b253b9b79ad0",
+      "size": 7656,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/3eda2f3fd4a7222b3fd961c90008b253b9b79ad0"
+    },
+    {
+      "path": "src/Serilog.Sinks.ApplicationInsights/Sinks/ApplicationInsights/Enrichers",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "714ca9920024c86d60083c88492398815bf64d1b",
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/trees/714ca9920024c86d60083c88492398815bf64d1b"
+    },
+    {
+      "path": "src/Serilog.Sinks.ApplicationInsights/Sinks/ApplicationInsights/Enrichers/ActivityDetailsEnricher.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0b8ba531acfa893032efcd577b7ec1f21c3c9118",
+      "size": 2403,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/0b8ba531acfa893032efcd577b7ec1f21c3c9118"
+    },
+    {
+      "path": "src/Serilog.Sinks.ApplicationInsights/Sinks/ApplicationInsights/Formatters",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "37bfd7afecdc74f34d6fdab4366ecb25607170b6",
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/trees/37bfd7afecdc74f34d6fdab4366ecb25607170b6"
+    },
+    {
+      "path": "src/Serilog.Sinks.ApplicationInsights/Sinks/ApplicationInsights/Formatters/ApplicationInsightsDottedValueFormatter.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f5c4b932dae3ae50f296e24768b25d598adf2102",
+      "size": 3357,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/f5c4b932dae3ae50f296e24768b25d598adf2102"
+    },
+    {
+      "path": "src/Serilog.Sinks.ApplicationInsights/Sinks/ApplicationInsights/Formatters/ApplicationInsightsJsonValueFormatter.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "24308a11973aca4c943e4f4cbc7daa4086cc3612",
+      "size": 2174,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/24308a11973aca4c943e4f4cbc7daa4086cc3612"
+    },
+    {
+      "path": "src/Serilog.Sinks.ApplicationInsights/Sinks/ApplicationInsights/Formatters/IValueFormatter.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3be8de3a12c855c90f4de50918f3f7fdb21c2da4",
+      "size": 984,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/3be8de3a12c855c90f4de50918f3f7fdb21c2da4"
+    },
+    {
+      "path": "src/Serilog.Sinks.ApplicationInsights/Sinks/ApplicationInsights/TelemetryConverters",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "60ccfc49e0e6f0f38addcaeea7a6244e2e8d30fd",
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/trees/60ccfc49e0e6f0f38addcaeea7a6244e2e8d30fd"
+    },
+    {
+      "path": "src/Serilog.Sinks.ApplicationInsights/Sinks/ApplicationInsights/TelemetryConverters/EventTelemetryConverter.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6546d0b444ef0cd41b0b23237db21ddf9a5452a4",
+      "size": 2311,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/6546d0b444ef0cd41b0b23237db21ddf9a5452a4"
+    },
+    {
+      "path": "src/Serilog.Sinks.ApplicationInsights/Sinks/ApplicationInsights/TelemetryConverters/ITelemetryConverter.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f4073c5154b1e758c92620ba908d7a651695ccdc",
+      "size": 345,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/f4073c5154b1e758c92620ba908d7a651695ccdc"
+    },
+    {
+      "path": "src/Serilog.Sinks.ApplicationInsights/Sinks/ApplicationInsights/TelemetryConverters/TelemetryConverterBase.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "08802ae7f3ca4b59cdf552c863ce88af108a141a",
+      "size": 15636,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/08802ae7f3ca4b59cdf552c863ce88af108a141a"
+    },
+    {
+      "path": "src/Serilog.Sinks.ApplicationInsights/Sinks/ApplicationInsights/TelemetryConverters/TraceTelemetryConverter.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "288f161d6f4027a4561519d2109a7f033c918ea2",
+      "size": 2231,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/288f161d6f4027a4561519d2109a7f033c918ea2"
+    },
+    {
+      "path": "src/Serilog.Sinks.ApplicationInsights/TelemetryConverter.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d8496e0e3fb603ac8798741835f20e0d949e9776",
+      "size": 919,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/d8496e0e3fb603ac8798741835f20e0d949e9776"
+    },
+    {
+      "path": "test",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "706fdb528fac4d97df859b096e9c8445a5cb7943",
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/trees/706fdb528fac4d97df859b096e9c8445a5cb7943"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "9d901d85aa3febf3176272cf5513f3b5e1301062",
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/trees/9d901d85aa3febf3176272cf5513f3b5e1301062"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests/ApplicationInsightsTest.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a7344fc021ba687be324f46804d562812d6c61d3",
+      "size": 1691,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/a7344fc021ba687be324f46804d562812d6c61d3"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests/DisposableTest.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "25b122ae59ce2ab08e111dd2f0d223946feaa13f",
+      "size": 670,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/25b122ae59ce2ab08e111dd2f0d223946feaa13f"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests/Enrichers",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "a5a5e67044b12ca0f8e0487e98bdb983c3bac474",
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/trees/a5a5e67044b12ca0f8e0487e98bdb983c3bac474"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests/Enrichers/ActivityDetailsEnricherTests.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d4bff2d122b0e397aaacab00cb61cca7c50141cd",
+      "size": 4528,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/d4bff2d122b0e397aaacab00cb61cca7c50141cd"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests/Enrichers/TestLogEventPropertyFactory.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6098fae289ca589369766f9e13505cfb1cd8a842",
+      "size": 863,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/6098fae289ca589369766f9e13505cfb1cd8a842"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests/FormattingTests.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "53254e1a960abf9863a4a0ee83c3987bc7d8ba04",
+      "size": 2738,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/53254e1a960abf9863a4a0ee83c3987bc7d8ba04"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests/Serilog.Sinks.ApplicationInsights.Tests.csproj",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1ee4167cfca4870437f3029b6473cac10f1ef026",
+      "size": 924,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/1ee4167cfca4870437f3029b6473cac10f1ef026"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests/TelemetryConverters",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "1abd298d52e0ddc8e5af8240676e692f05f46d0d",
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/trees/1abd298d52e0ddc8e5af8240676e692f05f46d0d"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests/TelemetryConverters/CustomTelemetryConversionTest.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2a026cf6dc08a0d7089f5a2ab57395bacd9995bd",
+      "size": 2547,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/2a026cf6dc08a0d7089f5a2ab57395bacd9995bd"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests/TelemetryConverters/DottedOutFormattingTest.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d1838e5b82d6e4246e1ef590c493684e968870c1",
+      "size": 1458,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/d1838e5b82d6e4246e1ef590c493684e968870c1"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests/TelemetryConverters/Event",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "3a6d6275bdea3fbf02a21c01c4e4b38f6735e13a",
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/trees/3a6d6275bdea3fbf02a21c01c4e4b38f6735e13a"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests/TelemetryConverters/Event/CustomiseEventTelemetryConverterTest.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "92f48ef212bfb86e3a23695d45a03e104233180b",
+      "size": 818,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/92f48ef212bfb86e3a23695d45a03e104233180b"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests/TelemetryConverters/Event/EventTelemetryConverterTest.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7b0fa559bcb1ceab8b2ddeca8118749a8067973e",
+      "size": 3569,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/7b0fa559bcb1ceab8b2ddeca8118749a8067973e"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests/TelemetryConverters/Event/IncludeOperationIdTest.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b231a160d0d62554ddb35356af8e3f1fd1b97544",
+      "size": 914,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/b231a160d0d62554ddb35356af8e3f1fd1b97544"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests/TelemetryConverters/Event/IncludeOperationNameTest.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1d193ab31bf0838fcfb889e3f9cdccb30fe44f74",
+      "size": 940,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/1d193ab31bf0838fcfb889e3f9cdccb30fe44f74"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests/TelemetryConverters/Event/IncludeParentSpanIdTest.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e6b01f8008bc269b64df24fc6f863c4d902ae55a",
+      "size": 918,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/e6b01f8008bc269b64df24fc6f863c4d902ae55a"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests/TelemetryConverters/Event/IncludeVersionTest.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "246dba3edcc4836714e507ab5e49599ca509947a",
+      "size": 846,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/246dba3edcc4836714e507ab5e49599ca509947a"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests/TelemetryConverters/TelemetryConversionTest.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "473a617cbe986a622fcc54fcd293c1e63a41c1b6",
+      "size": 1341,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/473a617cbe986a622fcc54fcd293c1e63a41c1b6"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests/TelemetryConverters/Trace",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "8de20ec96f794c041aa7e43d33770e3c0c61393e",
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/trees/8de20ec96f794c041aa7e43d33770e3c0c61393e"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests/TelemetryConverters/Trace/IncludeOperationIdTest.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "80e8758ad541204daa7586a2bf885b9a70d33182",
+      "size": 914,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/80e8758ad541204daa7586a2bf885b9a70d33182"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests/TelemetryConverters/Trace/IncludeOperationNameTest.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "873385d2534954ea27e2099ce7500c8a4edc4c38",
+      "size": 940,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/873385d2534954ea27e2099ce7500c8a4edc4c38"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests/TelemetryConverters/Trace/IncludeParentSpanIdTest.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "20428b9b16f4613057ea175a74097b1ffe1cc4b7",
+      "size": 918,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/20428b9b16f4613057ea175a74097b1ffe1cc4b7"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests/TelemetryConverters/Trace/IncludeVersionTest.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a7b5a380b02e6b1c2c1d97053bea8683ec9cf080",
+      "size": 846,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/a7b5a380b02e6b1c2c1d97053bea8683ec9cf080"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests/TelemetryConverters/Trace/TraceTelemetryConverterTest.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fb9e7c8048fdf6c840eb94ce3084872e11273ebd",
+      "size": 3503,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/fb9e7c8048fdf6c840eb94ce3084872e11273ebd"
+    },
+    {
+      "path": "test/Serilog.Sinks.ApplicationInsights.Tests/UnitTestTelemetryChannel.cs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2af53569726934656085e147041dccd2c1a18296",
+      "size": 954,
+      "url": "https://api.github.com/repos/serilog-contrib/serilog-sinks-applicationinsights/git/blobs/2af53569726934656085e147041dccd2c1a18296"
+    }
+  ],
+  "truncated": false
+}
