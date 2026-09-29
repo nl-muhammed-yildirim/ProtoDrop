@@ -91,3 +91,42 @@
 
 # 2026-09-28T15:14:09.432Z
 +I need a optimised prompt for implementing T-034-us-001-04-upload-progress.md . Now I have Qdrant (http://localhost:6333) for repository index and use it for optimise context. Quickly give me perfect prompt for task implementation for developer agent
+
+# 2026-09-28T15:19:41.862Z
++I need a optimised prompt for implementing US-001-01-select-files.md . Now I have Qdrant (http://localhost:6333) for repository index and use it for optimise context. Give me perfect prompt for task implementation
+
+# 2026-09-28T15:22:03.761Z
++I need a optimised prompt for implementing docs/features/Phase 0-MVP/F-TRF-001/US-001-01-select-files.md . Now I have Qdrant (http://localhost:6333) for repository index and use it for optimise context. Give me perfect prompt for task implementation
+
+# 2026-09-28T15:33:10.181Z
++I need a optimised prompt for implementing docs/features/Phase 0-MVP/F-TRF-001/US-001-01-select-files.md . Now I have Qdrant (http://localhost:6333) for repository index and use it for optimise context. Quickly Give me perfect prompt for task implementation
+
+# 2026-09-28T16:08:16.459Z
++I only need developer prompt for easy and fast implementation
+
+# 2026-09-28T16:12:46.343Z
++Proceed.
+
+# 2026-09-28T17:57:13.815Z
++continue
+
+# 2026-09-28T18:53:44.224Z
++now time to code review. Review code and leave comment if something is wrong with code
+
+# 2026-09-28T18:54:10.804Z
++now time to code review. Review code changes and leave comment if something is wrong with code
+
+# 2026-09-28T19:17:25.978Z
++There are some comments after review. fix them all
+
+# 2026-09-28T19:44:39.652Z
++Create Optimized Implementation Prompt for implementing docs/features/Phase 0-MVP/F-TRF-001/US-001-02-stage-files.md . We have qdrant for code indexing. use it actively. quickly give me prompt for developer agent
+
+# 2026-09-28T21:05:34.744Z
++Proceed.
+
+# 2026-09-28T21:24:04.964Z
++now we can review the code changes
+
+# 2026-09-29T06:29:55.619Z
++There are some review comments on code changes. fix them all

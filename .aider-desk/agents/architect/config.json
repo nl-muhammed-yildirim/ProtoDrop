@@ -2,7 +2,7 @@
   "id": "1e692408-0d24-4c81-80ef-fd3fbea09df4",
   "name": "Architect",
   "provider": "openai-compatible",
-  "model": "Qwen 3.8 Coder (Qwen3.8 27B 131K)",
+  "model": "qwen3.8-27b-uncensored-ymq-s-pro",
   "maxIterations": 0,
   "minTimeBetweenToolCalls": 0,
   "toolApprovals": {

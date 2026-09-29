@@ -2,7 +2,7 @@
   "id": "303cab0f-9e73-45ef-99a7-5b836206c0a6",
   "name": "Reviewer",
   "provider": "openai-compatible",
-  "model": "Qwen 3.8 Coder (Qwen3.8 27B 131K)",
+  "model": "qwen3.8-27b-uncensored-ymq-s-pro",
   "maxIterations": 0,
   "minTimeBetweenToolCalls": 0,
   "toolApprovals": {
