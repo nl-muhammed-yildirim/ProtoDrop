@@ -17,7 +17,7 @@ export interface UploadFile {
   progress: number;
 }
 
-/** Draft from POST /api/v1/transfers/draft (TA-4.2#1) — full DTO lands with US-001-03. */
+/** Draft from POST /api/v1/transfers/draft (TA-4.2#1) — full DTO lands with US-001-03/T-009. */
 export type UploadDraft = Record<string, unknown>;
 
 interface UploadEngineApi {
@@ -27,8 +27,8 @@ interface UploadEngineApi {
   addFiles(files: File[]): void;
   remove(fileId: string): void; // TA-8.3
   reset(): void; // TA-8.3
-  start(draft: UploadDraft): void; // TA-8.3 — block upload lands with US-001-03/T-004
-  retry(fileId: string): void; // TA-8.3 — block upload lands with US-001-03/T-004
+  start(draft: UploadDraft): void; // TA-8.3 — block upload lands with US-001-03/T-009 (draft creation + per-file cwr SAS)
+  retry(fileId: string): void; // TA-8.3 — block upload lands with US-001-03/T-009 (draft creation + per-file cwr SAS)
 }
 
 // EC-001-1: the later block upload continues on the original File objects, so the
@@ -74,10 +74,10 @@ export const useUploadEngine = create<UploadEngineApi>()((set) => ({
   },
 
   start(_draft: UploadDraft) {
-    // TODO(US-001-03/T-004): block upload — 8 MiB blocks, parallelism 4 per file (TA-8.3).
+    // TODO(US-001-03/T-009): block upload — 8 MiB blocks, parallelism 4 per file (TA-8.3).
   },
 
   retry(_fileId: string) {
-    // TODO(US-001-03/T-004): block upload — stop after 5 block retries (F-TRF-001-6, TA-8.3).
+    // TODO(US-001-03/T-009): block upload — stop after 5 block retries (F-TRF-001-6, TA-8.3).
   },
 }));

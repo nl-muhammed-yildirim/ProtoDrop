@@ -10,6 +10,14 @@ export function formatBytes(bytes: number): string {
     value /= 1024;
     unitIndex += 1;
   }
+  // Rounding can push a value up across the unit boundary (e.g. 1,048,575 → "1024 KB"
+  // without re-normalization); carry one unit so it renders as "1 MB".
+  const rounded = Math.round(value);
+  if (value >= 10 && rounded === 1024 && unitIndex < UNITS.length - 1) {
+    value = 1;
+    unitIndex += 1;
+  }
+
   const text =
     value < 10 ? trimTrailingZero(value.toFixed(1)) : Math.round(value).toString();
   return `${text} ${UNITS[unitIndex]}`;

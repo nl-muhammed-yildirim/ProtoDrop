@@ -34,6 +34,9 @@ const uploadIcon = (
 export function DropZone() {
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  // REVIEW(919cb3c): dragleave fires when the pointer crosses child elements (h2, button),
+  // so the highlight flickers mid-drag. Track enter/leave depth instead of resetting on leave.
+  const dragDepth = useRef(0);
   const addFiles = useUploadEngine((state) => state.addFiles);
 
   const openPicker = () => inputRef.current?.click();
@@ -57,9 +60,24 @@ export function DropZone() {
     return () => document.removeEventListener('paste', onPaste);
   }, [addFiles]);
 
-  const onDrop = (event: DragEvent<HTMLDivElement>) => {
+  const handleDragEnter = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    dragDepth.current += 1;
+    if (dragDepth.current > 0) setDragOver(true);
+  };
+
+ const handleDragLeave = () => {
+    dragDepth.current -= 1;
+    if (dragDepth.current <= 0) {
+      dragDepth.current = 0;
+      setDragOver(false);
+    }
+  };
+
+ const onDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setDragOver(false);
+    dragDepth.current = 0; // reset counter after a drop
     const dropped = Array.from(event.dataTransfer?.files ?? []);
     if (dropped.length === 0) {
       // EC-001-4: an empty folder or unsupported payload must not disappear silently.
@@ -69,7 +87,7 @@ export function DropZone() {
     addFiles(dropped);
   };
 
-  const onInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+ const onInputChange = (event: ChangeEvent<HTMLInputElement>) => {
     addFiles(Array.from(event.target.files ?? []));
     event.target.value = ''; // let the same file be picked again after removal
   };
@@ -79,11 +97,9 @@ export function DropZone() {
       className="dropzone-card"
       data-dragover={dragOver}
       onDrop={onDrop}
-      onDragOver={(event) => {
-        event.preventDefault();
-        setDragOver(true);
-      }}
-      onDragLeave={() => setDragOver(false)}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={(event) => event.preventDefault()} // allow drop, depth counter maintains highlight
       onClick={openPicker}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {

@@ -13,6 +13,8 @@ interface ToastItem {
 }
 
 const AUTO_DISMISS_MS = 5000; // UI-Reference §4.3
+const MAX_TOASTS = 5; // REVIEW(919cb3c): UI-Reference §4.3 does not freeze a count; cap oldest entries
+                      // to avoid unbounded accumulation when Toaster is remounted (future routing).
 
 let nextId = 1;
 
@@ -26,9 +28,13 @@ interface ToastApi {
 // eslint-disable-next-line react-refresh/only-export-components -- store + Toaster ship together (UI-Reference 4.3)
 export const useToasts = create<ToastApi>()((set) => ({
   toasts: [],
+
   push(kind, message) {
     set((state) => ({
-      toasts: [...state.toasts, { id: nextId++, kind, message }],
+      toasts: [
+        ...state.toasts.slice(Math.max(0, state.toasts.length - MAX_TOASTS + 1)),
+        { id: nextId++, kind, message },
+      ],
     }));
   },
   dismiss(id) {
