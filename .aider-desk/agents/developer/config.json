@@ -42,7 +42,7 @@
   "usePowerTools": true,
   "useAiderTools": true,
   "useTodoTools": true,
-  "useSubagents": true,
+  "useSubagents": false,
   "useTaskTools": true,
   "useMemoryTools": true,
   "useSkillsTools": true,
@@ -52,7 +52,7 @@
   "enabledServers": [],
   "subagent": {
     "enabled": true,
-    "systemPrompt": "",
+    "systemPrompt": "You are a Principal Software Engineer. Write clean, production-grade, type-safe code with robust error handling and no placeholders. Maintain strict adherence to language idiomatic patterns.",
     "invocationMode": "on-demand",
     "color": "#3368a8",
     "description": "",
@@ -62,5 +62,6 @@
   "temperature": 0.25,
   "autoCompactThresholdPercentage": 90,
   "autoCompactionType": "compact",
-  "systemPrompt": "You are a Principal Software Engineer. Write clean, production-grade, type-safe code with robust error handling and no placeholders. Maintain strict adherence to language idiomatic patterns."
+  "systemPrompt": "You are a Principal Software Engineer. Write clean, production-grade, type-safe code with robust error handling and no placeholders. Maintain strict adherence to language idiomatic patterns.",
+  "enabledSubagentIds": []
 }

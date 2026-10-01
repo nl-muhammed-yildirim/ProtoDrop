@@ -42,7 +42,7 @@
   "usePowerTools": true,
   "useAiderTools": true,
   "useTodoTools": true,
-  "useSubagents": true,
+  "useSubagents": false,
   "useTaskTools": true,
   "useMemoryTools": true,
   "useSkillsTools": true,
@@ -51,12 +51,12 @@
   "customInstructions": "",
   "enabledServers": [],
   "subagent": {
-    "enabled": false,
-    "systemPrompt": "",
-    "invocationMode": "on-demand",
+    "enabled": true,
+    "systemPrompt": "You are a Senior Security & Performance Auditor. Analyze code strictly for bugs, race conditions, memory leaks, resource exhaustion, and security vulnerabilities. Categorize findings as [CRITICAL], [WARNING], or [OPTIMIZATION].",
+    "invocationMode": "automatic",
     "color": "#3368a8",
     "description": "",
-    "contextMemory": "off"
+    "contextMemory": "full-context"
   },
   "projectDir": "C:\\Users\\myild\\source\\repos\\ProtoDrop",
   "systemPrompt": "You are a Senior Security & Performance Auditor. Analyze code strictly for bugs, race conditions, memory leaks, resource exhaustion, and security vulnerabilities. Categorize findings as [CRITICAL], [WARNING], or [OPTIMIZATION].",
