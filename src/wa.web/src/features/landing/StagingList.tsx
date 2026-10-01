@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { formatBytes } from '../../core/upload/formatBytes';
 import type { UploadDraft } from '../../core/upload/UploadEngine';
 import { useUploadEngine } from '../../core/upload/UploadEngine';
@@ -39,6 +40,24 @@ const removeIcon = (
   </svg>
 );
 
+// US-001-05: retry icon for failed rows (AC-001-3).
+const retryIcon = (
+  <svg
+    className="file-retry-icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    focusable="false"
+  >
+    <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85 1.03 6.5 2.7L21 8" />
+    <path d="M21 3v5h-5" />
+  </svg>
+);
+
 interface DraftFile {
   name: string;
   sizeBytes: number;
@@ -49,6 +68,10 @@ export function StagingList() {
   const totalBytes = useUploadEngine((state) => state.overall.totalBytes);
   const remove = useUploadEngine((state) => state.remove);
   const start = useUploadEngine((state) => state.start);
+  const retry = useUploadEngine((state) => state.retry);
+
+  // Fix 5: guard against double-submit on Send button.
+  const isSendingRef = useRef(false);
 
   // US-001-03: resolve effective limits (guest fallback; replace with /api/v1/limits fetch when auth lands).
   const limits = resolveEffectiveLimits();
@@ -57,10 +80,20 @@ export function StagingList() {
   const violations = validateSelection(files, limits);
   const hasViolation = violations.length > 0;
 
+  // US-001-05: count failed files for the overall status line (AC-001-3).
+  const failedCount = files.filter((f) => f.status === 'failed').length;
+
   if (files.length === 0) return null; // empty list → the drop zone is the whole UI again
 
   return (
     <div className="staging">
+      {/* US-001-05: overall status line — ARIA live region for screen readers (AC-001-3). */}
+      {failedCount > 0 && (
+        <p className="staging-overall" role="status" aria-live="polite">
+          Upload paused — {failedCount} file{failedCount === 1 ? '' : 's'} need attention.
+        </p>
+      )}
+
       <ul className="staging-list" aria-label="Staged files">
         {files.map((file) => {
           const fileViolation = violations.find(
@@ -68,17 +101,42 @@ export function StagingList() {
               v.type === 'singleFile' && file.size > limits.maxSingleFile
           );
 
+          // US-001-05: failed rows get danger styling + retry button (AC-001-3).
+          const isFailed = file.status === 'failed';
+
           return (
             <li
               key={file.id}
-              className={`file-row ${fileViolation ? 'file-row--over-limit' : ''}`}
-              title={fileViolation ? `Exceeds per-file limit: ${formatBytes(limits.maxSingleFile)}` : undefined}
+              className={`file-row ${fileViolation ? 'file-row--over-limit' : ''} ${isFailed ? 'file-row--failed' : ''}`}
+              title={
+                fileViolation
+                  ? `Exceeds per-file limit: ${formatBytes(limits.maxSingleFile)}`
+                  : isFailed
+                    ? 'Upload failed — retry'
+                    : undefined
+              }
             >
               {fileIcon}
               <span className="file-name" title={file.name}>
                 {file.name}
               </span>
-              <span className="file-size">{formatBytes(file.size)}</span>
+              {/* US-001-05: show "Upload failed — retry" text instead of size for failed files. */}
+              {isFailed ? (
+                <span className="file-size file-failed-label">Upload failed — retry</span>
+              ) : (
+                <span className="file-size">{formatBytes(file.size)}</span>
+              )}
+              {/* US-001-05: Retry button for failed files (AC-001-3). */}
+              {isFailed && (
+                <button
+                  type="button"
+                  className="btn btn-secondary file-retry-button"
+                  aria-label={`Retry ${file.name}`}
+                  onClick={() => retry(file.id)}
+                >
+                  {retryIcon}
+                </button>
+              )}
               <button
                 type="button"
                 className="file-remove"
@@ -118,12 +176,16 @@ export function StagingList() {
         style={{ opacity: hasViolation ? '0.55' : '1' }}
         title={hasViolation ? 'Limit exceeded — remove files to send.' : 'Send transfer'}
         onClick={async () => {
-          // Build the draft payload per TA-4.2#1.
-          const payload = {
-            files: files.map((f) => ({ name: f.name, sizeBytes: f.size })) as DraftFile[],
-          };
+          // Fix 5: guard against double-submit.
+          if (isSendingRef.current) return;
+          isSendingRef.current = true;
 
           try {
+            // Build the draft payload per TA-4.2#1.
+            const payload = {
+              files: files.map((f) => ({ name: f.name, sizeBytes: f.size })) as DraftFile[],
+            };
+
             const response = await fetch('/api/v1/transfers/draft', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -132,6 +194,14 @@ export function StagingList() {
 
             if (response.ok) {
               const data = await response.json();
+
+              // Fix 6: validate draft response before passing to start().
+              const parsedData = data as { files?: Array<{ uploadUrl: string }> };
+              if (!parsedData.files || !Array.isArray(parsedData.files) || parsedData.files.length !== files.length) {
+                showToast('error', 'Invalid draft response from server.');
+                return;
+              }
+
               start(data as UploadDraft); // triggers block upload (US-001-04 / T-009)
             } else {
               // Map server error codes to human messages (TA-4.1.3: Problem+JSON with closed code).
@@ -170,6 +240,8 @@ export function StagingList() {
               message = 'Transfer rejected: limit exceeded.';
             }
             showToast('error', message);
+          } finally {
+            isSendingRef.current = false; // Fix 5: release send guard.
           }
         }}
       >
