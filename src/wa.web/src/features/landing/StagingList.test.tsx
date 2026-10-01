@@ -239,9 +239,12 @@ describe('US-001-05 — Recover from a failed upload (StagingList)', () => {
   });
 
   it('uploading row shows progress bar with aria attributes', async () => {
+    // FR-001-5: mid-upload state shows progressbar with correct ARIA attributes.
+    // Use a 5-block file so the first batch of 4 blocks completes (progress > 0)
+    // while the 5th block hangs, keeping the file in 'uploading' state.
     render(<App />);
     const zone = screen.getByRole('button', { name: 'Upload files' });
-    fireEvent.drop(zone, { dataTransfer: { files: [makeFile('progress.bin', BLOCK_SIZE * 2)] } });
+    fireEvent.drop(zone, { dataTransfer: { files: [makeFile('progress.bin', BLOCK_SIZE * 5)] } });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- jsdom fetch mock requires casting
     (window as any).fetch = vi.fn().mockResolvedValue({
@@ -255,8 +258,8 @@ describe('US-001-05 — Recover from a failed upload (StagingList)', () => {
     let blockCount = 0;
     __setUploadFn(async (_block: Blob, _url: string) => {
       blockCount += 1;
-      if (blockCount === 1) return; // first block succeeds
-      return new Promise<void>(() => {}); // second block hangs forever
+      if (blockCount <= 4) return; // first 4 blocks succeed
+      return new Promise<void>(() => {}); // 5th block hangs forever
     });
     __setDelayFn(async () => {});
 
@@ -266,7 +269,7 @@ describe('US-001-05 — Recover from a failed upload (StagingList)', () => {
     const fileId = useUploadEngine.getState().files[0].id;
     await waitForStatus(fileId, 'uploading');
 
-    // Wait for progress > 0 (first block completed).
+    // Wait for progress > 0 (first batch of 4 blocks completed).
     const pollStart = Date.now();
     while (Date.now() - pollStart < 2000) {
       const file = useUploadEngine.getState().files.find((f) => f.id === fileId);

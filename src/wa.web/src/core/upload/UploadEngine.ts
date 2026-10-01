@@ -118,7 +118,7 @@ async function uploadFile(
   set: (fn: (state: UploadEngineApi) => Partial<UploadEngineApi>) => void
 ): Promise<void> {
   const totalBlocks = Math.ceil(file.size / BLOCK_SIZE);
-  let completedSet = completedBlocks.get(fileId) ?? new Set<number>();
+  const completedSet = completedBlocks.get(fileId) ?? new Set<number>();
 
   // US-001-05: resume from saved block indices — skip already-completed blocks (FR-001-6).
   if (completedSet.size >= totalBlocks) {

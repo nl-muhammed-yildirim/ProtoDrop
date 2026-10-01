@@ -97,12 +97,6 @@ export function StagingList() {
           text = `Upload paused — ${failedCount} file${failedCount === 1 ? '' : 's'} need attention.`;
           className += ' staging-overall--failed';
         } else if (uploadingCount > 0) {
-          const overallPct = files.every((f) => f.size === 0 || f.progress >= 1)
-            ? 100
-            : Math.round(
-                (files.reduce((s, f) => s + f.progress * f.size, 0)) /
-                  (files.reduce((s, f) => s + f.size, 0) || 1) * 100
-              );
           text = `Uploading… ${doneCount} of ${files.length}`;
         } else if (doneCount === files.length && files.length > 0) {
           text = 'All files uploaded.';
