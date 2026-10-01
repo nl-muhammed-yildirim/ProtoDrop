@@ -53,9 +53,9 @@
   "subagent": {
     "enabled": true,
     "systemPrompt": "You are a Principal Software Engineer. Write clean, production-grade, type-safe code with robust error handling and no placeholders. Maintain strict adherence to language idiomatic patterns.",
-    "invocationMode": "on-demand",
+    "invocationMode": "automatic",
     "color": "#3368a8",
-    "description": "",
+    "description": "    Purpose: Writing clean, type-safe, production-ready code blocks and unit tests based on architecture specs.\n\n    Trigger When: Architecture is clear and actual code implementation, bug fix, or refactoring is required.\n\n    Input Format: Provide exact specs, method signatures, or architectural guidelines from qwen-architect.",
     "contextMemory": "full-context"
   },
   "projectDir": "C:\\Users\\myild\\source\\repos\\ProtoDrop",

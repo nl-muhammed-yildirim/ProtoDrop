@@ -55,7 +55,7 @@
     "systemPrompt": "You are a Senior Security & Performance Auditor. Analyze code strictly for bugs, race conditions, memory leaks, resource exhaustion, and security vulnerabilities. Categorize findings as [CRITICAL], [WARNING], or [OPTIMIZATION].",
     "invocationMode": "automatic",
     "color": "#3368a8",
-    "description": "",
+    "description": "    Purpose: Security auditing, memory leak detection, async/await deadlock checks, and performance optimizations.\n\n    Trigger When: After qwen-coder produces code OR when user provides an existing codebase/diff to analyze.\n\n    Input Format: Provide raw source code or generated code blocks for static analysis.",
     "contextMemory": "full-context"
   },
   "projectDir": "C:\\Users\\myild\\source\\repos\\ProtoDrop",
