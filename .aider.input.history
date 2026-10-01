@@ -216,3 +216,33 @@
 
 # 2026-10-01T19:48:31.888Z
 +commit and push changes to main branch
+
+# 2026-10-01T19:55:00.391Z
++run application. I want to see UI and changes
+
+# 2026-10-01T20:24:12.691Z
++Create future branch for docs/features/Phase 0-MVP/F-TRF-002/F-TRF-002-transfer-link.md.
++Let's start implementing docs/features/Phase 0-MVP/F-TRF-002/US-002-01-unique-link.md .
++- Generate quick and perfect prompt for developer subagent
++   - You can seperate it to subtasks for developer subagent
++   - Run subagents in new subtasks
++- After completion of development review code changes with Reviewer subagent in another subtask
+
+# 2026-10-01T20:34:40.515Z
++Create feature branch for docs/features/Phase 0-MVP/F-TRF-002/F-TRF-002-transfer-link.md.
++Let's start implementing docs/features/Phase 0-MVP/F-TRF-002/US-002-01-unique-link.md .
++- Generate quick and perfect prompt for developer subagent
++   - You can seperate it to subtasks while generating prompt
++- Run subtasks with developer agent one by one and in an order
++- After completion of development review code changes with Reviewer subagent in another subtask
+
+# 2026-10-01T20:59:29.051Z
++fix all issues with developer subagent in subtask
+
+# 2026-10-01T21:03:46.318Z
++fix all issues with developer subagent im new subtask
+
+# 2026-10-01T21:35:53.192Z
++* Review Code changes and create comments if something found with Reiviewer subagent in new subtask.
++* Fix found issued with developer subagent in another subtaks
++* Dont forget to add subtasks to this task as subtask
