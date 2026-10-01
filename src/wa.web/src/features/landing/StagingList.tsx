@@ -80,19 +80,37 @@ export function StagingList() {
   const violations = validateSelection(files, limits);
   const hasViolation = violations.length > 0;
 
-  // US-001-05: count failed files for the overall status line (AC-001-3).
-  const failedCount = files.filter((f) => f.status === 'failed').length;
-
   if (files.length === 0) return null; // empty list → the drop zone is the whole UI again
 
   return (
     <div className="staging">
-      {/* US-001-05: overall status line — ARIA live region for screen readers (AC-001-3). */}
-      {failedCount > 0 && (
-        <p className="staging-overall" role="status" aria-live="polite">
-          Upload paused — {failedCount} file{failedCount === 1 ? '' : 's'} need attention.
-        </p>
-      )}
+      {/* FR-001-5: overall status line — ARIA live region for screen readers (AC-001-3). */}
+      {files.length > 0 && (() => {
+        const failedCount = files.filter((f) => f.status === 'failed').length;
+        const uploadingCount = files.filter((f) => f.status === 'uploading').length;
+        const doneCount = files.filter((f) => f.status === 'done').length;
+
+        let text: string | null = null;
+        let className = 'staging-overall';
+
+        if (failedCount > 0) {
+          text = `Upload paused — ${failedCount} file${failedCount === 1 ? '' : 's'} need attention.`;
+          className += ' staging-overall--failed';
+        } else if (uploadingCount > 0) {
+          const overallPct = files.every((f) => f.size === 0 || f.progress >= 1)
+            ? 100
+            : Math.round(
+                (files.reduce((s, f) => s + f.progress * f.size, 0)) /
+                  (files.reduce((s, f) => s + f.size, 0) || 1) * 100
+              );
+          text = `Uploading… ${doneCount} of ${files.length}`;
+        } else if (doneCount === files.length && files.length > 0) {
+          text = 'All files uploaded.';
+          className += ' staging-overall--done';
+        }
+
+        return text ? <p className={className} role="status" aria-live="polite">{text}</p> : null;
+      })()}
 
       <ul className="staging-list" aria-label="Staged files">
         {files.map((file) => {
@@ -125,6 +143,26 @@ export function StagingList() {
                 <span className="file-size file-failed-label">Upload failed — retry</span>
               ) : (
                 <span className="file-size">{formatBytes(file.size)}</span>
+              )}
+              {/* FR-001-5: per-file progress bar + percent / done checkmark. */}
+              {(file.status === 'uploading' || file.status === 'done') && (
+                <>
+                  <div
+                    className="file-progress-track"
+                    role="progressbar"
+                    aria-valuenow={Math.round(file.progress * 100)}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`Upload progress for ${file.name}`}
+                  >
+                    <div className="file-progress" style={{ width: `${file.progress * 100}%` }} />
+                  </div>
+                  {file.status === 'done' ? (
+                    <span className="file-done-icon" aria-hidden="true">✓</span>
+                  ) : (
+                    <span className="file-percent">{Math.round(file.progress * 100)}%</span>
+                  )}
+                </>
               )}
               {/* US-001-05: Retry button for failed files (AC-001-3). */}
               {isFailed && (

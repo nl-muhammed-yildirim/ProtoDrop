@@ -237,4 +237,142 @@ describe('US-001-05 — Recover from a failed upload (StagingList)', () => {
     // No "paused" line should be present.
     expect(screen.queryByText(/Upload paused/)).toBeNull();
   });
+
+  it('uploading row shows progress bar with aria attributes', async () => {
+    render(<App />);
+    const zone = screen.getByRole('button', { name: 'Upload files' });
+    fireEvent.drop(zone, { dataTransfer: { files: [makeFile('progress.bin', BLOCK_SIZE * 2)] } });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- jsdom fetch mock requires casting
+    (window as any).fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        draftId: 'draft-123',
+        files: [{ uploadUrl: 'http://example.com/upload/1' }],
+      }),
+    });
+
+    let blockCount = 0;
+    __setUploadFn(async (_block: Blob, _url: string) => {
+      blockCount += 1;
+      if (blockCount === 1) return; // first block succeeds
+      return new Promise<void>(() => {}); // second block hangs forever
+    });
+    __setDelayFn(async () => {});
+
+    const sendButton = screen.getByRole('button', { name: /Send transfer/i });
+    fireEvent.click(sendButton);
+
+    const fileId = useUploadEngine.getState().files[0].id;
+    await waitForStatus(fileId, 'uploading');
+
+    // Wait for progress > 0 (first block completed).
+    const pollStart = Date.now();
+    while (Date.now() - pollStart < 2000) {
+      const file = useUploadEngine.getState().files.find((f) => f.id === fileId);
+      if (file && file.progress > 0) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    const progressbar = screen.getByRole('progressbar');
+    expect(progressbar).toBeDefined();
+    expect(progressbar.getAttribute('aria-valuemin')).toBe('0');
+    expect(progressbar.getAttribute('aria-valuemax')).toBe('100');
+    const valuenow = parseInt(progressbar.getAttribute('aria-valuenow') || '0', 10);
+    expect(valuenow).toBeGreaterThan(0);
+    expect(valuenow).toBeLessThan(100);
+  });
+
+  it('done row shows check icon instead of percent', async () => {
+    render(<App />);
+    const zone = screen.getByRole('button', { name: 'Upload files' });
+    fireEvent.drop(zone, { dataTransfer: { files: [makeFile('done.bin', BLOCK_SIZE)] } });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- jsdom fetch mock requires casting
+    (window as any).fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        draftId: 'draft-123',
+        files: [{ uploadUrl: 'http://example.com/upload/1' }],
+      }),
+    });
+
+    __setUploadFn(async (_block: Blob, _url: string) => {});
+    __setDelayFn(async () => {});
+
+    const sendButton = screen.getByRole('button', { name: /Send transfer/i });
+    fireEvent.click(sendButton);
+
+    const fileId = useUploadEngine.getState().files[0].id;
+    await waitForStatus(fileId, 'done');
+
+    const list = screen.getByRole('list', { name: 'Staged files' });
+    expect(list.querySelector('.file-done-icon')).not.toBeNull();
+    expect(list.querySelector('.file-percent')).toBeNull();
+  });
+
+  it('overall line shows uploading count while in progress', async () => {
+    render(<App />);
+    const zone = screen.getByRole('button', { name: 'Upload files' });
+    fireEvent.drop(zone, {
+      dataTransfer: {
+        files: [makeFile('a.bin', BLOCK_SIZE), makeFile('b.bin', BLOCK_SIZE)],
+      },
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- jsdom fetch mock requires casting
+    (window as any).fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        draftId: 'draft-123',
+        files: [
+          { uploadUrl: 'http://example.com/upload/1' },
+          { uploadUrl: 'http://example.com/upload/2' },
+        ],
+      }),
+    });
+
+    let blockCount = 0;
+    __setUploadFn(async (_block: Blob, _url: string) => {
+      blockCount += 1;
+      if (blockCount === 1) return new Promise<void>(() => {}); // first file's block hangs
+    });
+    __setDelayFn(async () => {});
+
+    const sendButton = screen.getByRole('button', { name: /Send transfer/i });
+    fireEvent.click(sendButton);
+
+    const files = useUploadEngine.getState().files;
+    await waitForStatus(files[0].id, 'uploading');
+
+    const statusLine = document.querySelector('.staging-overall');
+    expect(statusLine?.textContent).toContain('Uploading…');
+  });
+
+  it("overall line shows 'All files uploaded.' when all done", async () => {
+    render(<App />);
+    const zone = screen.getByRole('button', { name: 'Upload files' });
+    fireEvent.drop(zone, { dataTransfer: { files: [makeFile('all.bin', BLOCK_SIZE)] } });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- jsdom fetch mock requires casting
+    (window as any).fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        draftId: 'draft-123',
+        files: [{ uploadUrl: 'http://example.com/upload/1' }],
+      }),
+    });
+
+    __setUploadFn(async (_block: Blob, _url: string) => {});
+    __setDelayFn(async () => {});
+
+    const sendButton = screen.getByRole('button', { name: /Send transfer/i });
+    fireEvent.click(sendButton);
+
+    const fileId = useUploadEngine.getState().files[0].id;
+    await waitForStatus(fileId, 'done');
+
+    const statusLine = document.querySelector('.staging-overall');
+    expect(statusLine?.textContent).toBe('All files uploaded.');
+  });
 });
