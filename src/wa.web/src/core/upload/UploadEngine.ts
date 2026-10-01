@@ -75,6 +75,7 @@ export const useUploadEngine = create<UploadEngineApi>()((set) => ({
 
   start(_draft: UploadDraft) {
     // TODO(US-001-03/T-009): block upload — 8 MiB blocks, parallelism 4 per file (TA-8.3).
+    set((state) => ({ files: state.files.map((file) => ({ ...file, status: 'uploading' as const })) }));
   },
 
   retry(_fileId: string) {

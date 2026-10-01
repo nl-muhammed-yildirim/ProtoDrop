@@ -1,199 +1,248 @@
-# Plan — Optimized Developer Prompt for US-001-02 (Stage and remove multiple files)
+# Plan — US-001-04: Watch per-file and overall upload progress
 
 ## 1. Goal
 
-Deliver one **self-contained, copy-pasteable Developer prompt** that closes `docs/features/Phase 0-MVP/F-TRF-001/US-001-02-stage-files.md` with near-zero ambiguity — accounting for the fact that **most of this story is already committed**, so the prompt must tell the developer exactly what exists (don't rebuild), which uncommitted review fixes to preserve, and which precise test gaps remain.
+Implement live, byte-accurate upload progress for the ProtoDrop landing page (F-TRF-001 / T-012), per `docs/features/Phase 0-MVP/F-TRF-001/US-001-04-upload-progress.md`:
+- After "Send.", each staged file row shows a **3 px progress bar + percentage** computed from **bytes uploaded, not block count** (FR-001-5).
+- An **overall line** reports combined uploaded bytes vs total bytes ("Uploading… 1.2 GB of 4.0 GB").
+- A file at 100 % is marked **done** (check icon) and the next file starts (files serialized — FR-001-4).
+- All files done → overall shows 100 %.
+- Progress is driven by the existing Zustand store (`useUploadEngine`) — **no polling**.
 
-## 2. Analysis (verified against working tree)
+## 2. Analysis
 
-### Already committed in `919cb3c` ("T-012 web part 1 — US-001-01 + US-001-02 stage/remove")
+### What already exists (verified against codebase)
 
 | File | State |
 |---|---|
-| `src/wa.web/src/core/upload/UploadEngine.ts` | TA-8.3 Zustand store: `addFiles` / `remove(fileId)` (recomputes total) / `reset()` live; `start(draft)` / `retry(fileId)` stubbed for US-001-03/T-009. Module-level `Map<id, File>` holds original handles (EC-001-1). |
-| `src/wa.web/src/features/landing/StagingList.tsx` | UI §4.2 rows (44 px, icon, truncated name + `title`, size via `formatBytes`, remove ✕ with `aria-label="Remove {name}"`) + total line `"N file(s) · X"`; **returns null when empty** (= empty drop-zone state). Wired in `App.tsx` below `<DropZone/>`. |
-| `src/wa.web/src/features/landing/DropZone.test.tsx` | 7 US-001-01 tests, incl. `'removes a staged file and updates the total line'` (AC-1 at UI level: click ✕ → row gone + "1 file · 1 KB"). |
-| `src/wa.web/src/core/upload/UploadEngine.test.ts` | 6 store tests, incl. `remove() drops the row and recomputes the total`, duplicate names kept with distinct ids (EC-001-2). |
-| `landing.css` L77+ | `.staging / .staging-list / .file-row / .staging-total` per §4.2/§5.1, tokens only. |
+| `src/wa.web/src/core/upload/UploadEngine.ts` | TA-8.3 Zustand store: `{ files:[{id,name,size,status:'queued'\|'uploading'\|'done'\|'failed',progress}], overall:{sentBytes,totalBytes} }`, API `addFiles/remove/reset/start(draft)/retry(fileId)`. Module-level `fileHandles` Map holds original `File` objects. **`start(_draft)` currently only flips every file to `'uploading'` — no real upload, no progress callbacks.** This is the seam US-001-04 extends. |
+| `src/wa.web/src/features/landing/StagingList.tsx` | UI §4.2 rows (icon, name, size, remove ✕), violation message, Send button that POSTs `/api/v1/transfers/draft` then calls `start(data)`. **No progress bar / percent label / overall line yet.** |
+| `src/wa.web/src/core/upload/formatBytes.ts` | 1024-based formatter (TA-8.5), already imported by StagingList — reuse for the overall line + labels. |
+| `src/wa.web/src/styles/landing.css`, `tokens.css` | Tokens: `--accent`, `--success`, `--fs-tiny`, `--fs-small`. Existing `.file-row*` styles to extend. |
 
-### Uncommitted in working tree — pending review fixes, tagged `REVIEW(919cb3c)` (MUST be preserved, not reverted)
+### What is missing for this slice
+- **Real uploader behind `start(draft)`**: serialized per-file block upload (8 MiB blocks, parallelism 4 within a file) that emits byte callbacks into the store.
+- **Byte-based progress math** (FR-001-5): per-file `progress = uploadedBytes / size`; overall `sentBytes = Σ uploaded bytes`, recomputed on every callback.
+- **Per-row UI**: 3 px bar + percent label; done check icon.
+- **Overall line**: "Uploading… X of Y" in `--fs-small`.
+- **ARIA live region** (`role=status`, polite) announcing overall changes (not every tick — F-TRF-016-3).
 
-| File | Change |
-|---|---|
-| `core/ui/Toast.tsx` | `MAX_TOASTS = 5` cap on toast stack. |
-| `core/upload/UploadEngine.ts` | comment fixes T-004 → **T-009** (draft creation + per-file cwr SAS). |
-| `core/upload/formatBytes.ts` + test | unit-boundary carry: 1,048,575 B renders `"1 MB"` not `"1024 KB"`; table case added. |
-| `features/landing/DropZone.tsx` | drag enter/leave **depth counter** — fixes highlight flicker when crossing child elements. |
+### Scope decision (critical — keep it shippable and testable)
+The story's technical notes call for `@azure/storage-blob` `BlockBlobClient.uploadData`. To keep this slice focused on **progress state + math + UI** while still being the real transport path:
+- Implement the uploader in `UploadEngine.ts` using a small, **injectable upload function** (module-level seam) so unit tests can simulate byte callbacks without a network. The default implementation uses `@azure/storage-blob`'s progress callback (cumulative bytes). If the package is not yet installed in `wa.web`, add it (`npm i @azure/storage-blob`) — matches FR-001-4/FR-001-7 and TA-8.3.
+- **Do NOT implement US-001-05** (block-level retry/backoff 5×, `failed` status, Retry button, resume from last completed block). Leave a clear TODO seam so that story owns failure semantics. Per-file errors are caught; for now the file stays at its last known state with a TODO(US-001-05/T-012) comment.
 
-### Remaining gaps for US-001-02 closure (story → missing proof)
+### Draft shape (from existing StagingList test mock — TA-4.2#1)
+```json
+POST /api/v1/transfers/draft → { "draftId": "...", "expiresInSec": 7200,
+  "files": [ { "uploadUrl": "…", "contentLength": N } ] }
+```
+The uploader matches draft files to staged files **by index/order** (the full DTO with `fileId` lands with US-001-03/T-009; for now order-based matching is the contract).
 
-| Story item | Status | Gap to fill |
+## 3. Files to Modify or Create
+
+| File | Action | Why |
 |---|---|---|
-| Happy path 1–3, alt flows (duplicates, no re-ordering), AC-1 list-shrink + total | ✅ implemented & tested (store + UI level in `DropZone.test.tsx`) | none |
-| **Edge: "Removing the last file returns the UI to the empty drop-zone state"** | code correct (`return null`), untested at UI level | new test |
-| **Alt flow EC-001-3: 0-byte file accepted, row shows "0 B" flag** | renders naturally via `formatBytes(0) = "0 B"`, untested | new test |
-| AC-2 "two files named report.pdf … both preserved" (staging half; upload half lands US-001-03/04) | store-level duplicate test exists, no UI assertion that **both rows render and each is independently removable** | new test |
-| AC-1 clause *"And 'Send.' remains enabled"* | Send. button deliberately deferred with pre-checks to **US-001-03** (prior session decision, PROGRESS 2026-09-28; story UI notes tie disabled-state to US-001-03) | state explicitly in prompt + PROGRESS entry so the clause is not "lost" |
+| `src/wa.web/src/core/upload/UploadEngine.ts` | **Modify** | Replace `start()` stub with a real serialized uploader; add byte-based progress math (pure, exported for tests); keep TA-8.3 state shape unchanged. |
+| `src/wa.web/src/features/landing/StagingList.tsx` | **Modify** | Render per-row 3 px bar + percent label; done check icon; overall line "Uploading… X of Y"; ARIA live region (throttled). |
+| `src/wa.web/src/styles/landing.css` | **Modify** | Add `.file-progress`, `.file-percent`, `.staging-overall`, `.file-done-icon` using tokens (`--accent`, `--success`, `--fs-tiny`, `--fs-small`). |
+| `src/wa.web/src/core/upload/UploadEngine.test.ts` | **Modify** | Unit tests: byte-based progress math, per-file completion → next file starts (serialization), overall recompute on every callback, all-done → 100 %, zero-byte file guard. |
+| `src/wa.web/src/features/landing/StagingList.test.tsx` | **Modify** | Component tests: bar + percent render from store state; overall line text format; done row shows check icon; live region present. |
+| `package.json` (wa.web) | **Possibly modify** | Add `@azure/storage-blob` if not present (real transport). Confirm before adding — the injectable seam keeps unit tests independent of it. |
 
-### Contract sources (quoted verbatim into prompt)
+## 4. Dependencies / Cross-cutting Impact
 
-- TA-8.3 (`docs/03-technical-architecture.md` L739–744): State `{ files: [{id, name, size, status: queued|uploading|done|failed, progress}], overall: {sentBytes, totalBytes} }`; API `start(draft), retry(fileId), remove(fileId), reset()`; 8 MiB blocks, parallelism 4 per file, stop after 5 block retries.
-- FR-001-2 (`02-feature-plan.md` L97): "Multi-file selection. Files are added to a staging list; user removes individual files before final 'Send.'"
-- EC-001-2 / EC-001-3 (`02-feature-plan.md` ~L127–128): duplicates kept with names preserved; 0-byte accepted but flagged in file list.
-- UI §4.2 (file row spec), §5.1 (landing: rows + total line "N files · X" below drop zone).
+- **TA-8.3 state contract is frozen.** Do NOT change the shape of `files[]`, `overall`, or API names (`start/retry/remove/reset`). US-001-05 (retry) and F-TRF-002 (finalize) depend on it.
+- **`fileHandles` Map** already stores original `File` objects — use these for upload; do not re-read from disk.
+- **Progress must be bytes-based.** A per-block callback that only counts blocks violates FR-001-5. The Azure SDK progress callback reports cumulative bytes transferred — use it directly.
+- **Files are serialized** (FR-001-4): upload file i fully before starting file i+1. Parallelism 4 applies *within* a single file only.
+- **No polling.** UI reads come from Zustand selectors; the uploader calls `set()` on each callback.
+- **ARIA live region** must announce overall changes (e.g., every ~5 % or at done/failed transitions), not every tick — otherwise screen readers are flooded (F-TRF-016-3).
+- **Existing test in StagingList.test.tsx** asserts that after Send, all files become `'uploading'` immediately. `start()` must flip files to `'uploading'` **synchronously** before any async upload work begins — keep that assertion passing.
+- **Windows/PowerShell 5.1** dev box: composite gates wrapped in `cmd /c "npm run lint && npm run test:run && npm run build"`; commit messages ASCII (no em-dash); judge success by per-stage output, not wrapper exit code.
 
-## 3. Files to Modify (the prompt tells the developer exactly these)
+## 5. Implementation Steps
 
-| File | Action |
-|---|---|
-| `src/wa.web/src/features/landing/StagingList.test.tsx` | **create** — 3 UI tests (empty-state, "0 B" flag, duplicates independently removable), same harness pattern as `DropZone.test.tsx`. |
-| `docs/PROGRESS.md` | **update (last step)** — US-001-02 closure entry: gaps closed, REVIEW(919cb3c) fixes kept in-tree, AC clauses carried to US-001-03 (Send. button + its "remains enabled" clause), T-012 stays open. |
-| working tree `Toast.tsx`, `UploadEngine.ts`, `formatBytes.{ts,test.ts}`, `DropZone.tsx` | **keep** uncommitted REVIEW(919cb3c) changes as-is (they must pass the gate together with the new tests). |
+### Step 1 — `UploadEngine.ts`: real uploader behind the existing seam
+- Keep `start(draft)` signature and its **synchronous** flip of every file to `'uploading'` (preserves the existing Send test).
+- After the synchronous flip, kick off an async serialized loop over staged files **in order**. For each file:
+  - Get its `File` from `fileHandles`.
+  - Upload via Azure `BlockBlobClient.uploadData(file, size, { blockSize: 8*1024*1024, maxParallelism: 4 })` to the per-file SAS URL (draft provides `{files:[{uploadUrl}]}` — match by index/order; if a file has no URL in tests, treat as a no-op transport).
+  - On each progress callback (cumulative bytes `loadedBytes`): set that file's `progress = loadedBytes / size` (guard zero-byte: `size === 0 ? 1 : …`) and recompute `overall.sentBytes = Σ uploadedBytes across all files`; keep `totalBytes = Σ sizes`.
+  - When a file reaches 100 %: set its status to `'done'`, progress 1, then start the next file (serialization).
+- **Pure byte-math helper** (exported for unit tests): given an array of `{size, uploadedBytes}`, return per-file progress fractions + overall sent/total. This isolates FR-001-5 from transport.
+- Keep `retry(fileId)` as a stub with a TODO(US-001-05/T-012) — do not invent backoff here.
+- **Testability:** make the upload function injectable (module-level seam, e.g., `let uploadFn = defaultUploader` or an optional param on `start`). Unit tests simulate byte callbacks without a network. Do not over-engineer — a simple injectable suffices for this story's test plan ("Unit: UploadEngine state machine, progress math").
 
-No production code is expected to change; if a test exposes a real bug, fix minimally and note it in PROGRESS.
+### Step 2 — `StagingList.tsx`: render progress
+- For each row (only when status is `'uploading'` or `'done'`; before Send keep the plain icon+name+size layout):
+  - Render a **3 px progress bar** element with CSS width = `${Math.round(progress*100)}%`, background `--accent`.
+  - Render a **percent label** (`--fs-tiny`) showing `Math.round(progress*100)` + "%".
+- For rows with status `'done'`: show a **check icon** (inline SVG, `aria-hidden`), colored `--success`, plus name and size — per the spec's done-row form ("Done row: --success check icon, name, size").
+- Add an **overall line** above the list: text `"Uploading… {formatBytes(sent)} of {formatBytes(total)}"` in `--fs-small`. Show it while any file is uploading; when all are `done`, show 100 % / total-of-total.
+- Wrap a dedicated span in an **ARIA live region**: `<div role="status" aria-live="polite">…</div>`. Update its text only on coarse changes (e.g., every 5 % or at done transitions) to avoid tick spam — track the last announced bucket via a `useRef`.
+- Reuse existing `formatBytes` helper (already imported).
+- Do **not** change the Send button logic, violation handling, or draft POST — those are US-001-03 and already work.
 
-## 4. Dependencies
+### Step 3 — `landing.css`: new styles using tokens
+- `.file-progress { height: 3px; background: var(--accent); border-radius: … ; }` (width set inline).
+- `.file-percent { font-size: var(--fs-tiny); color: var(--fg-muted); flex-shrink: 0; }`.
+- `.staging-overall { font-size: var(--fs-small); color: var(--fg-muted); text-align: center; padding: 4px 8px; }`.
+- `.file-done-icon { width/height ~16px; color: var(--success); flex-shrink: 0; }`.
+- Keep consistent with existing `.staging*` classes and spacing (gap 8 px).
 
-- No .NET changes → `dotnet test` suites re-run but are unchanged-green (Docker must be running for Testcontainers per gate).
-- **No new npm packages** (TA-17): react, zustand ^5, vitest + @testing-library/react already pinned.
-- Later stories consume this exact store shape: US-001-03 (Send./limits/telemetry on `start(draft)`), US-001-04 (`start()` block upload via the module-level File map), US-001-05 (retry/backoff). Do **not** rename state or actions.
-- `T-012` in Milestone-Backlog stays `pending` — its full exit check (Playwright manual pass, retry-on-injected-failure) needs the US-001-03/04 remainder + T-009 endpoint 1.
+### Step 4 — Tests
+- **Unit (`UploadEngine.test.ts`)** using the injected uploader / byte-callback simulator:
+  - Per-file progress reflects bytes uploaded (e.g., upload 512 of 1024 → progress 0.5, overall.sentBytes = 512).
+  - A file at 100 % is marked `done` and the next file begins uploading (serialization).
+  - Overall recompute on every callback: with 3 files, after partial bytes across files, overall.sentBytes equals Σ uploaded bytes; totalBytes unchanged.
+  - All files done → all status `done`, overall shows 100 % (sent == total).
+  - Byte-based not block-count: a file whose size is not a multiple of the block size still reaches exactly 1.0 at completion.
+  - Zero-byte file guard: progress = 1 and status `done` immediately on start (no divide-by-zero).
+- **Component (`StagingList.test.tsx`)**:
+  - Given store state with one `uploading` file at progress 0.5, render shows a bar (width ~50 %) and a "50%" label.
+  - Overall line text matches `formatBytes(sent)` + " of " + `formatBytes(total)` for the staged set.
+  - A `done` row renders the check icon (assert by class / accessible structure).
+  - Live region exists with `role="status"`.
 
-## 5. Implementation Steps (= the prompt content, summarized)
-
-1. **Preserve** committed implementation and uncommitted REVIEW(919cb3c) fixes (listed above).
-2. **Create `StagingList.test.tsx`** mirroring the `DropZone.test.tsx` harness (`render(<App/>)`, `makeFile` helper with `Object.defineProperty(file, 'size')`, `beforeEach` reset of `useUploadEngine` + `useToasts`) and encode:
-   - last-file removal → `queryByRole('list', { name: 'Staged files' })` null, drop zone still present;
-   - 0-byte staged file → row shows "0 B", total line `"1 file · 0 B"` (EC-001-3);
-   - two staged `report.pdf` → both rows render, removing one leaves the other + updated total (AC-2 staging half).
-3. **Gate** — AGENT.md §4 verbatim (PowerShell gotchas: no top-level `&&`, wrap in `cmd /c`; judge composite npm gates by per-stage output; Docker required for Testcontainers).
-4. **Update `docs/PROGRESS.md` last**, keep T-012 open, document carried-over AC clauses.
+### Step 5 — Update PROGRESS.md (last step)
+Mark US-001-04 completed, carry forward AC clauses to US-001-05 / T-012.
 
 ## 6. Risks & Considerations
 
-- **Over-build risk (main one):** developer may re-create UploadEngine/StagingList or add the "Send." button — prompt states both explicitly with file paths and deferral rationale.
-- **Test-only slice looks small:** reviewer must see that behavior was already committed in `919cb3c`; prompt cites it so PROGRESS/AC closure is traceable, not invented.
-- **`getAllByText('report.pdf')`:** the remove buttons carry only an SVG (no text node) — safe; but names with identical text require `queryAllByText`, and removal of one duplicate must target `getAllByRole('button', { name: 'Remove report.pdf' })[0]`.
-- **Zero-byte assertion:** "0 B" also appears in the total line for an all-zero list (`"1 file · 0 B"`) — assert both deliberately, not via a lone ambiguous lookup.
-- **jsdom:** no new techniques needed (drop/click only; paste/DOM-defining-property patterns already proven in `DropZone.test.tsx`).
-- **Working-tree noise:** untracked `plan.md`, `session-tmp/` and `.aider-desk/*` changes exist — developer should not commit unrelated noise beyond the slice's files + PROGRESS.
+| Risk | Mitigation |
+|---|---|
+| **Azure dependency** — `@azure/storage-blob` may not yet be in `wa.web`. | Make transport injectable so unit tests don't need the real client; only integration/E2E needs the SDK. Confirm with user before `npm i`. |
+| **Don't break US-001-05** — retry/backoff/`failed`/Retry button belong to that story. | Leave a TODO seam in `start()`'s per-file error path; don't introduce the 5× backoff loop or resume-from-last-block here. |
+| **Don't break existing "Send → all uploading" test** — `start()` must flip files to `'uploading'` synchronously before async work. | Flip status in the same synchronous `set()` that the current stub does; kick off the async loop after. |
+| **Byte-based progress (FR-001-5)** — a block counter passes happy path but fails non-multiple sizes. | Use cumulative bytes from the SDK callback, never block index/count. Test with a size not a multiple of 8 MiB. |
+| **Serialization vs parallelism** — getting this wrong changes throughput/UX and violates FR-001-4. | Files serialized (one at a time); parallelism 4 only *within* one file via the SDK's `maxParallelism`. |
+| **ARIA live region flooding** — announcing every tick spams screen readers (F-TRF-016-3). | Throttle to coarse buckets or transitions only; track last announced bucket with a ref. |
+| **Zero-byte file (EC-001-3)** — divide-by-zero on `loaded/size`. | Guard `progress = size === 0 ? 1 : loaded/size`; mark done immediately on start. |
+| **Paused tab / slow connection** — block-blob upload survives; no overall timeout. | The callback drives state; no timer-based recompute needed. No overall timeout (only block-level retries, US-001-05). |
+| **PowerShell/Windows dev box** — composite gates + ASCII commits. | `cmd /c "npm run lint && npm run test:run && npm run build"`; judge success by per-stage output, not wrapper exit code. |
 
----
-
-# Developer Prompt (copy everything between the lines)
+## 7. Final Developer Prompt
 
 ```text
-Task: US-001-02 — Stage and remove multiple files (closure slice of T-012 web part)
-Story: docs/features/Phase 0-MVP/F-TRF-001/US-001-02-stage-files.md
+Task: US-001-04 — Watch per-file and overall upload progress
+Story: docs/features/Phase 0-MVP/F-TRF-001/US-001-04-upload-progress.md
 Feature F-TRF-001 | Story ACs below are the acceptance criteria — encode them in tests.
 
 ## What you are building
 
-The landing-page staging list: a user adds several files (already possible via
-drop/picker/paste) and can remove any of them before "Send."; totals update on every
-add/remove; removing the last file returns the UI to the empty drop-zone state.
-FR-001-2 (02-feature-plan.md): "Files are added to a staging list; user removes individual
-files before final 'Send.'"
+Live, byte-accurate upload progress on the landing page:
+  • Per-file live percentage computed from BYTES uploaded (not block count) — FR-001-5.
+  • Overall line "Uploading… {sent} of {total}" using formatBytes().
+  • A file at 100 % is marked done (check icon); the next file starts (files serialized — FR-001-4).
+  • All files done → overall shows 100 %.
+  • Progress is driven by the existing Zustand store (useUploadEngine) — NO polling.
+
+The real transport uses @azure/storage-blob BlockBlobClient.uploadData (8 MiB blocks, maxParallelism 4 per file), but keep it injectable so unit tests simulate byte callbacks without a network. US-001-05 owns failure/retry semantics — leave a TODO seam for that story.
 
 ## Acceptance criteria (story, verbatim)
 
-Given the staging list has 2 files
-When I remove one file
-Then the list shows 1 file and the total size updates immediately
-And "Send." remains enabled            <- clause carried to US-001-03 (see Out of scope)
+Happy path:
+  Given I have 3 files staged and I press "Send."
+  When the upload runs
+  Then every file row shows a live percentage based on bytes uploaded
+  And the overall line shows combined progress
+  When all files reach 100%
+  Then "Send." advances to the link screen (F-TRF-002 — out of scope here; reaching done/100 % is enough)
 
-Given I stage two files named "report.pdf"
-When I press "Send."
-Then both files are uploaded and both names are preserved in the transfer
-    <- staging half closes here; upload half closes with US-001-03/04 via start()
+  Given a file row is at 100%
+  When the next file starts
+  Then the completed row shows a done check and the next row begins filling
 
-Edge cases (story): removing the LAST file returns the UI to the empty drop-zone state.
-Alt flow EC-001-3: a 0-byte file is accepted, but its row shows "0 B" so the sender
-is not surprised (EC-001-3 in 02-feature-plan.md: "0-byte file: accept but flag").
+Edge cases:
+  • The progress state is live (Zustand store), so no polling.
+  • A failed file pauses only its own row (US-001-05); overall % keeps counting the completed bytes.
+  • If the user leaves the page mid-upload, the session is lost in MVP (block-level resume is within-session only, FR-001-6).
 
-## What ALREADY EXISTS — do NOT rebuild or restructure (committed in 919cb3c)
+UI notes:
+  • Per-row bar: 3 px, --accent, percent in --fs-tiny (UI-Reference §4.2).
+  • Overall line above the list: "Uploading… 1.2 GB of 4.0 GB" in --fs-small.
+  • ARIA live region (role=status, polite) announces overall changes, not every percent tick (F-TRF-016-3).
+  • Done row: --success check icon, name, size.
 
-- src/wa.web/src/core/upload/UploadEngine.ts — TA-8.3 Zustand store, EXACT shape
-  { files: [{id, name, size, status: 'queued'|'uploading'|'done'|'failed', progress}],
-     overall: { sentBytes, totalBytes } }; live addFiles/remove/reset; start(draft)/
-  retry(fileId) stubbed (TODO US-001-03/T-009). remove() already filters the row AND
-  recomputes overall.totalBytes. Module-level Map<string, File> keeps original handles.
-- src/wa.web/src/features/landing/StagingList.tsx — §4.2 rows (icon, name with title attr,
-  size via formatBytes, remove ✕ button aria-label "Remove {name}" → store.remove) +
-  total line "{N} file(s) · {bytes}"; returns null when empty (= empty drop-zone state).
-- src/wa.web/src/features/landing/DropZone.test.tsx — already contains the UI test
-  "removes a staged file and updates the total line" (AC-1: click ✕ → row gone, "1 file · 1 KB").
-- UploadEngine.test.ts (6 tests incl. remove() recompute + duplicate ids), App.tsx wiring
-  (<DropZone/> then <StagingList/> in <main>), landing.css §4.2 styles — all committed.
+## Scope boundaries
 
-## UNCOMMITTED changes already in your working tree — KEEP all of them as-is:
+### In scope (this slice)
+- Replace the start(draft) stub in UploadEngine.ts with a real serialized uploader:
+    * Synchronously flip every file to 'uploading' first (preserves existing Send test).
+    * Then async loop over staged files IN ORDER (serialization — FR-001-4). For each file, upload via the injectable upload function using @azure/storage-blob BlockBlobClient.uploadData(file, size, { blockSize: 8*1024*1024, maxParallelism: 4 }) to the per-file SAS URL (draft.files[i].uploadUrl — match by index/order).
+    * On each progress callback (cumulative bytes loadedBytes): set file.progress = loadedBytes / size (guard zero-byte: size === 0 ? 1 : …) and recompute overall.sentBytes = Σ uploadedBytes across all files; totalBytes = Σ sizes.
+    * When a file reaches 100 %: status 'done', progress 1, then start the next file.
+- Pure byte-math helper (exported for unit tests): given [{size, uploadedBytes}], return per-file progress fractions + overall sent/total. Isolates FR-001-5 from transport.
+- Per-row UI in StagingList.tsx: 3 px bar (width = Math.round(progress*100)%) + percent label (--fs-tiny); done rows show --success check icon + name + size.
+- Overall line above the list: "Uploading… {formatBytes(sent)} of {formatBytes(total)}" in --fs-small; shows 100 % when all files are done.
+- ARIA live region (role="status", aria-live="polite") announcing overall changes only on coarse buckets (~5 %) or done transitions — throttle via useRef, not every tick.
+- Unit tests: byte-based progress math, per-file completion → next file starts (serialization), overall recompute on every callback, all-done → 100 %, zero-byte guard, non-multiple-of-block-size still reaches exactly 1.0.
+- Component tests: bar + percent render from store state; overall line text format "X of Y"; done row shows check icon; live region present (role="status").
 
-- core/ui/Toast.tsx            MAX_TOASTS = 5 cap (REVIEW(919cb3c))
-- core/upload/UploadEngine.ts  comment fixes T-004 → T-009 (REVIEW(919cb3c))
-- core/upload/formatBytes.ts   unit-boundary carry: 1,048,575 B renders "1 MB" not "1024 KB"
-- core/upload/formatBytes.test.ts  + [1_048_575, '1 MB'] case (REVIEW(919cb3c))
-- features/landing/DropZone.tsx drag enter/leave depth counter — fixes highlight flicker
-These review fixes must pass the gate together with your new tests. Do not revert them;
-do not extend beyond what is already there unless a test fails.
+### Out of scope (explicitly)
+- US-001-05: block-level retry/backoff (5 × backoff), 'failed' status, Retry button, resume from last completed block. Leave a TODO(US-001-05/T-012) seam in start()'s per-file error path — catch errors, leave file at last known state.
+- F-TRF-002: navigation to the link screen / FinalizeTransferCommand (T-010). Reaching done/100 % is enough here.
+- Draft DTO full shape with fileId (US-001-03/T-009) — for now match draft.files[i] to staged files by index/order; treat as {files:[{uploadUrl, contentLength}]}.
+- Telemetry upload_completed emission (TA-10.2) unless already wired — note as follow-up if not present.
 
-## Your changes (minimal)
+## Existing assets you must preserve (do NOT refactor or replace)
 
-1. CREATE src/wa.web/src/features/landing/StagingList.test.tsx
-   Mirror the DropZone.test.tsx harness exactly: render(<App/>), the same makeFile helper
-   (new File([''], name) + Object.defineProperty(file, 'size', { value })), beforeEach
-   resetting useUploadEngine.getState().reset() and useToasts.getState().clear().
-   Cite story IDs in a header comment. Tests to encode:
+  • src/wa.web/src/core/upload/UploadEngine.ts — TA-8.3 store; keep state shape {files:[{id,name,size,status,progress}], overall:{sentBytes,totalBytes}} and API names start/retry/remove/reset unchanged. Keep fileHandles Map for original File objects.
+  • src/wa.web/src/features/landing/StagingList.tsx — existing rows + Send button + violation logic (US-001-03) already work; only ADD progress UI, do not touch the draft POST or error mapping.
+  • src/wa.web/src/core/upload/formatBytes.ts — reuse for overall line + labels.
+  • src/wa.web/src/styles/tokens.css and landing.css — use existing tokens (--accent, --success, --fs-tiny, --fs-small); no new token values invented.
 
-   a) "removing the last file returns the UI to the empty drop-zone state" (story edge case):
-      stage 2 files via fireEvent.drop(zone, { dataTransfer: { files: [...] } });
-      remove both rows by clicking their ✕ buttons; then
-        expect(screen.queryByRole('list', { name: 'Staged files' })).toBeNull();
-        expect(screen.getByRole('button', { name: 'Upload files' })).toBeDefined(); // drop zone back
+## Technical contract (TA-8.3 / TA-4.2#1)
 
-   b) "a 0-byte file is accepted and flagged as 0 B in its row" (EC-001-3):
-      stage one makeFile('empty.txt', 0); then
-        expect(screen.getByText('empty.txt')).toBeDefined();
-        expect(screen.getByText('0 B')).toBeDefined();          // row size flag
-        expect(screen.getByText('1 file · 0 B')).toBeDefined(); // total line, deterministic
-
-   c) "two files with the same name are both staged and independently removable"
-      (AC-2 staging half; EC-001-2): stage two makeFile('report.pdf') in one drop; then
-        expect(screen.queryAllByText('report.pdf').length).toBe(2);
-        click the first of getAllByRole('button', { name: 'Remove report.pdf' });
-        expect(screen.getByText('report.pdf')).toBeDefined();   // exactly one left
-        expect(screen.getByText('1 file · 1 KB')).toBeDefined();// default makeFile size is 1024
-
-   Deterministic sizes only (default helper size 1024 → "1 KB"); no real timers needed.
-
-## Repository conventions (do not deviate)
-
-- Stack in package.json: react, zustand ^5, vitest + @testing-library/react.
-  TA-17 golden rule: NO new npm packages. No .NET changes expected.
-- Plain CSS with var(--*) from src/styles/tokens.css — no Tailwind classes; this slice adds none.
-- Cite IDs in comments (US-001-02, EC-001-3, TA-8.3, T-012), like existing code.
-- Tone: no exclamation points in user-facing copy.
-
-## Definition of done — AGENT.md §4 gate, run ALL (PowerShell 5.1 notes apply)
-
-dotnet test tests/wa.domain.unit
-dotnet test tests/wa.application.unit
-dotnet test tests/wa.api.integration     # Testcontainers: Docker must be running
-cd src/wa.web
-npm run lint && npm run test && npm run build
-
-Known env gotchas (from PROGRESS): PowerShell 5.1 has no top-level "&&" — wrap composite
-npm gates in cmd /c; judge the composite by per-stage output, not the wrapper exit code
-(npm stderr notices trigger a NativeCommandError even when every stage passes).
-
-Plus: T-012's full exit check (Playwright manual pass) does NOT apply to this slice —
-T-012 stays open until US-001-03/04 remainder lands. Update docs/PROGRESS.md LAST with a
-short entry: US-001-02 closed at test level on top of 919cb3c; REVIEW(919cb3c) fixes kept
-in-tree; AC clause "Send. remains enabled" + duplicate-upload half explicitly carried to
-US-001-03 (button render) / US-001-04 (start()).
-
-## Out of scope — do NOT build
-
-- "Send." button (any disabled-state logic, opacity 0.55 per UI §4.5 lands with US-001-03
-  and its limit pre-checks); draft POST /api/v1/transfers/draft; block upload (start()),
-  retry/backoff (US-001-05), progress bars/percent, telemetry; re-ordering UI (MVP: none).
+Draft response shape (from the existing StagingList test mock):
+```json
+POST /api/v1/transfers/draft → { "draftId": "...", "expiresInSec": 7200,
+  "files": [ { "uploadUrl": "…", "contentLength": N } ] }
 ```
+UploadEngine.start(draft) receives this. Match draft.files[i] to staged files by index/order (the full DTO with fileId lands with T-009).
+
+Progress math (FR-001-5 — bytes-based, NOT block count):
+  per-file progress = uploadedBytes / size   (zero-byte guard: size === 0 ? 1 : …)
+  overall.sentBytes  = Σ uploadedBytes across all files
+  overall.totalBytes = Σ sizes
+
+Serialization (FR-001-4): upload file i fully before starting file i+1. Parallelism 4 applies WITHIN a single file only (SDK maxParallelism).
+
+## Test requirements (vitest + @testing-library/react)
+
+Unit — src/wa.web/src/core/upload/UploadEngine.test.ts (use the injectable uploader / byte-callback simulator):
+  • Per-file progress reflects bytes uploaded: upload 512 of 1024 → progress 0.5, overall.sentBytes = 512.
+  • A file at 100 % is marked done and the next file begins uploading (serialization).
+  • Overall recompute on every callback: with 3 files, after partial bytes across files, overall.sentBytes equals Σ uploaded bytes; totalBytes unchanged.
+  • All files done → all status done, overall shows 100 % (sent == total).
+  • Byte-based not block-count: a file whose size is NOT a multiple of the 8 MiB block still reaches exactly 1.0 at completion.
+  • Zero-byte file guard: progress = 1 and status done immediately on start (no divide-by-zero).
+
+Component — src/wa.web/src/features/landing/StagingList.test.tsx:
+  • Given store state with one uploading file at progress 0.5, render shows a bar (width ~50 %) and a "50%" label.
+  • Overall line text matches formatBytes(sent) + " of " + formatBytes(total) for the staged set.
+  • A done row renders the check icon (assert by class / accessible structure).
+  • Live region exists with role="status".
+
+Reuse makeFile from existing tests (create File with Object.defineProperty(file, 'size', { value })). Use useUploadEngine.getState().addFiles([...]) in each test. Reset store + toasts in beforeEach (existing pattern).
+
+## Constraints (AGENT.md §4) — before marking complete, run the full gate:
+  ```powershell
+  dotnet test tests/wa.domain.unit
+  dotnet test tests/wa.application.unit
+  dotnet test tests/wa.api.integration
+  cd src/wa.web && npm run lint && npm run test:run && npm run build
+  ```
+  (Windows/PowerShell 5.1: wrap composite gates in cmd /c "…"; commit messages ASCII — no em-dash; judge success by per-stage output, not wrapper exit code.)
+
+Plus update docs/PROGRESS.md as the last step: mark US-001-04 completed, carry forward AC clauses to US-001-05 / T-012.
+
+## Notes for the reviewer
+
+The uploader is injectable so unit tests don't need a network; only integration/E2E needs @azure/storage-blob. If the package isn't yet in wa.web/package.json, add it (npm i @azure/storage-blob) — matches FR-001-4/FR-001-7 and TA-8.3. The per-file error path is a deliberate seam for US-001-05 (retry/backoff 5×, failed status, Retry button, resume from last completed block) — do NOT implement those here. Progress is bytes-based (cumulative loadedBytes from the SDK callback), never a block counter; this is what FR-001-5 checks and what the non-multiple-of-block-size test guards against.
+```
+
+---
+
+**May I proceed with this plan?** If you approve, I will execute the implementation exactly as scoped above. If any part of the scope needs adjustment (for example, if you want US-001-05 retry semantics included in this slice, or prefer a simpler approach without the Azure transport and just simulate progress), tell me and I'll refine the prompt before we begin.

@@ -67,4 +67,12 @@ describe('useUploadEngine (TA-8.3 state) — US-001-01 staging only', () => {
     expect(state.files).toEqual([]);
     expect(state.overall).toEqual({ sentBytes: 0, totalBytes: 0 });
   });
+
+  it('start() marks all staged files as uploading (US-001-03/T-009 stub)', () => {
+    useUploadEngine.getState().addFiles([makeFile('a.txt'), makeFile('b.txt')]);
+    useUploadEngine.getState().start({});
+
+    const state = useUploadEngine.getState();
+    expect(state.files.every((file) => file.status === 'uploading')).toBe(true);
+  });
 });

@@ -130,3 +130,51 @@
 
 # 2026-09-29T06:29:55.619Z
 +There are some review comments on code changes. fix them all
+
+# 2026-09-29T07:11:51.541Z
++We already implemented US-001-02 task and now I want to implement docs/features/Phase 0-MVP/F-TRF-001/US-001-03-size-validation.md user story. Actively use qdrant for finding necessary files. Quickly give me perfect prompt for develeper agent
+
+# 2026-09-29T07:24:14.772Z
++continue
+
+# 2026-09-29T08:03:58.904Z
++Proceed.
+
+# 2026-09-29T08:41:45.324Z
++It is time to review code changes. Review it. leave a comment if needed
+
+# 2026-09-29T13:51:13.903Z
++continue
+
+# 2026-10-01T09:02:06.800Z
++hi
+
+# 2026-10-01T09:02:45.093Z
++Introduce me yourself
+
+# 2026-10-01T09:08:04.270Z
++there are some bugs found. fix them
+
+# 2026-10-01T10:11:14.742Z
++I need a optimised prompt for implementing docs/features/Phase 0-MVP/F-TRF-001/US-001-04-upload-progress.md .Quickly give me perfect prompt for task implementation
+
+# 2026-10-01T10:40:58.365Z
++Proceed.
+
+# 2026-10-01T11:45:18.608Z
++continue
+
+# 2026-10-01T11:49:27.602Z
++continue last task
+
+# 2026-10-01T11:51:08.746Z
++continue
+
+# 2026-10-01T11:57:23.310Z
++start implementation
+
+# 2026-10-01T12:15:54.269Z
++Chnages have done. Review the code chnages for this branch
+
+# 2026-10-01T12:24:30.140Z
++apply all of the quick fixes now
