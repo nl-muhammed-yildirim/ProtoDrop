@@ -34,6 +34,37 @@
   color: var(--danger);
 }
 
+/* US-001-05: failed row styling (AC-001-3). */
+.file-row--failed {
+  color: var(--danger);
+}
+
+.file-failed-label {
+  font-size: var(--fs-tiny);
+  color: var(--danger);
+}
+
+/* US-001-05: retry button — small secondary button (AC-001-3). */
+.file-retry-button {
+  min-height: 28px;
+  min-width: 28px;
+  padding: 4px 8px;
+  font-size: var(--fs-tiny);
+}
+
+.file-retry-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* US-001-05: overall status line for failed files (AC-001-3). */
+.staging-overall {
+  font-size: var(--fs-small);
+  color: var(--danger);
+  text-align: center;
+  padding: 4px 8px;
+}
+
 .file-icon {
   width: 20px;
   height: 20px;
