@@ -314,6 +314,54 @@
   margin-top: 4px;
 }
 
+/* US-002-04: sender info + note fields (FR-002-4). */
+.sender-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.sender-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  font-size: var(--fs-small);
+  color: var(--fg);
+}
+
+.note-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 16px;
+}
+
+.note-textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  font-size: var(--fs-small);
+  color: var(--fg);
+  resize: vertical;
+  min-height: 64px;
+}
+
+.note-counter {
+  align-self: flex-end;
+  font-size: var(--fs-tiny);
+  color: var(--fg-muted);
+}
+
+.note-counter--warning {
+  color: var(--warning);
+}
+
 @media (max-width: 640px) {
   .dropzone-title {
     font-size: var(--fs-h1);

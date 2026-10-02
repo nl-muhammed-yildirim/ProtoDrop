@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { getPublicLink, useTransferStore } from '../../core/upload/TransferStore';
-import { MAX_EMAILS, parseRecipients } from '../../core/upload/emailUtils';
+import { EMAIL_REGEX, MAX_EMAILS, parseRecipients } from '../../core/upload/emailUtils';
 import { showToast } from '../../core/ui/Toast';
 
 // US-002-01: Link screen — shows the public URL with a copy button (UI-Reference §5.2).
@@ -21,6 +21,12 @@ export function LinkScreen() {
   // US-002-03: optional password field (sender-side).
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  // US-002-04: sender info + note (FR-002-4).
+  const [senderName, setSenderName] = useState('');
+  const [senderEmail, setSenderEmail] = useState('');
+  const [senderEmailError, setSenderEmailError] = useState<string | null>(null);
+  const [note, setNote] = useState('');
+  const [noteError, setNoteError] = useState<string | null>(null);
   const timeoutRef = useRef<number | null>(null);
   // US-002-02: guard against double-click before re-render disables the button.
   const isSendingRef = useRef(false);
@@ -105,7 +111,31 @@ export function LinkScreen() {
 
       // US-002-03: pass password only when non-empty.
       const pw = password.length > 0 ? password : undefined;
-      await send(linkId, valid, `send-${linkId}`, pw);
+
+      // US-002-04: sender info + note (FR-002-4).
+      const senderNameTrimmed = senderName.trim();
+      const noteTrimmed = note.trim();
+
+      // Validate note length.
+      if (note.length > 500) {
+        setNoteError('Note must be at most 500 characters.');
+        return;
+      }
+      setNoteError(null);
+
+      // Guest email: only include if valid (EC-002-2 — invalid doesn't block).
+      const emailValid = !senderEmail || EMAIL_REGEX.test(senderEmail.trim());
+      const senderEmailToPass = emailValid ? (senderEmail.trim() || undefined) : undefined;
+
+      await send(
+        linkId,
+        valid,
+        `send-${linkId}`,
+        pw,
+        senderNameTrimmed || undefined,
+        senderEmailToPass,
+        noteTrimmed || undefined
+      );
       if (useTransferStore.getState().sendStatus === 'idle') {
         showToast('error', useTransferStore.getState().sendError ?? 'Send failed.');
       }
@@ -120,6 +150,12 @@ export function LinkScreen() {
     setValidationError(null);
     setPassword('');
     setShowPassword(false);
+    // US-002-04: reset sender info + note.
+    setSenderName('');
+    setSenderEmail('');
+    setSenderEmailError(null);
+    setNote('');
+    setNoteError(null);
   };
 
   return (
@@ -229,6 +265,58 @@ export function LinkScreen() {
             {password.length > 0 && password.length < 4 && (
               <p className="password-min-hint">At least 4 characters recommended.</p>
             )}
+            {/* US-002-04: sender info + note (FR-002-4). */}
+            <div className="sender-field">
+              <label className="recipients-label" htmlFor="sender-name-input">From</label>
+              <input
+                id="sender-name-input"
+                type="text"
+                className="sender-input"
+                placeholder="Your name"
+                maxLength={100}
+                value={senderName}
+                onChange={(e) => setSenderName(e.target.value)}
+              />
+              <label className="recipients-label" htmlFor="sender-email-input">Your email (optional)</label>
+              <input
+                id="sender-email-input"
+                type="email"
+                className="sender-input"
+                placeholder="you@example.com"
+                maxLength={320}
+                value={senderEmail}
+                onChange={(e) => setSenderEmail(e.target.value)}
+                onBlur={() => {
+                  if (senderEmail && !EMAIL_REGEX.test(senderEmail.trim())) {
+                    setSenderEmailError('Invalid email address.');
+                  } else {
+                    setSenderEmailError(null);
+                  }
+                }}
+              />
+              {senderEmailError && (
+                <p role="alert" aria-live="polite" className="recipients-error">{senderEmailError}</p>
+              )}
+            </div>
+
+            <div className="note-section">
+              <label className="recipients-label" htmlFor="note-input">Note</label>
+              <textarea
+                id="note-input"
+                className="note-textarea"
+                rows={3}
+                maxLength={500}
+                placeholder="Add a short note for the recipient…"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+              />
+              <span className={`note-counter ${note.length >= 450 ? 'note-counter--warning' : ''}`} aria-hidden="true">
+                {note.length}/500
+              </span>
+              {noteError && (
+                <p role="alert" aria-live="polite" className="recipients-error">{noteError}</p>
+              )}
+            </div>
             <button
               type="button"
               className="btn btn-primary send-transfer-btn"

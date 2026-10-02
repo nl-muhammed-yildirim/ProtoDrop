@@ -13,7 +13,16 @@ interface TransferState {
   recipients: string[];
   sendError: string | null;
   finalize(draftId: string, idempotencyKey: string): Promise<void>;
-  send(linkId: string, recipients: string[], idempotencyKey: string, password?: string): Promise<void>;
+  // US-002-04: sender info + note (FR-002-4, TA-3.2)
+  send(
+    linkId: string,
+    recipients: string[],
+    idempotencyKey: string,
+    password?: string,
+    senderName?: string,
+    senderEmail?: string,
+    note?: string
+  ): Promise<void>;
   setDraftId(id: string): void;
   reset(): void;
   resetSend(): void;
@@ -81,7 +90,7 @@ export const useTransferStore = create<TransferState>()((set) => ({
   },
 
   // US-002-02: POST /api/v1/transfers/send with Idempotency-Key header (EC-006-1).
-  async send(linkId, recipients, idempotencyKey, password) {
+  async send(linkId, recipients, idempotencyKey, password, senderName, senderEmail, note) {
     const token = ++sendToken;
     set({ sendStatus: 'sending', sendError: null });
 
@@ -96,7 +105,14 @@ export const useTransferStore = create<TransferState>()((set) => ({
           'Content-Type': 'application/json',
           'Idempotency-Key': idempotencyKey,
         },
-        body: JSON.stringify({ linkId, recipients, ...(password ? { password } : {}) }),
+        body: JSON.stringify({
+          linkId,
+          recipients,
+          ...(password ? { password } : {}),
+          ...(senderName ? { senderName } : {}),
+          ...(senderEmail ? { senderEmail } : {}),
+          ...(note ? { note } : {}),
+        }),
         signal: controller.signal,
       });
 

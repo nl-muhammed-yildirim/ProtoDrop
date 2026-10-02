@@ -594,3 +594,255 @@ describe('US-002-03 — Password field on link screen', () => {
     expect(screen.queryByText('At least 4 characters recommended.')).toBeNull();
   });
 });
+
+describe('US-002-04 — Sender info and note', () => {
+  beforeEach(() => {
+    useUploadEngine.getState().reset();
+    useTransferStore.getState().reset();
+    useToasts.getState().clear();
+  });
+
+  afterEach(() => {
+    (window as any).fetch = originalFetch;
+  });
+
+  it('"From" field renders with label and placeholder', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const fromInput = screen.getByLabelText('From') as HTMLInputElement;
+    expect(fromInput).toBeDefined();
+    expect(fromInput.type).toBe('text');
+    expect(fromInput.maxLength).toBe(100);
+
+    const emailInput = screen.getByLabelText('Your email (optional)') as HTMLInputElement;
+    expect(emailInput).toBeDefined();
+    expect(emailInput.type).toBe('email');
+    expect(emailInput.maxLength).toBe(320);
+
+    const noteTextarea = screen.getByPlaceholderText('Add a short note for the recipient…') as HTMLTextAreaElement;
+    expect(noteTextarea).toBeDefined();
+    expect(noteTextarea.maxLength).toBe(500);
+  });
+
+  it('guest leaving name empty → senderName NOT in send body', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'a@x.com' } });
+
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+
+    const fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    const sendCall = fetchMock.mock.calls.find((call: unknown[]) => String(call[0]).includes('/transfers/send'));
+    const body = JSON.parse((sendCall as [string, { body?: string }])[1].body ?? '{}');
+    expect(body.senderName).toBeUndefined();
+  });
+
+  it('sender name is sent in body when provided', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const fromInput = screen.getByLabelText('From') as HTMLInputElement;
+    fireEvent.change(fromInput, { target: { value: 'Ada Lovelace' } });
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'a@x.com' } });
+
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+
+    const fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    const sendCall = fetchMock.mock.calls.find((call: unknown[]) => String(call[0]).includes('/transfers/send'));
+    const body = JSON.parse((sendCall as [string, { body?: string }])[1].body ?? '{}');
+    expect(body.senderName).toBe('Ada Lovelace');
+  });
+
+  it('guest sender email is sent when valid, omitted when invalid (EC-002-2)', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    // --- Test A: valid email is included in body ---
+    const emailInput = screen.getByLabelText('Your email (optional)') as HTMLInputElement;
+    fireEvent.change(emailInput, { target: { value: 'guest@example.com' } });
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'a@x.com' } });
+
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    let start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+
+    let fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    let sendCall = fetchMock.mock.calls.find((call: unknown[]) => String(call[0]).includes('/transfers/send'));
+    let body = JSON.parse((sendCall as [string, { body?: string }])[1].body ?? '{}');
+    expect(body.senderEmail).toBe('guest@example.com');
+
+    // --- Test B: invalid email is omitted from body (does not block send) ---
+    const sendAgainButton = screen.getByRole('button', { name: 'Send again' });
+    fireEvent.click(sendAgainButton);
+
+    const newEmailInput = screen.getByLabelText('Your email (optional)') as HTMLInputElement;
+    fireEvent.change(newEmailInput, { target: { value: 'not-an-email' } });
+    fireEvent.blur(newEmailInput);
+
+    const alerts = screen.getAllByRole('alert');
+    expect(alerts.some((el) => el.textContent === 'Invalid email address.')).toBe(true);
+
+    const newTextarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(newTextarea, { target: { value: 'a@x.com' } });
+
+    const newSendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(newSendButton);
+
+    start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+
+    fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    const allSendCalls = fetchMock.mock.calls.filter((call: unknown[]) => String(call[0]).includes('/transfers/send'));
+    const lastCall = allSendCalls[allSendCalls.length - 1];
+    body = JSON.parse((lastCall as [string, { body?: string }])[1].body ?? '{}');
+    expect(body.senderEmail).toBeUndefined();
+  });
+
+  it('note is sent in body when provided', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const noteTextarea = screen.getByPlaceholderText('Add a short note for the recipient…') as HTMLTextAreaElement;
+    fireEvent.change(noteTextarea, { target: { value: 'x'.repeat(300) } });
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'a@x.com' } });
+
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+
+    const fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    const sendCall = fetchMock.mock.calls.find((call: unknown[]) => String(call[0]).includes('/transfers/send'));
+    const body = JSON.parse((sendCall as [string, { body?: string }])[1].body ?? '{}');
+    expect(body.note.length).toBe(300);
+  });
+
+  it('note counter shows warning class at 450+ chars', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const noteTextarea = screen.getByPlaceholderText('Add a short note for the recipient…') as HTMLTextAreaElement;
+
+    // Type 449 chars — no warning class.
+    fireEvent.change(noteTextarea, { target: { value: 'x'.repeat(449) } });
+    const counter = document.querySelector('.note-counter') as HTMLElement;
+    expect(counter).toBeDefined();
+    expect(counter.className).not.toContain('note-counter--warning');
+
+    // Add one more char (450) — warning class appears.
+    fireEvent.change(noteTextarea, { target: { value: 'x'.repeat(450) } });
+    const counterAfter = document.querySelector('.note-counter') as HTMLElement;
+    expect(counterAfter.className).toContain('note-counter--warning');
+    expect(counterAfter.textContent).toBe('450/500');
+  });
+
+  it('send again resets all sender fields', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    // Fill all fields.
+    const fromInput = screen.getByLabelText('From') as HTMLInputElement;
+    fireEvent.change(fromInput, { target: { value: 'Test' } });
+
+    const emailInput = screen.getByLabelText('Your email (optional)') as HTMLInputElement;
+    fireEvent.change(emailInput, { target: { value: 'x@y.com' } });
+
+    const noteTextarea = screen.getByPlaceholderText('Add a short note for the recipient…') as HTMLTextAreaElement;
+    fireEvent.change(noteTextarea, { target: { value: 'hello' } });
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'a@x.com' } });
+
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+
+    // Click "Send again".
+    const sendAgainButton = screen.getByRole('button', { name: 'Send again' });
+    fireEvent.click(sendAgainButton);
+
+    // Assert all fields are reset.
+    const newFromInput = screen.getByLabelText('From') as HTMLInputElement;
+    expect(newFromInput.value).toBe('');
+
+    const newEmailInput = screen.getByLabelText('Your email (optional)') as HTMLInputElement;
+    expect(newEmailInput.value).toBe('');
+
+    const newNoteTextarea = screen.getByPlaceholderText('Add a short note for the recipient…') as HTMLTextAreaElement;
+    expect(newNoteTextarea.value).toBe('');
+  });
+});

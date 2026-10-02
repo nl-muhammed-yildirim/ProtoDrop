@@ -2,7 +2,7 @@
 
 export const MAX_EMAILS = 20; // EC-006-1 — max recipients per send
 
-const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+export const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 /** Parse raw textarea input into normalized unique email addresses. */
 export function parseRecipients(raw: string): { valid: string[]; invalid: string[] } {
