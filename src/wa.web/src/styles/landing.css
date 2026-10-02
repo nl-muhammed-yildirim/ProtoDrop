@@ -268,6 +268,7 @@
 .recipients-helper { font-size: var(--fs-tiny); color: var(--fg-muted); margin-top: 4px; }
 .recipients-error { font-size: var(--fs-tiny); color: var(--danger); margin-top: 4px; }
 .send-transfer-btn { width: 100%; margin-top: 8px; }
+.copy-link-only-btn { width: 100%; margin-top: 4px; }
 .send-again-btn { margin-top: 12px; }
 
 /* US-002-03: password field on link screen (UI-Reference §5.2). */

@@ -100,10 +100,6 @@ export function LinkScreen() {
         setValidationError(null);
       }
 
-      if (valid.length === 0) {
-        setValidationError('Enter at least one recipient.');
-        return;
-      }
       if (valid.length > MAX_EMAILS) {
         setValidationError(`Maximum ${MAX_EMAILS} recipients.`);
         return;
@@ -144,6 +140,39 @@ export function LinkScreen() {
     }
   };
 
+  // US-002-05: Copy link only — activates transfer with zero recipients (FR-002-6).
+  const handleCopyLinkOnly = async (): Promise<void> => {
+    if (isSendingRef.current) return;
+    isSendingRef.current = true;
+
+    try {
+      // Copy is best-effort — don't block the send on clipboard failure.
+      void handleCopy();
+
+      const pw = password.length > 0 ? password : undefined;
+      const senderNameTrimmed = senderName.trim();
+      const noteTrimmed = note.trim();
+      if (note.length > 500) { setNoteError('Note must be at most 500 characters.'); return; }
+      setNoteError(null);
+
+      await send(
+        linkId,
+        [], // zero recipients — this is the link-only path
+        `send-${linkId}`,
+        pw,
+        senderNameTrimmed || undefined,
+        undefined, // no email in link-only mode
+        noteTrimmed || undefined
+      );
+
+      if (useTransferStore.getState().sendStatus === 'idle') {
+        showToast('error', useTransferStore.getState().sendError ?? 'Send failed.');
+      }
+    } finally {
+      isSendingRef.current = false;
+    }
+  };
+
   const handleSendAgain = (): void => {
     resetSend();
     setLocalText('');
@@ -162,7 +191,11 @@ export function LinkScreen() {
     <div className="link-screen">
       {sendStatus === 'sent' ? (
         <>
-          <h2>Sent to {recipients.length} recipient{recipients.length === 1 ? '' : 's'}</h2>
+          <h2>
+            {recipients.length > 0
+              ? `Sent to ${recipients.length} recipient${recipients.length === 1 ? '' : 's'}`
+              : 'Link ready'}
+          </h2>
           <div className="link-copy-field">
             <input
               type="text"
@@ -324,6 +357,15 @@ export function LinkScreen() {
               disabled={sendStatus === 'sending'}
             >
               Send transfer
+            </button>
+            {/* US-002-05: Copy link only — ghost button for zero-recipient path (FR-002-6). */}
+            <button
+              type="button"
+              className="btn btn-ghost copy-link-only-btn"
+              onClick={handleCopyLinkOnly}
+              disabled={sendStatus === 'sending'}
+            >
+              Copy link only
             </button>
           </div>
         </>

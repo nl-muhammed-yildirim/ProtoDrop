@@ -846,3 +846,125 @@ describe('US-002-04 — Sender info and note', () => {
     expect(newNoteTextarea.value).toBe('');
   });
 });
+
+describe('US-002-05 — Link-only transfer (no emails)', () => {
+  beforeEach(() => {
+    useUploadEngine.getState().reset();
+    useTransferStore.getState().reset();
+    useToasts.getState().clear();
+  });
+
+  afterEach(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- jsdom fetch mock requires casting
+    (window as any).fetch = originalFetch;
+  });
+
+  it('"Copy link only" ghost button is visible on link screen', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const copyLinkOnlyBtn = screen.getByRole('button', { name: 'Copy link only' });
+    expect(copyLinkOnlyBtn).toBeDefined();
+    // Verify it uses the ghost button style.
+    expect(copyLinkOnlyBtn.className).toContain('btn-ghost');
+  });
+
+  it('"Copy link only" sends with empty recipients and copies link', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    // Mock clipboard.
+    Object.defineProperty(window.navigator, 'clipboard', {
+      value: { writeText: vi.fn().mockResolvedValue(undefined) },
+      writable: true,
+      configurable: true,
+    });
+
+    const copyLinkOnlyBtn = screen.getByRole('button', { name: 'Copy link only' });
+    fireEvent.click(copyLinkOnlyBtn);
+
+    // Wait for send to complete.
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+    expect(useTransferStore.getState().recipients).toEqual([]);
+
+    // Verify fetch body has empty recipients array.
+    const fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    const sendCall = fetchMock.mock.calls.find((call: unknown[]) => String(call[0]).includes('/transfers/send'));
+    expect(sendCall).toBeDefined();
+    const body = JSON.parse((sendCall as [string, { body?: string }])[1].body ?? '{}');
+    expect(body.recipients).toEqual([]);
+  });
+
+  it('"Send transfer" with empty recipients field succeeds with zero emails', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    // Leave the recipients field empty (default).
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    // Wait for sent.
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+
+    const fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    const sendCall = fetchMock.mock.calls.find((call: unknown[]) => String(call[0]).includes('/transfers/send'));
+    expect(sendCall).toBeDefined();
+    const body = JSON.parse((sendCall as [string, { body?: string }])[1].body ?? '{}');
+    expect(body.recipients).toEqual([]);
+  });
+
+  it('confirmation heading is "Link ready" not "Sent to 0 recipients"', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    // Use "Copy link only" for a clean zero-email path.
+    Object.defineProperty(window.navigator, 'clipboard', {
+      value: { writeText: vi.fn().mockResolvedValue(undefined) },
+      writable: true,
+      configurable: true,
+    });
+
+    const copyLinkOnlyBtn = screen.getByRole('button', { name: 'Copy link only' });
+    fireEvent.click(copyLinkOnlyBtn);
+
+    // Wait for sent.
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    // Assert heading is "Link ready" — NOT "Sent to 0 recipients".
+    const headings = screen.getAllByRole('heading', { level: 2 });
+    const linkReadyHeading = headings.find((h) => h.textContent === 'Link ready');
+    expect(linkReadyHeading).toBeDefined();
+  });
+});
