@@ -1,0 +1,1034 @@
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import App from '../../App';
+import { useUploadEngine, __setUploadFn, __setDelayFn } from '../../core/upload/UploadEngine';
+import { useTransferStore } from '../../core/upload/TransferStore';
+import { useToasts } from '../../core/ui/Toast';
+
+// US-002-01 — Get a unique link for my files (AC-002-1 / EC-002-1).
+// Integration tests for FinalizeButton visibility, finalize flow, LinkScreen rendering, and copy button.
+
+const BLOCK_SIZE = 8 * 1024 * 1024; // 8 MiB
+
+function makeFile(name: string, size = 1024): File {
+  const file = new File([''], name);
+  Object.defineProperty(file, 'size', { value: size });
+  return file;
+}
+
+/** US-002-01: wait for a file to reach a specific status. */
+async function waitForStatus(fileId: string, status: string, timeout = 2000): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    const file = useUploadEngine.getState().files.find((f) => f.id === fileId);
+    if (file?.status === status) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(`Timeout waiting for file ${fileId} to reach status ${status}`);
+}
+
+/** US-002-01: wait for transfer store to reach a specific status. */
+async function waitForTransferStatus(status: string, timeout = 2000): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    if (useTransferStore.getState().status === status) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(`Timeout waiting for transfer status to reach ${status}`);
+}
+
+/** US-002-01: set up fetch mock that differentiates draft vs finalize endpoints. */
+function setupFetchMock(fileCount = 1): void {
+  const uploadUrls = Array.from({ length: fileCount }, (_, i) => `http://example.com/upload/${i + 1}`);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- jsdom fetch mock requires casting
+  (window as any).fetch = vi.fn().mockImplementation(async (url: string) => {
+    if (url.includes('/transfers/draft')) {
+      return {
+        ok: true,
+        json: async () => ({
+          draftId: 'draft-abc',
+          files: uploadUrls.map((u) => ({ uploadUrl: u })),
+        }),
+      };
+    }
+    if (url.includes('/transfers/finalize')) {
+      return {
+        ok: true,
+        json: async () => ({ linkId: '3f9k2a7x' }),
+      };
+    }
+    if (url.includes('/transfers/send')) {
+      return { ok: true, json: async () => ({}) };
+    }
+    return { ok: false, status: 404 };
+  });
+}
+
+/** US-002-01: stage a file, send it, and wait for upload to complete. */
+async function stageAndUpload(fileCount = 1): Promise<void> {
+  const zone = screen.getByRole('button', { name: 'Upload files' });
+  const files = Array.from({ length: fileCount }, (_, i) => makeFile(`file${i}.bin`, BLOCK_SIZE));
+  fireEvent.drop(zone, { dataTransfer: { files } });
+
+  setupFetchMock(fileCount);
+  __setUploadFn(async (_block: Blob, _url: string) => {});
+  __setDelayFn(async () => {});
+
+  const sendButton = screen.getByRole('button', { name: /Send transfer/i });
+  fireEvent.click(sendButton);
+
+  const state = useUploadEngine.getState();
+  for (const file of state.files) {
+    await waitForStatus(file.id, 'done');
+  }
+}
+
+// Fix 15: save original fetch for cleanup between tests.
+const originalFetch = window.fetch;
+
+describe('US-002-01 — Get a unique link for my files', () => {
+  beforeEach(() => {
+    useUploadEngine.getState().reset();
+    useTransferStore.getState().reset();
+    useToasts.getState().clear();
+  });
+
+  afterEach(() => {
+    (window as any).fetch = originalFetch; // Fix 15: restore original fetch.
+  });
+
+  it('link screen shows after all files upload + finalize succeeds (AC-002-1)', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    // "Get my link" button should be visible now.
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    expect(finalizeButton).toBeDefined();
+
+    // Click to trigger finalize.
+    fireEvent.click(finalizeButton);
+
+    // Wait for transfer status to become 'ready'.
+    await waitForTransferStatus('ready');
+
+    // Assert: h2 "Your link is ready" is visible.
+    const heading = screen.getByRole('heading', { level: 2, name: 'Your link is ready' });
+    expect(heading).toBeDefined();
+
+    // Assert: input with aria-label="Transfer link" has value containing "/t/3f9k2a7x".
+    const input = screen.getByLabelText('Transfer link') as HTMLInputElement;
+    expect(input.value).toContain('/t/3f9k2a7x');
+
+    // Assert: copy button exists with text "Copy".
+    const copyButton = screen.getByRole('button', { name: 'Copy link' });
+    expect(copyButton.textContent).toBe('Copy');
+  });
+
+  it("copy button shows 'Copied ✓' after click (AC-002-1)", async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    // Trigger finalize.
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    // Mock navigator.clipboard (jsdom doesn't have it by default).
+    Object.defineProperty(window.navigator, 'clipboard', {
+      value: { writeText: vi.fn().mockResolvedValue(undefined) },
+      writable: true,
+      configurable: true,
+    });
+
+    // Click the copy button. handleCopy is async (awaits clipboard.writeText),
+    // so we need to wait for the state update to propagate.
+    const copyButton = screen.getByRole('button', { name: 'Copy link' });
+    fireEvent.click(copyButton);
+
+    // Wait for the button text to update (async clipboard call resolves).
+    const pollStart = Date.now();
+    while (Date.now() - pollStart < 2000) {
+      if (copyButton.textContent === 'Copied ✓') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    // Assert: button text is "Copied ✓" and has success class.
+    expect(copyButton.textContent).toBe('Copied ✓');
+    expect(copyButton.className).toContain('link-copy-btn--success');
+  });
+
+  it('finalize button only visible when all files done (AC-002-1)', async () => {
+    render(<App />);
+    const zone = screen.getByRole('button', { name: 'Upload files' });
+
+    // Stage a file but DON'T start upload (no Send click).
+    fireEvent.drop(zone, { dataTransfer: { files: [makeFile('a.bin', BLOCK_SIZE)] } });
+
+    // Assert: no "Get my link" button in document.
+    expect(screen.queryByRole('button', { name: /Get my link/i })).toBeNull();
+
+    // Now stage another file and send both.
+    fireEvent.drop(zone, { dataTransfer: { files: [makeFile('b.bin', BLOCK_SIZE)] } });
+
+    setupFetchMock(2);
+    __setUploadFn(async (_block: Blob, _url: string) => {});
+    __setDelayFn(async () => {});
+
+    const sendButton = screen.getByRole('button', { name: /Send transfer/i });
+    fireEvent.click(sendButton);
+
+    // Wait for both files to be done.
+    const state = useUploadEngine.getState();
+    for (const file of state.files) {
+      await waitForStatus(file.id, 'done');
+    }
+
+    // Assert: "Get my link" button appears.
+    expect(screen.getByRole('button', { name: /Get my link/i })).toBeDefined();
+  });
+
+  it('link input is read-only and shows full URL (AC-002-1)', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    // Trigger finalize.
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    // Assert: input has readOnly attribute true.
+    const input = screen.getByLabelText('Transfer link') as HTMLInputElement;
+    expect(input.readOnly).toBe(true);
+
+    // Assert: value starts with window.location.origin + "/t/".
+    expect(input.value).toBe(`${window.location.origin}/t/3f9k2a7x`);
+  });
+
+  it('idempotency key is SHA-256 hex (TA-4.1.5)', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    // Trigger finalize.
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    // Inspect the fetch call to /transfers/finalize — assert Idempotency-Key header format.
+    const fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    const finalizeCall = fetchMock.mock.calls.find(
+      (call: unknown[]) => String(call[0]).includes('/transfers/finalize'),
+    );
+    expect(finalizeCall).toBeDefined();
+    const headers = (finalizeCall as [string, { headers?: Record<string, string> }])[1].headers;
+    const key = headers?.['Idempotency-Key'];
+    expect(key).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe('US-002-02 — Send transfer by email', () => {
+  beforeEach(() => {
+    useUploadEngine.getState().reset();
+    useTransferStore.getState().reset();
+    useToasts.getState().clear();
+  });
+
+  afterEach(() => {
+    (window as any).fetch = originalFetch; // Fix 15: restore original fetch.
+  });
+
+  it('textarea renders with helper text after finalize succeeds', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    expect(textarea).toBeDefined();
+    expect(screen.getByText('One per line — you can also separate with commas.')).toBeDefined();
+  });
+
+  it('valid addresses are accepted and sent (trimmed + lowercased)', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'a@x.com, b@y.com ' } });
+
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    await waitForTransferStatus('ready'); // status stays ready; wait for send to settle via store.
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+    const fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    const sendCall = fetchMock.mock.calls.find((call: unknown[]) => String(call[0]).includes('/transfers/send'));
+    expect(sendCall).toBeDefined();
+    const body = JSON.parse((sendCall as [string, { body?: string }])[1].body ?? '{}');
+    expect(body.linkId).toBe('3f9k2a7x');
+    expect(body.recipients).toEqual(['a@x.com', 'b@y.com']);
+  });
+
+  it('invalid address is rejected inline on blur; valid one still sent on submit', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'bad-address\nok@x.com' } });
+    fireEvent.blur(textarea);
+
+    expect(screen.getByRole('alert').textContent).toBe('Invalid: bad-address');
+
+    // Per spec: submit sends the valid addresses (invalid ones are filtered out).
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+    const fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    const sendCall = fetchMock.mock.calls.find((call: unknown[]) => String(call[0]).includes('/transfers/send'));
+    const body = JSON.parse((sendCall as [string, { body?: string }])[1].body ?? '{}');
+    expect(body.recipients).toEqual(['ok@x.com']);
+  });
+
+  it('duplicate addresses are deduplicated before send', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'a@x.com\na@x.com' } });
+
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+    const fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    const sendCall = fetchMock.mock.calls.find((call: unknown[]) => String(call[0]).includes('/transfers/send'));
+    const body = JSON.parse((sendCall as [string, { body?: string }])[1].body ?? '{}');
+    expect(body.recipients).toEqual(['a@x.com']);
+  });
+
+  it('over-limit input shows inline error "Maximum 20 recipients"', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    const addresses = Array.from({ length: 25 }, (_, i) => `user${i}@x.com`).join('\n');
+    fireEvent.change(textarea, { target: { value: addresses } });
+    fireEvent.blur(textarea);
+
+    expect(screen.getByRole('alert').textContent).toBe('Maximum 20 recipients.');
+  });
+
+  it('confirmation state shows link + copy + "Send again"; clicking resets to staging list (FR-002-7)', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'a@x.com' } });
+
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Sent to 1 recipient' })).toBeDefined();
+    const input = screen.getByLabelText('Transfer link') as HTMLInputElement;
+    expect(input.value).toBe(`${window.location.origin}/t/3f9k2a7x`);
+    expect(screen.getByRole('button', { name: 'Copy link' })).toBeDefined();
+
+    // Click "Send again" — resets the entire transfer (status → idle, linkId → null).
+    const sendAgainButton = screen.getByRole('button', { name: 'Send again' });
+    fireEvent.click(sendAgainButton);
+
+    // FR-002-7: StagingList auto-creates a new draft (async) before "Get my link" re-appears.
+    const pollStart = Date.now();
+    while (Date.now() - pollStart < 2000) {
+      if (screen.queryByRole('button', { name: /Get my link/i })) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    // LinkScreen renders null (no linkId), so the staging list with "Get my link" re-appears.
+    expect(screen.getByRole('button', { name: /Get my link/i })).toBeDefined();
+    // The "Your link is ready" heading should NOT be present.
+    expect(screen.queryByRole('heading', { level: 2, name: 'Your link is ready' })).toBeNull();
+  });
+
+  it('shows error toast when send API fails (400)', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    // Override fetch so /transfers/send returns 400.
+    (window as any).fetch = vi.fn().mockImplementation(async (url: string) => {
+      if (url.includes('/transfers/send')) {
+        return { ok: false, status: 400, json: async () => ({ title: 'Bad request' }) };
+      }
+      return { ok: true, json: async () => ({}) };
+    });
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'a@x.com' } });
+
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    // Wait for the store to settle (sendStatus back to idle with error).
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'idle' && useTransferStore.getState().sendError) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    // Assert the inline error is shown.
+    const alerts = screen.getAllByRole('alert');
+    expect(alerts.some((el) => el.textContent === 'Bad request')).toBe(true);
+
+    // Assert the toast was pushed via showToast (useToasts store).
+    const toasts = useToasts.getState().toasts;
+    expect(toasts.length).toBeGreaterThan(0);
+  });
+});
+
+describe('US-002-03 — Password field on link screen', () => {
+  beforeEach(() => {
+    useUploadEngine.getState().reset();
+    useTransferStore.getState().reset();
+    useToasts.getState().clear();
+  });
+
+  afterEach(() => {
+    (window as any).fetch = originalFetch; // Fix 15: restore original fetch.
+  });
+
+  it('password field renders with helper text after finalize succeeds', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    // Assert the password input exists.
+    const passwordInput = screen.getByLabelText('Password') as HTMLInputElement;
+    expect(passwordInput).toBeDefined();
+    expect(passwordInput.type).toBe('password');
+
+    // Assert helper text is visible (US-002-03 Edge cases: case-sensitive helper).
+    expect(
+      screen.getByText('Optional — passwords are case-sensitive. Only people with this password can download.'),
+    ).toBeDefined();
+  });
+
+  it('show/hide toggle switches input type', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const passwordInput = screen.getByLabelText('Password') as HTMLInputElement;
+    expect(passwordInput.type).toBe('password');
+
+    // Click the toggle button (initially "Show password").
+    const toggleBtn = screen.getByRole('button', { name: 'Show password' });
+    fireEvent.click(toggleBtn);
+
+    // Assert input type is now "text" and aria-label changed to "Hide password".
+    expect(passwordInput.type).toBe('text');
+    expect(screen.getByRole('button', { name: 'Hide password' })).toBeDefined();
+  });
+
+  it('password value is sent in send API body when set', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    // Type a password into the field.
+    const passwordInput = screen.getByLabelText('Password') as HTMLInputElement;
+    fireEvent.change(passwordInput, { target: { value: 'secret123' } });
+
+    // Enter a recipient and send.
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'a@x.com' } });
+
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    // Wait for send to complete.
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+
+    // Inspect the fetch mock call to /transfers/send.
+    const fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    const sendCall = fetchMock.mock.calls.find((call: unknown[]) => String(call[0]).includes('/transfers/send'));
+    expect(sendCall).toBeDefined();
+    const body = JSON.parse((sendCall as [string, { body?: string }])[1].body ?? '{}');
+    expect(body.password).toBe('secret123');
+  });
+
+  it('no password key in send body when field is empty', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    // Leave password empty, enter a recipient and send.
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'a@x.com' } });
+
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    // Wait for send to complete.
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+
+    // Inspect the fetch mock call to /transfers/send.
+    const fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    const sendCall = fetchMock.mock.calls.find((call: unknown[]) => String(call[0]).includes('/transfers/send'));
+    expect(sendCall).toBeDefined();
+    const body = JSON.parse((sendCall as [string, { body?: string }])[1].body ?? '{}');
+    expect(body.password).toBeUndefined();
+  });
+
+  it('min-length hint appears for short non-empty passwords', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const passwordInput = screen.getByLabelText('Password') as HTMLInputElement;
+
+    // Type a short password (2 chars).
+    fireEvent.change(passwordInput, { target: { value: 'ab' } });
+
+    // Assert the hint is visible.
+    expect(
+      screen.getByText('At least 4 characters recommended.'),
+    ).toBeDefined();
+
+    // Clear it and assert hint disappears.
+    fireEvent.change(passwordInput, { target: { value: '' } });
+    expect(screen.queryByText('At least 4 characters recommended.')).toBeNull();
+  });
+
+  it('send again resets the password field (FR-002-7)', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    // Set a password and send.
+    const passwordInput = screen.getByLabelText('Password') as HTMLInputElement;
+    fireEvent.change(passwordInput, { target: { value: 'secret123' } });
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'a@x.com' } });
+
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    // Wait for sent.
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    // Click "Send again" — resets entire transfer (status → idle, linkId → null).
+    const sendAgainButton = screen.getByRole('button', { name: 'Send again' });
+    fireEvent.click(sendAgainButton);
+
+    // FR-002-7: StagingList auto-creates a new draft (async) before "Get my link" re-appears.
+    const pollStart = Date.now();
+    while (Date.now() - pollStart < 2000) {
+      if (screen.queryByRole('button', { name: /Get my link/i })) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    // LinkScreen renders null; staging list with "Get my link" re-appears.
+    expect(screen.getByRole('button', { name: /Get my link/i })).toBeDefined();
+
+    // Re-finalize to get a new link screen and verify password field is empty.
+    fireEvent.click(screen.getByRole('button', { name: /Get my link/i }));
+    await waitForTransferStatus('ready');
+
+    const newPasswordInput = screen.getByLabelText('Password') as HTMLInputElement;
+    expect(newPasswordInput.value).toBe('');
+  });
+
+  it('min-length hint does not appear at exactly 4 characters', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const passwordInput = screen.getByLabelText('Password') as HTMLInputElement;
+    fireEvent.change(passwordInput, { target: { value: 'abcd' } });
+
+    // Exactly 4 chars: no hint should be visible.
+    expect(screen.queryByText('At least 4 characters recommended.')).toBeNull();
+  });
+});
+
+describe('US-002-04 — Sender info and note', () => {
+  beforeEach(() => {
+    useUploadEngine.getState().reset();
+    useTransferStore.getState().reset();
+    useToasts.getState().clear();
+  });
+
+  afterEach(() => {
+    (window as any).fetch = originalFetch;
+  });
+
+  it('"From" field renders with label and placeholder', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const fromInput = screen.getByLabelText('From') as HTMLInputElement;
+    expect(fromInput).toBeDefined();
+    expect(fromInput.type).toBe('text');
+    expect(fromInput.maxLength).toBe(100);
+
+    const emailInput = screen.getByLabelText('Your email (optional)') as HTMLInputElement;
+    expect(emailInput).toBeDefined();
+    expect(emailInput.type).toBe('email');
+    expect(emailInput.maxLength).toBe(320);
+
+    const noteTextarea = screen.getByPlaceholderText('Add a short note for the recipient…') as HTMLTextAreaElement;
+    expect(noteTextarea).toBeDefined();
+    expect(noteTextarea.maxLength).toBe(500);
+  });
+
+  it('guest leaving name empty → senderName NOT in send body', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'a@x.com' } });
+
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+
+    const fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    const sendCall = fetchMock.mock.calls.find((call: unknown[]) => String(call[0]).includes('/transfers/send'));
+    const body = JSON.parse((sendCall as [string, { body?: string }])[1].body ?? '{}');
+    expect(body.senderName).toBeUndefined();
+  });
+
+  it('sender name is sent in body when provided', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const fromInput = screen.getByLabelText('From') as HTMLInputElement;
+    fireEvent.change(fromInput, { target: { value: 'Ada Lovelace' } });
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'a@x.com' } });
+
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+
+    const fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    const sendCall = fetchMock.mock.calls.find((call: unknown[]) => String(call[0]).includes('/transfers/send'));
+    const body = JSON.parse((sendCall as [string, { body?: string }])[1].body ?? '{}');
+    expect(body.senderName).toBe('Ada Lovelace');
+  });
+
+  it('guest sender email is sent when valid, omitted when invalid (EC-002-2)', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    // --- Test A: valid email is included in body ---
+    const emailInput = screen.getByLabelText('Your email (optional)') as HTMLInputElement;
+    fireEvent.change(emailInput, { target: { value: 'guest@example.com' } });
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'a@x.com' } });
+
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    let start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+
+    let fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    let sendCall = fetchMock.mock.calls.find((call: unknown[]) => String(call[0]).includes('/transfers/send'));
+    let body = JSON.parse((sendCall as [string, { body?: string }])[1].body ?? '{}');
+    expect(body.senderEmail).toBe('guest@example.com');
+
+    // --- Test B: invalid email is omitted from body (does not block send) ---
+    // Click "Send again" — resets entire transfer (FR-002-7).
+    const sendAgainButton = screen.getByRole('button', { name: 'Send again' });
+    fireEvent.click(sendAgainButton);
+
+    // FR-002-7: StagingList auto-creates a new draft (async) before "Get my link" re-appears.
+    const pollStart = Date.now();
+    while (Date.now() - pollStart < 2000) {
+      if (screen.queryByRole('button', { name: /Get my link/i })) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    // Re-finalize to get a new link screen.
+    fireEvent.click(screen.getByRole('button', { name: /Get my link/i }));
+    await waitForTransferStatus('ready');
+
+    const newEmailInput = screen.getByLabelText('Your email (optional)') as HTMLInputElement;
+    fireEvent.change(newEmailInput, { target: { value: 'not-an-email' } });
+    fireEvent.blur(newEmailInput);
+
+    const alerts = screen.getAllByRole('alert');
+    expect(alerts.some((el) => el.textContent === 'Invalid email address.')).toBe(true);
+
+    const newTextarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(newTextarea, { target: { value: 'a@x.com' } });
+
+    const newSendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(newSendButton);
+
+    start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+
+    fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    const allSendCalls = fetchMock.mock.calls.filter((call: unknown[]) => String(call[0]).includes('/transfers/send'));
+    const lastCall = allSendCalls[allSendCalls.length - 1];
+    body = JSON.parse((lastCall as [string, { body?: string }])[1].body ?? '{}');
+    expect(body.senderEmail).toBeUndefined();
+  });
+
+  it('note is sent in body when provided', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const noteTextarea = screen.getByPlaceholderText('Add a short note for the recipient…') as HTMLTextAreaElement;
+    fireEvent.change(noteTextarea, { target: { value: 'x'.repeat(300) } });
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'a@x.com' } });
+
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+
+    const fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    const sendCall = fetchMock.mock.calls.find((call: unknown[]) => String(call[0]).includes('/transfers/send'));
+    const body = JSON.parse((sendCall as [string, { body?: string }])[1].body ?? '{}');
+    expect(body.note.length).toBe(300);
+  });
+
+  it('note counter shows warning class at 450+ chars', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const noteTextarea = screen.getByPlaceholderText('Add a short note for the recipient…') as HTMLTextAreaElement;
+
+    // Type 449 chars — no warning class.
+    fireEvent.change(noteTextarea, { target: { value: 'x'.repeat(449) } });
+    const counter = document.querySelector('.note-counter') as HTMLElement;
+    expect(counter).toBeDefined();
+    expect(counter.className).not.toContain('note-counter--warning');
+
+    // Add one more char (450) — warning class appears.
+    fireEvent.change(noteTextarea, { target: { value: 'x'.repeat(450) } });
+    const counterAfter = document.querySelector('.note-counter') as HTMLElement;
+    expect(counterAfter.className).toContain('note-counter--warning');
+    expect(counterAfter.textContent).toBe('450/500');
+  });
+
+  it('send again resets all sender fields (FR-002-7)', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    // Fill all fields.
+    const fromInput = screen.getByLabelText('From') as HTMLInputElement;
+    fireEvent.change(fromInput, { target: { value: 'Test' } });
+
+    const emailInput = screen.getByLabelText('Your email (optional)') as HTMLInputElement;
+    fireEvent.change(emailInput, { target: { value: 'x@y.com' } });
+
+    const noteTextarea = screen.getByPlaceholderText('Add a short note for the recipient…') as HTMLTextAreaElement;
+    fireEvent.change(noteTextarea, { target: { value: 'hello' } });
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'a@x.com' } });
+
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+
+    // Click "Send again" — resets entire transfer.
+    const sendAgainButton = screen.getByRole('button', { name: 'Send again' });
+    fireEvent.click(sendAgainButton);
+
+    // FR-002-7: StagingList auto-creates a new draft (async) before "Get my link" re-appears.
+    const pollStart = Date.now();
+    while (Date.now() - pollStart < 2000) {
+      if (screen.queryByRole('button', { name: /Get my link/i })) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    // LinkScreen renders null; staging list with "Get my link" re-appears.
+    expect(screen.getByRole('button', { name: /Get my link/i })).toBeDefined();
+
+    // Re-finalize to get a new link screen and verify all fields are reset.
+    fireEvent.click(screen.getByRole('button', { name: /Get my link/i }));
+    await waitForTransferStatus('ready');
+
+    const newFromInput = screen.getByLabelText('From') as HTMLInputElement;
+    expect(newFromInput.value).toBe('');
+
+    const newEmailInput = screen.getByLabelText('Your email (optional)') as HTMLInputElement;
+    expect(newEmailInput.value).toBe('');
+
+    const newNoteTextarea = screen.getByPlaceholderText('Add a short note for the recipient…') as HTMLTextAreaElement;
+    expect(newNoteTextarea.value).toBe('');
+  });
+});
+
+describe('US-002-05 — Link-only transfer (no emails)', () => {
+  beforeEach(() => {
+    useUploadEngine.getState().reset();
+    useTransferStore.getState().reset();
+    useToasts.getState().clear();
+  });
+
+  afterEach(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- jsdom fetch mock requires casting
+    (window as any).fetch = originalFetch;
+  });
+
+  it('"Copy link only" ghost button is visible on link screen', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const copyLinkOnlyBtn = screen.getByRole('button', { name: 'Copy link only' });
+    expect(copyLinkOnlyBtn).toBeDefined();
+    // Verify it uses the ghost button style.
+    expect(copyLinkOnlyBtn.className).toContain('btn-ghost');
+  });
+
+  it('"Copy link only" sends with empty recipients and copies link', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    // Mock clipboard.
+    Object.defineProperty(window.navigator, 'clipboard', {
+      value: { writeText: vi.fn().mockResolvedValue(undefined) },
+      writable: true,
+      configurable: true,
+    });
+
+    const copyLinkOnlyBtn = screen.getByRole('button', { name: 'Copy link only' });
+    fireEvent.click(copyLinkOnlyBtn);
+
+    // Wait for send to complete.
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+    expect(useTransferStore.getState().recipients).toEqual([]);
+
+    // Verify fetch body has empty recipients array.
+    const fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    const sendCall = fetchMock.mock.calls.find((call: unknown[]) => String(call[0]).includes('/transfers/send'));
+    expect(sendCall).toBeDefined();
+    const body = JSON.parse((sendCall as [string, { body?: string }])[1].body ?? '{}');
+    expect(body.recipients).toEqual([]);
+  });
+
+  it('"Send transfer" with empty recipients field succeeds with zero emails', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    // Leave the recipients field empty (default).
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    // Wait for sent.
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+
+    const fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    const sendCall = fetchMock.mock.calls.find((call: unknown[]) => String(call[0]).includes('/transfers/send'));
+    expect(sendCall).toBeDefined();
+    const body = JSON.parse((sendCall as [string, { body?: string }])[1].body ?? '{}');
+    expect(body.recipients).toEqual([]);
+  });
+
+  it('confirmation heading is "Link ready" not "Sent to 0 recipients"', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    // Use "Copy link only" for a clean zero-email path.
+    Object.defineProperty(window.navigator, 'clipboard', {
+      value: { writeText: vi.fn().mockResolvedValue(undefined) },
+      writable: true,
+      configurable: true,
+    });
+
+    const copyLinkOnlyBtn = screen.getByRole('button', { name: 'Copy link only' });
+    fireEvent.click(copyLinkOnlyBtn);
+
+    // Wait for sent.
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    // Assert heading is "Link ready" — NOT "Sent to 0 recipients".
+    const headings = screen.getAllByRole('heading', { level: 2 });
+    const linkReadyHeading = headings.find((h) => h.textContent === 'Link ready');
+    expect(linkReadyHeading).toBeDefined();
+  });
+});
