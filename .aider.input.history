@@ -260,3 +260,20 @@
 
 # 2026-10-01T22:32:57.940Z
 +Start implementation with developer subagent in new subtask
+
+# 2026-10-02T06:20:57.040Z
++Let's start implementing docs/features/Phase docs/features/Phase 0-MVP/F-TRF-002/US-002-03-password.md
++- Generate quick and perfect prompt for developer subagent
++   - You can seperate it to tasks while generating prompt
++- Run tasks with developer agent one by one and in an order with each new task
++- After completion of development review code changes with Reviewer subagent in new task
++- If something found from Code Review, fix it with developer subagent in new task
+
+# 2026-10-02T06:52:45.895Z
++I dont see that Task2 is completed. Verify task
+
+# 2026-10-02T06:55:04.045Z
++where is the backend changes?
+
+# 2026-10-02T06:58:09.926Z
++if backend endpoints are a separate upcoming task, then its okey

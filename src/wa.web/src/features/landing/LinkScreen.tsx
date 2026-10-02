@@ -18,6 +18,9 @@ export function LinkScreen() {
   const [copied, setCopied] = useState(false);
   const [localText, setLocalText] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
+  // US-002-03: optional password field (sender-side).
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const timeoutRef = useRef<number | null>(null);
   // US-002-02: guard against double-click before re-render disables the button.
   const isSendingRef = useRef(false);
@@ -100,7 +103,9 @@ export function LinkScreen() {
         return;
       }
 
-      await send(linkId, valid, `send-${linkId}`);
+      // US-002-03: pass password only when non-empty.
+      const pw = password.length > 0 ? password : undefined;
+      await send(linkId, valid, `send-${linkId}`, pw);
       if (useTransferStore.getState().sendStatus === 'idle') {
         showToast('error', useTransferStore.getState().sendError ?? 'Send failed.');
       }
@@ -113,6 +118,8 @@ export function LinkScreen() {
     resetSend();
     setLocalText('');
     setValidationError(null);
+    setPassword('');
+    setShowPassword(false);
   };
 
   return (
@@ -183,6 +190,44 @@ export function LinkScreen() {
               <p role="alert" aria-live="polite" className="recipients-error">
                 {validationError ?? sendError}
               </p>
+            )}
+            {/* US-002-03: optional password field. */}
+            <label className="recipients-label" htmlFor="password-input">
+              Password
+            </label>
+            <div className="password-field">
+              <input
+                id="password-input"
+                type={showPassword ? 'text' : 'password'}
+                className="password-input"
+                aria-label="Password"
+                maxLength={64}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+              <button
+                type="button"
+                className="password-toggle"
+                aria-controls="password-input"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                onClick={() => setShowPassword((prev) => !prev)}
+              >
+                {showPassword ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                    <line x1="1" y1="1" x2="23" y2="23" />
+                  </svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                )}
+              </button>
+            </div>
+            <p className="recipients-helper">Optional — only people with this password can download.</p>
+            {password.length > 0 && password.length < 4 && (
+              <p className="password-min-hint">At least 4 characters recommended.</p>
             )}
             <button
               type="button"

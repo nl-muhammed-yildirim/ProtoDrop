@@ -270,6 +270,50 @@
 .send-transfer-btn { width: 100%; margin-top: 8px; }
 .send-again-btn { margin-top: 12px; }
 
+/* US-002-03: password field on link screen (UI-Reference §5.2). */
+.password-field {
+  position: relative;
+  margin-top: 8px;
+}
+
+.password-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 36px 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  font-size: var(--fs-small);
+  color: var(--fg);
+}
+
+.password-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+  padding: 0;
+}
+
+.password-toggle:hover {
+  color: var(--fg);
+}
+
+.password-min-hint {
+  font-size: var(--fs-tiny);
+  color: var(--warning);
+  margin-top: 4px;
+}
+
 @media (max-width: 640px) {
   .dropzone-title {
     font-size: var(--fs-h1);

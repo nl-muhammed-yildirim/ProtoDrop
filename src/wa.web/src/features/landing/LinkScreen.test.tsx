@@ -403,3 +403,194 @@ describe('US-002-02 — Send transfer by email', () => {
     expect(toasts.length).toBeGreaterThan(0);
   });
 });
+
+describe('US-002-03 — Password field on link screen', () => {
+  beforeEach(() => {
+    useUploadEngine.getState().reset();
+    useTransferStore.getState().reset();
+    useToasts.getState().clear();
+  });
+
+  afterEach(() => {
+    (window as any).fetch = originalFetch; // Fix 15: restore original fetch.
+  });
+
+  it('password field renders with helper text after finalize succeeds', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    // Assert the password input exists.
+    const passwordInput = screen.getByLabelText('Password') as HTMLInputElement;
+    expect(passwordInput).toBeDefined();
+    expect(passwordInput.type).toBe('password');
+
+    // Assert helper text is visible.
+    expect(
+      screen.getByText('Optional — only people with this password can download.'),
+    ).toBeDefined();
+  });
+
+  it('show/hide toggle switches input type', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const passwordInput = screen.getByLabelText('Password') as HTMLInputElement;
+    expect(passwordInput.type).toBe('password');
+
+    // Click the toggle button (initially "Show password").
+    const toggleBtn = screen.getByRole('button', { name: 'Show password' });
+    fireEvent.click(toggleBtn);
+
+    // Assert input type is now "text" and aria-label changed to "Hide password".
+    expect(passwordInput.type).toBe('text');
+    expect(screen.getByRole('button', { name: 'Hide password' })).toBeDefined();
+  });
+
+  it('password value is sent in send API body when set', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    // Type a password into the field.
+    const passwordInput = screen.getByLabelText('Password') as HTMLInputElement;
+    fireEvent.change(passwordInput, { target: { value: 'secret123' } });
+
+    // Enter a recipient and send.
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'a@x.com' } });
+
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    // Wait for send to complete.
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+
+    // Inspect the fetch mock call to /transfers/send.
+    const fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    const sendCall = fetchMock.mock.calls.find((call: unknown[]) => String(call[0]).includes('/transfers/send'));
+    expect(sendCall).toBeDefined();
+    const body = JSON.parse((sendCall as [string, { body?: string }])[1].body ?? '{}');
+    expect(body.password).toBe('secret123');
+  });
+
+  it('no password key in send body when field is empty', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    // Leave password empty, enter a recipient and send.
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'a@x.com' } });
+
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    // Wait for send to complete.
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+
+    // Inspect the fetch mock call to /transfers/send.
+    const fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    const sendCall = fetchMock.mock.calls.find((call: unknown[]) => String(call[0]).includes('/transfers/send'));
+    expect(sendCall).toBeDefined();
+    const body = JSON.parse((sendCall as [string, { body?: string }])[1].body ?? '{}');
+    expect(body.password).toBeUndefined();
+  });
+
+  it('min-length hint appears for short non-empty passwords', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const passwordInput = screen.getByLabelText('Password') as HTMLInputElement;
+
+    // Type a short password (2 chars).
+    fireEvent.change(passwordInput, { target: { value: 'ab' } });
+
+    // Assert the hint is visible.
+    expect(
+      screen.getByText('At least 4 characters recommended.'),
+    ).toBeDefined();
+
+    // Clear it and assert hint disappears.
+    fireEvent.change(passwordInput, { target: { value: '' } });
+    expect(screen.queryByText('At least 4 characters recommended.')).toBeNull();
+  });
+
+  it('send again resets the password field', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    // Set a password and send.
+    const passwordInput = screen.getByLabelText('Password') as HTMLInputElement;
+    fireEvent.change(passwordInput, { target: { value: 'secret123' } });
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'a@x.com' } });
+
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    // Wait for sent.
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    // Click "Send again".
+    const sendAgainButton = screen.getByRole('button', { name: 'Send again' });
+    fireEvent.click(sendAgainButton);
+
+    // Assert password field is back and empty.
+    const newPasswordInput = screen.getByLabelText('Password') as HTMLInputElement;
+    expect(newPasswordInput.value).toBe('');
+  });
+
+  it('min-length hint does not appear at exactly 4 characters', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const passwordInput = screen.getByLabelText('Password') as HTMLInputElement;
+    fireEvent.change(passwordInput, { target: { value: 'abcd' } });
+
+    // Exactly 4 chars: no hint should be visible.
+    expect(screen.queryByText('At least 4 characters recommended.')).toBeNull();
+  });
+});
