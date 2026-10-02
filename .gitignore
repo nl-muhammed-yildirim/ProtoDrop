@@ -44,4 +44,3 @@ desktop.ini
 
 # Note: global.json is COMMITTED (pins .NET 10 per TA-2.6) — do not ignore.
 .aider*
-/.aider.tags.cache.v4/cache.db-wal
