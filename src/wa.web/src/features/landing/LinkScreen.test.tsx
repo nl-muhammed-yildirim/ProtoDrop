@@ -204,6 +204,26 @@ describe('US-002-01 — Get a unique link for my files', () => {
     // Assert: value starts with window.location.origin + "/t/".
     expect(input.value).toBe(`${window.location.origin}/t/3f9k2a7x`);
   });
+
+  it('idempotency key is SHA-256 hex (TA-4.1.5)', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    // Trigger finalize.
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    // Inspect the fetch call to /transfers/finalize — assert Idempotency-Key header format.
+    const fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    const finalizeCall = fetchMock.mock.calls.find(
+      (call: unknown[]) => String(call[0]).includes('/transfers/finalize'),
+    );
+    expect(finalizeCall).toBeDefined();
+    const headers = (finalizeCall as [string, { headers?: Record<string, string> }])[1].headers;
+    const key = headers?.['Idempotency-Key'];
+    expect(key).toMatch(/^[0-9a-f]{64}$/);
+  });
 });
 
 describe('US-002-02 — Send transfer by email', () => {
@@ -332,7 +352,7 @@ describe('US-002-02 — Send transfer by email', () => {
     expect(screen.getByRole('alert').textContent).toBe('Maximum 20 recipients.');
   });
 
-  it('confirmation state shows link + copy + "Send again"; clicking resets to empty textarea', async () => {
+  it('confirmation state shows link + copy + "Send again"; clicking resets to staging list (FR-002-7)', async () => {
     render(<App />);
     await stageAndUpload(1);
 
@@ -357,12 +377,20 @@ describe('US-002-02 — Send transfer by email', () => {
     expect(input.value).toBe(`${window.location.origin}/t/3f9k2a7x`);
     expect(screen.getByRole('button', { name: 'Copy link' })).toBeDefined();
 
+    // Click "Send again" — resets the entire transfer (status → idle, linkId → null).
     const sendAgainButton = screen.getByRole('button', { name: 'Send again' });
     fireEvent.click(sendAgainButton);
 
-    const newTextarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
-    expect(newTextarea.value).toBe('');
-    expect(screen.getByRole('heading', { level: 2, name: 'Your link is ready' })).toBeDefined();
+    // FR-002-7: StagingList auto-creates a new draft (async) before "Get my link" re-appears.
+    const pollStart = Date.now();
+    while (Date.now() - pollStart < 2000) {
+      if (screen.queryByRole('button', { name: /Get my link/i })) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    // LinkScreen renders null (no linkId), so the staging list with "Get my link" re-appears.
+    expect(screen.getByRole('button', { name: /Get my link/i })).toBeDefined();
+    // The "Your link is ready" heading should NOT be present.
+    expect(screen.queryByRole('heading', { level: 2, name: 'Your link is ready' })).toBeNull();
   });
 
   it('shows error toast when send API fails (400)', async () => {
@@ -428,9 +456,9 @@ describe('US-002-03 — Password field on link screen', () => {
     expect(passwordInput).toBeDefined();
     expect(passwordInput.type).toBe('password');
 
-    // Assert helper text is visible.
+    // Assert helper text is visible (US-002-03 Edge cases: case-sensitive helper).
     expect(
-      screen.getByText('Optional — only people with this password can download.'),
+      screen.getByText('Optional — passwords are case-sensitive. Only people with this password can download.'),
     ).toBeDefined();
   });
 
@@ -545,7 +573,7 @@ describe('US-002-03 — Password field on link screen', () => {
     expect(screen.queryByText('At least 4 characters recommended.')).toBeNull();
   });
 
-  it('send again resets the password field', async () => {
+  it('send again resets the password field (FR-002-7)', async () => {
     render(<App />);
     await stageAndUpload(1);
 
@@ -570,11 +598,23 @@ describe('US-002-03 — Password field on link screen', () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
 
-    // Click "Send again".
+    // Click "Send again" — resets entire transfer (status → idle, linkId → null).
     const sendAgainButton = screen.getByRole('button', { name: 'Send again' });
     fireEvent.click(sendAgainButton);
 
-    // Assert password field is back and empty.
+    // FR-002-7: StagingList auto-creates a new draft (async) before "Get my link" re-appears.
+    const pollStart = Date.now();
+    while (Date.now() - pollStart < 2000) {
+      if (screen.queryByRole('button', { name: /Get my link/i })) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    // LinkScreen renders null; staging list with "Get my link" re-appears.
+    expect(screen.getByRole('button', { name: /Get my link/i })).toBeDefined();
+
+    // Re-finalize to get a new link screen and verify password field is empty.
+    fireEvent.click(screen.getByRole('button', { name: /Get my link/i }));
+    await waitForTransferStatus('ready');
+
     const newPasswordInput = screen.getByLabelText('Password') as HTMLInputElement;
     expect(newPasswordInput.value).toBe('');
   });
@@ -717,8 +757,20 @@ describe('US-002-04 — Sender info and note', () => {
     expect(body.senderEmail).toBe('guest@example.com');
 
     // --- Test B: invalid email is omitted from body (does not block send) ---
+    // Click "Send again" — resets entire transfer (FR-002-7).
     const sendAgainButton = screen.getByRole('button', { name: 'Send again' });
     fireEvent.click(sendAgainButton);
+
+    // FR-002-7: StagingList auto-creates a new draft (async) before "Get my link" re-appears.
+    const pollStart = Date.now();
+    while (Date.now() - pollStart < 2000) {
+      if (screen.queryByRole('button', { name: /Get my link/i })) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    // Re-finalize to get a new link screen.
+    fireEvent.click(screen.getByRole('button', { name: /Get my link/i }));
+    await waitForTransferStatus('ready');
 
     const newEmailInput = screen.getByLabelText('Your email (optional)') as HTMLInputElement;
     fireEvent.change(newEmailInput, { target: { value: 'not-an-email' } });
@@ -800,7 +852,7 @@ describe('US-002-04 — Sender info and note', () => {
     expect(counterAfter.textContent).toBe('450/500');
   });
 
-  it('send again resets all sender fields', async () => {
+  it('send again resets all sender fields (FR-002-7)', async () => {
     render(<App />);
     await stageAndUpload(1);
 
@@ -831,11 +883,23 @@ describe('US-002-04 — Sender info and note', () => {
     }
     expect(useTransferStore.getState().sendStatus).toBe('sent');
 
-    // Click "Send again".
+    // Click "Send again" — resets entire transfer.
     const sendAgainButton = screen.getByRole('button', { name: 'Send again' });
     fireEvent.click(sendAgainButton);
 
-    // Assert all fields are reset.
+    // FR-002-7: StagingList auto-creates a new draft (async) before "Get my link" re-appears.
+    const pollStart = Date.now();
+    while (Date.now() - pollStart < 2000) {
+      if (screen.queryByRole('button', { name: /Get my link/i })) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    // LinkScreen renders null; staging list with "Get my link" re-appears.
+    expect(screen.getByRole('button', { name: /Get my link/i })).toBeDefined();
+
+    // Re-finalize to get a new link screen and verify all fields are reset.
+    fireEvent.click(screen.getByRole('button', { name: /Get my link/i }));
+    await waitForTransferStatus('ready');
+
     const newFromInput = screen.getByLabelText('From') as HTMLInputElement;
     expect(newFromInput.value).toBe('');
 

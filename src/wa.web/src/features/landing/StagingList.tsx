@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { formatBytes } from '../../core/upload/formatBytes';
 import type { UploadDraft } from '../../core/upload/UploadEngine';
 import { useUploadEngine } from '../../core/upload/UploadEngine';
@@ -74,6 +74,47 @@ export function StagingList() {
 
   // Fix 5: guard against double-submit on Send button.
   const isSendingRef = useRef(false);
+
+  // FR-002-7: after "Send again" clears the draftId, auto-create a NEW draft so
+  // FinalizeButton re-appears with a fresh idempotency key (finalize-${newDraftId}).
+  // This ensures re-finalize produces a NEW transfer (not an idempotent replay).
+  const draftId = useTransferStore((state) => state.draftId);
+  const allFilesDone = files.length > 0 && files.every((f) => f.status === 'done');
+  const autoDraftRef = useRef(false);
+
+  useEffect(() => {
+    if (!allFilesDone || draftId !== null) return;
+    // Prevent double-fire (e.g. React StrictMode double-mount).
+    if (autoDraftRef.current) return;
+    autoDraftRef.current = true;
+
+    const currentFiles = useUploadEngine.getState().files;
+    const payload = {
+      files: currentFiles.map((f) => ({ name: f.name, sizeBytes: f.size })) as DraftFile[],
+    };
+
+    fetch('/api/v1/transfers/draft', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+      .then((response) => {
+        if (!response.ok) return;
+        return response.json();
+      })
+      .then((data) => {
+        const parsed = data as { draftId?: string };
+        if (parsed.draftId) {
+          useTransferStore.getState().setDraftId(parsed.draftId);
+        }
+      })
+      .catch(() => {
+        // Network error — user can retry by clicking "Send" again.
+      })
+      .finally(() => {
+        autoDraftRef.current = false;
+      });
+  }, [allFilesDone, draftId]);
 
   // US-001-03: resolve effective limits (guest fallback; replace with /api/v1/limits fetch when auth lands).
   const limits = resolveEffectiveLimits();

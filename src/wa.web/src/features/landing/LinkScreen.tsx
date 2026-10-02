@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getPublicLink, useTransferStore } from '../../core/upload/TransferStore';
 import { EMAIL_REGEX, MAX_EMAILS, parseRecipients } from '../../core/upload/emailUtils';
+import { generateIdempotencyKey } from '../../core/upload/idempotencyKey';
 import { showToast } from '../../core/ui/Toast';
 
 // US-002-01: Link screen — shows the public URL with a copy button (UI-Reference §5.2).
@@ -14,7 +15,6 @@ export function LinkScreen() {
   const recipients = useTransferStore((state) => state.recipients);
   const sendError = useTransferStore((state) => state.sendError);
   const send = useTransferStore((state) => state.send);
-  const resetSend = useTransferStore((state) => state.resetSend);
   const [copied, setCopied] = useState(false);
   const [localText, setLocalText] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -123,10 +123,12 @@ export function LinkScreen() {
       const emailValid = !senderEmail || EMAIL_REGEX.test(senderEmail.trim());
       const senderEmailToPass = emailValid ? (senderEmail.trim() || undefined) : undefined;
 
+      // TA-4.1.5: include timestamp so re-sends after "Send again" get different keys.
+      const idempotencyKey = await generateIdempotencyKey(`send-${linkId}-${Date.now()}`);
       await send(
         linkId,
         valid,
-        `send-${linkId}`,
+        idempotencyKey,
         pw,
         senderNameTrimmed || undefined,
         senderEmailToPass,
@@ -155,10 +157,12 @@ export function LinkScreen() {
       if (note.length > 500) { setNoteError('Note must be at most 500 characters.'); return; }
       setNoteError(null);
 
+      // TA-4.1.5: include timestamp so re-sends after "Send again" get different keys.
+      const idempotencyKey = await generateIdempotencyKey(`send-${linkId}-${Date.now()}`);
       await send(
         linkId,
         [], // zero recipients — this is the link-only path
-        `send-${linkId}`,
+        idempotencyKey,
         pw,
         senderNameTrimmed || undefined,
         undefined, // no email in link-only mode
@@ -174,7 +178,11 @@ export function LinkScreen() {
   };
 
   const handleSendAgain = (): void => {
-    resetSend();
+    // FR-002-7: reset the entire transfer so the user can re-finalize (new linkId)
+    // from the same uploaded files. Files in UploadEngine remain staged and done.
+    // Clear draftId so StagingList auto-creates a NEW draft → new idempotency key
+    // → finalize produces a NEW transfer (not an idempotent replay of the old one).
+    useTransferStore.getState().reset();
     setLocalText('');
     setValidationError(null);
     setPassword('');
@@ -294,7 +302,7 @@ export function LinkScreen() {
                 )}
               </button>
             </div>
-            <p className="recipients-helper">Optional — only people with this password can download.</p>
+            <p className="recipients-helper">Optional — passwords are case-sensitive. Only people with this password can download.</p>
             {password.length > 0 && password.length < 4 && (
               <p className="password-min-hint">At least 4 characters recommended.</p>
             )}

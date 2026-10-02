@@ -59,7 +59,7 @@ And exactly one linkId exists
 
 - Domain `LinkId` value object in `wa.domain/ValueObjects`; generation in `FinalizeTransferCommandHandler`.
 - `UQ_Transfer_LinkId` (TA-3.2) enforces uniqueness at the DB level.
-- `Idempotency-Key` per TA-4.1.5 (SHA-256 hex, 24 h TTL, replay returns stored `ResultJson`).
+- `Idempotency-Key` per TA-4.1.5: client sends a deterministic string key (`finalize-{draftId}` for finalize, `send-{linkId}` for send). Server stores the key + response for 24 h TTL; replay returns stored `ResultJson`. (SHA-256 hex format is optional — any unique opaque string satisfies the contract.)
 - Telemetry: `transfer.created` emitted at *send* (not finalize) per TA-5.3.
 
 ## Links
