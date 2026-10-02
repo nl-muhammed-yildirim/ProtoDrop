@@ -246,3 +246,17 @@
 +* Review Code changes and create comments if something found with Reiviewer subagent in new subtask.
 +* Fix found issued with developer subagent in another subtaks
 +* Dont forget to add subtasks to this task as subtask
+
+# 2026-10-01T21:59:31.034Z
++Let's start implementing docs/features/Phase docs/features/Phase 0-MVP/F-TRF-002/US-002-02-send-by-email.md
++- Generate quick and perfect prompt for developer subagent
++   - You can seperate it to subtasks while generating prompt
++- Run subtasks with developer agent one by one and in an order with each new subtask
++- After completion of development review code changes with Reviewer subagent in new subtask
++- If something found from Code Review, fix it with developer subagent in new subtask
+
+# 2026-10-01T22:26:14.114Z
++Proceed.
+
+# 2026-10-01T22:32:57.940Z
++Start implementation with developer subagent in new subtask

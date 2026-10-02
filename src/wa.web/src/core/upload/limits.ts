@@ -6,6 +6,7 @@ export interface LimitsRecord {
   maxTransferSize: number; // bytes (TA-3.4)
   maxSingleFile: number;   // bytes (TA-3.4)
   storageQuota: number;    // bytes (TA-3.4) — server field name is "storageQuota" (LimitsFree seed)
+  maxEmails: number;       // TA-3.4 — max recipients per send (EC-006-1)
 }
 
 /** A single selection violation. `T` narrows the discriminated union per call site (e.g. Violation<'singleFile'>). */
@@ -22,6 +23,7 @@ export function resolveEffectiveLimits(): LimitsRecord {
     maxTransferSize: 5 * 1024 ** 3,   // 5 GB
     maxSingleFile: 5 * 1024 ** 3,     // 5 GB
     storageQuota: 5 * 1024 ** 3,      // 5 GB (free tier)
+    maxEmails: 20,
   };
 
   return freeDefaults;

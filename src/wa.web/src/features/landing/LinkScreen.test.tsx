@@ -58,6 +58,9 @@ function setupFetchMock(fileCount = 1): void {
         json: async () => ({ linkId: '3f9k2a7x' }),
       };
     }
+    if (url.includes('/transfers/send')) {
+      return { ok: true, json: async () => ({}) };
+    }
     return { ok: false, status: 404 };
   });
 }
@@ -200,5 +203,203 @@ describe('US-002-01 — Get a unique link for my files', () => {
 
     // Assert: value starts with window.location.origin + "/t/".
     expect(input.value).toBe(`${window.location.origin}/t/3f9k2a7x`);
+  });
+});
+
+describe('US-002-02 — Send transfer by email', () => {
+  beforeEach(() => {
+    useUploadEngine.getState().reset();
+    useTransferStore.getState().reset();
+    useToasts.getState().clear();
+  });
+
+  afterEach(() => {
+    (window as any).fetch = originalFetch; // Fix 15: restore original fetch.
+  });
+
+  it('textarea renders with helper text after finalize succeeds', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    expect(textarea).toBeDefined();
+    expect(screen.getByText('One per line — you can also separate with commas.')).toBeDefined();
+  });
+
+  it('valid addresses are accepted and sent (trimmed + lowercased)', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'a@x.com, b@y.com ' } });
+
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    await waitForTransferStatus('ready'); // status stays ready; wait for send to settle via store.
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+    const fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    const sendCall = fetchMock.mock.calls.find((call: unknown[]) => String(call[0]).includes('/transfers/send'));
+    expect(sendCall).toBeDefined();
+    const body = JSON.parse((sendCall as [string, { body?: string }])[1].body ?? '{}');
+    expect(body.linkId).toBe('3f9k2a7x');
+    expect(body.recipients).toEqual(['a@x.com', 'b@y.com']);
+  });
+
+  it('invalid address is rejected inline on blur; valid one still sent on submit', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'bad-address\nok@x.com' } });
+    fireEvent.blur(textarea);
+
+    expect(screen.getByRole('alert').textContent).toBe('Invalid: bad-address');
+
+    // Per spec: submit sends the valid addresses (invalid ones are filtered out).
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+    const fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    const sendCall = fetchMock.mock.calls.find((call: unknown[]) => String(call[0]).includes('/transfers/send'));
+    const body = JSON.parse((sendCall as [string, { body?: string }])[1].body ?? '{}');
+    expect(body.recipients).toEqual(['ok@x.com']);
+  });
+
+  it('duplicate addresses are deduplicated before send', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'a@x.com\na@x.com' } });
+
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(useTransferStore.getState().sendStatus).toBe('sent');
+    const fetchMock = (window as any).fetch as ReturnType<typeof vi.fn>;
+    const sendCall = fetchMock.mock.calls.find((call: unknown[]) => String(call[0]).includes('/transfers/send'));
+    const body = JSON.parse((sendCall as [string, { body?: string }])[1].body ?? '{}');
+    expect(body.recipients).toEqual(['a@x.com']);
+  });
+
+  it('over-limit input shows inline error "Maximum 20 recipients"', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    const addresses = Array.from({ length: 25 }, (_, i) => `user${i}@x.com`).join('\n');
+    fireEvent.change(textarea, { target: { value: addresses } });
+    fireEvent.blur(textarea);
+
+    expect(screen.getByRole('alert').textContent).toBe('Maximum 20 recipients.');
+  });
+
+  it('confirmation state shows link + copy + "Send again"; clicking resets to empty textarea', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'a@x.com' } });
+
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'sent') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Sent to 1 recipient' })).toBeDefined();
+    const input = screen.getByLabelText('Transfer link') as HTMLInputElement;
+    expect(input.value).toBe(`${window.location.origin}/t/3f9k2a7x`);
+    expect(screen.getByRole('button', { name: 'Copy link' })).toBeDefined();
+
+    const sendAgainButton = screen.getByRole('button', { name: 'Send again' });
+    fireEvent.click(sendAgainButton);
+
+    const newTextarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    expect(newTextarea.value).toBe('');
+    expect(screen.getByRole('heading', { level: 2, name: 'Your link is ready' })).toBeDefined();
+  });
+
+  it('shows error toast when send API fails (400)', async () => {
+    render(<App />);
+    await stageAndUpload(1);
+
+    const finalizeButton = screen.getByRole('button', { name: /Get my link/i });
+    fireEvent.click(finalizeButton);
+    await waitForTransferStatus('ready');
+
+    // Override fetch so /transfers/send returns 400.
+    (window as any).fetch = vi.fn().mockImplementation(async (url: string) => {
+      if (url.includes('/transfers/send')) {
+        return { ok: false, status: 400, json: async () => ({ title: 'Bad request' }) };
+      }
+      return { ok: true, json: async () => ({}) };
+    });
+
+    const textarea = screen.getByPlaceholderText('one@x.com, two@y.com') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'a@x.com' } });
+
+    const sendButton = screen.getByRole('button', { name: 'Send transfer' });
+    fireEvent.click(sendButton);
+
+    // Wait for the store to settle (sendStatus back to idle with error).
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (useTransferStore.getState().sendStatus === 'idle' && useTransferStore.getState().sendError) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    // Assert the inline error is shown.
+    const alerts = screen.getAllByRole('alert');
+    expect(alerts.some((el) => el.textContent === 'Bad request')).toBe(true);
+
+    // Assert the toast was pushed via showToast (useToasts store).
+    const toasts = useToasts.getState().toasts;
+    expect(toasts.length).toBeGreaterThan(0);
   });
 });

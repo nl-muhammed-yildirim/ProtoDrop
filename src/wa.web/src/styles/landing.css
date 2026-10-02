@@ -261,6 +261,15 @@
   width: 100%;
 }
 
+/* US-002-02: recipients section + send transfer (EC-006-1). */
+.recipients-section { margin-top: 16px; }
+.recipients-label { display: block; font-size: var(--fs-small); color: var(--fg-muted); margin-bottom: 4px; }
+.recipients-textarea { width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-input, #fff); font-size: var(--fs-small); resize: vertical; min-height: 64px; }
+.recipients-helper { font-size: var(--fs-tiny); color: var(--fg-muted); margin-top: 4px; }
+.recipients-error { font-size: var(--fs-tiny); color: var(--danger); margin-top: 4px; }
+.send-transfer-btn { width: 100%; margin-top: 8px; }
+.send-again-btn { margin-top: 12px; }
+
 @media (max-width: 640px) {
   .dropzone-title {
     font-size: var(--fs-h1);
