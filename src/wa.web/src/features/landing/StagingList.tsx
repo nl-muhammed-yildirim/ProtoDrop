@@ -1,7 +1,9 @@
-import { useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { formatBytes } from '../../core/upload/formatBytes';
 import type { UploadDraft } from '../../core/upload/UploadEngine';
 import { useUploadEngine } from '../../core/upload/UploadEngine';
+import { useTransferStore } from '../../core/upload/TransferStore';
+import { FinalizeButton } from './FinalizeButton';
 import { resolveEffectiveLimits, validateSelection } from '../../core/upload/limits';
 import type { Violation } from '../../core/upload/limits';
 import { showToast } from '../../core/ui/Toast';
@@ -73,38 +75,77 @@ export function StagingList() {
   // Fix 5: guard against double-submit on Send button.
   const isSendingRef = useRef(false);
 
+  // FR-002-7: after "Send again" clears the draftId, auto-create a NEW draft so
+  // FinalizeButton re-appears with a fresh idempotency key (finalize-${newDraftId}).
+  // This ensures re-finalize produces a NEW transfer (not an idempotent replay).
+  const draftId = useTransferStore((state) => state.draftId);
+  const allFilesDone = files.length > 0 && files.every((f) => f.status === 'done');
+  const autoDraftRef = useRef(false);
+
+  useEffect(() => {
+    if (!allFilesDone || draftId !== null) return;
+    // Prevent double-fire (e.g. React StrictMode double-mount).
+    if (autoDraftRef.current) return;
+    autoDraftRef.current = true;
+
+    const currentFiles = useUploadEngine.getState().files;
+    const payload = {
+      files: currentFiles.map((f) => ({ name: f.name, sizeBytes: f.size })) as DraftFile[],
+    };
+
+    fetch('/api/v1/transfers/draft', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+      .then((response) => {
+        if (!response.ok) return;
+        return response.json();
+      })
+      .then((data) => {
+        const parsed = data as { draftId?: string };
+        if (parsed.draftId) {
+          useTransferStore.getState().setDraftId(parsed.draftId);
+        }
+      })
+      .catch(() => {
+        // Network error — user can retry by clicking "Send" again.
+      })
+      .finally(() => {
+        autoDraftRef.current = false;
+      });
+  }, [allFilesDone, draftId]);
+
   // US-001-03: resolve effective limits (guest fallback; replace with /api/v1/limits fetch when auth lands).
   const limits = resolveEffectiveLimits();
 
-  // US-001-03: validate selection on every render (reactive to changes in files array or limits).
-  const violations = validateSelection(files, limits);
+  // Fix 7: memoize validation — avoids O(n) per file row × total files on every render.
+  const violations = useMemo(() => validateSelection(files, limits), [files, limits]);
   const hasViolation = violations.length > 0;
 
   if (files.length === 0) return null; // empty list → the drop zone is the whole UI again
 
+  // Fix 18: compute status line once per render instead of an IIFE in JSX.
+  const failedCount = files.filter((f) => f.status === 'failed').length;
+  const uploadingCount = files.filter((f) => f.status === 'uploading').length;
+  const doneCount = files.filter((f) => f.status === 'done').length;
+
+  let statusText: string | null = null;
+  let statusClassName = 'staging-overall';
+  if (failedCount > 0) {
+    statusText = `Upload paused — ${failedCount} file${failedCount === 1 ? '' : 's'} need attention.`;
+    statusClassName += ' staging-overall--failed';
+  } else if (uploadingCount > 0) {
+    statusText = `Uploading… ${doneCount} of ${files.length}`;
+  } else if (doneCount === files.length && files.length > 0) {
+    statusText = 'All files uploaded.';
+    statusClassName += ' staging-overall--done';
+  }
+
   return (
     <div className="staging">
       {/* FR-001-5: overall status line — ARIA live region for screen readers (AC-001-3). */}
-      {files.length > 0 && (() => {
-        const failedCount = files.filter((f) => f.status === 'failed').length;
-        const uploadingCount = files.filter((f) => f.status === 'uploading').length;
-        const doneCount = files.filter((f) => f.status === 'done').length;
-
-        let text: string | null = null;
-        let className = 'staging-overall';
-
-        if (failedCount > 0) {
-          text = `Upload paused — ${failedCount} file${failedCount === 1 ? '' : 's'} need attention.`;
-          className += ' staging-overall--failed';
-        } else if (uploadingCount > 0) {
-          text = `Uploading… ${doneCount} of ${files.length}`;
-        } else if (doneCount === files.length && files.length > 0) {
-          text = 'All files uploaded.';
-          className += ' staging-overall--done';
-        }
-
-        return text ? <p className={className} role="status" aria-live="polite">{text}</p> : null;
-      })()}
+      {statusText && <p className={statusClassName} role="status" aria-live="polite">{statusText}</p>}
 
       <ul className="staging-list" aria-label="Staged files">
         {files.map((file) => {
@@ -213,9 +254,12 @@ export function StagingList() {
           isSendingRef.current = true;
 
           try {
+            // Fix 8: read the current files from the store to avoid stale closure capture.
+            const currentFiles = useUploadEngine.getState().files;
+
             // Build the draft payload per TA-4.2#1.
             const payload = {
-              files: files.map((f) => ({ name: f.name, sizeBytes: f.size })) as DraftFile[],
+              files: currentFiles.map((f) => ({ name: f.name, sizeBytes: f.size })) as DraftFile[],
             };
 
             const response = await fetch('/api/v1/transfers/draft', {
@@ -227,14 +271,26 @@ export function StagingList() {
             if (response.ok) {
               const data = await response.json();
 
-              // Fix 6: validate draft response before passing to start().
-              const parsedData = data as { files?: Array<{ uploadUrl: string }> };
-              if (!parsedData.files || !Array.isArray(parsedData.files) || parsedData.files.length !== files.length) {
+              // Fix 3: validate draft response — check length AND per-file uploadUrl non-empty.
+              // TA-4.2#1: server echoes back files in the same order as sent.
+              const parsedData = data as { files?: Array<{ uploadUrl?: string }>; draftId?: string };
+              if (
+                !parsedData.files ||
+                !Array.isArray(parsedData.files) ||
+                parsedData.files.length !== currentFiles.length ||
+                !parsedData.files.every((f: { uploadUrl?: string }) => typeof f.uploadUrl === 'string' && f.uploadUrl.length > 0)
+              ) {
                 showToast('error', 'Invalid draft response from server.');
                 return;
               }
 
-              start(data as UploadDraft); // triggers block upload (US-001-04 / T-009)
+              // US-002-01: store the draftId so FinalizeButton can call /finalize later.
+              if (parsedData.draftId) {
+                useTransferStore.getState().setDraftId(parsedData.draftId);
+              }
+
+              // Fix 1: pass the exact file snapshot used in the POST body to start().
+              start(data as UploadDraft, currentFiles); // triggers block upload (US-001-04 / T-009)
             } else {
               // Map server error codes to human messages (TA-4.1.3: Problem+JSON with closed code).
               const contentType = response.headers.get('content-type') ?? '';
@@ -263,15 +319,9 @@ export function StagingList() {
 
               showToast('error', errorMessage);
             }
-          } catch (e) {
-            // Network error, CORS, etc. — generic error with optional correlationId if available.
-            let message = 'Network error. Please try again.';
-            const err = e as Error & { response?: Response };
-            if (err.response?.status === 409 && err.response.headers.get('x-correlation-id')) {
-              // Could include correlation ID in toast, but MVP keeps it simple.
-              message = 'Transfer rejected: limit exceeded.';
-            }
-            showToast('error', message);
+          } catch {
+            // Fix 17: standard fetch doesn't attach .response — just show a generic network error.
+            showToast('error', 'Network error. Please try again.');
           } finally {
             isSendingRef.current = false; // Fix 5: release send guard.
           }
@@ -279,6 +329,9 @@ export function StagingList() {
       >
         Send
       </button>
+
+      {/* US-002-01: "Get my link" button — appears when all files are done. */}
+      <FinalizeButton />
 
       <p className="staging-total">
         {files.length === 1 ? '1 file' : `${files.length} files`} · {formatBytes(totalBytes)}

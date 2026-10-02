@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach } from 'vitest';
 import App from '../../App';
 import { useUploadEngine, __setUploadFn, __setDelayFn } from '../../core/upload/UploadEngine';
+import { useTransferStore } from '../../core/upload/TransferStore';
 import { useToasts } from '../../core/ui/Toast';
 
 // US-001-05 — Recover from a failed upload (FR-001-6 / AC-001-3).
@@ -25,10 +27,18 @@ async function waitForStatus(fileId: string, status: string, timeout = 2000): Pr
   throw new Error(`Timeout waiting for file ${fileId} to reach status ${status}`);
 }
 
+// Fix 15: save original fetch for cleanup between tests.
+const originalFetch = window.fetch;
+
 describe('US-001-05 — Recover from a failed upload (StagingList)', () => {
   beforeEach(() => {
     useUploadEngine.getState().reset();
+    useTransferStore.getState().reset(); // Fix 14: reset TransferStore between tests.
     useToasts.getState().clear();
+  });
+
+  afterEach(() => {
+    (window as any).fetch = originalFetch; // Fix 15: restore original fetch.
   });
 
   it('failed row renders with danger styling + Retry button (AC-001-3)', async () => {

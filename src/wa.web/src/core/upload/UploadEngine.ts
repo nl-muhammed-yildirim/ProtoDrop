@@ -28,7 +28,7 @@ interface UploadEngineApi {
   addFiles(files: File[]): void;
   remove(fileId: string): void; // TA-8.3
   reset(): void; // TA-8.3
-  start(draft: UploadDraft): void; // TA-8.3 — US-001-05: block upload with retry
+  start(draft: UploadDraft, filesSnapshot?: UploadFile[]): void; // TA-8.3 — US-001-05: block upload with retry
   retry(fileId: string): void; // TA-8.3 — US-001-05: resume from saved block index
 }
 
@@ -45,6 +45,9 @@ const completedBlocks = new Map<string, Set<number>>();
 // US-001-05: double-click guard — track in-flight retry file IDs (Fix 3).
 const activeRetries = new Set<string>();
 
+// Fix 6: AbortController per file for cancelling in-flight blocks on removal.
+const abortControllers = new Map<string, AbortController>();
+
 // US-001-05: fire toast only once per session on first failure (AC-001-3).
 let failureToastShown = false;
 
@@ -54,14 +57,20 @@ const BLOCK_SIZE = 8 * 1024 * 1024;
 // US-001-05: exponential backoff delays for up to 5 retry attempts (FR-001-6).
 const RETRY_DELAYS_MS = [500, 1000, 2000, 4000, 8000];
 
+// Fix 16: total attempts including the initial try.
+const MAX_ATTEMPTS = RETRY_DELAYS_MS.length + 1;
+
 // US-001-05: parallelism per file (TA-8.3).
 const PARALLELISM = 4;
 
-/** US-001-05: default block transport — PUT the block to the SAS URL. */
-type UploadFn = (block: Blob, uploadUrl: string) => Promise<void>;
+// Fix 13: per-block timeout to prevent hung TCP connections blocking forever.
+const BLOCK_TIMEOUT_MS = 60_000;
 
-let uploadFn: UploadFn = async (block, uploadUrl) => {
-  const response = await fetch(uploadUrl, { method: 'PUT', body: block });
+/** US-001-05: default block transport — PUT the block to the SAS URL. */
+type UploadFn = (block: Blob, uploadUrl: string, signal?: AbortSignal) => Promise<void>;
+
+let uploadFn: UploadFn = async (block, uploadUrl, signal) => {
+  const response = await fetch(uploadUrl, { method: 'PUT', body: block, signal });
   if (!response.ok) throw new Error(`Block upload failed: ${response.status}`);
 };
 
@@ -88,24 +97,33 @@ const summarize = (files: UploadFile[]) => ({
   totalBytes: files.reduce((sum, file) => sum + file.size, 0),
 });
 
-/** US-001-05: upload a single block with retry sub-loop (up to 5 attempts). */
+/** US-001-05: upload a single block with retry sub-loop (up to MAX_ATTEMPTS). */
 async function uploadBlockWithRetry(
   _fileId: string,
   blockIndex: number,
   file: File,
-  uploadUrl: string
+  uploadUrl: string,
+  abortSignal?: AbortSignal
 ): Promise<void> {
   const start = blockIndex * BLOCK_SIZE;
   const end = Math.min(start + BLOCK_SIZE, file.size);
   const block = file.slice(start, end);
 
-  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    // Fix 6: per-attempt AbortController so removal can cancel in-flight blocks.
+    const controller = new AbortController();
+    // Fix 13: per-block timeout to prevent hung TCP connections blocking forever.
+    const timeout = setTimeout(() => controller.abort(), BLOCK_TIMEOUT_MS);
+
     try {
-      await uploadFn(block, uploadUrl);
+      if (abortSignal?.aborted) throw new Error('Aborted');
+      await uploadFn(block, uploadUrl, controller.signal);
       return; // success — exit retry loop
     } catch {
-      if (attempt === RETRY_DELAYS_MS.length) throw new Error(`Block ${blockIndex} failed after ${RETRY_DELAYS_MS.length + 1} attempts`);
+      if (attempt === MAX_ATTEMPTS - 1) throw new Error(`Block ${blockIndex} failed after ${MAX_ATTEMPTS} attempts`);
       await delayFn(RETRY_DELAYS_MS[attempt]);
+    } finally {
+      clearTimeout(timeout);
     }
   }
 }
@@ -132,23 +150,27 @@ async function uploadFile(
         )
       ),
     }));
+    // Fix 5: clean up Maps in early-return path (retry-after-success).
+    fileHandles.delete(fileId);
+    completedBlocks.delete(fileId);
+    uploadUrls.delete(fileId);
     return;
   }
 
+  const abortSignal = abortControllers.get(fileId)?.signal;
+
   // US-001-05: process blocks in batches of PARALLELISM (TA-8.3).
   while (completedSet.size < totalBlocks) {
-    // Fix 2: find block indices not yet completed, take the next PARALLELISM.
-    const remaining = Array.from(
-      { length: totalBlocks },
-      (_, i) => i
-    ).filter((i) => !completedSet.has(i));
-
-    const batch = remaining.slice(0, PARALLELISM);
+    // Fix 4: find the next batch of uncompleted block indices without allocating an array each time.
+    const remaining: number[] = [];
+    for (let i = 0; i < totalBlocks && remaining.length < PARALLELISM; i++) {
+      if (!completedSet.has(i)) remaining.push(i);
+    }
 
     // US-001-05: upload batch in parallel; track which blocks succeeded.
     const results = await Promise.allSettled(
-      batch.map(async (blockIndex) => {
-        await uploadBlockWithRetry(fileId, blockIndex, file, uploadUrl);
+      remaining.map(async (blockIndex) => {
+        await uploadBlockWithRetry(fileId, blockIndex, file, uploadUrl, abortSignal);
         return blockIndex;
       })
     );
@@ -161,10 +183,14 @@ async function uploadFile(
       // Fix 2: add only successfully completed block indices to the set.
       results.forEach((r, idx) => {
         if (r.status === 'fulfilled') {
-          completedSet.add(batch[idx]);
+          completedSet.add(remaining[idx]);
         }
       });
       completedBlocks.set(fileId, completedSet);
+
+      // Fix 2: guard against file removed during upload — don't mutate state.
+      const currentFiles = useUploadEngine.getState().files;
+      if (!currentFiles.some((f) => f.id === fileId)) return;
 
       set((state) => {
         const files = state.files.map((f) =>
@@ -178,10 +204,14 @@ async function uploadFile(
     }
 
     // All blocks in batch succeeded — add all to the set.
-    for (const blockIndex of batch) {
+    for (const blockIndex of remaining) {
       completedSet.add(blockIndex);
     }
     completedBlocks.set(fileId, completedSet);
+
+    // Fix 2: guard against file removed during upload — don't mutate state.
+    const currentFiles = useUploadEngine.getState().files;
+    if (!currentFiles.some((f) => f.id === fileId)) return;
 
     set((state) => {
       const files = state.files.map((f) =>
@@ -204,6 +234,7 @@ async function uploadFile(
   // Fix 4: clean up Maps after file completes (memory leak prevention).
   fileHandles.delete(fileId);
   completedBlocks.delete(fileId);
+  uploadUrls.delete(fileId);
 }
 
 export const useUploadEngine = create<UploadEngineApi>()((set) => ({
@@ -226,10 +257,13 @@ export const useUploadEngine = create<UploadEngineApi>()((set) => ({
   },
 
   remove(fileId: string) {
+    // Fix 6: abort in-flight blocks before deleting Maps.
+    abortControllers.get(fileId)?.abort();
     fileHandles.delete(fileId);
     uploadUrls.delete(fileId); // Fix 1: clear stored URL on removal
     completedBlocks.delete(fileId); // US-001-05: clear progress on removal
     activeRetries.delete(fileId); // Fix 3: clear retry guard on removal
+    abortControllers.delete(fileId); // Fix 6: remove controller entry
     set((state) => {
       const files = state.files.filter((file) => file.id !== fileId);
       return { files, overall: summarize(files) };
@@ -237,17 +271,22 @@ export const useUploadEngine = create<UploadEngineApi>()((set) => ({
   },
 
   reset() {
+    // Fix 6: abort all in-flight blocks.
+    for (const controller of abortControllers.values()) {
+      controller.abort();
+    }
     fileHandles.clear();
     uploadUrls.clear(); // Fix 1: clear all stored URLs
     completedBlocks.clear(); // US-001-05: clear all block progress
     activeRetries.clear(); // Fix 3: clear all retry guards
+    abortControllers.clear(); // Fix 6: clear all controllers
     failureToastShown = false; // US-001-05: reset toast flag (AC-001-3)
     set({ files: [], overall: { sentBytes: 0, totalBytes: 0 } });
   },
 
-  start(draft: UploadDraft) {
-    // US-001-05: serialized per-file upload loop (FR-001-4).
-    const files = useUploadEngine.getState().files;
+  start(draft: UploadDraft, filesSnapshot?: UploadFile[]) {
+    // Fix 1: use the caller's file snapshot to avoid index drift if a file is removed between POST and here.
+    const files = filesSnapshot ?? useUploadEngine.getState().files;
     const draftFiles = (draft as { files?: Array<{ uploadUrl: string }> }).files ?? [];
 
     // Fix 1: store each file's upload URL so retry() can resume with the correct URL.
@@ -264,6 +303,11 @@ export const useUploadEngine = create<UploadEngineApi>()((set) => ({
     void (async () => {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
+
+        // Fix 2: check if file still exists in the store (may have been removed during upload).
+        const currentFiles = useUploadEngine.getState().files;
+        if (!currentFiles.some((f) => f.id === file.id)) continue;
+
         const fileHandle = fileHandles.get(file.id);
         if (!fileHandle) continue;
 
@@ -277,16 +321,24 @@ export const useUploadEngine = create<UploadEngineApi>()((set) => ({
           continue;
         }
 
+        // Fix 6: create AbortController for this file's upload.
+        const controller = new AbortController();
+        abortControllers.set(file.id, controller);
+
         const uploadUrl = draftFiles[i]?.uploadUrl ?? '';
         try {
           await uploadFile(file.id, fileHandle, uploadUrl, set);
         } catch {
           // US-001-05: mark file as failed (AC-001-3).
+          const currentAfterFail = useUploadEngine.getState().files;
+          if (!currentAfterFail.some((f) => f.id === file.id)) return;
           set((state) => ({
             files: state.files.map((f) =>
               f.id === file.id ? { ...f, status: 'failed' as const } : f
             ),
           }));
+        } finally {
+          abortControllers.delete(file.id); // Fix 6: clean up controller after completion.
         }
 
         // US-001-05: fire toast on first failure in session (AC-001-3).

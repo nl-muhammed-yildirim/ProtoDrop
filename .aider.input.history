@@ -216,3 +216,76 @@
 
 # 2026-10-01T19:48:31.888Z
 +commit and push changes to main branch
+
+# 2026-10-01T19:55:00.391Z
++run application. I want to see UI and changes
+
+# 2026-10-01T20:24:12.691Z
++Create future branch for docs/features/Phase 0-MVP/F-TRF-002/F-TRF-002-transfer-link.md.
++Let's start implementing docs/features/Phase 0-MVP/F-TRF-002/US-002-01-unique-link.md .
++- Generate quick and perfect prompt for developer subagent
++   - You can seperate it to subtasks for developer subagent
++   - Run subagents in new subtasks
++- After completion of development review code changes with Reviewer subagent in another subtask
+
+# 2026-10-01T20:34:40.515Z
++Create feature branch for docs/features/Phase 0-MVP/F-TRF-002/F-TRF-002-transfer-link.md.
++Let's start implementing docs/features/Phase 0-MVP/F-TRF-002/US-002-01-unique-link.md .
++- Generate quick and perfect prompt for developer subagent
++   - You can seperate it to subtasks while generating prompt
++- Run subtasks with developer agent one by one and in an order
++- After completion of development review code changes with Reviewer subagent in another subtask
+
+# 2026-10-01T20:59:29.051Z
++fix all issues with developer subagent in subtask
+
+# 2026-10-01T21:03:46.318Z
++fix all issues with developer subagent im new subtask
+
+# 2026-10-01T21:35:53.192Z
++* Review Code changes and create comments if something found with Reiviewer subagent in new subtask.
++* Fix found issued with developer subagent in another subtaks
++* Dont forget to add subtasks to this task as subtask
+
+# 2026-10-01T21:59:31.034Z
++Let's start implementing docs/features/Phase docs/features/Phase 0-MVP/F-TRF-002/US-002-02-send-by-email.md
++- Generate quick and perfect prompt for developer subagent
++   - You can seperate it to subtasks while generating prompt
++- Run subtasks with developer agent one by one and in an order with each new subtask
++- After completion of development review code changes with Reviewer subagent in new subtask
++- If something found from Code Review, fix it with developer subagent in new subtask
+
+# 2026-10-01T22:26:14.114Z
++Proceed.
+
+# 2026-10-01T22:32:57.940Z
++Start implementation with developer subagent in new subtask
+
+# 2026-10-02T06:20:57.040Z
++Let's start implementing docs/features/Phase docs/features/Phase 0-MVP/F-TRF-002/US-002-03-password.md
++- Generate quick and perfect prompt for developer subagent
++   - You can seperate it to tasks while generating prompt
++- Run tasks with developer agent one by one and in an order with each new task
++- After completion of development review code changes with Reviewer subagent in new task
++- If something found from Code Review, fix it with developer subagent in new task
+
+# 2026-10-02T06:52:45.895Z
++I dont see that Task2 is completed. Verify task
+
+# 2026-10-02T06:55:04.045Z
++where is the backend changes?
+
+# 2026-10-02T06:58:09.926Z
++if backend endpoints are a separate upcoming task, then its okey
+
+# 2026-10-02T11:01:02.619Z
++Feature docs/features/Phase 0-MVP/F-TRF-002/F-TRF-002-transfer-link.md completed. Verify it. tell me any thing is missing?
+
+# 2026-10-02T11:14:05.111Z
++Fix the gaps by using developer agent 
+
+# 2026-10-02T15:42:24.819Z
++Feature docs/features/Phase 0-MVP/F-TRF-002/F-TRF-002-transfer-link.md completed. Verify it. tell me any thing is missing?
+
+# 2026-10-02T15:49:48.457Z
++run application
