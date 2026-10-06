@@ -1,11 +1,15 @@
 import './styles/tokens.css';
 import './styles/landing.css';
+import './styles/recipient.css';
 import { Toaster } from './core/ui/Toast';
 import { DropZone } from './features/landing/DropZone';
 import { StagingList } from './features/landing/StagingList';
 import { LinkScreen } from './features/landing/LinkScreen';
+import { RecipientPage } from './features/recipient/RecipientPage';
 
 function App() {
+  const isRecipientRoute = /^\/t\/[A-Z0-9]{8}$/.test(window.location.pathname);
+
   return (
     <div className="landing">
       <header className="topbar">
@@ -16,11 +20,17 @@ function App() {
           </button>
         </div>
       </header>
-      <main className="dropzone">
-        <DropZone />
-        <StagingList />
-        {/* US-002-01: LinkScreen renders null until finalize succeeds (AC-002-1). */}
-        <LinkScreen />
+      <main className={isRecipientRoute ? 'recipient-main' : 'dropzone'}>
+        {isRecipientRoute ? (
+          <RecipientPage />
+        ) : (
+          <>
+            <DropZone />
+            <StagingList />
+            {/* US-002-01: LinkScreen renders null until finalize succeeds (AC-002-1). */}
+            <LinkScreen />
+          </>
+        )}
       </main>
       <Toaster />
     </div>

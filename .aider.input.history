@@ -289,3 +289,30 @@
 
 # 2026-10-02T15:49:48.457Z
 +run application
+
+# 2026-10-02T16:13:33.342Z
++Create feature branch for docs/features/Phase docs/features/Phase 0-MVP/F-TRF-003/F-TRF-003-recipient-page.md
++Let's start implementing docs/features/Phase docs/features/Phase docs/features/Phase 0-MVP/F-TRF-003/US-003-01-open-link.md
++
++/init docs/AGENTS.md
++/init docs/03-technical-architecture.md
++/init docs/PROGRESS.md
++
++- Generate quick and perfect prompt for developer subagent
++    * Consider about added files 
++    * Generate prompts in Plan mode with Prompter model
++    * You can seperate it to subtasks while generating prompt
++    * You can use codegraph extension for detecting context files
++    * Create a plan.md 
++- Run subtasks with developer agent from plan.md
++    * Run developer agent in Agent mode
++    * Run tasks one by one 
++    * Run tasks in an order 
++    * Run each task with new subtask
++- After completion of development review code changes
++    * Run it with Reviewer subagent in agent mode
++    * Run it in new subtask
++    * Create comments for each findings
++- If something found from Code Review
++    * Fix them with developer subagent in agent mode
++    * Fix them in new subtask

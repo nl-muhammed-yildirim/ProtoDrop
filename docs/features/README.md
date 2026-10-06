@@ -1,9 +1,11 @@
 # Features — Spec & User Story Index
 
 **Last updated:** 2026-08-28
-Every Phase-0 feature has **one spec file** and **one file per user story** — 66 stories, 100 % coverage of the F-TRF-001…017 index. **Phase 1 is fully specced too:** F-BIL-001…003 + F-PRF-001…004, 31 stories (US-018…024). **Phase 2 is fully specced:** F-COL-001…005 + F-SGN-001…004 + F-ALB-001…004, 44 stories (US-025…037). Phase 3 is fully specced too: F-ENT-001…006, 27 stories (US-038…043). **Phase X (cross-cutting) is fully specced:** F-XCT-001…005, 11 stories (US-044…048).
+Every Phase-0 feature has **one spec file** and **one file per user story** — 66 stories, 100 % coverage of the F-TRF-001…017 index. **Phase 0-Foundation (M0) is fully specced:** F-FND-001…008, 21 stories (US-049…056). **Phase 1 is fully specced too:** F-BIL-001…003 + F-PRF-001…004, 31 stories (US-018…024). **Phase 2 is fully specced:** F-COL-001…005 + F-SGN-001…004 + F-ALB-001…004, 44 stories (US-025…037). Phase 3 is fully specced too: F-ENT-001…006, 27 stories (US-038…043). **Phase X (cross-cutting) is fully specced:** F-XCT-001…005, 11 stories (US-044…048).
 
 > **ID mapping (Phase X):** continues the per-feature numbering: F-XCT-001 → 044 · F-XCT-002 → 045 · F-XCT-003 → 046 · F-XCT-004 → 047 · F-XCT-005 → 048.
+
+> **ID mapping (Phase 0-Foundation):** M0 features continue the global sequence: F-FND-001 → FR/AC/US-049 · F-FND-002 → 050 · F-FND-003 → 051 · F-FND-004 → 052 · F-FND-005 → 053 · F-FND-006 → 054 · F-FND-007 → 055 · F-FND-008 → 056.
 
 > **ID mapping (Phase 1):** Phase 0 occupies FR-001…017 / AC-0xx / US-0xx per feature number. Phase 1 continues the numbering per feature: F-BIL-001 → FR-018 / AC-018 / US-018; F-BIL-002 → 019; F-BIL-003 → 020; F-PRF-001 → 021; F-PRF-002 → 022; F-PRF-003 → 023; F-PRF-004 → 024. Phase 2 continues from 025.
 
@@ -21,6 +23,78 @@ Every Phase-0 feature has **one spec file** and **one file per user story** — 
 ---
 
 ## Index
+
+### F-FND-001 — Solution & Project Scaffold
+Spec: `Phase 0-Foundation/F-FND-001/F-FND-001-solution-scaffold.md`
+
+| Story | File |
+|---|---|
+| Open the repo in VS 2026 and build everything | `Phase 0-Foundation/F-FND-001/US-049-01-open-and-build.md` |
+| Know exactly where new code goes | `Phase 0-Foundation/F-FND-001/US-049-02-layer-rules.md` |
+| Run the web app locally in the same solution | `Phase 0-Foundation/F-FND-001/US-049-03-web-in-solution.md` |
+
+### F-FND-002 — Local Tooling & Health Endpoint
+Spec: `Phase 0-Foundation/F-FND-002/F-FND-002-local-tooling-health.md`
+
+| Story | File |
+|---|---|
+| Bring up my local data tier with one command | `Phase 0-Foundation/F-FND-002/US-050-01-docker-local.md` |
+| Know in one request whether the stack is ready | `Phase 0-Foundation/F-FND-002/US-050-02-health-check.md` |
+| See what happened without opening a debugger | `Phase 0-Foundation/F-FND-002/US-050-03-serilog-console.md` |
+
+### F-FND-003 — CI Pipeline (PR Gate)
+Spec: `Phase 0-Foundation/F-FND-003/F-FND-003-ci-pipeline.md`
+
+| Story | File |
+|---|---|
+| Know my PR is safe to merge before I click | `Phase 0-Foundation/F-FND-003/US-051-01-pr-gate.md` |
+| Catch format drift between Windows and Linux | `Phase 0-Foundation/F-FND-003/US-051-02-format-determinism.md` |
+| Have an image ready before deploy exists | `Phase 0-Foundation/F-FND-003/US-051-03-image-build.md` |
+
+### F-FND-004 — Domain Model & Database Schema
+Spec: `Phase 0-Foundation/F-FND-004/F-FND-004-domain-model-schema.md`
+
+| Story | File |
+|---|---|
+| Migrate a fresh database and get the whole schema | `Phase 0-Foundation/F-FND-004/US-052-01-migrate-fresh-db.md` |
+| Trust that seeds are identical in every environment | `Phase 0-Foundation/F-FND-004/US-052-02-seed-everywhere.md` |
+| Keep the domain layer free of infrastructure | `Phase 0-Foundation/F-FND-004/US-052-03-pure-domain.md` |
+
+### F-FND-005 — Limits Registry
+Spec: `Phase 0-Foundation/F-FND-005/F-FND-005-limits-registry.md`
+
+| Story | File |
+|---|---|
+| Ask "what are this plan's limits?" in one call | `Phase 0-Foundation/F-FND-005/US-053-01-resolve-limits.md` |
+| Change a limit and have it apply within 30 seconds | `Phase 0-Foundation/F-FND-005/US-053-02-flag-override.md` |
+
+### F-FND-006 — Event Backbone (outbox → Service Bus)
+Spec: `Phase 0-Foundation/F-FND-006/F-FND-006-event-backbone.md`
+
+| Story | File |
+|---|---|
+| Emit an event from a use case and have it reach the broker exactly once | `Phase 0-Foundation/F-FND-006/US-054-01-publish-once.md` |
+| Replay the same event without double-processing | `Phase 0-Foundation/F-FND-006/US-054-02-dedup-replay.md` |
+| Test events end-to-end without a Service Bus connection | `Phase 0-Foundation/F-FND-006/US-054-03-in-memory-fake.md` |
+
+### F-FND-007 — Blob Foundation (IBlobStore + SAS minting)
+Spec: `Phase 0-Foundation/F-FND-007/F-FND-007-blob-foundation.md`
+
+| Story | File |
+|---|---|
+| Mint a browser upload URL that needs no credentials | `Phase 0-Foundation/F-FND-007/US-055-01-mint-upload-sas.md` |
+| Upload a block over plain HTTP and read it back byte-exact | `Phase 0-Foundation/F-FND-007/US-055-02-round-trip.md` |
+| Trust that every blob has exactly one canonical path | `Phase 0-Foundation/F-FND-007/US-055-03-canonical-paths.md` |
+
+### F-FND-008 — Pipeline Foundation (correlation, errors, CORS, rate limits, telemetry)
+Spec: `Phase 0-Foundation/F-FND-008/F-FND-008-pipeline-foundation.md`
+
+| Story | File |
+|---|---|
+| Trace every request end-to-end with one correlation ID | `Phase 0-Foundation/F-FND-008/US-056-01-correlation-id.md` |
+| Every error is Problem+JSON from a closed code list | `Phase 0-Foundation/F-FND-008/US-056-02-problem-json.md` |
+| Burst traffic on auth doesn't take the API down | `Phase 0-Foundation/F-FND-008/US-056-03-rate-limit.md` |
+| Emit telemetry events from a closed, named set | `Phase 0-Foundation/F-FND-008/US-056-04-telemetry-events.md` |
 
 ### F-TRF-001 — Upload Surface (chunked upload)
 Spec: `Phase 0-MVP/F-TRF-001/F-TRF-001-upload-surface.md`
