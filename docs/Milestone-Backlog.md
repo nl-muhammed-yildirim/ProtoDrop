@@ -1,6 +1,6 @@
 # Milestone Backlog
 
-**Last updated:** 2026-08-28
+**Last updated:** 2026-10-06 (reset to blank — all tasks pending, CURRENT = T-001)
 Ordered task list. **One `CURRENT` at a time — no skipping.** Each task: scope, spec links (F/TA IDs), and a **measurable exit check**. Blocked-only-by-decisions: if a `TBD-you` blocks you, open a decision request (AGENT.md §8) and stop.
 
 Status: `pending` → `done` (date). `CURRENT` = first non-done task.
