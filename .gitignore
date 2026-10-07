@@ -3,4 +3,7 @@
 ################################################################################
 
 /src/wa.web/node_modules/@rolldown/binding-win32-x64-msvc
+# .NET build output
+[Bb]in/
+[Oo]bj/
 /.vs
