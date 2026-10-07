@@ -1,6 +1,8 @@
-var builder = WebApplication.CreateBuilder(args);
-var app = builder.Build();
+using wa.application.UseCases.Sample;
 
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(PingCommand).Assembly));
+var app = builder.Build();
 app.MapGet("/", () => "Hello World!");
 
 app.Run();
