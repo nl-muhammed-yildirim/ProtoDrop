@@ -68,11 +68,24 @@ AC-009-3: Expired row
 - Integration: 30 seeded transfers → page 1 = 25 (AC-009-1); filter Active excludes expired; delete → row gone + `transfer.deleted` + refcount decremented; double delete → `NOT_FOUND` (EC-009-2); guest (no owner) transfer not listed.
 - E2E: My Files CRUD happy path (T-022 exit; T-028 e2e suite).
 
-## User stories
+## User stories & implementation tasks
 
-| ID | Story | File |
+| ID | Story / Task | File |
 |---|---|---|
-| US-009-01 | Review my transfers | `US-009-01-history-list.md` |
-| US-009-02 | Filter my transfers | `US-009-02-filters.md` |
-| US-009-03 | Re-send a transfer from My Files | `US-009-03-resend.md` |
-| US-009-04 | Delete one of my transfers | `US-009-04-delete.md` |
+| US-009-01 | Review my transfers | `US-009-01-history-list/US-009-01-history-list.md` |
+| US-009-02 | Filter my transfers | `US-009-02-filters/US-009-02-filters.md` |
+| US-009-03 | Re-send a transfer from My Files | `US-009-03-resend/US-009-03-resend.md` |
+| US-009-04 | Delete one of my transfers | `US-009-04-delete/US-009-04-delete.md` |
+
+**Implementation tasks:** one file per task — each story folder holds its story .md + its task files (context-friendly; execute top-to-bottom).
+
+| Story | Task | File | Status |
+|---|---|---|---|
+| US-009-01 | T-009-01 ListMyTransfersQuery + endpoint 14: owner-scoped list, cursor paging (FR-009-1/2) | `US-009-01-history-list/T-009-01-my-files-list-endpoint.md` | ☐ |
+| US-009-02 | T-009-02 Status filter on endpoint 14: All / Active / Expired (FR-009-4) | `US-009-02-filters/T-009-02-status-filter.md` | ☐ |
+| US-009-01 | T-009-03 GetMyTransferQuery + endpoint 15: owner detail incl. recipient list (TA-4.2#15) | `US-009-01-history-list/T-009-03-transfer-detail-endpoint.md` | ☐ |
+| US-009-04 | T-009-04 DeleteTransferCommand + endpoint 17: owner delete, refcount path (FR-009-3) | `US-009-04-delete/T-009-04-delete-transfer-endpoint.md` | ☐ |
+| US-009-01 + US-009-02 | T-009-05 My Files screen: list, filter pills, row actions (UI-Reference §5.4) | `US-009-01-history-list/T-009-05-my-files-ui.md` | ☐ |
+| US-009-04 + US-009-01 | T-009-06 Delete confirm modal + row actions (copy / view / re-send) (FR-009-3) | `US-009-04-delete/T-009-06-delete-confirm-ui.md` | ☐ |
+
+**Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-022 can be marked `done` in `Milestone-Backlog.md`. (US-009-03 needs no new code here — its endpoint 16 + shared-blob mechanics live in F-TRF-010 / T-023.)

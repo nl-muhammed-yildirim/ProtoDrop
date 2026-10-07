@@ -76,12 +76,29 @@ AC-001-4: User drops an empty folder
 - Integration (API): draft creation returns per-file SAS; limit pre-check at API (AC-001-2 server side); idempotent finalize.
 - E2E (Playwright): AC-001-1…001-4; injected network failure → AC-001-3; retry button restores upload.
 
-## User stories
+## User stories & implementation tasks
 
-| ID | Story | File |
+| ID | Story / Task | File |
 |---|---|---|
-| US-001-01 | Select files with drag & drop, click, or paste | `US-001-01-select-files.md` |
-| US-001-02 | Stage and remove multiple files | `US-001-02-stage-files.md` |
-| US-001-03 | Get warned before upload exceeds the limit | `US-001-03-size-validation.md` |
-| US-001-04 | Watch per-file and overall progress | `US-001-04-upload-progress.md` |
-| US-001-05 | Recover from a failed upload | `US-001-05-retry-upload.md` |
+| US-001-01 | Select files with drag & drop, click, or paste | `US-001-01-select-files/US-001-01-select-files.md` |
+| US-001-02 | Stage and remove multiple files | `US-001-02-stage-files/US-001-02-stage-files.md` |
+| US-001-03 | Get warned before upload exceeds the limit | `US-001-03-size-validation/US-001-03-size-validation.md` |
+| US-001-04 | Watch per-file and overall progress | `US-001-04-upload-progress/US-001-04-upload-progress.md` |
+| US-001-05 | Recover from a failed upload | `US-001-05-retry-upload/US-001-05-retry-upload.md` |
+
+**Implementation tasks:** one file per task — each story folder holds its story .md + its task files (context-friendly; execute top-to-bottom).
+
+| Story | Task | File | Status |
+|---|---|---|---|
+| US-001-02 | T-001-01 UploadEngine Zustand store (TA-8.3 contract) | `US-001-02-stage-files/T-001-01-uploadengine-store.md` | ☐ |
+| US-001-01 | T-001-02 Drop zone: drag, click-to-browse, paste (FR-001-1) | `US-001-01-select-files/T-001-02-drop-zone.md` | ☐ |
+| US-001-02 | T-001-03 Staging list UI: rows, remove ✕, total line, "Send." button | `US-001-02-stage-files/T-001-03-staging-list-ui.md` | ☐ |
+| US-001-03 | T-001-04 Client-side limit pre-check + "Send." disable (FR-001-3) | `US-001-03-size-validation/T-001-04-client-limit-precheck.md` | ☐ |
+| US-001-03 | T-001-05 CreateDraftCommand + endpoint 1: draft creation, per-file cwr SAS (T-009) | `US-001-03-size-validation/T-001-05-create-draft-endpoint.md` | ☐ |
+| US-001-04 | T-001-06 UploadEngine.start: block-blob upload (8 MiB, parallelism 4, files serialized) | `US-001-04-upload-progress/T-001-06-block-upload-engine.md` | ☐ |
+| US-001-04 | T-001-07 Progress UI: per-file % + overall bytes line (FR-001-5) | `US-001-04-upload-progress/T-001-07-progress-ui.md` | ☐ |
+| US-001-05 | T-001-08 Per-block retry with backoff + row-local Retry (FR-001-6) | `US-001-05-retry-upload/T-001-08-block-retry-backoff.md` | ☐ |
+| US-001-04 | T-001-09 E2E (Playwright): AC-001-1…001-4 + injected failure (T-012 exit check) | `US-001-04-upload-progress/T-001-09-e2e-playwright.md` | ☐ |
+| US-001-04 | T-001-10 FinalizeTransferCommand + endpoint 2: idempotent finalize (T-010) | `US-001-04-upload-progress/T-001-10-finalize-endpoint.md` | ☐ |
+
+**Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-009, T-010 and T-012 can be marked `done` in `Milestone-Backlog.md`.

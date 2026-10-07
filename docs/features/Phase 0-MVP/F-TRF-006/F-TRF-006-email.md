@@ -76,12 +76,24 @@ AC-006-4: Transfer sent with zero emails
 - E2E: dev log-sender run shows the rendered email (manual visual check); unsubscribe round-trip (link → suppression row → admin list).
 - Load: 1k emails in one burst → all delivered under 60 s p95 lag target (TA-15).
 
-## User stories
+## User stories & implementation tasks
 
-| ID | Story | File |
+| ID | Story / Task | File |
 |---|---|---|
-| US-006-01 | Recipients get a notification email with the link | `US-006-01-recipient-email.md` |
-| US-006-02 | Failed deliveries retry and dead-letter | `US-006-02-retry-delivery.md` |
-| US-006-03 | Unsubscribe from a sender's emails | `US-006-03-unsubscribe.md` |
-| US-006-04 | Reply goes to the sender (branded email) | `US-006-04-reply-branding.md` |
-| US-006-05 | Receive the email in my language | `US-006-05-localized-email.md` |
+| US-006-01 | Recipients get a notification email with the link | `US-006-01-recipient-email/US-006-01-recipient-email.md` |
+| US-006-02 | Failed deliveries retry and dead-letter | `US-006-02-retry-delivery/US-006-02-retry-delivery.md` |
+| US-006-03 | Unsubscribe from a sender's emails | `US-006-03-unsubscribe/US-006-03-unsubscribe.md` |
+| US-006-04 | Reply goes to the sender (branded email) | `US-006-04-reply-branding/US-006-04-reply-branding.md` |
+| US-006-05 | Receive the email in my language | `US-006-05-localized-email/US-006-05-localized-email.md` |
+
+**Implementation tasks:** one file per task — each story folder holds its story .md + its task files (context-friendly; execute top-to-bottom).
+
+| Story | Task | File | Status |
+|---|---|---|---|
+| US-006-01 + US-006-04 | T-006-01 f-email consumer: template render, CH send, dedup + skips (TA-6.7) | `US-006-01-recipient-email/T-006-01-femail-consumer.md` | ☐ |
+| US-006-02 | T-006-02 Retry + dead-letter: backoff via SB delivery count, email.failed (FR-006-4) | `US-006-02-retry-delivery/T-006-02-retry-dlq.md` | ☐ |
+| US-006-03 | T-006-03 Unsubscribe: /unsubscribe/{token} + EmailSuppression (FR-006-5) | `US-006-03-unsubscribe/T-006-03-unsubscribe-route.md` | ☐ |
+| US-006-05 | T-006-04 Localized templates: per-language render + en fallback (F-TRF-014-5) | `US-006-05-localized-email/T-006-04-localized-templates.md` | ☐ |
+| US-006-01 + US-006-03 | T-006-05 E2E: dev log-sender run + unsubscribe round-trip (T-019 exit check) | `US-006-01-recipient-email/T-006-05-e2e-log-sender.md` | ☐ |
+
+**Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-019 can be marked `done` in `Milestone-Backlog.md`. (US-006-04 needs no new code — its headers are covered by T-006-01.)

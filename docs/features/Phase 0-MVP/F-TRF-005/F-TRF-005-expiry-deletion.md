@@ -72,10 +72,21 @@ AC-005-3: Transfer hits download cap before time expiry
 - E2E: full lifecycle via admin flag override (`RETENTION_DAYS=0`): send → expired screen ≤15 min → deleted (My Files row gone after grace via flag override too).
 - Load: 10k expired rows → job completes in one 15-min window (regression: < 10 min of that).
 
-## User stories
+## User stories & implementation tasks
 
-| ID | Story | File |
+| ID | Story / Task | File |
 |---|---|---|
-| US-005-01 | Transfers expire automatically | `US-005-01-auto-expiry.md` |
-| US-005-02 | Expired storage is deleted after grace | `US-005-02-auto-deletion.md` |
-| US-005-03 | Download cap ends the transfer early | `US-005-03-download-limit.md` |
+| US-005-01 | Transfers expire automatically | `US-005-01-auto-expiry/US-005-01-auto-expiry.md` |
+| US-005-02 | Expired storage is deleted after grace | `US-005-02-auto-deletion/US-005-02-auto-deletion.md` |
+| US-005-03 | Download cap ends the transfer early | `US-005-03-download-limit/US-005-03-download-limit.md` |
+
+**Implementation tasks:** one file per task — each story folder holds its story .md + its task files (context-friendly; execute top-to-bottom).
+
+| Story | Task | File | Status |
+|---|---|---|---|
+| US-005-01 | T-005-01 f-expire: timer job, batch 500, JobRun claim (TA-6.3) | `US-005-01-auto-expiry/T-005-01-fexpire-job.md` | ☐ |
+| US-005-02 | T-005-02 f-delete-transfers: grace scan, RefCount decrement, row/blob cleanup (TA-6.4) | `US-005-02-auto-deletion/T-005-02-fdelete-transfers.md` | ☐ |
+| US-005-02 | T-005-03 f-delete-blobs: hourly physical deletion of refcount-0 blobs (TA-6.5) | `US-005-02-auto-deletion/T-005-03-fdelete-blobs.md` | ☐ |
+| US-005-01 + US-005-02 | T-005-04 E2E: full lifecycle via admin flag override (RETENTION_DAYS=0) | `US-005-02-auto-deletion/T-005-04-e2e-lifecycle-flag.md` | ☐ |
+
+**Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-018 can be marked `done` in `Milestone-Backlog.md`. (The download-cap flip itself is endpoint 6 — T-003-06; US-005-03 needs no new code.)
