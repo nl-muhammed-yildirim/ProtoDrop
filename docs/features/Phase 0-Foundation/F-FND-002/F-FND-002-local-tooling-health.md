@@ -72,10 +72,22 @@ AC-050-4: Logs are readable
 - Integration: DB-ping failure path covered by stopping the container and asserting 503 (manual or test).
 - Gate: full AGENT.md §4 gate green.
 
-## User stories
+## User stories & implementation tasks
 
-| ID | Story | File |
+| ID | Story / Task | File |
 |---|---|---|
-| US-050-01 | Bring up my local data tier with one command | `US-050-01-docker-local.md` |
-| US-050-02 | Know in one request whether the stack is ready | `US-050-02-health-check.md` |
-| US-050-03 | See what happened without opening a debugger | `US-050-03-serilog-console.md` |
+| US-050-01 | Bring up my local data tier with one command | `US-050-01-docker-local/US-050-01-docker-local.md` |
+| US-050-02 | Know in one request whether the stack is ready | `US-050-02-health-check/US-050-02-health-check.md` |
+| US-050-03 | See what happened without opening a debugger | `US-050-03-serilog-console/US-050-03-serilog-console.md` |
+
+**Implementation tasks:** one file per task — each story folder holds its story .md + its task files (context-friendly; execute top-to-bottom).
+
+| Story | Task | File | Status |
+|---|---|---|---|
+| US-050-01 | T-050-01 Add docker-compose.local.yml (sql + azurite) | `US-050-01-docker-local/T-050-01-compose-file.md` | ☐ |
+| US-050-01 | T-050-02 Add the Local profile with every §5.2 env var | `US-050-01-docker-local/T-050-02-launch-settings-local.md` | ☐ |
+| US-050-02 | T-050-03 GET /health with real DB ping and auto-created wa database | `US-050-02-health-check/T-050-03-health-endpoint.md` | ☐ |
+| US-050-02 | T-050-04 DB down returns 503 with Problem+JSON body | `US-050-02-health-check/T-050-04-db-down-failure-path.md` | ☐ |
+| US-050-03 | T-050-05 Wire Serilog console logging with TA-10.5 levels | `US-050-03-serilog-console/T-050-05-serilog-console.md` | ☐ |
+
+**Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-002 can be marked `done` in `Milestone-Backlog.md`.

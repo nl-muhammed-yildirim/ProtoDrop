@@ -70,12 +70,27 @@ AC-002-4: Collision on linkId (astronomically unlikely)
 - Integration: finalize → `GET /t/{linkId}` 200; double-finalize with same `Idempotency-Key` returns same transfer (EC-002-1); send with `"a@x.com, b@y.com "` stores 2 normalized addresses; send with 0 emails → Active + no `EmailRecipient` rows; `transfer.created` payload matches TA-5.3.
 - E2E: guest full flow draft→finalize→send→copy (T-013 manual pass).
 
-## User stories
+## User stories & implementation tasks
 
-| ID | Story | File |
+| ID | Story / Task | File |
 |---|---|---|
-| US-002-01 | Get a unique link for my files | `US-002-01-unique-link.md` |
-| US-002-02 | Send the transfer to recipients by email | `US-002-02-send-by-email.md` |
-| US-002-03 | Protect my transfer with a password | `US-002-03-password.md` |
-| US-002-04 | Add sender info and a note | `US-002-04-sender-note.md` |
-| US-002-05 | Create a link-only transfer (no emails) | `US-002-05-link-only.md` |
+| US-002-01 | Get a unique link for my files | `US-002-01-unique-link/US-002-01-unique-link.md` |
+| US-002-02 | Send the transfer to recipients by email | `US-002-02-send-by-email/US-002-02-send-by-email.md` |
+| US-002-03 | Protect my transfer with a password | `US-002-03-password/US-002-03-password.md` |
+| US-002-04 | Add sender info and a note | `US-002-04-sender-note/US-002-04-sender-note.md` |
+| US-002-05 | Create a link-only transfer (no emails) | `US-002-05-link-only/US-002-05-link-only.md` |
+
+**Implementation tasks:** one file per task — each story folder holds its story .md + its task files (context-friendly; execute top-to-bottom).
+
+| Story | Task | File | Status |
+|---|---|---|---|
+| US-002-01 | T-002-01 LinkId value object: Crockford base32, 8 chars, retry-once (FR-002-1) | `US-002-01-unique-link/T-002-01-linkid-value-object.md` | ☐ |
+| US-002-01 | T-002-02 Idempotency-Key middleware for finalize + send (TA-4.1.5, EC-002-1) | `US-002-01-unique-link/T-002-02-idempotency-middleware.md` | ☐ |
+| US-002-01 | T-002-03 Link screen: "Your link is ready" + copy field (FR-002-2/3, UI §5.2) | `US-002-01-unique-link/T-002-03-link-screen-copy-field.md` | ☐ |
+| US-002-05 | T-002-04 SendTransferCommand + endpoint 3: activate, recipients, transfer.created (T-011) | `US-002-05-link-only/T-002-04-send-transfer-endpoint.md` | ☐ |
+| US-002-02 | T-002-05 Recipients field: parse, inline validation, MAX_EMAILS cap (FR-002-5) | `US-002-02-send-by-email/T-002-05-recipients-field-ui.md` | ☐ |
+| US-002-03 | T-002-06 Password at send: PBKDF2 hash into Transfer.PasswordHash (FR-002-3/4) | `US-002-03-password/T-002-06-password-hash-send.md` | ☐ |
+| US-002-04 | T-002-07 Sender name + note fields: pre-fill, 500-char counter (FR-002-4) | `US-002-04-sender-note/T-002-07-sender-name-note-ui.md` | ☐ |
+| US-002-05 | T-002-08 "Copy link only" + confirmation screen (FR-002-6/7, AC-002-3) | `US-002-05-link-only/T-002-08-copy-link-only-confirmation.md` | ☐ |
+
+**Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-011 and T-013 can be marked `done` in `Milestone-Backlog.md`.

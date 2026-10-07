@@ -74,10 +74,24 @@ AC-054-4: No broker needed locally
 - Integration: publish → consume round-trip against the fake; `DomainEvents` row state transitions (unpublished → published).
 - Gate: full AGENT.md §4 gate green.
 
-## User stories
+## User stories & implementation tasks
 
-| ID | Story | File |
+| ID | Story / Task | File |
 |---|---|---|
-| US-054-01 | Emit an event from a use case and have it reach the broker exactly once | `US-054-01-publish-once.md` |
-| US-054-02 | Replay the same event without double-processing | `US-054-02-dedup-replay.md` |
-| US-054-03 | Test events end-to-end without a Service Bus connection | `US-054-03-in-memory-fake.md` |
+| US-054-01 | Emit an event from a use case and have it reach the broker exactly once | `US-054-01-publish-once/US-054-01-publish-once.md` |
+| US-054-02 | Replay the same event without double-processing | `US-054-02-dedup-replay/US-054-02-dedup-replay.md` |
+| US-054-03 | Test events end-to-end without a Service Bus connection | `US-054-03-in-memory-fake/US-054-03-in-memory-fake.md` |
+
+**Implementation tasks:** one file per task — each story folder holds its story .md + its task files (context-friendly; execute top-to-bottom).
+
+| Story | Task | File | Status |
+|---|---|---|---|
+| US-054-01 | T-054-01 EventEnvelope (TA-5.2 exact) + IEventPublisher port | `US-054-01-publish-once/T-054-01-event-envelope-publisher-port.md` | ☐ |
+| US-054-01 | T-054-02 Outbox: DomainEvents row in the same transaction (T-006b) | `US-054-01-publish-once/T-054-02-outbox-same-transaction.md` | ☐ |
+| US-054-01 | T-054-03 Service Bus adapter: publish to topic core (MessageId = eventId) | `US-054-01-publish-once/T-054-03-sb-adapter.md` | ☐ |
+| US-054-02 | T-054-04 Consumer-side dedup: 15-min LRU by eventId (replay = no-op) | `US-054-02-dedup-replay/T-054-04-consumer-dedup-lru.md` | ☐ |
+| US-054-03 | T-054-05 In-memory publisher fake + DI wiring (unset SB → fake) | `US-054-03-in-memory-fake/T-054-05-in-memory-fake.md` | ☐ |
+| US-054-01 | T-054-06 Unit tests: envelope shape per TA-5.3 type + outbox retry idempotency | `US-054-01-publish-once/T-054-06-envelope-outbox-unit-tests.md` | ☐ |
+| US-054-03 | T-054-07 Unit tests: fake round-trip (publish → store → retrieve by topic) | `US-054-03-in-memory-fake/T-054-07-fake-roundtrip-unit-tests.md` | ☐ |
+
+**Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-006 and T-006b can be marked `done` in `Milestone-Backlog.md`.

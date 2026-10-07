@@ -84,14 +84,30 @@ AC-003-5: Download limit reached
 - E2E: AC-003-1…003-5 (Playwright, two contexts — recipient has no cookie); Range-resume on a 500 MB blob (EC-003-1).
 - Perf: recipient page TTFB < 500 ms (TA-15), TTI < 1 s on 4G.
 
-## User stories
+## User stories & implementation tasks
 
-| ID | Story | File |
+| ID | Story / Task | File |
 |---|---|---|
-| US-003-01 | Open a transfer link with no account | `US-003-01-open-link.md` |
-| US-003-02 | Download all files in one zip | `US-003-02-download-all.md` |
-| US-003-03 | Download individual files | `US-003-03-download-individual.md` |
-| US-003-04 | Unlock a password-protected transfer | `US-003-04-unlock-password.md` |
-| US-003-05 | See remaining downloads and expired states | `US-003-05-remaining-expired.md` |
-| US-003-06 | Download from a phone | `US-003-06-mobile-download.md` |
-| US-003-07 | Become a sender after downloading (growth loop) | `US-003-07-growth-loop.md` |
+| US-003-01 | Open a transfer link with no account | `US-003-01-open-link/US-003-01-open-link.md` |
+| US-003-02 | Download all files in one zip | `US-003-02-download-all/US-003-02-download-all.md` |
+| US-003-03 | Download individual files | `US-003-03-download-individual/US-003-03-download-individual.md` |
+| US-003-04 | Unlock a password-protected transfer | `US-003-04-unlock-password/US-003-04-unlock-password.md` |
+| US-003-05 | See remaining downloads and expired states | `US-003-05-remaining-expired/US-003-05-remaining-expired.md` |
+| US-003-06 | Download from a phone | `US-003-06-mobile-download/US-003-06-mobile-download.md` |
+| US-003-07 | Become a sender after downloading (growth loop) | `US-003-07-growth-loop/US-003-07-growth-loop.md` |
+
+**Implementation tasks:** one file per task — each story folder holds its story .md + its task files (context-friendly; execute top-to-bottom).
+
+| Story | Task | File | Status |
+|---|---|---|---|
+| US-003-01 | T-003-01 Endpoint 4: GetPublicTransferQuery, recipient metadata (T-014) | `US-003-01-open-link/T-003-01-get-public-transfer-endpoint.md` | ☐ |
+| US-003-01 | T-003-02 Recipient page UI: file list, From header, note (FR-003-1/2) | `US-003-01-open-link/T-003-02-recipient-page-ui.md` | ☐ |
+| US-003-05 | T-003-03 Terminal-state screens: expired / not-found / download-limit + "Downloads left" (FR-003-5/8/9) | `US-003-05-remaining-expired/T-003-03-terminal-state-screens.md` | ☐ |
+| US-003-04 | T-003-04 Endpoint 5: unlock, PBKDF2 verify → 7-day JWT (T-015) | `US-003-04-unlock-password/T-003-04-unlock-endpoint-jwt.md` | ☐ |
+| US-003-04 | T-003-05 Password gate UI: single card, shake on wrong, sessionStorage token (FR-003-6) | `US-003-04-unlock-password/T-003-05-password-gate-ui.md` | ☐ |
+| US-003-03 | T-003-06 Endpoint 6: single-file SAS mint, DownloadsCount + cap check (T-016) | `US-003-03-download-individual/T-003-06-single-file-sas-endpoint.md` | ☐ |
+| US-003-07 | T-003-07 Growth loop: "Send something" panel + terminal-state CTA (FR-003-7) | `US-003-07-growth-loop/T-003-07-growth-loop-panel.md` | ☐ |
+| US-003-06 | T-003-08 Mobile layout: single column, sticky download button (FR-003-10) | `US-003-06-mobile-download/T-003-08-mobile-layout-sticky.md` | ☐ |
+| US-003-01 | T-003-09 E2E (Playwright): AC-003-1…AC-003-5 + Range-resume (T-014 exit check) | `US-003-01-open-link/T-003-09-e2e-playwright.md` | ☐ |
+
+**Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-014, T-015 and T-016 can be marked `done` in `Milestone-Backlog.md`. (Download-all / zip generation is F-TRF-004 — T-017.)

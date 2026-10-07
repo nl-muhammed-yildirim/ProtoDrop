@@ -71,10 +71,21 @@ AC-051-4: Formatting is deterministic
 - Exit check: "PR gate runs green on a sample PR" (T-003) — verified locally by running every job's commands and via one real PR.
 - Negative: break a unit test in a scratch branch → red verdict with the test name visible.
 
-## User stories
+## User stories & implementation tasks
 
-| ID | Story | File |
+| ID | Story / Task | File |
 |---|---|---|
-| US-051-01 | Know my PR is safe to merge before I click | `US-051-01-pr-gate.md` |
-| US-051-02 | Catch format drift between Windows and Linux | `US-051-02-format-determinism.md` |
-| US-051-03 | Have an image ready before deploy exists | `US-051-03-image-build.md` |
+| US-051-01 | Know my PR is safe to merge before I click | `US-051-01-pr-gate/US-051-01-pr-gate.md` |
+| US-051-02 | Catch format drift between Windows and Linux | `US-051-02-format-determinism/US-051-02-format-determinism.md` |
+| US-051-03 | Have an image ready before deploy exists | `US-051-03-image-build/US-051-03-image-build.md` |
+
+**Implementation tasks:** one file per task — each story folder holds its story .md + its task files (context-friendly; execute top-to-bottom).
+
+| Story | Task | File | Status |
+|---|---|---|---|
+| US-051-02 | T-051-01 Add .gitattributes locking line endings | `US-051-02-format-determinism/T-051-01-gitattributes.md` | ☐ |
+| US-051-03 | T-051-02 Multi-stage Dockerfile + .dockerignore for wa-api | `US-051-03-image-build/T-051-02-dockerfile.md` | ☐ |
+| US-051-01 | T-051-03 Create .github/workflows/ci.yml with the TA-12.1 job set | `US-051-01-pr-gate/T-051-03-ci-yml-jobs.md` | ☐ |
+| US-051-01 | T-051-04 Sample PR runs the gate green (and red when it should) | `US-051-01-pr-gate/T-051-04-sample-pr-green.md` | ☐ |
+
+**Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-003 can be marked `done` in `Milestone-Backlog.md`.

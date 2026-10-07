@@ -17,7 +17,7 @@ The free tier acquires users without eating the business alive. Every limit — 
 
 | ID | Requirement |
 |---|---|
-| FR-007-1 | All limits come from the **Limits configuration** (per-plan `Plan.LimitsJson` + `FeatureFlag` overrides, TA-3.4). Free defaults: |
+| FR-007-1 | All limits come from the **Limits configuration** (per-plan `Plan.LimitsJson` + `FeatureFlag` overrides, TA-3.4). Free defaults per the table below. |
 
 | Constant | Free default | Note |
 |---|---|---|
@@ -82,11 +82,24 @@ AC-007-3: An account with 20 active transfers sends a 21st
 - Integration: AC-007-1 (finalize 5.2 GB → send rejected), AC-007-2 (quota meter via `storage_bytes_active`), AC-007-3; flag override mid-test (set flag → new draft uses new value).
 - E2E: pre-upload limit message appears before any bytes are written (US-001-03 + this).
 
-## User stories
+## User stories & implementation tasks
 
-| ID | Story | File |
+| ID | Story / Task | File |
 |---|---|---|
-| US-007-01 | Use the free tier within its limits | `US-007-01-free-limits.md` |
-| US-007-02 | Know when my account storage is full | `US-007-02-storage-quota.md` |
-| US-007-03 | Limits are enforced even if the client lies | `US-007-03-server-enforcement.md` |
-| US-007-04 | Change limits without a deploy | `US-007-04-flag-limits.md` |
+| US-007-01 | Use the free tier within its limits | `US-007-01-free-limits/US-007-01-free-limits.md` |
+| US-007-02 | Know when my account storage is full | `US-007-02-storage-quota/US-007-02-storage-quota.md` |
+| US-007-03 | Limits are enforced even if the client lies | `US-007-03-server-enforcement/US-007-03-server-enforcement.md` |
+| US-007-04 | Change limits without a deploy | `US-007-04-flag-limits/US-007-04-flag-limits.md` |
+
+**Implementation tasks:** one file per task — each story folder holds its story .md + its task files (context-friendly; execute top-to-bottom).
+
+| Story | Task | File | Status |
+|---|---|---|---|
+| US-007-01 | T-007-01 Limits Registry: LimitsRecord, ILimitsProvider, caches (T-005) | `US-007-01-free-limits/T-007-01-limits-registry.md` | ☐ |
+| US-007-03 | T-007-02 Draft-time enforcement: transfer size + single file (FR-007-2) | `US-007-03-server-enforcement/T-007-02-draft-size-enforcement.md` | ☐ |
+| US-007-02 | T-007-03 Finalize-time enforcement: storage quota, active transfers, blob size truth (FR-007-4) | `US-007-02-storage-quota/T-007-03-finalize-enforcement.md` | ☐ |
+| US-007-03 | T-007-04 Send-time enforcement: re-check + MAX_EMAILS cap + retention (AC-007-1) | `US-007-03-server-enforcement/T-007-04-send-enforcement.md` | ☐ |
+| US-007-02 | T-007-05 Storage meter: per-user active bytes + storage_bytes_active metric (AC-007-2) | `US-007-02-storage-quota/T-007-05-storage-meter.md` | ☐ |
+| US-007-04 | T-007-06 Integration test: flag override changes a limit without deploy (FR-007-5) | `US-007-04-flag-limits/T-007-06-flag-override-integration-test.md` | ☐ |
+
+**Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-005 and T-020 can be marked `done` in `Milestone-Backlog.md`.

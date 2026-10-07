@@ -29,136 +29,136 @@ Spec: `Phase 0-Foundation/F-FND-001/F-FND-001-solution-scaffold.md`
 
 | Story | File |
 |---|---|
-| Open the repo in VS 2026 and build everything | `Phase 0-Foundation/F-FND-001/US-049-01-open-and-build.md` |
-| Know exactly where new code goes | `Phase 0-Foundation/F-FND-001/US-049-02-layer-rules.md` |
-| Run the web app locally in the same solution | `Phase 0-Foundation/F-FND-001/US-049-03-web-in-solution.md` |
+| Open the repo in VS 2026 and build everything | `Phase 0-Foundation/F-FND-001/US-049-01-open-and-build/US-049-01-open-and-build.md` |
+| Know exactly where new code goes | `Phase 0-Foundation/F-FND-001/US-049-02-layer-rules/US-049-02-layer-rules.md` |
+| Run the web app locally in the same solution | `Phase 0-Foundation/F-FND-001/US-049-03-web-in-solution/US-049-03-web-in-solution.md` |
 
 ### F-FND-002 — Local Tooling & Health Endpoint
 Spec: `Phase 0-Foundation/F-FND-002/F-FND-002-local-tooling-health.md`
 
 | Story | File |
 |---|---|
-| Bring up my local data tier with one command | `Phase 0-Foundation/F-FND-002/US-050-01-docker-local.md` |
-| Know in one request whether the stack is ready | `Phase 0-Foundation/F-FND-002/US-050-02-health-check.md` |
-| See what happened without opening a debugger | `Phase 0-Foundation/F-FND-002/US-050-03-serilog-console.md` |
+| Bring up my local data tier with one command | `Phase 0-Foundation/F-FND-002/US-050-01-docker-local/US-050-01-docker-local.md` |
+| Know in one request whether the stack is ready | `Phase 0-Foundation/F-FND-002/US-050-02-health-check/US-050-02-health-check.md` |
+| See what happened without opening a debugger | `Phase 0-Foundation/F-FND-002/US-050-03-serilog-console/US-050-03-serilog-console.md` |
 
 ### F-FND-003 — CI Pipeline (PR Gate)
 Spec: `Phase 0-Foundation/F-FND-003/F-FND-003-ci-pipeline.md`
 
 | Story | File |
 |---|---|
-| Know my PR is safe to merge before I click | `Phase 0-Foundation/F-FND-003/US-051-01-pr-gate.md` |
-| Catch format drift between Windows and Linux | `Phase 0-Foundation/F-FND-003/US-051-02-format-determinism.md` |
-| Have an image ready before deploy exists | `Phase 0-Foundation/F-FND-003/US-051-03-image-build.md` |
+| Know my PR is safe to merge before I click | `Phase 0-Foundation/F-FND-003/US-051-01-pr-gate/US-051-01-pr-gate.md` |
+| Catch format drift between Windows and Linux | `Phase 0-Foundation/F-FND-003/US-051-02-format-determinism/US-051-02-format-determinism.md` |
+| Have an image ready before deploy exists | `Phase 0-Foundation/F-FND-003/US-051-03-image-build/US-051-03-image-build.md` |
 
 ### F-FND-004 — Domain Model & Database Schema
 Spec: `Phase 0-Foundation/F-FND-004/F-FND-004-domain-model-schema.md`
 
 | Story | File |
 |---|---|
-| Migrate a fresh database and get the whole schema | `Phase 0-Foundation/F-FND-004/US-052-01-migrate-fresh-db.md` |
-| Trust that seeds are identical in every environment | `Phase 0-Foundation/F-FND-004/US-052-02-seed-everywhere.md` |
-| Keep the domain layer free of infrastructure | `Phase 0-Foundation/F-FND-004/US-052-03-pure-domain.md` |
+| Migrate a fresh database and get the whole schema | `Phase 0-Foundation/F-FND-004/US-052-01-migrate-fresh-db/US-052-01-migrate-fresh-db.md` |
+| Trust that seeds are identical in every environment | `Phase 0-Foundation/F-FND-004/US-052-02-seed-everywhere/US-052-02-seed-everywhere.md` |
+| Keep the domain layer free of infrastructure | `Phase 0-Foundation/F-FND-004/US-052-03-pure-domain/US-052-03-pure-domain.md` |
 
 ### F-FND-005 — Limits Registry
 Spec: `Phase 0-Foundation/F-FND-005/F-FND-005-limits-registry.md`
 
 | Story | File |
 |---|---|
-| Ask "what are this plan's limits?" in one call | `Phase 0-Foundation/F-FND-005/US-053-01-resolve-limits.md` |
-| Change a limit and have it apply within 30 seconds | `Phase 0-Foundation/F-FND-005/US-053-02-flag-override.md` |
+| Ask "what are this plan's limits?" in one call | `Phase 0-Foundation/F-FND-005/US-053-01-resolve-limits/US-053-01-resolve-limits.md` |
+| Change a limit and have it apply within 30 seconds | `Phase 0-Foundation/F-FND-005/US-053-02-flag-override/US-053-02-flag-override.md` |
 
 ### F-FND-006 — Event Backbone (outbox → Service Bus)
 Spec: `Phase 0-Foundation/F-FND-006/F-FND-006-event-backbone.md`
 
 | Story | File |
 |---|---|
-| Emit an event from a use case and have it reach the broker exactly once | `Phase 0-Foundation/F-FND-006/US-054-01-publish-once.md` |
-| Replay the same event without double-processing | `Phase 0-Foundation/F-FND-006/US-054-02-dedup-replay.md` |
-| Test events end-to-end without a Service Bus connection | `Phase 0-Foundation/F-FND-006/US-054-03-in-memory-fake.md` |
+| Emit an event from a use case and have it reach the broker exactly once | `Phase 0-Foundation/F-FND-006/US-054-01-publish-once/US-054-01-publish-once.md` |
+| Replay the same event without double-processing | `Phase 0-Foundation/F-FND-006/US-054-02-dedup-replay/US-054-02-dedup-replay.md` |
+| Test events end-to-end without a Service Bus connection | `Phase 0-Foundation/F-FND-006/US-054-03-in-memory-fake/US-054-03-in-memory-fake.md` |
 
 ### F-FND-007 — Blob Foundation (IBlobStore + SAS minting)
 Spec: `Phase 0-Foundation/F-FND-007/F-FND-007-blob-foundation.md`
 
 | Story | File |
 |---|---|
-| Mint a browser upload URL that needs no credentials | `Phase 0-Foundation/F-FND-007/US-055-01-mint-upload-sas.md` |
-| Upload a block over plain HTTP and read it back byte-exact | `Phase 0-Foundation/F-FND-007/US-055-02-round-trip.md` |
-| Trust that every blob has exactly one canonical path | `Phase 0-Foundation/F-FND-007/US-055-03-canonical-paths.md` |
+| Mint a browser upload URL that needs no credentials | `Phase 0-Foundation/F-FND-007/US-055-01-mint-upload-sas/US-055-01-mint-upload-sas.md` |
+| Upload a block over plain HTTP and read it back byte-exact | `Phase 0-Foundation/F-FND-007/US-055-02-round-trip/US-055-02-round-trip.md` |
+| Trust that every blob has exactly one canonical path | `Phase 0-Foundation/F-FND-007/US-055-03-canonical-paths/US-055-03-canonical-paths.md` |
 
 ### F-FND-008 — Pipeline Foundation (correlation, errors, CORS, rate limits, telemetry)
 Spec: `Phase 0-Foundation/F-FND-008/F-FND-008-pipeline-foundation.md`
 
 | Story | File |
 |---|---|
-| Trace every request end-to-end with one correlation ID | `Phase 0-Foundation/F-FND-008/US-056-01-correlation-id.md` |
-| Every error is Problem+JSON from a closed code list | `Phase 0-Foundation/F-FND-008/US-056-02-problem-json.md` |
-| Burst traffic on auth doesn't take the API down | `Phase 0-Foundation/F-FND-008/US-056-03-rate-limit.md` |
-| Emit telemetry events from a closed, named set | `Phase 0-Foundation/F-FND-008/US-056-04-telemetry-events.md` |
+| Trace every request end-to-end with one correlation ID | `Phase 0-Foundation/F-FND-008/US-056-01-correlation-id/US-056-01-correlation-id.md` |
+| Every error is Problem+JSON from a closed code list | `Phase 0-Foundation/F-FND-008/US-056-02-problem-json/US-056-02-problem-json.md` |
+| Burst traffic on auth doesn't take the API down | `Phase 0-Foundation/F-FND-008/US-056-03-rate-limit/US-056-03-rate-limit.md` |
+| Emit telemetry events from a closed, named set | `Phase 0-Foundation/F-FND-008/US-056-04-telemetry-events/US-056-04-telemetry-events.md` |
 
 ### F-TRF-001 — Upload Surface (chunked upload)
 Spec: `Phase 0-MVP/F-TRF-001/F-TRF-001-upload-surface.md`
 
 | Story | File |
 |---|---|
-| Select files with drag & drop, click, or paste | `Phase 0-MVP/F-TRF-001/US-001-01-select-files.md` |
-| Stage and remove multiple files | `Phase 0-MVP/F-TRF-001/US-001-02-stage-files.md` |
-| Get warned before upload exceeds the limit | `Phase 0-MVP/F-TRF-001/US-001-03-size-validation.md` |
-| Watch per-file and overall progress | `Phase 0-MVP/F-TRF-001/US-001-04-upload-progress.md` |
-| Recover from a failed upload | `Phase 0-MVP/F-TRF-001/US-001-05-retry-upload.md` |
+| Select files with drag & drop, click, or paste | `Phase 0-MVP/F-TRF-001/US-001-01-select-files/US-001-01-select-files.md` |
+| Stage and remove multiple files | `Phase 0-MVP/F-TRF-001/US-001-02-stage-files/US-001-02-stage-files.md` |
+| Get warned before upload exceeds the limit | `Phase 0-MVP/F-TRF-001/US-001-03-size-validation/US-001-03-size-validation.md` |
+| Watch per-file and overall progress | `Phase 0-MVP/F-TRF-001/US-001-04-upload-progress/US-001-04-upload-progress.md` |
+| Recover from a failed upload | `Phase 0-MVP/F-TRF-001/US-001-05-retry-upload/US-001-05-retry-upload.md` |
 
 ### F-TRF-002 — Transfer Creation & Link
 Spec: `Phase 0-MVP/F-TRF-002/F-TRF-002-transfer-link.md`
 
 | Story | File |
 |---|---|
-| Get a unique link for my files | `Phase 0-MVP/F-TRF-002/US-002-01-unique-link.md` |
-| Send the transfer to recipients by email | `Phase 0-MVP/F-TRF-002/US-002-02-send-by-email.md` |
-| Protect my transfer with a password | `Phase 0-MVP/F-TRF-002/US-002-03-password.md` |
-| Add sender info and a note | `Phase 0-MVP/F-TRF-002/US-002-04-sender-note.md` |
-| Create a link-only transfer (no emails) | `Phase 0-MVP/F-TRF-002/US-002-05-link-only.md` |
+| Get a unique link for my files | `Phase 0-MVP/F-TRF-002/US-002-01-unique-link/US-002-01-unique-link.md` |
+| Send the transfer to recipients by email | `Phase 0-MVP/F-TRF-002/US-002-02-send-by-email/US-002-02-send-by-email.md` |
+| Protect my transfer with a password | `Phase 0-MVP/F-TRF-002/US-002-03-password/US-002-03-password.md` |
+| Add sender info and a note | `Phase 0-MVP/F-TRF-002/US-002-04-sender-note/US-002-04-sender-note.md` |
+| Create a link-only transfer (no emails) | `Phase 0-MVP/F-TRF-002/US-002-05-link-only/US-002-05-link-only.md` |
 
 ### F-TRF-003 — Recipient Download Page
 Spec: `Phase 0-MVP/F-TRF-003/F-TRF-003-recipient-page.md`
 
 | Story | File |
 |---|---|
-| Open a transfer link with no account | `Phase 0-MVP/F-TRF-003/US-003-01-open-link.md` |
-| Download all files in one zip | `Phase 0-MVP/F-TRF-003/US-003-02-download-all.md` |
-| Download individual files | `Phase 0-MVP/F-TRF-003/US-003-03-download-individual.md` |
-| Unlock a password-protected transfer | `Phase 0-MVP/F-TRF-003/US-003-04-unlock-password.md` |
-| See remaining downloads and expired states | `Phase 0-MVP/F-TRF-003/US-003-05-remaining-expired.md` |
-| Download from a phone | `Phase 0-MVP/F-TRF-003/US-003-06-mobile-download.md` |
-| Become a sender after downloading (growth loop) | `Phase 0-MVP/F-TRF-003/US-003-07-growth-loop.md` |
+| Open a transfer link with no account | `Phase 0-MVP/F-TRF-003/US-003-01-open-link/US-003-01-open-link.md` |
+| Download all files in one zip | `Phase 0-MVP/F-TRF-003/US-003-02-download-all/US-003-02-download-all.md` |
+| Download individual files | `Phase 0-MVP/F-TRF-003/US-003-03-download-individual/US-003-03-download-individual.md` |
+| Unlock a password-protected transfer | `Phase 0-MVP/F-TRF-003/US-003-04-unlock-password/US-003-04-unlock-password.md` |
+| See remaining downloads and expired states | `Phase 0-MVP/F-TRF-003/US-003-05-remaining-expired/US-003-05-remaining-expired.md` |
+| Download from a phone | `Phase 0-MVP/F-TRF-003/US-003-06-mobile-download/US-003-06-mobile-download.md` |
+| Become a sender after downloading (growth loop) | `Phase 0-MVP/F-TRF-003/US-003-07-growth-loop/US-003-07-growth-loop.md` |
 
 ### F-TRF-004 — Download All (ZIP)
 Spec: `Phase 0-MVP/F-TRF-004/F-TRF-004-download-zip.md`
 
 | Story | File |
 |---|---|
-| Generate a zip of the whole transfer | `Phase 0-MVP/F-TRF-004/US-004-01-generate-zip.md` |
-| Get the cached zip instantly on later requests | `Phase 0-MVP/F-TRF-004/US-004-02-cached-zip.md` |
-| See why "Download all" is unavailable | `Phase 0-MVP/F-TRF-004/US-004-03-zip-cap.md` |
+| Generate a zip of the whole transfer | `Phase 0-MVP/F-TRF-004/US-004-01-generate-zip/US-004-01-generate-zip.md` |
+| Get the cached zip instantly on later requests | `Phase 0-MVP/F-TRF-004/US-004-02-cached-zip/US-004-02-cached-zip.md` |
+| See why "Download all" is unavailable | `Phase 0-MVP/F-TRF-004/US-004-03-zip-cap/US-004-03-zip-cap.md` |
 
 ### F-TRF-005 — Expiry & Auto-Deletion
 Spec: `Phase 0-MVP/F-TRF-005/F-TRF-005-expiry-deletion.md`
 
 | Story | File |
 |---|---|
-| Transfers expire automatically | `Phase 0-MVP/F-TRF-005/US-005-01-auto-expiry.md` |
-| Expired storage is deleted after grace | `Phase 0-MVP/F-TRF-005/US-005-02-auto-deletion.md` |
-| Download cap ends the transfer early | `Phase 0-MVP/F-TRF-005/US-005-03-download-limit.md` |
+| Transfers expire automatically | `Phase 0-MVP/F-TRF-005/US-005-01-auto-expiry/US-005-01-auto-expiry.md` |
+| Expired storage is deleted after grace | `Phase 0-MVP/F-TRF-005/US-005-02-auto-deletion/US-005-02-auto-deletion.md` |
+| Download cap ends the transfer early | `Phase 0-MVP/F-TRF-005/US-005-03-download-limit/US-005-03-download-limit.md` |
 
 ### F-TRF-006 — Email Notifications
 Spec: `Phase 0-MVP/F-TRF-006/F-TRF-006-email.md`
 
 | Story | File |
 |---|---|
-| Recipients get a notification email with the link | `Phase 0-MVP/F-TRF-006/US-006-01-recipient-email.md` |
-| Failed deliveries retry and dead-letter | `Phase 0-MVP/F-TRF-006/US-006-02-retry-delivery.md` |
-| Unsubscribe from a sender's emails | `Phase 0-MVP/F-TRF-006/US-006-03-unsubscribe.md` |
-| Reply goes to the sender (branded email) | `Phase 0-MVP/F-TRF-006/US-006-04-reply-branding.md` |
-| Receive the email in my language | `Phase 0-MVP/F-TRF-006/US-006-05-localized-email.md` |
+| Recipients get a notification email with the link | `Phase 0-MVP/F-TRF-006/US-006-01-recipient-email/US-006-01-recipient-email.md` |
+| Failed deliveries retry and dead-letter | `Phase 0-MVP/F-TRF-006/US-006-02-retry-delivery/US-006-02-retry-delivery.md` |
+| Unsubscribe from a sender's emails | `Phase 0-MVP/F-TRF-006/US-006-03-unsubscribe/US-006-03-unsubscribe.md` |
+| Reply goes to the sender (branded email) | `Phase 0-MVP/F-TRF-006/US-006-04-reply-branding/US-006-04-reply-branding.md` |
+| Receive the email in my language | `Phase 0-MVP/F-TRF-006/US-006-05-localized-email/US-006-05-localized-email.md` |
 
 ### F-TRF-007 — Free-Tier Limits
 Spec: `Phase 0-MVP/F-TRF-007/F-TRF-007-limits.md`

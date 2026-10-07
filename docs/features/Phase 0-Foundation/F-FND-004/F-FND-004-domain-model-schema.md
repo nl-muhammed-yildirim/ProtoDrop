@@ -76,10 +76,22 @@ AC-052-4: No drift between DDL and migration
 - Unit: none at M0 (POCOs have no behavior yet; domain logic tests arrive with T-005/T-009+).
 - Gate: full AGENT.md §4 gate green.
 
-## User stories
+## User stories & implementation tasks
 
-| ID | Story | File |
+| ID | Story / Task | File |
 |---|---|---|
-| US-052-01 | Migrate a fresh database and get the whole schema | `US-052-01-migrate-fresh-db.md` |
-| US-052-02 | Trust that seeds are identical in every environment | `US-052-02-seed-everywhere.md` |
-| US-052-03 | Keep the domain layer free of infrastructure | `US-052-03-pure-domain.md` |
+| US-052-01 | Migrate a fresh database and get the whole schema | `US-052-01-migrate-fresh-db/US-052-01-migrate-fresh-db.md` |
+| US-052-02 | Trust that seeds are identical in every environment | `US-052-02-seed-everywhere/US-052-02-seed-everywhere.md` |
+| US-052-03 | Keep the domain layer free of infrastructure | `US-052-03-pure-domain/US-052-03-pure-domain.md` |
+
+**Implementation tasks:** one file per task — each story folder holds its story .md + its task files (context-friendly; execute top-to-bottom).
+
+| Story | Task | File | Status |
+|---|---|---|---|
+| US-052-03 | T-052-01 Add the 15 POCO entities to wa.domain (BCL-only) | `US-052-03-pure-domain/T-052-01-domain-pocos.md` | ☐ |
+| US-052-01 | T-052-02 WaDbContext + IEntityTypeConfiguration per entity | `US-052-01-migrate-fresh-db/T-052-02-wadbcontext-configurations.md` | ☐ |
+| US-052-01 | T-052-03 InitialCreate migration, cross-checked against TA-3.2 | `US-052-01-migrate-fresh-db/T-052-03-initialcreate-migration.md` | ☐ |
+| US-052-02 | T-052-04 SeedPlansAndFeatureFlags migration (3 plans + full flag set) | `US-052-02-seed-everywhere/T-052-04-seed-migration.md` | ☐ |
+| US-052-02 | T-052-05 SeedDataIntegrationTest (Testcontainers SQL) | `US-052-02-seed-everywhere/T-052-05-seed-data-integration-test.md` | ☐ |
+
+**Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-004 can be marked `done` in `Milestone-Backlog.md`.

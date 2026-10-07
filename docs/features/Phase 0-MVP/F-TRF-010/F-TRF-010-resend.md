@@ -64,10 +64,21 @@ AC-010-2: Re-send a transfer whose blobs are gone
 - Integration: re-send an expired transfer → new linkId, same `BlobRefId`s, `RefCount` 2, original `Status` unchanged, `SupersededBy` set on send; re-send after `f-delete-blobs` ran → `FILES_GONE`; storage byte total unchanged (sum of `BlobRef.SizeBytes`); AC-010-1…010-2.
 - E2E: My Files → re-send → edit note → send → new link works, old link still works (T-023 exit).
 
-## User stories
+## User stories & implementation tasks
 
-| ID | Story | File |
+| ID | Story / Task | File |
 |---|---|---|
-| US-010-01 | Re-send an expired transfer in one click | `US-010-01-resend-click.md` |
-| US-010-02 | Edit the pre-filled details before re-sending | `US-010-02-edit-prefill.md` |
-| US-010-03 | Not pay for duplicated storage | `US-010-03-shared-blobs.md` |
+| US-010-01 | Re-send an expired transfer in one click | `US-010-01-resend-click/US-010-01-resend-click.md` |
+| US-010-02 | Edit the pre-filled details before re-sending | `US-010-02-edit-prefill/US-010-02-edit-prefill.md` |
+| US-010-03 | Not pay for duplicated storage | `US-010-03-shared-blobs/US-010-03-shared-blobs.md` |
+
+**Implementation tasks:** one file per task — each story folder holds its story .md + its task files (context-friendly; execute top-to-bottom).
+
+| Story | Task | File | Status |
+|---|---|---|---|
+| US-010-01 | T-010-01 ResendTransferCommand + endpoint 16: new draft sharing blobs (FR-010-1/2/3) | `US-010-01-resend-click/T-010-01-resend-command-endpoint.md` | ☐ |
+| US-010-01 | T-010-02 FILES_GONE predicate + draft cleanup (FR-010-4, AC-010-2) | `US-010-01-resend-click/T-010-02-files-gone-draft-cleanup.md` | ☐ |
+| US-010-02 + US-010-01 | T-010-03 Re-send link screen: pre-filled fields + banner + FILES_GONE state (FR-010-2/4) | `US-010-02-edit-prefill/T-010-03-resend-screen-ui.md` | ☐ |
+| US-010-03 | T-010-04 Storage meter counts unique BlobRefs: no double-count on re-send (FR-010-1, AC-010-1) | `US-010-03-shared-blobs/T-010-04-meter-no-double-count.md` | ☐ |
+
+**Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-023 can be marked `done` in `Milestone-Backlog.md`. (The Re-send row action itself is F-TRF-009 / T-009-06 — it navigates into this feature.)

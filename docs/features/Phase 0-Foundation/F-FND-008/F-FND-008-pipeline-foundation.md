@@ -76,11 +76,23 @@ AC-056-4: Telemetry events use the closed set
 - Live verification: rate limit breached against the running API (T-008c).
 - Gate: full AGENT.md §4 gate green.
 
-## User stories
+## User stories & implementation tasks
 
-| ID | Story | File |
+| ID | Story / Task | File |
 |---|---|---|
-| US-056-01 | Trace every request end-to-end with one correlation ID | `US-056-01-correlation-id.md` |
-| US-056-02 | Every error is Problem+JSON from a closed code list | `US-056-02-problem-json.md` |
-| US-056-03 | Burst traffic on auth doesn't take the API down | `US-056-03-rate-limit.md` |
-| US-056-04 | Emit telemetry events from a closed, named set | `US-056-04-telemetry-events.md` |
+| US-056-01 | Trace every request end-to-end with one correlation ID | `US-056-01-correlation-id/US-056-01-correlation-id.md` |
+| US-056-02 | Every error is Problem+JSON from a closed code list | `US-056-02-problem-json/US-056-02-problem-json.md` |
+| US-056-03 | Burst traffic on auth doesn't take the API down | `US-056-03-rate-limit/US-056-03-rate-limit.md` |
+| US-056-04 | Emit telemetry events from a closed, named set | `US-056-04-telemetry-events/US-056-04-telemetry-events.md` |
+
+**Implementation tasks:** one file per task — each story folder holds its story .md + its task files (context-friendly; execute top-to-bottom).
+
+| Story | Task | File | Status |
+|---|---|---|---|
+| US-056-01 | T-056-01 W3CTraceParser + CorrelationContext/CorrelationMiddleware | `US-056-01-correlation-id/T-056-01-w3c-trace-parser.md` | ☐ |
+| US-056-02 | T-056-02 ProblemWriter + GlobalErrorMiddleware (closed code list) | `US-056-02-problem-json/T-056-02-problem-writer-global-error.md` | ☐ |
+| US-056-03 | T-056-03 CORS allow-list + auth rate limiting (5/min per IP) | `US-056-03-rate-limit/T-056-03-cors-rate-limit.md` | ☐ |
+| US-056-04 | T-056-04 TelemetryEvents.cs + WaTelemetryReporter (closed TA-10.2 set) | `US-056-04-telemetry-events/T-056-04-telemetry-events-reporter.md` | ☐ |
+| US-056-01 | T-056-05 Integration tests: Problem+JSON with correlationId + exact telemetry template (T-008 exit check) | `US-056-01-correlation-id/T-056-05-pipeline-integration-tests.md` | ☐ |
+
+**Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-008a–d can be marked `done` in `Milestone-Backlog.md`.
