@@ -1,0 +1,10 @@
+<Solution>
+  <Project Path="../tests/wa.api.integration/wa.api.integration.csproj" />
+  <Project Path="../tests/wa.application.unit/wa.application.unit.csproj" />
+  <Project Path="../tests/wa.domain.unit/wa.domain.unit.csproj" />
+  <Project Path="wa.api/wa.api.csproj" />
+  <Project Path="wa.application/wa.application.csproj" />
+  <Project Path="wa.domain/wa.domain.csproj" />
+  <Project Path="wa.infrastructure/wa.infrastructure.csproj" />
+  <Project Path="wa.workers/wa.workers.csproj" />
+</Solution>
