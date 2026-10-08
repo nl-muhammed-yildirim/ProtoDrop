@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using wa.application.Ports;
 using wa.application.UseCases.Health;
 using Xunit;
@@ -14,6 +15,7 @@ public class HealthQueryTests
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(HealthQuery).Assembly));
         services.AddSingleton(db);
         services.AddSingleton(sb);
+        services.AddSingleton<ILogger<HealthQueryHandler>>(new StubLogger());
         return services.BuildServiceProvider().GetRequiredService<ISender>();
     }
 
@@ -64,4 +66,11 @@ public class HealthQueryTests
     }
 
     private sealed class SqlExceptionLike : Exception;
+
+    private sealed class StubLogger : ILogger<HealthQueryHandler>
+    {
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null!;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) { }
+    }
 }
