@@ -18,9 +18,9 @@
 
 ## Exit check
 
-- [ ] `src/wa.slnx` exists and lists exactly the 8 projects above
-- [ ] `dotnet build` at repo root: 0 warnings, 0 errors
-- [ ] `dotnet --version` still reports 10.x (global.json active)
+- [x] `src/wa.slnx` exists and lists exactly the 8 projects above
+- [x] `dotnet build` at repo root: 0 warnings, 0 errors
+- [x] `dotnet --version` still reports 10.x (global.json active)
 
 ## Implementation prompt
 

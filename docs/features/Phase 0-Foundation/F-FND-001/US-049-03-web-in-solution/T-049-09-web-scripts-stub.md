@@ -19,9 +19,9 @@
 
 ## Exit check
 
-- [ ] `npm ci && npm run lint` → green
-- [ ] `npm run test:run` → 1 pass
-- [ ] `npm run build` → `dist/` contains the bundle
+- [x] `npm ci && npm run lint` → green
+- [x] `npm run test:run` → 1 pass
+- [x] `npm run build` → `dist/` contains the bundle
 
 ## Implementation prompt
 

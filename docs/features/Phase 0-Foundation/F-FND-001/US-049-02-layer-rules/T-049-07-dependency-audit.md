@@ -20,9 +20,8 @@
 3. Record the audit result under **Audit result** below in this file.
 
 ## Exit check
-
-- [ ] All assertions above hold (no code change expected)
-- [ ] Audit result recorded in this file
+- [x] All assertions above hold (no code change expected)
+- [x] Audit result recorded in this file
 
 ## Implementation prompt
 
@@ -40,4 +39,22 @@ Constraints: do not restructure anything — if a violation needs restructuring,
 
 ## Audit result
 
-*(fill in after running this task)*
+All assertions hold — no code change was needed.
+
+| Project | Project refs | Package refs |
+| --- | --- | --- |
+| `wa.domain` | — | — (BCL only) |
+| `wa.application` | `wa.domain` | MediatR 12.5.0, FluentValidation 12.1.1 |
+| `wa.infrastructure` | `wa.application` | — |
+| `wa.api` | `wa.infrastructure` (composition root) | — |
+| `wa.workers` | `wa.infrastructure` | — |
+| `tests/wa.domain.unit` | `wa.domain` | xunit, Microsoft.NET.Test.Sdk, coverlet.collector |
+| `tests/wa.application.unit` | `wa.application` | xunit, Microsoft.NET.Test.Sdk, Microsoft.Extensions.DependencyInjection 10.0.12, coverlet.collector |
+| `tests/wa.api.integration` | `wa.api` | xunit, Microsoft.NET.Test.Sdk, Microsoft.AspNetCore.Mvc.Testing 10.0.12, Testcontainers 4.15.0, Testcontainers.MsSql 4.15.0, coverlet.collector |
+
+Verified:
+- `wa.domain`: zero project refs, zero package refs (BCL only). ✓
+- `wa.application`: only `wa.domain` + MediatR/FluentValidation. ✓
+- No cycles; graph is a DAG (`domain ← application ← infrastructure ← {api, workers}`), tests reference upward. ✓
+- `wa.api` never references `wa.workers`. ✓
+- EF/Azure packages appear only in `wa.infrastructure` or below — holds (none present yet at M0). ✓

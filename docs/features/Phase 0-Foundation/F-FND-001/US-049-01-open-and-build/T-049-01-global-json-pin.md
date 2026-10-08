@@ -26,8 +26,8 @@
 
 ## Exit check (must pass before marking done)
 
-- [ ] `global.json` exists at repo root with the content above
-- [ ] `dotnet --version` at repo root reports a 10.x SDK
+- [x] `global.json` exists at repo root with the content above
+- [x] `dotnet --version` at repo root reports a 10.x SDK
 
 ## Implementation prompt
 

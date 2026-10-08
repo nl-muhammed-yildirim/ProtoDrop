@@ -21,9 +21,9 @@
 
 ## Exit check
 
-- [ ] `dotnet test tests/wa.domain.unit` → 1 pass
-- [ ] `dotnet test tests/wa.application.unit` → 1 pass
-- [ ] `dotnet test tests/wa.api.integration` → 1 pass (no Docker required)
+- [x] `dotnet test tests/wa.domain.unit` → 1 pass
+- [x] `dotnet test tests/wa.application.unit` → 1 pass
+- [x] `dotnet test tests/wa.api.integration` → 1 pass (no Docker required)
 
 ## Implementation prompt
 

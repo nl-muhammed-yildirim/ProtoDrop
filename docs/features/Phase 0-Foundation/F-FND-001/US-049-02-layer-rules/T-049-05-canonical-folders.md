@@ -19,8 +19,8 @@
 
 ## Exit check
 
-- [ ] All three folders exist with their README lines
-- [ ] `dotnet build` still green
+- [x] All three folders exist with their README lines
+- [x] `dotnet build` still green
 
 ## Implementation prompt
 
