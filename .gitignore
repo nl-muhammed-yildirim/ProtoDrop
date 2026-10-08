@@ -2,8 +2,9 @@
 # This .gitignore file was automatically created by Microsoft(R) Visual Studio.
 ################################################################################
 
-/src/wa.web/node_modules/@rolldown/binding-win32-x64-msvc
 # .NET build output
 [Bb]in/
 [Oo]bj/
-/.vs
+*.csproj.user
+# Visual Studio
+**/.vs/
