@@ -17,9 +17,9 @@
 
 ## Exit check
 
-- [ ] Solution lists `src/wa.web` as a web project
-- [ ] `dotnet build` at repo root still 0 warnings / 0 errors (esproj doesn't affect the .NET build)
-- [ ] npm commands in `src/wa.web` unchanged and still green
+- [x] Solution lists `src/wa.web` as a web project
+- [x] `dotnet build` at repo root still 0 warnings / 0 errors (esproj doesn't affect the .NET build)
+- [x] npm commands in `src/wa.web` unchanged and still green
 
 ## Implementation prompt
 
