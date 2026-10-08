@@ -93,7 +93,7 @@ AC-049-4: The SDK pin works
 | US-049-02 | T-049-05 Add the canonical folder homes with one-line READMEs | `US-049-02-layer-rules/T-049-05-canonical-folders.md` | ☑ |
 | US-049-02 | T-049-06 Prove the CQRS convention with a first trivial use case | `US-049-02-layer-rules/T-049-06-first-use-case.md` | ☑ |
 | US-049-02 | T-049-07 Audit the dependency rule and record the result | `US-049-02-layer-rules/T-049-07-dependency-audit.md` | ☑ |
-| US-049-03 | T-049-08 Scaffold src/wa.web (Vite 5 + React 18 + TS strict) | `US-049-03-web-in-solution/T-049-08-web-scaffold.md` | ☐ |
+| US-049-03 | T-049-08 Scaffold src/wa.web (Vite 5 + React 18 + TS strict) | `US-049-03-web-in-solution/T-049-08-web-scaffold.md` | ☑ |
 | US-049-03 | T-049-09 Web scripts, landing stub, and first Vitest test | `US-049-03-web-in-solution/T-049-09-web-scripts-stub.md` | ☐ |
 | US-049-03 | T-049-10 Wrap wa.web into the solution via its package.json | `US-049-03-web-in-solution/T-049-10-web-in-solution.md` | ☐ |
 
