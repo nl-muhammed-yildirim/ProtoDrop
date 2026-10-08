@@ -18,8 +18,8 @@
 
 ## Exit check
 
-- [ ] `dotnet run --launch-profile Local` in `src/wa.api` starts without missing-config errors
-- [ ] `SELECT 1` succeeds against the `wa` database using the profile's connection string (manual or script)
+- [x] `dotnet run --launch-profile Local` in `src/wa.api` starts without missing-config errors
+- [x] `SELECT 1` succeeds against the `wa` database using the profile's connection string (manual or script)
 
 ## Implementation prompt
 

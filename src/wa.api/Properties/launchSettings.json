@@ -1,6 +1,24 @@
 {
   "$schema": "https://json.schemastore.org/launchsettings.json",
   "profiles": {
+    "Local": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:8080",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Local",
+        "ConnectionStrings__WaDb": "Server=localhost,1433;User Id=sa;Password=YourStrong!Passw0rd;Database=wa;TrustServerCertificate=True",
+        "Wa:Blob:AccountUrl": "http://127.0.0.1:10000/devstoreaccount1",
+        "Wa:Blob:AccountKey": "Eby8vdM02xNOcqTqKcx6vjjfHnQRhbnNVwVQO9lwBTq5U1dMTkGldJYTmddZap/UKqGZ9jyJSSod7BNgseYHSrg==",
+        "Wa:Jwt:Secret": "1f3a9c0e2d4b6f8a0c1e3d5b7f9a2c4e6d8b0f1a3c5e7d9b1f3a5c7e9d1b3f5a",
+        "Wa:Url:Public": "http://localhost:5173",
+        "Wa:Url:Api": "http://localhost:8080",
+        "Wa:Cors:AllowedOrigins": "http://localhost:5173",
+        "Wa:AdminEmails": "dev@example.com",
+        "Wa:Zip:SignKey": "local-zip-signing-key-m0-dev-only"
+      }
+    },
     "http": {
       "commandName": "Project",
       "dotnetRunMessages": true,
