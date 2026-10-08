@@ -1,0 +1,12 @@
+services:
+  sql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "YourStrong!Passw0rd"
+      MSSQL_PID: "Developer"
+    ports: ["1433:1433"]
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    command: ["azurite-blob", "--blobHost", "0.0.0.0"]
+    ports: ["10000:10000"]

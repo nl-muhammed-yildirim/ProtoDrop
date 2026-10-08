@@ -84,7 +84,7 @@ AC-050-4: Logs are readable
 
 | Story | Task | File | Status |
 |---|---|---|---|
-| US-050-01 | T-050-01 Add docker-compose.local.yml (sql + azurite) | `US-050-01-docker-local/T-050-01-compose-file.md` | ☐ |
+| US-050-01 | T-050-01 Add docker-compose.local.yml (sql + azurite) | `US-050-01-docker-local/T-050-01-compose-file.md` | ☑ |
 | US-050-01 | T-050-02 Add the Local profile with every §5.2 env var | `US-050-01-docker-local/T-050-02-launch-settings-local.md` | ☐ |
 | US-050-02 | T-050-03 GET /health with real DB ping and auto-created wa database | `US-050-02-health-check/T-050-03-health-endpoint.md` | ☐ |
 | US-050-02 | T-050-04 DB down returns 503 with Problem+JSON body | `US-050-02-health-check/T-050-04-db-down-failure-path.md` | ☐ |
