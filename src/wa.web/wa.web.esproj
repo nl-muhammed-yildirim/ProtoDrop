@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.VisualStudio.JavaScript.Sdk/1.0.6165494">
+  <PropertyGroup>
+    <!-- Pinned explicitly so the VS project system and MSBuild don't depend on package.json script naming. -->
+    <StartupCommand>npm run dev</StartupCommand>
+    <TestCommand>npm run test:run</TestCommand>
+  </PropertyGroup>
+</Project>

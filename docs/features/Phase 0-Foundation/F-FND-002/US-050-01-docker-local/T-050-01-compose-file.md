@@ -19,8 +19,8 @@
 
 ## Exit check
 
-- [ ] `docker compose -f docker-compose.local.yml up -d` starts both containers
-- [ ] `sql` listens on 1433, `azurite` serves blob storage on 10000 (port check)
+- [x] `docker compose -f docker-compose.local.yml up -d` starts both containers
+- [x] `sql` listens on 1433, `azurite` serves blob storage on 10000 (port check)
 
 ## Implementation prompt
 

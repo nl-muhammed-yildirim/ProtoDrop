@@ -86,15 +86,15 @@ AC-049-4: The SDK pin works
 
 | Story | Task | File | Status |
 |---|---|---|---|
-| US-049-01 | T-049-01 Pin .NET SDK via global.json | `US-049-01-open-and-build/T-049-01-global-json-pin.md` | ☐ |
-| US-049-01 | T-049-02 Create the five src projects with TA-2.2 references | `US-049-01-open-and-build/T-049-02-src-projects.md` | ☐ |
-| US-049-01 | T-049-03 Create the three test projects with smoke tests | `US-049-01-open-and-build/T-049-03-test-projects.md` | ☐ |
-| US-049-01 | T-049-04 Create the solution and make the build gate green | `US-049-01-open-and-build/T-049-04-solution-build-gate.md` | ☐ |
-| US-049-02 | T-049-05 Add the canonical folder homes with one-line READMEs | `US-049-02-layer-rules/T-049-05-canonical-folders.md` | ☐ |
-| US-049-02 | T-049-06 Prove the CQRS convention with a first trivial use case | `US-049-02-layer-rules/T-049-06-first-use-case.md` | ☐ |
-| US-049-02 | T-049-07 Audit the dependency rule and record the result | `US-049-02-layer-rules/T-049-07-dependency-audit.md` | ☐ |
-| US-049-03 | T-049-08 Scaffold src/wa.web (Vite 5 + React 18 + TS strict) | `US-049-03-web-in-solution/T-049-08-web-scaffold.md` | ☐ |
-| US-049-03 | T-049-09 Web scripts, landing stub, and first Vitest test | `US-049-03-web-in-solution/T-049-09-web-scripts-stub.md` | ☐ |
-| US-049-03 | T-049-10 Wrap wa.web into the solution via its package.json | `US-049-03-web-in-solution/T-049-10-web-in-solution.md` | ☐ |
+| US-049-01 | T-049-01 Pin .NET SDK via global.json | `US-049-01-open-and-build/T-049-01-global-json-pin.md` | ☑ |
+| US-049-01 | T-049-02 Create the five src projects with TA-2.2 references | `US-049-01-open-and-build/T-049-02-src-projects.md` | ☑ |
+| US-049-01 | T-049-03 Create the three test projects with smoke tests | `US-049-01-open-and-build/T-049-03-test-projects.md` | ☑ |
+| US-049-01 | T-049-04 Create the solution and make the build gate green | `US-049-01-open-and-build/T-049-04-solution-build-gate.md` | ☑ |
+| US-049-02 | T-049-05 Add the canonical folder homes with one-line READMEs | `US-049-02-layer-rules/T-049-05-canonical-folders.md` | ☑ |
+| US-049-02 | T-049-06 Prove the CQRS convention with a first trivial use case | `US-049-02-layer-rules/T-049-06-first-use-case.md` | ☑ |
+| US-049-02 | T-049-07 Audit the dependency rule and record the result | `US-049-02-layer-rules/T-049-07-dependency-audit.md` | ☑ |
+| US-049-03 | T-049-08 Scaffold src/wa.web (Vite 5 + React 18 + TS strict) | `US-049-03-web-in-solution/T-049-08-web-scaffold.md` | ☑ |
+| US-049-03 | T-049-09 Web scripts, landing stub, and first Vitest test | `US-049-03-web-in-solution/T-049-09-web-scripts-stub.md` | ☑ |
+| US-049-03 | T-049-10 Wrap wa.web into the solution via its package.json | `US-049-03-web-in-solution/T-049-10-web-in-solution.md` | ☑ |
 
 **Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-001 can be marked `done` in `Milestone-Backlog.md`.

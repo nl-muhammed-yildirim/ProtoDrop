@@ -24,9 +24,9 @@
 
 ## Exit check
 
-- [ ] All 5 projects exist under `src/` with the exact reference graph above
-- [ ] `dotnet build` on each project succeeds (solution-level gate comes in T-049-04)
-- [ ] `wa.domain.csproj` has zero `<PackageReference>` and zero `<ProjectReference>`
+- [x] All 5 projects exist under `src/` with the exact reference graph above
+- [x] `dotnet build` on each project succeeds (solution-level gate comes in T-049-04)
+- [x] `wa.domain.csproj` has zero `<PackageReference>` and zero `<ProjectReference>`
 
 ## Implementation prompt
 

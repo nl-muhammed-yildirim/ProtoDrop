@@ -20,8 +20,8 @@
 
 ## Exit check
 
-- [ ] `package.json` pins React 18 + Vite 5; tsconfig has `"strict": true`
-- [ ] `npm run dev` serves at http://localhost:5173 (Ctrl-C after confirming)
+- [x] `package.json` pins React 18 + Vite 5; tsconfig has `"strict": true`
+- [x] `npm run dev` serves at http://localhost:5173 (Ctrl-C after confirming)
 
 ## Implementation prompt
 

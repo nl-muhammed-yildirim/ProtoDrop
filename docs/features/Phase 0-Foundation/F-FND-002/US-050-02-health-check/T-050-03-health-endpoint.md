@@ -20,8 +20,8 @@
 
 ## Exit check
 
-- [ ] Fresh SQL instance → first `GET /health` returns 200 and the `wa` database now exists in master
-- [ ] Body is byte-exact: `{"status":"ok","db":"ok","sb":"skipped"}` (AC-050-1)
+- [x] Fresh SQL instance → first `GET /health` returns 200 and the `wa` database now exists in master
+- [x] Body is byte-exact: `{"status":"ok","db":"ok","sb":"skipped"}` (AC-050-1)
 
 ## Implementation prompt
 

@@ -20,8 +20,8 @@
 
 ## Exit check
 
-- [ ] `dotnet build` green; `dotnet test tests/wa.application.unit` passes (now 2 tests)
-- [ ] No `DbContext`, no `IQueryable<T>` anywhere in the use case or handler (golden rule 8)
+- [x] `dotnet build` green; `dotnet test tests/wa.application.unit` passes (now 2 tests)
+- [x] No `DbContext`, no `IQueryable<T>` anywhere in the use case or handler (golden rule 8)
 
 ## Implementation prompt
 
