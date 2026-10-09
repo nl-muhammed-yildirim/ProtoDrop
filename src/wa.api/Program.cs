@@ -4,12 +4,21 @@ using wa.application.UseCases.Health;
 using wa.application.UseCases.Sample;
 using wa.infrastructure.Events;
 using wa.infrastructure.Persistence;
+using Serilog;
+using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
+// TA-10.5: console sink locally (App Insights later per environment); Microsoft.* → Warning, app at Information.
+builder.Host.UseSerilog((context, cfg) => cfg
+    .Enrich.FromLogContext()
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .WriteTo.Console());
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(PingCommand).Assembly));
 builder.Services.AddSingleton<wa.application.Ports.IDbHealthProbe, WaDbHealthProbe>();
 builder.Services.AddSingleton<wa.application.Ports.ISbHealthProbe, SbHealthProbe>();
 var app = builder.Build();
+app.UseSerilogRequestLogging(); // per-request INF line (Microsoft.* request logging is suppressed to Warning)
 app.MapGet("/", () => "Hello World!");
 app.MapGet("/health", async (ISender sender, CancellationToken ct) =>
 {

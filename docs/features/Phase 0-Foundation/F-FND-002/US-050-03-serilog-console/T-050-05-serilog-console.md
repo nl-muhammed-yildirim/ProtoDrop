@@ -18,9 +18,9 @@
 
 ## Exit check
 
-- [ ] Any request to the API produces Serilog console lines with level + timestamp + message
-- [ ] `Microsoft.*` framework logging is at Warning, not Information
-- [ ] A `/health` call on a fresh setup shows INF lines (T-002 exit check)
+- [x] Any request to the API produces Serilog console lines with level + timestamp + message
+- [x] `Microsoft.*` framework logging is at Warning, not Information
+- [x] A `/health` call on a fresh setup shows INF lines (T-002 exit check)
 
 ## Implementation prompt
 
