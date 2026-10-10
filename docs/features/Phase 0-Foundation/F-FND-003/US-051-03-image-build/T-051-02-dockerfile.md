@@ -14,13 +14,16 @@
 
 1. Create `src/wa.api/Dockerfile` — multi-stage: **publish** stage (`dotnet publish`) → final stage on **`aspnet:10.0`**.
 2. Create `.dockerignore` at repo root excluding docs/tests/node_modules so the build context stays ~3 MB.
-3. Build locally: `docker build -t wa-api:local-check src/wa.api`.
+3. Build locally: `docker build -f src/wa.api/Dockerfile . -t wa-api:local-check` (root context — see note below).
 
 ## Exit check
 
-- [ ] `docker build -t wa-api:local-check src/wa.api` succeeds (multi-stage, aspnet:10.0 base)
-- [ ] The image starts and serves `/health` when given the right env vars (second Gherkin block)
-- [ ] Build context ~3 MB (.dockerignore working — check with `du -sh` on what gets sent, or just confirm docs/ is excluded)
+- [x] `docker build -t wa-api:local-check` succeeds (multi-stage, aspnet:10.0 base)
+- [x] The image starts and serves `/health` when given the right env vars (second Gherkin block) — verified: `200 {"status":"ok","db":"ok","sb":"skipped"}`
+- [x] Build context ~3 MB (.dockerignore working — context is **136K**; docs/ excluded)
+
+> **Deviation — build command:** the literal `docker build -t wa-api:local-check src/wa.api` uses `src/wa.api/` as the build context, but the publish stage needs sibling projects (`wa.infrastructure`, `wa.application`, `wa.domain`) that live outside that directory. BuildKit's `COPY --parents ../…` does not reach outside the context in Docker 29.7.2 (path resolves as absolute within the context: `"/global.json": not found`). Working form: `docker build -f src/wa.api/Dockerfile . -t wa-api:local-check` — root context with `.dockerignore` filtering it down to just the publish-stage inputs.
+
 
 ## Implementation prompt
 
