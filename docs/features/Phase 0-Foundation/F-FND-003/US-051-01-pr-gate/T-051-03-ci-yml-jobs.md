@@ -27,7 +27,7 @@
 ## Exit check
 
 - [x] ci.yml defines exactly six jobs matching AGENT.md §4 commands 1:1
-- [ ] The green verdict on a real sample PR is verified in T-051-04 (this task only creates the workflow)
+- [x] The green verdict on a real sample PR is verified in T-051-04 (this task only creates the workflow)
 
 ## Implementation prompt
 
