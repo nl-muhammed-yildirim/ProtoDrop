@@ -24,7 +24,6 @@
 
 > **Deviation — build command:** the literal `docker build -t wa-api:local-check src/wa.api` uses `src/wa.api/` as the build context, but the publish stage needs sibling projects (`wa.infrastructure`, `wa.application`, `wa.domain`) that live outside that directory. BuildKit's `COPY --parents ../…` does not reach outside the context in Docker 29.7.2 (path resolves as absolute within the context: `"/global.json": not found`). Working form: `docker build -f src/wa.api/Dockerfile . -t wa-api:local-check` — root context with `.dockerignore` filtering it down to just the publish-stage inputs.
 
-
 ## Implementation prompt
 
 ```text
