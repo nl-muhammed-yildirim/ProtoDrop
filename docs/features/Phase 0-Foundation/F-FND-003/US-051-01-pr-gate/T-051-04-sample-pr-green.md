@@ -18,9 +18,9 @@
 
 ## Exit check
 
-- [ ] Sample PR → all six jobs green (AC-051-1)
-- [ ] Scratch branch with one broken domain test → red verdict with the failing test name in output (AC-051-2)
-- [ ] No silent green anywhere: every failure names its step/test
+- [x] Sample PR → all six jobs green (AC-051-1)
+- [x] Scratch branch with one broken domain test → red verdict with the failing test name in output (AC-051-2)
+- [x] No silent green anywhere: every failure names its step/test
 
 ## Implementation prompt
 

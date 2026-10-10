@@ -1,0 +1,17 @@
+# T-051-01: lock line endings so `dotnet format --verify-no-changes` is deterministic
+# across Windows local / Linux CI (FR-051-3). Minimal rule list: text normalization + binary markers only.
+* text=auto eol=lf
+
+# Binary markers (images, fonts)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.eot binary
