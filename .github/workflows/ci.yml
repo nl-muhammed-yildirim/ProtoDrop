@@ -1,0 +1,102 @@
+# T-051-03 — PR gate (F-FND-003, FR-051-1/4/5). Job set mirrors AGENT.md §4 1:1;
+# adding a job requires updating both files. No secrets at M0 (OIDC federation later, TA-12.2).
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  # AGENT.md §4: cd src/wa.web && npm run lint
+  lint-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: src/wa.web/package-lock.json
+      - working-directory: src/wa.web
+        run: npm ci
+      - name: eslint
+        working-directory: src/wa.web
+        run: npm run lint
+      # EC-051-1: prettier gated until its dev-dep lands (T-003 note); eslint is the active web linter at M0.
+      - name: prettier
+        if: false
+        working-directory: src/wa.web
+        run: npx prettier --check .
+
+  # AGENT.md §4 (determinism via T-051-01 .gitattributes): structural no-op until an .editorconfig lands.
+  lint-dotnet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - run: dotnet format src/wa.slnx --verify-no-changes
+
+  # AGENT.md §4: dotnet test tests/wa.domain.unit + tests/wa.application.unit (100% pass gate).
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - run: dotnet test tests/wa.domain.unit
+      - run: dotnet test tests/wa.application.unit
+
+  # AGENT.md §4: dotnet test tests/wa.api.integration (Testcontainers; runners have Docker — EC-051-2).
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - run: dotnet test tests/wa.api.integration
+
+  # AGENT.md §4: tsc typecheck + eslint + test:run (one-shot) + build. Gzip size is reference only at M0 (EC-051-4).
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: src/wa.web/package-lock.json
+      - working-directory: src/wa.web
+        run: npm ci
+      - name: tsc typecheck
+        working-directory: src/wa.web
+        run: npx tsc -b
+      - name: eslint
+        working-directory: src/wa.web
+        run: npm run lint
+      - name: vitest (one-shot)
+        working-directory: src/wa.web
+        run: npm run test:run
+      - name: build
+        working-directory: src/wa.web
+        run: npm run build
+      - name: Report gzip size (reference only, TA-8.4 budgets are not a hard gate at M0)
+        working-directory: src/wa.web
+        run: |
+          total=0
+          while IFS= read -r f; do
+            s=$(gzip -c "$f" | wc -c)
+            total=$((total + s))
+          done < <(find dist -type f)
+          echo "dist gzip total: ${total} bytes"
+
+  # FR-051-2: multi-stage build, tagged wa-api:ci-<sha>; no push at M0 (push gated on AZURE_CONTAINER_REGISTRY, E-003).
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build wa-api image
+        run: docker build -f src/wa.api/Dockerfile . -t "wa-api:ci-${GITHUB_SHA}"

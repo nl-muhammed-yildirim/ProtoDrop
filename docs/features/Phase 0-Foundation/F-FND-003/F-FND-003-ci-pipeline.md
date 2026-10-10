@@ -85,7 +85,7 @@ AC-051-4: Formatting is deterministic
 |---|---|---|---|
 | US-051-02 | T-051-01 Add .gitattributes locking line endings | `US-051-02-format-determinism/T-051-01-gitattributes.md` | ☑ |
 | US-051-03 | T-051-02 Multi-stage Dockerfile + .dockerignore for wa-api | `US-051-03-image-build/T-051-02-dockerfile.md` | ☑ |
-| US-051-01 | T-051-03 Create .github/workflows/ci.yml with the TA-12.1 job set | `US-051-01-pr-gate/T-051-03-ci-yml-jobs.md` | ☐ |
+| US-051-01 | T-051-03 Create .github/workflows/ci.yml with the TA-12.1 job set | `US-051-01-pr-gate/T-051-03-ci-yml-jobs.md` | ☑ |
 | US-051-01 | T-051-04 Sample PR runs the gate green (and red when it should) | `US-051-01-pr-gate/T-051-04-sample-pr-green.md` | ☐ |
 
 **Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-003 can be marked `done` in `Milestone-Backlog.md`.
