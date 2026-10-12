@@ -6,6 +6,6 @@ public class EmailRecipient
     public Guid Id { get; set; }
     public Guid TransferId { get; set; }
     public string Address { get; set; } = null!;
-    /// <summary>Set when the recipient was notified (re-send idempotency per address).</summary>
+    /// <summary>Set when the recipient was notified (TA-6.7 f-email).</summary>
     public DateTime? NotifiedAtUtc { get; set; }
 }

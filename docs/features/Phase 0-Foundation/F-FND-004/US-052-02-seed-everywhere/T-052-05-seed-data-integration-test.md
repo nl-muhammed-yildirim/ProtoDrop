@@ -19,8 +19,8 @@
 
 ## Exit check
 
-- [ ] Test passes against Testcontainers SQL with the identical seed values as local
-- [ ] The test is the T-004 exit evidence for seeds (spec Technical notes)
+- [x] Test passes against Testcontainers SQL with the identical seed values as local
+- [x] The test is the T-004 exit evidence for seeds (spec Technical notes)
 
 ## Implementation prompt
 

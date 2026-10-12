@@ -5,7 +5,7 @@ public class EmailSuppression
 {
     public Guid Id { get; set; }
     public string Address { get; set; } = null!;
-    /// <summary>NULL = suppress from any sender (UQ_ES allows one NULL per address in SQL).</summary>
+    /// <summary>NULL = suppress from any sender (one per address; enforced app-side — UQ_ES allows multiple NULLs in SQL Server).</summary>
     public string? SenderEmail { get; set; }
     public DateTime CreatedAtUtc { get; set; }
 }
