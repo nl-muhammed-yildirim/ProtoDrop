@@ -18,8 +18,8 @@
 
 ## Exit check
 
-- [ ] Ports live in wa.application, adapters in wa.infrastructure (no DB reads anywhere else)
-- [ ] Reading an unknown plan code yields the typed PLAN_UNKNOWN failure, not a null/empty record
+- [x] Ports live in wa.application, adapters in wa.infrastructure (no DB reads anywhere else)
+- [x] Reading an unknown plan code yields the typed PLAN_UNKNOWN failure, not a null/empty record
 
 ## Implementation prompt
 
