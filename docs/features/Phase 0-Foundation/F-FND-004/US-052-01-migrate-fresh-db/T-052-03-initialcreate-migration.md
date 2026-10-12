@@ -18,9 +18,9 @@
 
 ## Exit check
 
-- [ ] Fresh SQL instance: after `dotnet ef database update` every TA-3.2 table exists with exact PK/FK constraint names
-- [ ] Filtered indexes and unique constraints present: IX_BlobRef_Cleanup, UQ_ES, UQ_Transfer_LinkId, IX_Transfer_Owner (DESC), IX_Transfer_Expiry INCLUDE
-- [ ] `out.sql` diff against TA-3.2 shows zero drift (T-004 exit evidence)
+- [x] Fresh SQL instance: after `dotnet ef database update` every TA-3.2 table exists with exact PK/FK constraint names
+- [x] Filtered indexes and unique constraints present: IX_BlobRef_Cleanup, UQ_ES, UQ_Transfer_LinkId, IX_Transfer_Owner (DESC), IX_Transfer_Expiry INCLUDE
+- [x] `out.sql` diff against TA-3.2 shows zero drift (T-004 exit evidence)
 
 ## Implementation prompt
 
