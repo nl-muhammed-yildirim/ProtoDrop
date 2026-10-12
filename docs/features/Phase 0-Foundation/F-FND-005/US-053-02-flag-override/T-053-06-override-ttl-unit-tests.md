@@ -19,9 +19,9 @@
 
 ## Exit check
 
-- [ ] Override test proves exactly-one-field semantics (AC-053-2)
-- [ ] TTL tests pass for both PlansCache and FlagsCache via the fake clock (AC-053-3)
-- [ ] Full T-005 suite is 9/9 green in wa.application.unit
+- [x] Override test proves exactly-one-field semantics (AC-053-2)
+- [x] TTL tests pass for both PlansCache and FlagsCache via the fake clock (AC-053-3)
+- [x] Full T-005 suite is 9/9 green in wa.application.unit
 
 ## Implementation prompt
 

@@ -65,22 +65,45 @@ public class LimitsProviderTests
     }
 
     [Fact]
-    public async Task Resolve_FlagOverride_ChangesOnlyThatField_OnThatPlan() // AC-053-2: 10 GB override on free.maxTransferSize.
+    public async Task Resolve_FlagOverride_ChangesOnlyThatField_OnThatPlan() // AC-053-2: asserted field-by-field — exactly one field changed, on exactly one plan (T-053-06).
     {
         var provider = CreateProvider(rows: new[]
         {
-            Flag("limits.free.maxTransferSize", "10737418240"),
+            Flag("limits.free.maxTransferSize", "10737418240"), // 10 GB.
         });
 
         var free = await provider.Resolve("free", CancellationToken.None);
-        Assert.Equal(10_737_418_240L, free.MaxTransferSize); // the override.
-        Assert.Equal(5_368_709_120L, free.MaxSingleFile);   // siblings untouched — one field only.
+        Assert.Equal(10_737_418_240L, free.MaxTransferSize);  // the override — only this field of free moves.
+        Assert.Equal(5_368_709_120L, free.MaxSingleFile);
+        Assert.Equal(4_294_967_296L, free.MaxZipSize);
         Assert.Equal(7, free.RetentionDays);
+        Assert.Equal(3, free.GraceDays);
+        Assert.Equal(100, free.MaxDownloads);
+        Assert.Equal(20, free.MaxEmails);
+        Assert.Equal(5_368_709_120L, free.StorageQuota);
+        Assert.Equal(20, free.ActiveTransfersMax);
 
-        var pro = await provider.Resolve("pro", CancellationToken.None);      // other plans completely unchanged.
-        Assert.Equal(10_737_418_240L, pro.MaxTransferSize);                   // still the seed, not the override.
-        var business = await provider.Resolve("business", CancellationToken.None);
+        var pro = await provider.Resolve("pro", CancellationToken.None); // other plans completely unchanged.
+        Assert.Equal(10_737_418_240L, pro.MaxTransferSize);  // still the seed — a limits.free.* flag never touches pro.
+        Assert.Equal(10_737_418_240L, pro.MaxSingleFile);
+        Assert.Equal(long.MaxValue, pro.MaxZipSize);
+        Assert.Equal(30, pro.RetentionDays);
+        Assert.Equal(3, pro.GraceDays);
+        Assert.Equal(1000, pro.MaxDownloads);
+        Assert.Equal(100, pro.MaxEmails);
+        Assert.Equal(107_374_182_400L, pro.StorageQuota);
+        Assert.Equal(200, pro.ActiveTransfersMax);
+
+        var business = await provider.Resolve("business", CancellationToken.None); // and business.
         Assert.Equal(107_374_182_400L, business.MaxTransferSize);
+        Assert.Equal(107_374_182_400L, business.MaxSingleFile);
+        Assert.Equal(long.MaxValue, business.MaxZipSize);
+        Assert.Equal(90, business.RetentionDays);
+        Assert.Equal(3, business.GraceDays);
+        Assert.Equal(-1, business.MaxDownloads); // -1 = unlimited (TA-4.2).
+        Assert.Equal(500, business.MaxEmails);
+        Assert.Equal(1_099_511_627_776L, business.StorageQuota);
+        Assert.Equal(-1, business.ActiveTransfersMax);
     }
 
     [Fact]

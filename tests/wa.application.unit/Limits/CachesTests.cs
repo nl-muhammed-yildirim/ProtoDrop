@@ -14,14 +14,15 @@ public class CachesTests
     // ── PlansCache ────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Plans_Get_YoungerThanTtl_ReturnsCachedInstanceWithoutRefetch()
+    public async Task Plans_Get_YoungerThanTtl_ReturnsCachedInstanceWithoutRefetch() // AC-053-3.
     {
         var (cache, store, _) = CreatePlans();
 
-        await cache.GetAsync("free", CancellationToken.None);
+        var first = await cache.GetAsync("free", CancellationToken.None);
         var second = await cache.GetAsync("free", CancellationToken.None);
 
-        Assert.Equal(1, store.Calls); // younger than the TTL — no refetch.
+        Assert.Same(first, second); // younger than the TTL — same instance from cache.
+        Assert.Equal(1, store.Calls); // no refetch.
     }
     [Fact]
     public async Task Plans_Get_DifferentPlans_AreCachedIndependently()
@@ -66,14 +67,14 @@ public class CachesTests
     // ── FlagsCache ────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Flags_GetAll_YoungerThanTtl_ReturnsCachedListWithoutRefetch()
+    public async Task Flags_GetAll_YoungerThanTtl_ReturnsCachedListWithoutRefetch() // AC-053-3.
     {
         var (cache, store, _) = CreateFlags();
+        var first = await cache.GetAllAsync(CancellationToken.None);
+        var second = await cache.GetAllAsync(CancellationToken.None);
 
-        await cache.GetAllAsync(CancellationToken.None);
-        await cache.GetAllAsync(CancellationToken.None);
-
-        Assert.Equal(1, store.Calls); // younger than the TTL — no refetch.
+        Assert.Same(first, second); // younger than the TTL — same instance from cache.
+        Assert.Equal(1, store.Calls); // no refetch.
     }
 
     [Fact]
