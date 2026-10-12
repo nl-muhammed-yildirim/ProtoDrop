@@ -18,8 +18,8 @@
 
 ## Exit check
 
-- [ ] With no SB connection string, publishing through `IEventPublisher` records the event in the fake and a test consumer reads it back with exact TA-5.2 fields (round-trip)
-- [ ] No "is this the fake?" branches anywhere — DI picks the adapter
+- [x] With no SB connection string, publishing through `IEventPublisher` records the event in the fake and a test consumer reads it back with exact TA-5.2 fields (round-trip)
+- [x] No "is this the fake?" branches anywhere — DI picks the adapter
 
 ## Implementation prompt
 

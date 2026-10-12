@@ -17,8 +17,8 @@
 
 ## Exit check
 
-- [ ] A consumer that already processed eventId X skips a redelivered envelope with X within 15 minutes — no side effect repeats (AC-054-3)
-- [ ] After LRU expiry, re-delivery is handled by the consumer's own idempotency (documented + unit-tested)
+- [x] A consumer that already processed eventId X skips a redelivered envelope with X within 15 minutes — no side effect repeats (AC-054-3)
+- [x] After LRU expiry, re-delivery is handled by the consumer's own idempotency (documented + unit-tested)
 
 ## Implementation prompt
 
