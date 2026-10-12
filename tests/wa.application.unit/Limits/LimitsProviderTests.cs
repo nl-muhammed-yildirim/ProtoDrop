@@ -124,13 +124,20 @@ public class LimitsProviderTests
         IReadOnlyList<FeatureFlag>? rows = null,
         Exception? plansThrow = null)
     {
+        var clock = new FakeClock(DateTimeOffset.UtcNow); // fakes + fake clock only — no real wall-clock dependency (T-053-05).
         var planStore = new StubPlansStore { Throw = plansThrow };
         if (plansThrow is not null) planStore.ThrowForCode = "free";
         var flagStore = new StubFlagsStore(rows ?? Array.Empty<FeatureFlag>());
 
         return new LimitsProvider(
-            new PlansCache(planStore, Ttl, () => DateTimeOffset.UtcNow),
-            new FlagsCache(flagStore, Ttl, () => DateTimeOffset.UtcNow));
+            new PlansCache(planStore, Ttl, () => clock.Now),
+            new FlagsCache(flagStore, Ttl, () => clock.Now));
+    }
+
+    private sealed class FakeClock(DateTimeOffset start)
+    {
+        public DateTimeOffset Now { get; private set; } = start;
+        public void Advance(TimeSpan by) => Now += by;
     }
 
     private static FeatureFlag Flag(string key, string value) => new() { Key = key, Value = value };
