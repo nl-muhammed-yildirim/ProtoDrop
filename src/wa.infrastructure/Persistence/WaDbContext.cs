@@ -25,7 +25,7 @@ public sealed class WaDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // 15 configurations in EntityConfigurations/ (one per entity); the model build below proves discovery.
+        // 16 configurations in EntityConfigurations/ (one per entity); the model build below proves discovery.
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(WaDbContext).Assembly);
     }
 }

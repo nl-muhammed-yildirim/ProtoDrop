@@ -15,7 +15,7 @@ namespace wa.infrastructure.Events;
 /// MessageId = EventId — broker-level dedup by that identity (FR-054-4, TA-5.1); the topic itself is created in
 /// infra, not in code at M0. On publish failure the outbox row stays unpublished and PUBLISH_FAILED is logged
 /// — no silent drop (EC-054-1). MVP simplification per TA-4.1.7: at-most-once accepted for non-critical events;
-/// the outbox row + alert cover the rest.
+/// the outbox row + alert cover the rest. <b>Assumes a non-empty connection string</b>: Program.cs selects this adapter only when <c>Wa:ServiceBus:ConnectionString</c> is present, so the ctor input is guaranteed non-null in production (a direct construction with a missing key throws from the ServiceBusClient ctor at publish time — acceptable for M0).
 /// </summary>
 public sealed class SbEventPublisher : IEventPublisher
 {
@@ -24,13 +24,14 @@ public sealed class SbEventPublisher : IEventPublisher
     /// <summary>Publish timeout (TA-4.1.7).</summary>
     private static readonly TimeSpan PublishTimeout = TimeSpan.FromSeconds(10);
 
-    private readonly IConfiguration _configuration;
+    private readonly string _connectionString;
     private readonly ILogger<SbEventPublisher> _logger;
     private readonly IDbContextFactory<WaDbContext> _dbFactory;
 
     public SbEventPublisher(IConfiguration configuration, ILogger<SbEventPublisher> logger, IDbContextFactory<WaDbContext> dbFactory)
     {
-        _configuration = configuration;
+        // Cached for publish-time use. DI selects this adapter only when the key exists (Program.cs), so production never sees a null here; direct constructions with an empty config throw at publish time from the ServiceBusClient ctor — OutboxRetryTests relies on that path.
+        _connectionString = configuration["Wa:ServiceBus:ConnectionString"]!;
         _logger = logger;
         _dbFactory = dbFactory;
     }
@@ -44,7 +45,7 @@ public sealed class SbEventPublisher : IEventPublisher
         var row = new DomainEvent
         {
             EventId = envelope.EventId,
-            EventType = JsonSerializer.SerializeToElement(envelope.Type).GetString()!, // TA-5.3 wire name via the bound converter
+            EventType = EventTypeConverter.WireName(envelope.Type), // TA-5.3 wire name — direct lookup, no serialization round-trip
             EnvelopeJson = envelopeJson,
             CorrelationId = envelope.CorrelationId,
             PartitionKey = envelope.PartitionKey,
@@ -59,7 +60,7 @@ public sealed class SbEventPublisher : IEventPublisher
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             cts.CancelAfter(PublishTimeout);
-            await using var client = new ServiceBusClient(_configuration["Wa:ServiceBus:ConnectionString"]!);
+            await using var client = new ServiceBusClient(_connectionString);
             await using var sender = client.CreateSender(TopicName);
             var message = new ServiceBusMessage(Encoding.UTF8.GetBytes(envelopeJson)) { MessageId = envelope.EventId.ToString() };
             if (!string.IsNullOrEmpty(envelope.PartitionKey))

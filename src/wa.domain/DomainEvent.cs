@@ -6,7 +6,7 @@ public class DomainEvent
     /// <summary>The envelope's EventId — Service Bus MessageId; broker-level dedup identity (TA-5.1).</summary>
     public Guid EventId { get; set; }
 
-    /// <summary>Ta-5.3 wire name, e.g. "transfer.created".</summary>
+    /// <summary>TA-5.3 wire name, e.g. "transfer.created".</summary>
     public string EventType { get; set; } = null!;
 
     /// <summary>The exact TA-5.2 serialized envelope (single source of truth for re-publish).</summary>

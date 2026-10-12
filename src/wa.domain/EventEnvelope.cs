@@ -93,6 +93,9 @@ public sealed class EventTypeConverter : JsonConverter<EventType>
         return ByWireName.TryGetValue(wireName, out var value) ? value : throw new JsonException($"unknown eventType: {wireName}");
     }
 
+    /// <summary>The TA-5.3 wire name for a value (e.g. "transfer.created") — direct lookup, no serialization round-trip.</summary>
+    public static string WireName(EventType value) => WireNames[(int)value];
+
     public override void Write(Utf8JsonWriter writer, EventType value, JsonSerializerOptions options) =>
         writer.WriteStringValue(WireNames[(int)value]);
 

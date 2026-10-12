@@ -3,8 +3,8 @@ using System.Collections.Concurrent;
 namespace wa.application.Events;
 
 /// <summary>
-/// Consumer-side dedup (T-054-04): a 15-min LRU against <c>eventId</c> that consumers use to skip already-seen envelopes —
-/// the broker's MessageId dedup is the first line, this is the second (FR-054-4). <b>The LRU is an optimization, not
+/// Consumer-side dedup (T-054-04): a 15-min window ("LRU" per FR-054-4; actually TTL-based purge-on-insert — reads don't refresh recency) against <c>eventId</c> that consumers use to skip already-seen envelopes —
+/// the broker's MessageId dedup is the first line, this is the second (FR-054-4). <b>The window is an optimization, not
 /// the guarantee:</b> after <see cref="Window"/> expires a redelivery of the same eventId can still arrive, so every
 /// consumer must also be idempotent by design (e.g. email send checks state, not just memory) — AC-054-3's post-expiry
 /// path relies on that property.
@@ -26,7 +26,7 @@ public sealed class EventDeduplicator(Func<DateTimeOffset> clock)
             return true; // replay within the window — skip.
 
         _seen[eventId] = now;
-        PurgeExpired(now); // bound memory: drop entries older than the window (LRU eviction).
+        PurgeExpired(now); // bound memory: drop entries older than the window (TTL purge).
         return false;
     }
 

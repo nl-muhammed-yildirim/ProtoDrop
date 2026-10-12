@@ -21,6 +21,7 @@ public sealed class InMemoryEventPublisher(TimeSpan ttl, Func<DateTimeOffset> cl
     /// <summary>DI ctor (TA-0.2 rule 7): real clock, 30-min in-process retention — mirrors the broker's 30-day topic retention scaled down to a process-lifetime fake.</summary>
     public InMemoryEventPublisher() : this(TimeSpan.FromMinutes(30), () => DateTimeOffset.UtcNow) { }
     /// <inheritdoc cref="IEventPublisher.PublishAsync"/> Dedup: a second publish of the same EventId is a no-op (one stored record, no double side effect).
+    /// Note: synchronous body — <paramref name="cancellationToken"/> is accepted for interface parity but not observed; concurrent first-publish race on the same EventId is benign for this test double.
     public Task<DomainEventRecord> PublishAsync(EventEnvelope envelope, CancellationToken cancellationToken)
     {
         var json = JsonSerializer.Serialize(envelope); // exact TA-5.2 byte shape — single source of truth (same as SbEventPublisher).
