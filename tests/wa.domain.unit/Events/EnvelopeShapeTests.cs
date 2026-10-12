@@ -15,29 +15,32 @@ public class EnvelopeShapeTests
     private const string OccurredAt = "2026-10-12T08:30:00Z";
     private const string PartitionKey = "transfer:22222222";
 
-    // ---- AC-054-2: exact full-string equality for every TA-5.3 type (11 cases) ----
+    // ---- AC-054-2: exact full-string equality for every TA-5.3 type — all 11 members of the closed list, one pass each ----
 
-    [Theory]
-    [InlineData(EventType.TransferCreated, "transfer.created")]
-    [InlineData(EventType.TransferExpired, "transfer.expired")]
-    [InlineData(EventType.TransferDeleted, "transfer.deleted")]
-    [InlineData(EventType.EmailSent, "email.sent")]
-    [InlineData(EventType.EmailFailed, "email.failed")]
-    [InlineData(EventType.DownloadCompleted, "download.completed")]
-    [InlineData(EventType.ZipGenerated, "zip.generated")]
-    [InlineData(EventType.UserCreated, "user.created")]
-    [InlineData(EventType.AccountDeleted, "account.deleted")]
-    [InlineData(EventType.PlanChanged, "plan.changed")]
-    [InlineData(EventType.AdminAction, "admin.action")]
-    public void EventEnvelope_SerializesToExactTa52Shape_ForEveryTa53Type(EventType type, string wireName)
+    [Fact]
+    public void EventEnvelope_SerializesToExactTa52Shape_ForEveryTa53Type()
     {
-        var envelope = CreateEnvelope(type);
+        var ta53Types = new (EventType Type, string WireName)[]
+        {
+            (EventType.TransferCreated, "transfer.created"),
+            (EventType.TransferExpired, "transfer.expired"),
+            (EventType.TransferDeleted, "transfer.deleted"),
+            (EventType.EmailSent, "email.sent"),
+            (EventType.EmailFailed, "email.failed"),
+            (EventType.DownloadCompleted, "download.completed"),
+            (EventType.ZipGenerated, "zip.generated"),
+            (EventType.UserCreated, "user.created"),
+            (EventType.AccountDeleted, "account.deleted"),
+            (EventType.PlanChanged, "plan.changed"),
+            (EventType.AdminAction, "admin.action")
+        };
 
-        var actual = JsonSerializer.Serialize(envelope);
+        // The closed TA-5.3 list is exactly these 11 members — anything else fails CI.
+        Assert.Equal(11, ta53Types.Length);
+        Assert.Equal(ta53Types.Select(t => t.Type), Enum.GetValues<EventType>());
 
-        Assert.Equal(
-            ExpectedEnvelope(wireName),
-            actual);
+        foreach (var (type, wireName) in ta53Types)
+            Assert.Equal(ExpectedEnvelope(wireName), JsonSerializer.Serialize(CreateEnvelope(type)));
     }
 
     // ---- AC-054-2: independent structural check — key sequence is exactly the seven fields, in order, nothing else ----
