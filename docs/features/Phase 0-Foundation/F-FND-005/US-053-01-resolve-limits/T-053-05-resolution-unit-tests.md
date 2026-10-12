@@ -20,8 +20,8 @@
 
 ## Exit check
 
-- [ ] All resolution unit tests pass in wa.application.unit (part of the T-005 9/9 suite — the override/TTL half lands in T-053-06)
-- [ ] No Testcontainers used: fakes + fake clock only
+- [x] All resolution unit tests pass in wa.application.unit (part of the T-005 9/9 suite — the override/TTL half lands in T-053-06)
+- [x] No Testcontainers used: fakes + fake clock only
 
 ## Implementation prompt
 

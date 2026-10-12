@@ -22,9 +22,9 @@
 
 ## Exit check
 
-- [ ] `Resolve("free")`, `Resolve("pro")`, `Resolve("business")` each return exactly their Part-2 constant values (AC-053-1)
-- [ ] A flag setting `limits.free.maxTransferSize` to 10 GB changes only that one field on free (AC-053-2)
-- [ ] Guest resolution returns Free's limits without an account lookup
+- [x] `Resolve("free")`, `Resolve("pro")`, `Resolve("business")` each return exactly their Part-2 constant values (AC-053-1)
+- [x] A flag setting `limits.free.maxTransferSize` to 10 GB changes only that one field on free (AC-053-2)
+- [x] Guest resolution returns Free's limits without an account lookup
 
 ## Implementation prompt
 

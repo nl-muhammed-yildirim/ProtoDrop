@@ -84,11 +84,11 @@ AC-053-4: Unknown plans fail loudly
 
 | Story | Task | File | Status |
 |---|---|---|---|
-| US-053-01 | T-053-01 LimitsRecord POCO in wa.domain (BCL-only) | `US-053-01-resolve-limits/T-053-01-limits-record-poco.md` | ☐ |
-| US-053-01 | T-053-02 IPlansStore / IFlagsStore ports + infrastructure adapters | `US-053-01-resolve-limits/T-053-02-store-ports.md` | ☐ |
-| US-053-02 | T-053-03 PlansCache + FlagsCache with 30 s TTL and injectable clock | `US-053-02-flag-override/T-053-03-caches-ttl.md` | ☐ |
-| US-053-01 | T-053-04 LimitsProvider: Resolve with override layering + guest → Free | `US-053-01-resolve-limits/T-053-04-limits-provider.md` | ☐ |
-| US-053-01 | T-053-05 Unit tests: per-plan seed resolution, guest → Free, unknown plan | `US-053-01-resolve-limits/T-053-05-resolution-unit-tests.md` | ☐ |
-| US-053-02 | T-053-06 Unit tests: override wins for exactly one field + TTL honored | `US-053-02-flag-override/T-053-06-override-ttl-unit-tests.md` | ☐ |
+| US-053-01 | T-053-01 LimitsRecord POCO in wa.domain (BCL-only) | `US-053-01-resolve-limits/T-053-01-limits-record-poco.md` | ☑ |
+| US-053-01 | T-053-02 IPlansStore / IFlagsStore ports + infrastructure adapters | `US-053-01-resolve-limits/T-053-02-store-ports.md` | ☑ |
+| US-053-02 | T-053-03 PlansCache + FlagsCache with 30 s TTL and injectable clock | `US-053-02-flag-override/T-053-03-caches-ttl.md` | ☑ |
+| US-053-01 | T-053-04 LimitsProvider: Resolve with override layering + guest → Free | `US-053-01-resolve-limits/T-053-04-limits-provider.md` | ☑ |
+| US-053-01 | T-053-05 Unit tests: per-plan seed resolution, guest → Free, unknown plan | `US-053-01-resolve-limits/T-053-05-resolution-unit-tests.md` | ☑ |
+| US-053-02 | T-053-06 Unit tests: override wins for exactly one field + TTL honored | `US-053-02-flag-override/T-053-06-override-ttl-unit-tests.md` | ☑ |
 
 **Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-005 can be marked `done` in `Milestone-Backlog.md`.

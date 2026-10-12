@@ -18,8 +18,8 @@
 
 ## Exit check
 
-- [ ] `LimitsRecord` compiles in wa.domain with zero external references
-- [ ] Its camelCase JSON property names are 1:1 with the seeded `LimitsJson` keys (free/pro/business rows from T-052-04)
+- [x] `LimitsRecord` compiles in wa.domain with zero external references
+- [x] Its camelCase JSON property names are 1:1 with the seeded `LimitsJson` keys (free/pro/business rows from T-052-04)
 
 ## Implementation prompt
 
