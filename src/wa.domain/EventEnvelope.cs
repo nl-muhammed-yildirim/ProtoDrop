@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace wa.domain;
@@ -5,6 +7,7 @@ namespace wa.domain;
 /// <summary>
 /// TA-5.3 closed event-type list — no ad-hoc types at M0. Serialized names are the wire contract (TA-5.2).
 /// </summary>
+[JsonConverter(typeof(EventTypeConverter))]
 public enum EventType
 {
     [JsonPropertyName("transfer.created")]
@@ -43,7 +46,7 @@ public enum EventType
 
 /// <summary>
 /// TA-5.2 event envelope — exactly these seven fields, no more, no less (AC-054-2).
-/// Serialized with camelCase keys pinned by <see cref="System.Text.Json.Serialization.JsonPropertyNameAttribute"/> so the contract does not depend on serializer options.
+/// Serialized byte-exact with plain <c>JsonSerializer</c> calls — no per-call options (AC-054-2): camelCase keys pinned by [JsonPropertyName], and EventType's bound converter emits its TA-5.3 wire name.
 /// </summary>
 public class EventEnvelope
 {
@@ -74,4 +77,36 @@ public class EventEnvelope
     /// <summary>The MediatR-free domain event POCO, serialized as its JSON representation.</summary>
     [JsonPropertyName("payload")]
     public object? Payload { get; set; }
+}
+
+/// <summary>
+/// Serializes <see cref="EventType"/> as its TA-5.3 wire name (e.g. "transfer.created") — the dotted form no naming policy can produce from member names, so plain <c>JsonSerializer</c> calls stay option-free. Bound via [JsonConverter] on the enum.
+/// </summary>
+public sealed class EventTypeConverter : JsonConverter<EventType>
+{
+    private static readonly string[] WireNames = BuildWireNames();
+    private static readonly Dictionary<string, EventType> ByWireName = BuildIndex();
+
+    public override EventType Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        var wireName = reader.GetString() ?? string.Empty;
+        return ByWireName.TryGetValue(wireName, out var value) ? value : throw new JsonException($"unknown eventType: {wireName}");
+    }
+
+    public override void Write(Utf8JsonWriter writer, EventType value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(WireNames[(int)value]);
+
+    private static string[] BuildWireNames() =>
+        typeof(EventType).GetFields(BindingFlags.Public | BindingFlags.Static)
+            .Where(fld => fld.IsLiteral)
+            .Select(fld => fld.GetCustomAttribute<JsonPropertyNameAttribute>()!.Name!)
+            .ToArray();
+
+    private static Dictionary<string, EventType> BuildIndex()
+    {
+        var index = new Dictionary<string, EventType>();
+        foreach (var value in Enum.GetValues(typeof(EventType)))
+            index[WireNames[(int)value]] = (EventType)value;
+        return index;
+    }
 }

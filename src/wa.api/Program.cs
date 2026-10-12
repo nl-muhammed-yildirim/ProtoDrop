@@ -1,5 +1,8 @@
 using System.Diagnostics;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
 using wa.application.UseCases.Health;
 using wa.application.UseCases.Sample;
 using wa.infrastructure.Events;
@@ -17,6 +20,10 @@ builder.Host.UseSerilog((context, cfg) => cfg
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(PingCommand).Assembly));
 builder.Services.AddSingleton<wa.application.Ports.IDbHealthProbe, WaDbHealthProbe>();
 builder.Services.AddSingleton<wa.application.Ports.ISbHealthProbe, SbHealthProbe>();
+// T-054-03: adapter-owned contexts (no request scope in the current API surface); the IEventPublisher switch lands in T-054-05.
+builder.Services.AddSingleton(new DbContextOptionsBuilder<WaDbContext>()
+    .UseSqlServer(builder.Configuration.GetConnectionString("WaDb")).Options);
+builder.Services.AddSingleton<wa.infrastructure.Persistence.AppDbContextFactory>();
 var app = builder.Build();
 app.UseSerilogRequestLogging(); // per-request INF line (Microsoft.* request logging is suppressed to Warning)
 app.MapGet("/", () => "Hello World!");
