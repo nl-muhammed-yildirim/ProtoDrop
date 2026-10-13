@@ -2,6 +2,7 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using wa.application.Blob;
 
 namespace wa.infrastructure.Blob;
 
@@ -43,7 +44,7 @@ public sealed class BlobContainerBootstrap : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         // Ensure both TA-3.5 containers exist (idempotent).
-        foreach (var name in new[] { "staging", "transfers" })
+        foreach (var name in new[] { BlobPaths.StagingContainer, BlobPaths.TransfersContainer })
         {
             try
             {
