@@ -19,9 +19,9 @@
 
 ## Exit check
 
-- [ ] Upload purpose: cwr, 2 h TTL, blob scope, sv=2024 — all asserted exactly
-- [ ] Download purpose: r, 30 min TTL, blob scope, sv=2024 — all asserted exactly
-- [ ] Signature matches the independent HMAC-SHA256 computation (both purposes)
+- [x] Upload purpose: cwr, 2 h TTL, blob scope, sv=2024 — all asserted exactly
+- [x] Download purpose: r, 30 min TTL, blob scope, sv=2024 — all asserted exactly
+- [x] Signature matches the independent HMAC-SHA256 computation (both purposes)
 
 ## Implementation prompt
 

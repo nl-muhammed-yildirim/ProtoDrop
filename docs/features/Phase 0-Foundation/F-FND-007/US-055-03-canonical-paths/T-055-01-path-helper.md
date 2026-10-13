@@ -19,8 +19,8 @@
 
 ## Exit check
 
-- [ ] The helper returns `/staging/{draftId}/f/{fileId}` for any staged file — nothing else at M0 (AC-055-3)
-- [ ] No blob path strings exist anywhere outside this helper (grep audit)
+- [x] The helper returns `/staging/{draftId}/f/{fileId}` for any staged file — nothing else at M0 (AC-055-3)
+- [x] No blob path strings exist anywhere outside this helper (grep audit)
 
 ## Implementation prompt
 

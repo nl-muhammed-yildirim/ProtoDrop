@@ -80,10 +80,10 @@ AC-055-3: The staging path is canonical
 
 | Story | Task | File | Status |
 |---|---|---|---|
-| US-055-03 | T-055-01 Canonical blob path helper (TA-3.5 table) | `US-055-03-canonical-paths/T-055-01-path-helper.md` | ☐ |
-| US-055-02 | T-055-02 IBlobStore port + Azurite/Azure adapters | `US-055-02-round-trip/T-055-02-iblobstore-port.md` | ☐ |
-| US-055-01 | T-055-03 BlobSasMinter: exact TA-3.6 URL shapes | `US-055-01-mint-upload-sas/T-055-03-blob-sas-minter.md` | ☐ |
-| US-055-01 | T-055-04 Unit tests: exact URL form, TTLs, scope, signature correctness | `US-055-01-mint-upload-sas/T-055-04-minter-unit-tests.md` | ☐ |
-| US-055-02 | T-055-05 SAS round-trip integration test (mint → plain HTTP upload → read back) | `US-055-02-round-trip/T-055-05-sas-roundtrip-integration-test.md` | ☐ |
+| US-055-03 | T-055-01 Canonical blob path helper (TA-3.5 table) | `US-055-03-canonical-paths/T-055-01-path-helper.md` | ☑ |
+| US-055-02 | T-055-02 IBlobStore port + Azurite/Azure adapters | `US-055-02-round-trip/T-055-02-iblobstore-port.md` | ☑ |
+| US-055-01 | T-055-03 BlobSasMinter: exact TA-3.6 URL shapes | `US-055-01-mint-upload-sas/T-055-03-blob-sas-minter.md` | ☑ |
+| US-055-01 | T-055-04 Unit tests: exact URL form, TTLs, scope, signature correctness | `US-055-01-mint-upload-sas/T-055-04-minter-unit-tests.md` | ☑ |
+| US-055-02 | T-055-05 SAS round-trip integration test (mint → plain HTTP upload → read back) | `US-055-02-round-trip/T-055-05-sas-roundtrip-integration-test.md` | ☑ |
 
 **Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-007 and T-007a can be marked `done` in `Milestone-Backlog.md`.

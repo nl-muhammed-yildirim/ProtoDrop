@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\wa.application\wa.application.csproj" />
+    <!-- TA-0.2 rule 7 (T-007b ADR): the T-055-04 minter test constructs BlobSasMinter directly. -->
+    <ProjectReference Include="..\..\src\wa.infrastructure\wa.infrastructure.csproj" />
   </ItemGroup>
-
 </Project>

@@ -1,10 +1,9 @@
 using System.Net;
-using System.Text.Json;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.AspNetCore.Hosting;
+using System.Text.Json;
 using wa.application.Ports;
 using Xunit;
 
@@ -12,6 +11,13 @@ namespace wa.api.integration;
 
 public class HealthFailureTests
 {
+    // Program.cs builds the blob client eagerly from §5.2 config (T-055-02); the test host has no launchSettings, and ConfigureAppConfiguration in the factory lands too late for top-level statements — env vars are always visible to CreateBuilder's configuration.
+    static HealthFailureTests()
+    {
+        Environment.SetEnvironmentVariable("Wa__Blob__AccountUrl", "http://127.0.0.1:10000/devstoreaccount1");
+        Environment.SetEnvironmentVariable("Wa__Blob__AccountKey", "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==");
+    }
+
     private static readonly TestFactory factory = new();
 
     private sealed class TestFactory : WebApplicationFactory<Program>

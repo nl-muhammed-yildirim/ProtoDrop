@@ -18,8 +18,8 @@
 
 ## Exit check
 
-- [ ] A blob written at `/staging/{draftId}/f/{fileId}` is readable back through `IBlobStore.DownloadAsync` with exact bytes
-- [ ] No account key appears in browser-facing code or logs (masking rules land with the minter's tests — T-055-04)
+- [x] A blob written at `/staging/{draftId}/f/{fileId}` is readable back through `IBlobStore.DownloadAsync` with exact bytes
+- [x] No account key appears in browser-facing code or logs (masking rules land with the minter's tests — T-055-04)
 
 ## Implementation prompt
 

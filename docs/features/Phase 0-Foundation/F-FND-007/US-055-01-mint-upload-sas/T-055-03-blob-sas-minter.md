@@ -21,8 +21,8 @@
 
 ## Exit check
 
-- [ ] A minted upload URL has scope/permissions/TTL/sv exactly per TA-3.6 for its purpose
-- [ ] The signature verifies against an independently computed HMAC-SHA256 over the same string-to-sign (FR-055-6)
+- [x] A minted upload URL has scope/permissions/TTL/sv exactly per TA-3.6 for its purpose
+- [x] The signature verifies against an independently computed HMAC-SHA256 over the same string-to-sign (FR-055-6)
 
 ## Implementation prompt
 
