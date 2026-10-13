@@ -13,7 +13,7 @@
 ## Instructions
 
 1. In **`CreateDraftCommand`**, resolve the caller's effective limits via `ILimitsProvider` (TA-3.4 — never literals): total of `files[].sizeBytes` > `MAX_TRANSFER_SIZE`, or any single file > `MAX_SINGLE_FILE`.
-2. On violation return 400 Problem+JSON **`TRANSFER_SIZE_EXCEEDED`** with both numbers in `details` ("Transfer size 5.2 GB exceeds the 5 GB limit.").
+2. On violation return 422 Problem+JSON **`TRANSFER_SIZE_EXCEEDED`** with both numbers in `details` ("Transfer size 5.2 GB exceeds the 5 GB limit.").
 3. Sizes are BIGINT bytes end-to-end (1024-based display only); the check is metadata-only — no blob reads, no re-upload.
 
 ## Exit check
@@ -30,7 +30,7 @@ Task T-007-02 — add draft-time size enforcement.
 Read first (only): docs/features/Phase 0-MVP/F-TRF-007/US-007-03-server-enforcement/US-007-03-server-enforcement.md (happy path + Alternative flows) and F-TRF-007-limits.md (FR-007-2/3).
 Do exactly:
 1. In CreateDraftCommand, resolve the caller's effective limits via ILimitsProvider (TA-3.4 — never literals): total of files[].sizeBytes > MAX_TRANSFER_SIZE or any single file > MAX_SINGLE_FILE.
-2. On violation return 400 Problem+JSON TRANSFER_SIZE_EXCEEDED with both numbers in details ("Transfer size 5.2 GB exceeds the 5 GB limit.").
+2. On violation return 422 Problem+JSON TRANSFER_SIZE_EXCEEDED with both numbers in details ("Transfer size 5.2 GB exceeds the 5 GB limit.").
 3. Keep sizes as BIGINT bytes end-to-end (1024-based display only); the check is metadata-only — no blob reads, no re-upload.
 Done when: AC-007-1's draft half holds — a raw API call with a 5.2 GB Free-plan draft gets TRANSFER_SIZE_EXCEEDED naming both numbers, and a single oversized file is caught even when the total fits.
 Constraints: thin endpoint (TA-4.2a) — logic in CreateDraftCommand; error code from the closed TA-4.1.3 list only.

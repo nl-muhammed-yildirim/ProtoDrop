@@ -58,12 +58,10 @@ public class PipelineTests
 
         using var doc = JsonDocument.Parse(await response.Content.ReadAsByteArrayAsync());
         var root = doc.RootElement;
-        // Exact TA-4.1.3 field set for a 404 — nothing else, correlationId included (US-056-02 first Gherkin block).
+        // Exact TA-4.1.3 field set for a 404 — names AND order pinned (US-056-02 first Gherkin block; JsonObject preserves insertion order, ProblemWriter.Build is the single construction site).
+        Assert.Equal(["type", "title", "status", "code", "details", "correlationId"], root.EnumerateObject().Select(p => p.Name).ToArray());
         Assert.Equal("NOT_FOUND", root.GetProperty("code").GetString());
         Assert.Equal(404, root.GetProperty("status").GetInt32());
-        Assert.True(root.TryGetProperty("type", out _));
-        Assert.True(root.TryGetProperty("title", out _));
-        Assert.True(root.TryGetProperty("details", out _));
 
         // The body's correlationId IS the log-context value for this request: CorrelationMiddleware pushes it into Serilog's context, and that same 8-hex prefix is what the TraceParent response header carries (TA-10.1 "traceparent in → out").
         var correlationId = root.GetProperty("correlationId").GetString()!;
