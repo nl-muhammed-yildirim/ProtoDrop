@@ -18,8 +18,8 @@
 
 ## Exit check
 
-- [ ] The envelope has exactly the seven TA-5.2 fields (serialized form inspected — AC-054-2)
-- [ ] No MediatR eventing dependency in wa.application (grep: no `IPublisher` usage for domain events)
+- [x] The envelope has exactly the seven TA-5.2 fields (serialized form inspected — AC-054-2)
+- [x] No MediatR eventing dependency in wa.application (grep: no `IPublisher` usage for domain events)
 
 ## Implementation prompt
 

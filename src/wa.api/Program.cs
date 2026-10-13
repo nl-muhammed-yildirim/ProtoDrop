@@ -1,5 +1,8 @@
 using System.Diagnostics;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
 using wa.application.UseCases.Health;
 using wa.application.UseCases.Sample;
 using wa.infrastructure.Events;
@@ -17,6 +20,19 @@ builder.Host.UseSerilog((context, cfg) => cfg
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(PingCommand).Assembly));
 builder.Services.AddSingleton<wa.application.Ports.IDbHealthProbe, WaDbHealthProbe>();
 builder.Services.AddSingleton<wa.application.Ports.ISbHealthProbe, SbHealthProbe>();
+// Adapter-owned contexts (no request scope in the current API surface).
+builder.Services.AddSingleton(new DbContextOptionsBuilder<WaDbContext>()
+    .UseSqlServer(builder.Configuration.GetConnectionString("WaDb")).Options);
+builder.Services.AddSingleton<wa.infrastructure.Persistence.AppDbContextFactory>();
+// T-054-05 (TA-0.2 rule 7): no "is this the fake?" branch in production code — DI picks the adapter on the connection string.
+var sbConnString = builder.Configuration["Wa:ServiceBus:ConnectionString"];
+if (string.IsNullOrEmpty(sbConnString))
+    builder.Services.AddSingleton<wa.application.Ports.IEventPublisher, InMemoryEventPublisher>();
+else
+    builder.Services.AddSingleton<wa.application.Ports.IEventPublisher>(sp => new SbEventPublisher(
+        sp.GetRequiredService<IConfiguration>(),
+        sp.GetRequiredService<ILogger<SbEventPublisher>>(),
+        sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
 var app = builder.Build();
 app.UseSerilogRequestLogging(); // per-request INF line (Microsoft.* request logging is suppressed to Warning)
 app.MapGet("/", () => "Hello World!");

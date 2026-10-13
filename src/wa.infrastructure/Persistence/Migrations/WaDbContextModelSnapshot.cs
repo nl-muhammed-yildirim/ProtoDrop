@@ -177,6 +177,41 @@ namespace wa.infrastructure.Persistence.Migrations
                     b.ToTable("BlobRef", (string)null);
                 });
 
+            modelBuilder.Entity("wa.domain.DomainEvent", b =>
+                {
+                    b.Property<Guid>("EventId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CorrelationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EnvelopeJson")
+                        .IsRequired()
+                        .HasColumnType("NVARCHAR(MAX)");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(64)");
+
+                    b.Property<bool>("IsPublished")
+                        .HasColumnType("BIT");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PartitionKey")
+                        .HasColumnType("VARCHAR(320)");
+
+                    b.HasKey("EventId")
+                        .HasName("PK_DomainEvents");
+
+                    b.ToTable("DomainEvents", (string)null);
+                });
+
             modelBuilder.Entity("wa.domain.DownloadEvent", b =>
                 {
                     b.Property<long>("Id")
