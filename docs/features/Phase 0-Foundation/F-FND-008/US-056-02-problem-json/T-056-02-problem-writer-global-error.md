@@ -19,9 +19,9 @@
 
 ## Exit check
 
-- [ ] Unknown route → 404 Problem+JSON with `code: NOT_FOUND`, correlationId present
-- [ ] Unhandled exception → 500 Problem+JSON with `code: INTERNAL`; stack trace in Serilog, not in the body
-- [ ] No response body contains a raw stack trace (grep audit)
+- [x] Unknown route → 404 Problem+JSON with `code: NOT_FOUND`, correlationId present
+- [x] Unhandled exception → 500 Problem+JSON with `code: INTERNAL`; stack trace in Serilog, not in the body
+- [x] No response body contains a raw stack trace (grep audit)
 
 ## Implementation prompt
 
