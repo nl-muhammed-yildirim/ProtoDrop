@@ -20,9 +20,9 @@
 
 ## Exit check
 
-- [ ] Mint → plain HTTP block upload → read back passes with byte-exact equality (AC-055-1)
-- [ ] The blob's location is exactly `/staging/{draftId}/f/{fileId}` (AC-055-3)
-- [ ] This test closes T-007a — the T-007 exit check
+- [x] Mint → plain HTTP block upload → read back passes with byte-exact equality (AC-055-1)
+- [x] The blob's location is exactly `/staging/{draftId}/f/{fileId}` (AC-055-3)
+- [x] This test closes T-007a — the T-007 exit check
 
 ## Implementation prompt
 
