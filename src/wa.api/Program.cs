@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Azure.Storage;
 using Azure.Storage.Blobs;
 using MediatR;
@@ -7,6 +6,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using wa.application.UseCases.Health;
 using wa.application.UseCases.Sample;
+using wa.domain.Errors; // T-056-02: /health catch writes through ProblemWriter (closed code list)
 using wa.infrastructure.Blob;
 using wa.infrastructure.Events;
 using wa.infrastructure.Persistence;
@@ -50,6 +50,7 @@ builder.Services.AddSingleton(new BlobServiceClient(
 builder.Services.AddHostedService<BlobContainerBootstrap>();
 var app = builder.Build();
 app.UseMiddleware<CorrelationMiddleware>(); // FR-056-1: runs before everything else — correlationId present in every log line incl. UseSerilogRequestLogging's per-request INF line
+app.UseMiddleware<GlobalErrorMiddleware>(); // FR-056-3: every failure → TA-4.1.3 Problem+JSON (business codes keep their status, others 500 INTERNAL)
 app.UseSerilogRequestLogging(); // per-request INF line (Microsoft.* request logging is suppressed to Warning)
 app.MapGet("/", () => "Hello World!");
 app.MapGet("/health", async (ISender sender, CancellationToken ct) =>
@@ -61,17 +62,9 @@ app.MapGet("/health", async (ISender sender, CancellationToken ct) =>
     }
     catch (Exception)
     {
-        // Reason is logged by the handler (T-050-04). Body is TA-4.1.3 Problem+JSON; code list is closed — no DB_DOWN, so INTERNAL.
-        var correlationId = (Activity.Current?.TraceId.ToString() ?? Guid.NewGuid().ToString("n"))[..8];
-        return Results.Json(new
-        {
-            type = "https://example.com/errors/internal",
-            title = "Internal server error",
-            status = 503,
-            code = "INTERNAL",
-            details = "A required component is unreachable.",
-            correlationId
-        }, statusCode: 503);
+        // Reason is logged by the handler (T-050-04). Body is TA-4.1.3 Problem+JSON via the shared writer; code list is closed — no DB_DOWN, so INTERNAL.
+        // 503 is an explicit-status override: ProblemCodes pins INTERNAL at 500, but component-unreachable answers ServiceUnavailable (HealthFailureTests' contract).
+        return Results.Json(ProblemWriter.Build(503, ProblemCodes.Internal, "A required component is unreachable."), statusCode: 503);
     }
 });
 
