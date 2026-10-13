@@ -42,7 +42,13 @@ public sealed class GlobalErrorMiddleware
         }
 
         // Unknown route: minimal APIs set 404 with no body — rewrite to the exact TA-4.1.3 shape (correlationId included). Real 404s with a written body pass through untouched.
-        if (!context.Response.HasStarted && context.Response.StatusCode == StatusCodes.Status404NotFound && context.Response.Body.Position == 0)
-            await ProblemWriter.WriteAsync(context, ProblemCodes.StatusOf(ProblemCodes.NotFound), ProblemCodes.NotFound, "No route matches this request.");
+        if (!context.Response.HasStarted && context.Response.StatusCode == StatusCodes.Status404NotFound)
+        {
+            // Kestrel's HttpResponseStream doesn't support Position — the empty-body check only works under TestServer, so treat it as best-effort evidence.
+            var bodyIsEmpty = true;
+            try { bodyIsEmpty = context.Response.Body.Position == 0; } catch (NotSupportedException) { }
+            if (bodyIsEmpty)
+                await ProblemWriter.WriteAsync(context, ProblemCodes.StatusOf(ProblemCodes.NotFound), ProblemCodes.NotFound, "No route matches this request.");
+        }
     }
 }

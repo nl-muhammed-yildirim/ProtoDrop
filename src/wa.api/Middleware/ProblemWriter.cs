@@ -34,7 +34,17 @@ public static class ProblemWriter
         return payload;
     }
 
-    /// <summary>Writes the Problem response: status code + application/json body. Callers guarantee the response has not started.</summary>
+    /// <summary>
+    /// Writes the Problem response and commits it before writing a single body byte (Response.StartAsync). Kestrel flushes headers with the first bytes, so any header set after this method returns is lost — callers that must carry extra headers (e.g. Retry-After) set them on <c>context.Response.Headers</c> beforehand.
+    /// </summary>
+    public static async Task WriteCompleteAsync(HttpContext context, int status, string code, string details, IReadOnlyList<ProblemFieldError>? errors = null)
+    {
+        var payload = Build(status, code, details, errors);
+        context.Response.StatusCode = status;
+        context.Response.ContentType = "application/json";
+        await context.Response.StartAsync(); // commits headers — everything set on Response.Headers up to now is locked in
+        await JsonSerializer.SerializeAsync(context.Response.Body, payload);
+    }
     public static async Task WriteAsync(HttpContext context, int status, string code, string details, IReadOnlyList<ProblemFieldError>? errors = null)
     {
         var payload = Build(status, code, details, errors);
