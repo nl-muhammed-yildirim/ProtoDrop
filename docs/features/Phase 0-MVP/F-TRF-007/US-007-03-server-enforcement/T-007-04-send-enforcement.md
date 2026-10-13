@@ -12,7 +12,7 @@
 
 ## Instructions
 
-1. In **`SendTransferCommand`**, re-check the transfer's total size against `MAX_TRANSFER_SIZE` via `ILimitsProvider` — a flag may have changed since draft/finalize; on violation → 400 Problem+JSON **`TRANSFER_SIZE_EXCEEDED`** naming both numbers (AC-007-1: "finalize succeeds but send fails").
+1. In **`SendTransferCommand`**, re-check the transfer's total size against `MAX_TRANSFER_SIZE` via `ILimitsProvider` — a flag may have changed since draft/finalize; on violation → 422 Problem+JSON **`TRANSFER_SIZE_EXCEEDED`** naming both numbers (AC-007-1: "finalize succeeds but send fails").
 2. Cap recipients at `MAX_EMAILS` (inclusive): 21 addresses on Free → cap error naming the limit.
 3. Assign `ExpiresAtUtc = now + RETENTION_DAYS` from the resolved record — never a literal day count.
 
@@ -29,7 +29,7 @@ Repo: C:\Users\myild\source\repos\ProtoDrop (.NET 10; SendTransferCommand + Limi
 Task T-007-04 — add send-time enforcement.
 Read first (only): docs/features/Phase 0-MVP/F-TRF-007/US-007-03-server-enforcement/US-007-03-server-enforcement.md (happy path) and F-TRF-007-limits.md (FR-007-2/3 + AC-007-1).
 Do exactly:
-1. In SendTransferCommand, re-check the transfer's total size against MAX_TRANSFER_SIZE via ILimitsProvider — a flag may have changed since draft/finalize; on violation → 400 Problem+JSON TRANSFER_SIZE_EXCEEDED naming both numbers (AC-007-1: "finalize succeeds but send fails").
+1. In SendTransferCommand, re-check the transfer's total size against MAX_TRANSFER_SIZE via ILimitsProvider — a flag may have changed since draft/finalize; on violation → 422 Problem+JSON TRANSFER_SIZE_EXCEEDED naming both numbers (AC-007-1: "finalize succeeds but send fails").
 2. Cap recipients at MAX_EMAILS (inclusive): 21 addresses on Free → cap error naming the limit.
 3. Assign ExpiresAtUtc = now + RETENTION_DAYS from the resolved record — never a literal day count.
 Done when: AC-007-1 holds end-to-end — finalize of 5.2 GB succeeds, send fails with the exact message, and retention is set from the registry.

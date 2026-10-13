@@ -18,9 +18,9 @@
 
 ## Exit check
 
-- [ ] A request with no traceparent gets one generated; its 8-hex correlationId appears in every log line for that request
-- [ ] A valid incoming traceparent is reused (not regenerated)
-- [ ] A malformed traceparent is treated as absent — new one generated, pipeline doesn't crash
+- [x] A request with no traceparent gets one generated; its 8-hex correlationId appears in every log line for that request
+- [x] A valid incoming traceparent is reused (not regenerated)
+- [x] A malformed traceparent is treated as absent — new one generated, pipeline doesn't crash
 
 ## Implementation prompt
 

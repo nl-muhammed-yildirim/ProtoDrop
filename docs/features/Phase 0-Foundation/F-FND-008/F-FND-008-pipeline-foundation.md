@@ -89,10 +89,10 @@ AC-056-4: Telemetry events use the closed set
 
 | Story | Task | File | Status |
 |---|---|---|---|
-| US-056-01 | T-056-01 W3CTraceParser + CorrelationContext/CorrelationMiddleware | `US-056-01-correlation-id/T-056-01-w3c-trace-parser.md` | ☐ |
-| US-056-02 | T-056-02 ProblemWriter + GlobalErrorMiddleware (closed code list) | `US-056-02-problem-json/T-056-02-problem-writer-global-error.md` | ☐ |
-| US-056-03 | T-056-03 CORS allow-list + auth rate limiting (5/min per IP) | `US-056-03-rate-limit/T-056-03-cors-rate-limit.md` | ☐ |
-| US-056-04 | T-056-04 TelemetryEvents.cs + WaTelemetryReporter (closed TA-10.2 set) | `US-056-04-telemetry-events/T-056-04-telemetry-events-reporter.md` | ☐ |
-| US-056-01 | T-056-05 Integration tests: Problem+JSON with correlationId + exact telemetry template (T-008 exit check) | `US-056-01-correlation-id/T-056-05-pipeline-integration-tests.md` | ☐ |
+| US-056-01 | T-056-01 W3CTraceParser + CorrelationContext/CorrelationMiddleware | `US-056-01-correlation-id/T-056-01-w3c-trace-parser.md` | ☑ |
+| US-056-02 | T-056-02 ProblemWriter + GlobalErrorMiddleware (closed code list) | `US-056-02-problem-json/T-056-02-problem-writer-global-error.md` | ☑ |
+| US-056-03 | T-056-03 CORS allow-list + auth rate limiting (5/min per IP) | `US-056-03-rate-limit/T-056-03-cors-rate-limit.md` | ☑ |
+| US-056-04 | T-056-04 TelemetryEvents.cs + WaTelemetryReporter (closed TA-10.2 set) | `US-056-04-telemetry-events/T-056-04-telemetry-events-reporter.md` | ☑ |
+| US-056-01 | T-056-05 Integration tests: Problem+JSON with correlationId + exact telemetry template (T-008 exit check) | `US-056-01-correlation-id/T-056-05-pipeline-integration-tests.md` | ☑ |
 
 **Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-008a–d can be marked `done` in `Milestone-Backlog.md`.

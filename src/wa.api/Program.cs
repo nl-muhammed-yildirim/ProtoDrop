@@ -1,4 +1,4 @@
-using System.Diagnostics;
+using AspNetCoreRateLimit;
 using Azure.Storage;
 using Azure.Storage.Blobs;
 using MediatR;
@@ -7,10 +7,13 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using wa.application.UseCases.Health;
 using wa.application.UseCases.Sample;
+using wa.domain.Errors; // T-056-02: /health catch writes through ProblemWriter (closed code list)
 using wa.infrastructure.Blob;
 using wa.infrastructure.Events;
 using wa.infrastructure.Persistence;
+using wa.api.Middleware;
 using Serilog;
+using Serilog.Context;
 using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -46,7 +49,37 @@ builder.Services.AddSingleton(new BlobServiceClient(
     new Uri(blobAccountUrl!),
     new StorageSharedKeyCredential(AzureBlobStore.AccountNameFrom(new Uri(blobAccountUrl!)), blobAccountKey!)));
 builder.Services.AddHostedService<BlobContainerBootstrap>();
+// TA-9.5 second line (T-056-03): AspNetCoreRateLimit frozen at 5.0.0, in-memory store — per-instance state is correct at M0 scale; a distributed store would be an ADR change.
+builder.Services.AddMemoryCache(); // the package's MemoryCache* stores need IMemoryCache, which this app does not register by default (DI validation caught it)
+builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>(); // v5.0.0 leaves this to the caller — AsyncKeyLockProcessingStrategy requires it and AddInMemoryRateLimiting registers no implementation
+builder.Services.AddInMemoryRateLimiting(); // must run before Build() — the middleware pulls RateLimitConfiguration from DI
+// FR-056-3 (T-056-03): *:/api/v1/auth/* = 5/min per IP → 429 RATE_LIMITED + Retry-After, body via ProblemWriter. The rule's Endpoint keeps the literal `*:` prefix —
+// the processor matches GeneralRules against both `*:{path}` and `{verb}:{path}`, so a plain path would never align (Core/RateLimitProcessor.cs).
+var authRule = new RateLimitRule { Endpoint = "*:/api/v1/auth/*", Period = "1m", Limit = 5 };
+// On breach the library's ReturnQuotaExceededResponse writes AFTER our hook on the same unstarted response — an empty application/json body keeps the Problem payload intact.
+authRule.QuotaExceededResponse = new QuotaExceededResponse { StatusCode = 429, ContentType = "application/json", Content = "" };
+builder.Services.Configure<IpRateLimitOptions>(opts =>
+{
+    opts.EnableEndpointRateLimiting = true; // required — without it GeneralRules only match Endpoint == "*" (Core/RateLimitProcessor.cs)
+    opts.GeneralRules = [authRule];
+    // The library sets Retry-After only AFTER our hook returns (RateLimitMiddleware.Invoke → ReturnQuotaExceededResponse), but Kestrel flushes headers with the first body byte — so we set it here, before WriteCompleteAsync commits headers (same formula the library uses: Extensions.RetryAfterFrom).
+    opts.RequestBlockedBehaviorAsync = async (context, _, counter, rule) =>
+    {
+        context.Response.Headers["Retry-After"] = counter.Timestamp.RetryAfterFrom(rule); // set BEFORE WriteCompleteAsync — its StartAsync commits headers before any body byte, so this survives Kestrel's header flush
+        await ProblemWriter.WriteCompleteAsync(context, 429, ProblemCodes.RateLimited, "Too many requests — limit is 5 per minute.");
+    };
+});
+// AC-056-4 (T-056-04): one reporter for every event — names from the closed TA-10.2 set, template shapes pinned in its doc comment (T-056-05 asserts them).
+builder.Services.AddSingleton<wa.application.Telemetry.WaTelemetryReporter>(sp => new wa.application.Telemetry.WaTelemetryReporter(
+    sp.GetRequiredService<ILogger<wa.application.Telemetry.WaTelemetryReporter>>(),
+    System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Wa:Jwt:Secret"]!))); // TA-9.4: the IP HMAC key IS Wa:Jwt:Secret — UTF-8 of the raw string (same key T-008's session cookie signs with, TA-9.1)
 var app = builder.Build();
+// TA-4.1.6 (T-056-03): allow-list CORS only — configured origins via Wa:Cors:AllowedOrigins, no wildcard, preflight cached 1 h.
+app.UseMiddleware<CorsAllowListMiddleware>();
+app.UseMiddleware<CorrelationMiddleware>(); // FR-056-1: runs before everything else — correlationId present in every log line incl. UseSerilogRequestLogging's per-request INF line
+// Rate limiting sits after correlation so the 429 body gets a correlationId, and BEFORE GlobalError so its empty-body 404 rewrite can't touch the 429 (the limiter short-circuits before routing).
+app.UseIpRateLimiting();
+app.UseMiddleware<GlobalErrorMiddleware>(); // FR-056-3: every failure → TA-4.1.3 Problem+JSON (business codes keep their status, others 500 INTERNAL)
 app.UseSerilogRequestLogging(); // per-request INF line (Microsoft.* request logging is suppressed to Warning)
 app.MapGet("/", () => "Hello World!");
 app.MapGet("/health", async (ISender sender, CancellationToken ct) =>
@@ -58,17 +91,9 @@ app.MapGet("/health", async (ISender sender, CancellationToken ct) =>
     }
     catch (Exception)
     {
-        // Reason is logged by the handler (T-050-04). Body is TA-4.1.3 Problem+JSON; code list is closed — no DB_DOWN, so INTERNAL.
-        var correlationId = (Activity.Current?.TraceId.ToString() ?? Guid.NewGuid().ToString("n"))[..8];
-        return Results.Json(new
-        {
-            type = "https://example.com/errors/internal",
-            title = "Internal server error",
-            status = 503,
-            code = "INTERNAL",
-            details = "A required component is unreachable.",
-            correlationId
-        }, statusCode: 503);
+        // Reason is logged by the handler (T-050-04). Body is TA-4.1.3 Problem+JSON via the shared writer; code list is closed — no DB_DOWN, so INTERNAL.
+        // 503 is an explicit-status override: ProblemCodes pins INTERNAL at 500, but component-unreachable answers ServiceUnavailable (HealthFailureTests' contract).
+        return Results.Json(ProblemWriter.Build(503, ProblemCodes.Internal, "A required component is unreachable."), statusCode: 503);
     }
 });
 
