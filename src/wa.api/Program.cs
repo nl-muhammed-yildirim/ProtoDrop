@@ -10,7 +10,9 @@ using wa.application.UseCases.Sample;
 using wa.infrastructure.Blob;
 using wa.infrastructure.Events;
 using wa.infrastructure.Persistence;
+using wa.api.Middleware;
 using Serilog;
+using Serilog.Context;
 using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -47,6 +49,7 @@ builder.Services.AddSingleton(new BlobServiceClient(
     new StorageSharedKeyCredential(AzureBlobStore.AccountNameFrom(new Uri(blobAccountUrl!)), blobAccountKey!)));
 builder.Services.AddHostedService<BlobContainerBootstrap>();
 var app = builder.Build();
+app.UseMiddleware<CorrelationMiddleware>(); // FR-056-1: runs before everything else — correlationId present in every log line incl. UseSerilogRequestLogging's per-request INF line
 app.UseSerilogRequestLogging(); // per-request INF line (Microsoft.* request logging is suppressed to Warning)
 app.MapGet("/", () => "Hello World!");
 app.MapGet("/health", async (ISender sender, CancellationToken ct) =>
