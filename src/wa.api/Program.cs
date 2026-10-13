@@ -1,10 +1,13 @@
 using System.Diagnostics;
+using Azure.Storage;
+using Azure.Storage.Blobs;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using wa.application.UseCases.Health;
 using wa.application.UseCases.Sample;
+using wa.infrastructure.Blob;
 using wa.infrastructure.Events;
 using wa.infrastructure.Persistence;
 using Serilog;
@@ -33,6 +36,16 @@ else
         sp.GetRequiredService<IConfiguration>(),
         sp.GetRequiredService<ILogger<SbEventPublisher>>(),
         sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+// T-055-02 (TA-3.5 topology, §5.2 config): blob store + one-time container bootstrap. GR#7 — no "is this the fake?" branch; the adapter is picked by its §5.2 config values only.
+var blobAccountUrl = builder.Configuration["Wa:Blob:AccountUrl"];
+var blobAccountKey = builder.Configuration["Wa:Blob:AccountKey"];
+builder.Services.AddSingleton<wa.application.Ports.IBlobStore>(sp => new AzureBlobStore(
+    new Uri(blobAccountUrl!), blobAccountKey!, sp.GetRequiredService<ILogger<AzureBlobStore>>()));
+// BlobContainerBootstrap (TA-3.5) needs a raw client for service-level properties; account name via the adapter's helper.
+builder.Services.AddSingleton(new BlobServiceClient(
+    new Uri(blobAccountUrl!),
+    new StorageSharedKeyCredential(AzureBlobStore.AccountNameFrom(new Uri(blobAccountUrl!)), blobAccountKey!)));
+builder.Services.AddHostedService<BlobContainerBootstrap>();
 var app = builder.Build();
 app.UseSerilogRequestLogging(); // per-request INF line (Microsoft.* request logging is suppressed to Warning)
 app.MapGet("/", () => "Hello World!");
