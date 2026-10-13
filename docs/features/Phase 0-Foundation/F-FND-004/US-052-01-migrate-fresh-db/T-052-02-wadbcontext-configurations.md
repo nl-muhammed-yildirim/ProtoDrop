@@ -19,8 +19,8 @@
 
 ## Exit check
 
-- [ ] The model compiles and `WaDbContext` discovers all 15 configurations
-- [ ] No configuration class or DbContext leaks into wa.domain (AC-052-3 still holds)
+- [x] The model compiles and `WaDbContext` discovers all 15 configurations (T-052-docs sweep — verified against `ApplyConfigurationsFromAssembly`; 16 configuration classes present incl. T-054's DomainEvents)
+- [x] No configuration class or DbContext leaks into wa.domain (AC-052-3 still holds)
 
 ## Implementation prompt
 
