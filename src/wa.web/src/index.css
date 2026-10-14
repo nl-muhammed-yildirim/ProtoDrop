@@ -44,8 +44,10 @@ body {
 main {
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 24px;
 }
 
 /* §4.1 Drop zone */
@@ -142,4 +144,97 @@ input[type='file'] {
 @keyframes dz-toast-in {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+/* §4.2 Staging list (in-list state, §5.1) */
+.sl {
+  width: 100%;
+  max-width: 560px;
+}
+
+.sl-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sl-row {
+  min-height: 44px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.sl-icon {
+  color: var(--fg-muted);
+  display: flex;
+  align-items: center;
+}
+
+.sl-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sl-size {
+  color: var(--fg-muted);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+
+.sl-remove {
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--fg-muted);
+  font-size: var(--fs-small);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.sl-remove:hover {
+  color: var(--fg);
+  background: var(--bg-elevated);
+}
+
+.sl-total {
+  margin: 12px 0;
+  color: var(--fg-muted);
+  font-size: var(--fs-small);
+  text-align: center;
+}
+
+.sl-footer {
+  display: flex;
+  justify-content: center;
+}
+
+.sl-send:focus-visible,
+.sl-remove:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.btn-primary:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* In-list state: shrink the drop zone so list + rows fit on screen */
+main:has(.sl) .dz {
+  min-height: auto;
+  padding: 24px 32px;
+  gap: 12px;
 }
