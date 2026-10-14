@@ -216,9 +216,16 @@ input[type='file'] {
   text-align: center;
 }
 
-.sl-footer {
-  display: flex;
-  justify-content: center;
+/* Limit violation (T-001-04): message under the total + marked rows */
+.sl-limit-msg {
+  color: var(--danger);
+  font-size: var(--fs-small);
+  text-align: center;
+}
+
+.sl-row-over .sl-name,
+.sl-row-over .sl-size {
+  color: var(--danger);
 }
 
 .sl-send:focus-visible,

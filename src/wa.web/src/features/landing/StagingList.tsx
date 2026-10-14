@@ -1,10 +1,13 @@
 import { useUploadEngine } from '../../core/upload/UploadEngine'
 import { formatBytes } from '../../core/upload/formatBytes'
+import { checkLimits, getPlanLimits, limitMessage } from '../../core/upload/planLimits'
 
 /**
  * Staging list (T-001-03): one row per staged file — icon, name (truncated, `title`),
  * size via `formatBytes`, remove ✕; total line "N files · X" recomputed from store
- * state on every add/remove; footer **Send.** enabled only while the list is non-empty.
+ * state on every add/remove. **Send.** is enabled only while the list is non-empty
+ * and no limit violation stands (T-001-04): oversized rows are marked, a message
+ * names the exact limit under the total, and Send.'s tooltip explains why it's off.
  */
 
 export function StagingList() {
@@ -12,11 +15,16 @@ export function StagingList() {
   const overall = useUploadEngine((s) => s.overall)
   const removeFile = useUploadEngine((s) => s.remove)
 
+  // Pure arithmetic on staged sizes; re-read every render (TA-8.3).
+  const limits = getPlanLimits()
+  const check = checkLimits(files, limits)
+  const message = limitMessage(files, check, limits)
+
   return (
     <section className="sl" aria-label="Staged files">
       <ul className="sl-list">
         {files.map((f) => (
-          <li key={f.id} className="sl-row">
+          <li key={f.id} className={`sl-row${check.overFileIds.has(f.id) ? ' sl-row-over' : ''}`}>
             <span className="sl-icon" aria-hidden="true">
               {/* generic file icon */}
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -36,8 +44,16 @@ export function StagingList() {
         ))}
       </ul>
       <p className="sl-total">{files.length} {files.length === 1 ? 'file' : 'files'} · {formatBytes(overall.totalBytes)}</p>
+      {message && (
+        <p className="sl-limit-msg" role="alert">
+          {message}
+        </p>
+      )}
       <div className="sl-footer">
-        <button type="button" className="btn-primary sl-send" disabled={files.length === 0}>Send.</button>
+        {/* Disabled buttons don't fire their own mouse events — the span wrapper carries title. */}
+        <span className="sl-send-wrap" title={message ?? undefined}>
+          <button type="button" className="btn-primary sl-send" disabled={files.length === 0 || message !== null}>Send.</button>
+        </span>
       </div>
     </section>
   )
