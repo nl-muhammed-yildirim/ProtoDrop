@@ -19,9 +19,9 @@
 
 ## Exit check
 
-- [ ] Unknown route → 404 Problem+JSON, body `correlationId` == log context value
-- [ ] Forced unhandled exception → 500 Problem+JSON, no stack trace in the body
-- [ ] The telemetry event's template name and properties match TA-10.2 exactly
+- [x] Unknown route → 404 Problem+JSON, body `correlationId` == log context value
+- [x] Forced unhandled exception → 500 Problem+JSON, no stack trace in the body
+- [x] The telemetry event's template name and properties match TA-10.2 exactly
 
 ## Implementation prompt
 

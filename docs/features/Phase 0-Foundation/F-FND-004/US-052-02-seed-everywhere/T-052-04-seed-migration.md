@@ -20,8 +20,8 @@
 
 ## Exit check
 
-- [ ] After migration: exactly 3 Plan rows with Part-2 JSON and the full flag set present (12 + 42 keys)
-- [ ] Re-running the migration on an already-seeded DB is a no-op
+- [x] After migration: exactly 3 Plan rows with Part-2 JSON and the full flag set present (12 + 42 keys)
+- [x] Re-running the migration on an already-seeded DB is a no-op
 
 ## Implementation prompt
 

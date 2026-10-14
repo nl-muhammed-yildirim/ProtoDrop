@@ -88,10 +88,10 @@ AC-052-4: No drift between DDL and migration
 
 | Story | Task | File | Status |
 |---|---|---|---|
-| US-052-03 | T-052-01 Add the 15 POCO entities to wa.domain (BCL-only) | `US-052-03-pure-domain/T-052-01-domain-pocos.md` | ☐ |
-| US-052-01 | T-052-02 WaDbContext + IEntityTypeConfiguration per entity | `US-052-01-migrate-fresh-db/T-052-02-wadbcontext-configurations.md` | ☐ |
-| US-052-01 | T-052-03 InitialCreate migration, cross-checked against TA-3.2 | `US-052-01-migrate-fresh-db/T-052-03-initialcreate-migration.md` | ☐ |
-| US-052-02 | T-052-04 SeedPlansAndFeatureFlags migration (3 plans + full flag set) | `US-052-02-seed-everywhere/T-052-04-seed-migration.md` | ☐ |
-| US-052-02 | T-052-05 SeedDataIntegrationTest (Testcontainers SQL) | `US-052-02-seed-everywhere/T-052-05-seed-data-integration-test.md` | ☐ |
+| US-052-03 | T-052-01 Add the 15 POCO entities to wa.domain (BCL-only) | `US-052-03-pure-domain/T-052-01-domain-pocos.md` | ☑ |
+| US-052-01 | T-052-02 WaDbContext + IEntityTypeConfiguration per entity | `US-052-01-migrate-fresh-db/T-052-02-wadbcontext-configurations.md` | ☑ |
+| US-052-01 | T-052-03 InitialCreate migration, cross-checked against TA-3.2 | `US-052-01-migrate-fresh-db/T-052-03-initialcreate-migration.md` | ☑ |
+| US-052-02 | T-052-04 SeedPlansAndFeatureFlags migration (3 plans + full flag set) | `US-052-02-seed-everywhere/T-052-04-seed-migration.md` | ☑ |
+| US-052-02 | T-052-05 SeedDataIntegrationTest (Testcontainers SQL) | `US-052-02-seed-everywhere/T-052-05-seed-data-integration-test.md` | ☑ |
 
 **Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-004 can be marked `done` in `Milestone-Backlog.md`.

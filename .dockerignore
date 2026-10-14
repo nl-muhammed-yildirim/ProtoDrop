@@ -1,0 +1,19 @@
+# Build context for src/wa.api/Dockerfile (built from repo root).
+# Keep only what the publish stage needs: wa.api + its ProjectReference chain
+# (wa.infrastructure → wa.application → wa.domain) and global.json.
+.git/
+**/.vs/
+docs/
+tests/
+src/wa.web/
+src/wa.workers/
+**/bin/
+**/obj/
+**/node_modules/
+*.md
+docker-compose.local.yml
+_cleanup_tmp.py
+_rename_tmp.py
+_restructure_tmp.py
+.gitattributes
+.gitignore

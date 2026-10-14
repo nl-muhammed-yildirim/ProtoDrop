@@ -18,8 +18,8 @@
 
 ## Exit check
 
-- [ ] A published event arrives on topic `core` with MessageId equal to its eventId (verified against a real or fake broker)
-- [ ] Failure path: timeout/failure leaves the row unpublished and raises the PUBLISH_FAILED alert path
+- [x] A published event arrives on topic `core` with MessageId equal to its eventId (verified against a real or fake broker)
+- [x] Failure path: timeout/failure leaves the row unpublished and raises the PUBLISH_FAILED alert path
 
 ## Implementation prompt
 

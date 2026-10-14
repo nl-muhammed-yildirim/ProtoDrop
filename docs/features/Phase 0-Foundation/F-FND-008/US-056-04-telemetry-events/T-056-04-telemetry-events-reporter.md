@@ -18,8 +18,8 @@
 
 ## Exit check
 
-- [ ] An `upload_started`-style event emitted through WaTelemetryReporter produces Serilog output whose template name and properties match TA-10.2 exactly
-- [ ] Listing TelemetryEvents.cs members shows a 1:1 mapping to the closed TA-10.2 set (no ad-hoc names)
+- [x] An `upload_started`-style event emitted through WaTelemetryReporter produces Serilog output whose template name and properties match TA-10.2 exactly
+- [x] Listing TelemetryEvents.cs members shows a 1:1 mapping to the closed TA-10.2 set (no ad-hoc names)
 
 ## Implementation prompt
 

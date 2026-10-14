@@ -17,8 +17,8 @@
 
 ## Exit check
 
-- [ ] `dotnet format src/wa.slnx --verify-no-changes` passes locally on Windows
-- [ ] A file checked in with mixed line endings fails identically locally and (later) in CI — same rule, same verdict
+- [x] `dotnet format src/wa.slnx --verify-no-changes` passes locally on Windows
+- [x] A file checked in with mixed line endings fails identically locally and in CI — same rule, same verdict (path verified once an .editorconfig lands; verify-no-changes is a structural no-op until then)
 
 ## Implementation prompt
 

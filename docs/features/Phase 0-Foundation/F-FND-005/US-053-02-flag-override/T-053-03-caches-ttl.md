@@ -19,8 +19,8 @@
 
 ## Exit check
 
-- [ ] A cached entry younger than 30 s is served from cache (no refetch)
-- [ ] After 30 s the next read refetches (verified with the fake clock, not real waits)
+- [x] A cached entry younger than 30 s is served from cache (no refetch)
+- [x] After 30 s the next read refetches (verified with the fake clock, not real waits)
 
 ## Implementation prompt
 

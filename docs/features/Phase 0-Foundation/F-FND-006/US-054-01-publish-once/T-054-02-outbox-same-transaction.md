@@ -18,8 +18,8 @@
 
 ## Exit check
 
-- [ ] A command that writes business data + emits one event commits both atomically (kill mid-transaction → neither exists)
-- [ ] After a successful publish the outbox row is `IsPublished = true`; after a failed publish it stays `false` and re-publish picks it up
+- [x] A command that writes business data + emits one event commits both atomically (kill mid-transaction → neither exists)
+- [x] After a successful publish the outbox row is `IsPublished = true`; after a failed publish it stays `false` and re-publish picks it up
 
 ## Implementation prompt
 

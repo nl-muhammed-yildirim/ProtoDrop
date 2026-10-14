@@ -19,9 +19,9 @@
 
 ## Exit check
 
-- [ ] All 15 POCOs compile in wa.domain
-- [ ] `wa.domain.csproj` has zero NuGet/project references (AC-052-3)
-- [ ] No EF attributes, DbContext, or configuration classes inside wa.domain
+- [x] All 15 POCOs compile in wa.domain
+- [x] `wa.domain.csproj` has zero NuGet/project references (AC-052-3)
+- [x] No EF attributes, DbContext, or configuration classes inside wa.domain
 
 ## Implementation prompt
 

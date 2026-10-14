@@ -17,8 +17,8 @@
 
 ## Exit check
 
-- [ ] With the `sql` container stopped: `GET /health` → 503 + Problem+JSON body
-- [ ] Failure reason visible in the terminal (re-verify after T-050-05 for the Serilog line)
+- [x] With the `sql` container stopped: `GET /health` → 503 + Problem+JSON body
+- [x] Failure reason visible in the terminal (re-verify after T-050-05 for the Serilog line)
 
 ## Implementation prompt
 

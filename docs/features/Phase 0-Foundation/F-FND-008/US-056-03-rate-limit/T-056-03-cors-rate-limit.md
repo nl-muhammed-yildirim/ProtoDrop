@@ -18,9 +18,9 @@
 
 ## Exit check
 
-- [ ] 6 rapid requests to `/api/v1/auth/*` from one IP within a minute → the 6th returns 429 Problem+JSON `RATE_LIMITED` with `Retry-After` (verified **live against the running API** — T-008c exit evidence)
-- [ ] After the window slides, the same IP passes again (in-memory store, no persistent state)
-- [ ] Local dev origin `http://localhost:5173` gets a valid CORS response; an unlisted origin does not
+- [x] 6 rapid requests to `/api/v1/auth/*` from one IP within a minute → the 6th returns 429 Problem+JSON `RATE_LIMITED` with `Retry-After` (verified **live against the running API** — T-008c exit evidence)
+- [x] After the window slides, the same IP passes again (in-memory store, no persistent state)
+- [x] Local dev origin `http://localhost:5173` gets a valid CORS response; an unlisted origin does not
 
 ## Implementation prompt
 

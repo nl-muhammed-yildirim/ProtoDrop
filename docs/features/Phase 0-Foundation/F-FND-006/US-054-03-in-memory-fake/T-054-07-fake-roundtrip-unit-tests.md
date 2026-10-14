@@ -20,9 +20,9 @@
 
 ## Exit check
 
-- [ ] Publish → store → retrieve by topic passes; no cross-topic contamination
-- [ ] TTL expiry behaves per the fake's contract (fake clock, no real waits)
-- [ ] Round-trip envelope is byte-exact TA-5.2 (AC-054-4 second block)
+- [x] Publish → store → retrieve by topic passes; no cross-topic contamination
+- [x] TTL expiry behaves per the fake's contract (fake clock, no real waits)
+- [x] Round-trip envelope is byte-exact TA-5.2 (AC-054-4 second block)
 
 ## Implementation prompt
 

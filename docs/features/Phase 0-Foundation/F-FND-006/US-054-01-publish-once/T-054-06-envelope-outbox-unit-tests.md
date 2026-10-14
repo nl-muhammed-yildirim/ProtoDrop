@@ -18,8 +18,8 @@
 
 ## Exit check
 
-- [ ] Every TA-5.3 event type's serialized envelope matches the exact seven-field shape
-- [ ] Idempotent retry: publishing the same eventId twice produces one stored message (MessageId dedup) and no double side effect
+- [x] Every TA-5.3 event type's serialized envelope matches the exact seven-field shape
+- [x] Idempotent retry: publishing the same eventId twice produces one stored message (MessageId dedup) and no double side effect
 
 ## Implementation prompt
 

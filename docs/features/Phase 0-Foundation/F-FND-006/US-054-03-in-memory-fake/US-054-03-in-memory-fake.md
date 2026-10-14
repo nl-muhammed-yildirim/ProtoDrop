@@ -47,7 +47,7 @@ Then the envelope arrives with its exact TA-5.2 fields (round-trip)
 
 ## Technical notes
 
-- T-006 exit evidence: unit tests 7/7 — publish → store → retrieve by topic, TTL expiry, no cross-topic contamination; full §4 gate green (domain 11/11, application 9/9, api.integration 4/4).
+- T-006 exit evidence: unit tests 7/7 (new tests across T-054-06 + T-054-07) — publish → store → retrieve by topic, TTL expiry, no cross-topic contamination; full §4 gate green (domain.unit 3/3, application.unit 22/22, api.integration 9/9).
 - The fake keeps the F-FND-002 promise: unset SB connection string = in-memory publisher, not a broken pipeline.
 
 ## Links
