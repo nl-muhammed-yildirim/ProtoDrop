@@ -40,7 +40,7 @@ interface UploadEngineState {
 
 interface UploadEngineActions {
   /** Stage files (selection order = SortOrder at finalize time). */
-  addFiles(entries: Array<{ name: string; size: number }>): void
+  addFiles(entries: Array<{ name: string; size: number; file?: File }>): string[]
   /** Stub — T-001-06 consumes the draft; param kept for the TA-8.3 API shape. */
   start(draft: Draft): void
   /** Stub — re-enqueues a failed file (T-001-08 owns backoff). */
@@ -49,7 +49,9 @@ interface UploadEngineActions {
   reset(): void
 }
 
-// Totals recomputed on every mutation (3+ call sites, lockstep — T-001-04 pre-check reads them).
+/** Staged ids → File handles. Registered by the drop zone (T-001-02); T-001-06 reads them in start(). */
+export const stagedHandles = new Map<string, File>()
+// Totals recomputed on every mutation (lockstep — T-001-04 pre-check reads them).
 function totals(files: StagedFile[]): UploadEngineState['overall'] {
   return {
     totalBytes: files.reduce((sum, f) => sum + f.size, 0),
@@ -62,18 +64,18 @@ export const useUploadEngine = create<UploadEngineState & UploadEngineActions>(
     files: [],
     overall: { sentBytes: 0, totalBytes: 0 },
 
-    addFiles: (entries) =>
+    addFiles: (entries) => {
+      const staged = entries.map((e) => {
+        const file = { id: crypto.randomUUID(), name: e.name, size: e.size, status: 'queued' as FileStatus, progress: 0 }
+        if (e.file) stagedHandles.set(file.id, e.file) // T-001-06 reads handles via stagedHandles.
+        return file
+      })
       set((state) => {
-        // Selection order preserved (T-001-03); duplicate names both kept (EC-001-2).
-        const staged = entries.map((e) => ({
-          id: crypto.randomUUID(),
-          name: e.name,
-          size: e.size,
-          status: 'queued' as FileStatus,
-          progress: 0,
-        }))
-        return { files: [...state.files, ...staged], overall: totals([...state.files, ...staged]) }
-      }),
+        const files = [...state.files, ...staged]
+        return { files, overall: totals(files) }
+      })
+      return staged.map((f) => f.id)
+    },
 
     start: () =>
       set((state) => {
@@ -91,13 +93,14 @@ export const useUploadEngine = create<UploadEngineState & UploadEngineActions>(
         return { files, overall: totals(files) }
       }),
 
-    remove: (fileId) =>
+    remove: (fileId) => {
+      stagedHandles.delete(fileId) // keep the handle registry in sync with the rows.
       set((state) => {
         const files = state.files.filter((f) => f.id !== fileId)
         return { files, overall: totals(files) }
-      }),
-
+      })
+    },
     // Stub — T-001-06 consumes the draft's upload URLs; param kept for the TA-8.3 API shape.
-    reset: () => set({ files: [], overall: { sentBytes: 0, totalBytes: 0 } }),
+    reset: () => { stagedHandles.clear(); set({ files: [], overall: { sentBytes: 0, totalBytes: 0 } }) },
   }),
 )
