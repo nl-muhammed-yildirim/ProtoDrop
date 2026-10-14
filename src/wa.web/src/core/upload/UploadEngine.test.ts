@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { BLOCK_SIZE_BYTES, useUploadEngine, type Draft } from './UploadEngine'
+import { BLOCK_SIZE_BYTES, MAX_ATTEMPTS, RETRY_BACKOFF_MS, fileAttempts, setSleepFnForTests, useUploadEngine, type Draft } from './UploadEngine'
 import { formatBytes } from './formatBytes'
 
 const state = () => useUploadEngine.getState()
@@ -42,6 +42,7 @@ function makeDraft(urls: string[]): Draft {
 
 beforeEach(() => {
   state().reset()
+  setSleepFnForTests(async () => {}) // FR-001-6 backoff is delay-injected — no test waits real seconds (T-001-08)
 })
 
 // ── Staging (T-001-01, TA-8.3) — unchanged. ───────────────────────────────────────────────────────────────────────
@@ -204,6 +205,80 @@ describe('UploadEngine exit checks (T-001-06)', () => {
     // Only the blocks that had NOT completed in the killed run are staged again — finished bytes never re-uploaded.
     const replay = entries.slice(runLength).filter((e) => e.method === 'PUT' && stageUrl(e.url))
     expect(replay.map((e) => stagedOffsetOf(e.url)).sort((a, b) => a - b)).toEqual([BLOCK_SIZE_BYTES, BLOCK_SIZE_BYTES * 2])
+  })
+})
+
+// ── Per-block retry + backoff (T-001-08, FR-001-6): real BlockBlobClient, delay-injected. ────────────────────────
+describe('UploadEngine retry/backoff (T-001-08)', () => {
+  it('a block failing 5 times marks the row failed with Retry; sibling files continue unaffected (AC-001-3)', async () => {
+    const size = 16 // one block per file — smallest real path through the pool
+    stubFetch((req) => (stageUrl(req.url) && req.url.includes('/a?') ? new Response('gone', { status: 404 }) : new Response(null, { status: 201 })))
+    const [idA] = state().addFiles([
+      { name: 'a.bin', size, file: new File(['x'.repeat(size)], 'a.bin') },
+      { name: 'b.bin', size, file: new File(['y'.repeat(size)], 'b.bin') },
+    ])
+
+    await state().start(makeDraft([`https://host/c/a?sv=2024&sp=cwr`, `https://host/c/b?sv=2024&sp=cwr`]))
+
+    const aStages = entries.filter((e) => stageUrl(e.url) && e.url.includes('/a?'))
+    expect(aStages).toHaveLength(MAX_ATTEMPTS) // exactly 5 requests for the one block — deterministic IDs keep re-issuing idempotent (FR-001-6)
+    const record = fileAttempts.get(idA)
+    expect(record?.retries).toBe(MAX_ATTEMPTS - 1) // FR-001-6 counter — T-001-10's upload_failed payload reads this.
+    expect(record?.lastErrorCode ?? '').not.toBe('') // TA-10.2 last error code recorded for the same emission.
+    expect(state().files[0].status).toBe('failed') // row-local failure — no global state (FR-001-6)
+    expect(state().files[1].status).toBe('done') // sibling B ran to completion after A's run settled (AC-001-3)
+  })
+
+  it('backoff waits the exact FR-001-6 schedule between attempts — no wait before attempt 1 or after the last', async () => {
+    const waits: number[] = []
+    setSleepFnForTests(async (ms) => { waits.push(ms) }) // capture instead of sleeping — real ms would blow the 5 s timeout.
+    stubFetch(() => new Response('timeout', { status: 408 }))
+    state().addFiles([{ name: 'a.bin', size: 16, file: new File(['x'.repeat(16)], 'a.bin') }])
+
+    await state().start(makeDraft([`https://host/c/a?sv=2024&sp=cwr`]))
+
+    expect(waits).toEqual([...RETRY_BACKOFF_MS]) // 0.5 s, 1 s, 2 s, 4 s (capped) — exact order, MAX_ATTEMPTS-1 waits for MAX_ATTEMPTS requests (TA-8.3)
+  })
+
+  it('retry after a partial failure re-enters skipping finished bytes — no finished block re-uploaded (FR-001-5/6)', async () => {
+    const size = BLOCK_SIZE_BYTES * 2 // two blocks; the second block's stage dies while the network is down.
+    let killSecondBlock = true
+    stubFetch((req) => (killSecondBlock && stageUrl(req.url) && stagedOffsetOf(req.url) !== 0 ? new Response('gone', { status: 404 }) : new Response(null, { status: 201 })))
+    const [id] = state().addFiles([{ name: 'big.bin', size, file: new File(['x'.repeat(size)], 'big.bin') }])
+
+    await state().start(makeDraft([`https://host/c/big?sv=2024&sp=cwr`]))
+    expect(state().files[0].status).toBe('failed')
+    expect(fileAttempts.get(id)?.retries).toBe(MAX_ATTEMPTS - 1) // the first run burned its full FR-001-6 budget...
+
+    const runLength = entries.length
+    killSecondBlock = false // network back — retry() re-arms the counter and resumes from the last completed block.
+    await state().retry(id)
+
+    expect(state().files[0].status).toBe('done')
+    expect(fileAttempts.get(id)?.retries).toBe(0) // fresh run recorded no new retries (T-001-10 counts per failure run, not cumulative).
+    const replay = entries.slice(runLength).filter((e) => e.method === 'PUT' && stageUrl(e.url))
+    expect(replay.map((e) => stagedOffsetOf(e.url)).sort((a, b) => a - b)).toEqual([BLOCK_SIZE_BYTES]) // only the unfinished offset re-sent.
+  })
+
+  it('the row-local state machine reaches every FR status — queued → uploading → done/failed (T-001-08 exit check)', async () => {
+    const size = 16
+    stubFetch((req) => (stageUrl(req.url) && req.url.includes('/b?') ? new Response('gone', { status: 404 }) : new Response(null, { status: 201 })))
+    const [idA, idB] = state().addFiles([
+      { name: 'a.bin', size, file: new File(['x'.repeat(size)], 'a.bin') },
+      { name: 'b.bin', size, file: new File(['y'.repeat(size)], 'b.bin') },
+    ])
+    const seenA: string[] = ['queued'] // queued is the staged status (T-001-01) — predates subscribing.
+    const seenB: string[] = ['queued']
+    let unsub = () => {}
+    unsub = useUploadEngine.subscribe((s) => { for (const f of s.files) if (f.id === idA || f.id === idB) (f.id === idA ? seenA : seenB).push(f.status) })
+
+    await state().start(makeDraft([`https://host/c/a?sv=2024&sp=cwr`, `https://host/c/b?sv=2024&sp=cwr`]))
+    unsub()
+
+    expect(seenA).toContain('uploading') // queued → uploading happened live (serialization: B only starts after A settles).
+    expect(seenA[seenA.length - 1]!).toBe('done') // A's final state.
+    expect(seenB).toContain('uploading')
+    expect(seenB[seenB.length - 1]!).toBe('failed') // B's final state — row-local, no shared failure flag (FR-001-6).
   })
 })
 

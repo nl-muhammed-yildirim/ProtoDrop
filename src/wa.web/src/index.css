@@ -264,8 +264,39 @@ input[type='file'] {
   line-height: 1;
 }
 
-.sl-send:focus-visible,
-.sl-remove:focus-visible {
+/* Row-local failure + Retry (FR-001-6 / T-001-08): failed name turns --danger, message + compact row button */
+.sl-row-failed .sl-name {
+  color: var(--danger);
+}
+
+.sl-failed-msg {
+  color: var(--danger);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+
+.sl-retry {
+  min-height: 32px;
+  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  font-size: var(--fs-small);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.sl-retry:hover {
+  background: var(--bg-elevated);
+  color: var(--fg);
+}
+
+ .sl-send:focus-visible,
+ .sl-remove:focus-visible,
+ .sl-retry:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }

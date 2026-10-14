@@ -5,7 +5,7 @@ import { act } from 'react-dom/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import StagingList from './StagingList'
-import { useUploadEngine, type Draft } from '../../core/upload/UploadEngine'
+import { useUploadEngine, setSleepFnForTests, type Draft } from '../../core/upload/UploadEngine'
 import { formatBytes } from '../../core/upload/formatBytes'
 import { resetPlanLimits, setPlanLimits } from '../../core/upload/planLimits'
 
@@ -191,6 +191,45 @@ describe('StagingList', () => {
       unsub()
 
       expect(seen.size).toBeLessThanOrEqual(n + 1) // one new byte value per file completion — never per byte.
+    })
+  })
+  describe('T-001-08 row-local failure + Retry (FR-001-6)', () => {
+    const killBlock = (req: Request, mark: string) => req.url.includes('comp=block') && !req.url.includes('comp=blocklist') && req.url.includes(mark) // the local stub keeps no capture — filter by URL shape.
+
+    it('a failed row turns --danger with "Upload failed — retry" and a Retry button; sibling rows are unaffected (AC-001-3)', async () => {
+      setSleepFnForTests(async () => {}) // backoff delay-injected here too — the real 7.5 s schedule would blow the timeout.
+      stubFetch((req) => (killBlock(req, '/a?') ? new Response('gone', { status: 404 }) : new Response(null, { status: 201 }))) // A's block dies 5 times; B is untouched.
+      const [idA] = useUploadEngine.getState().addFiles([
+        { name: 'a.bin', size: 48, file: new File(['x'.repeat(48)], 'a.bin') },
+        { name: 'b.bin', size: 48, file: new File(['y'.repeat(48)], 'b.bin') },
+      ])
+      await useUploadEngine.getState().start(makeDraft([`https://host/c/a?sv=2024&sp=cwr`, `https://host/c/b?sv=2024&sp=cwr`])) // start settles: A failed, B done.
+
+      const rows = renderClient(createElement(StagingList)).split('<li class="sl-row')
+      expect(rows[1]!).toContain('sl-row-failed"') // the failure marker is on the row's <li> only while status === 'failed'.
+      expect(rows[1]!).toContain('>Upload failed — retry<') // the FR-001-6 text (rendered in --danger via .sl-failed-msg).
+      expect(rows[1]!).toContain('class="sl-retry"')
+      expect(rows[1]!).toContain('aria-label="Retry a.bin"')
+      void idA // the row identity is proven by its aria-label and the sibling checks below.
+      expect(rows[2]!).not.toContain('sl-row-failed') // B: unaffected — row-local failure (FR-001-6).
+      expect(rows[2]!).toContain('class="sl-done"')
+    })
+
+    it('pressing Retry re-enters the engine — the danger text and button leave once the file is done', async () => {
+      setSleepFnForTests(async () => {})
+      let kill = true
+      stubFetch((req) => (kill && killBlock(req, '/a?') ? new Response('gone', { status: 404 }) : new Response(null, { status: 201 })))
+      const [idA] = useUploadEngine.getState().addFiles([{ name: 'a.bin', size: 48, file: new File(['x'.repeat(48)], 'a.bin') }])
+      await useUploadEngine.getState().start(makeDraft([`https://host/c/a?sv=2024&sp=cwr`]))
+      expect(renderClient(createElement(StagingList))).toContain('class="sl-failed-msg"') // failed row before the retry.
+
+      kill = false // network back — the Retry button's onClick is exactly this call (FR-001-5 resume).
+      await useUploadEngine.getState().retry(idA)
+
+      const after = renderClient(createElement(StagingList))
+      expect(after).not.toContain('sl-failed-msg') // danger text gone — the row left the failed state.
+      expect(after).not.toContain('class="sl-retry"')
+      expect(after).toContain('>100%<') // progress restored to full via resume, not reset.
     })
   })
 })

@@ -8,7 +8,9 @@ import { create } from 'zustand'
  * API: `start(draft)`, `retry(fileId)`, `remove(fileId)`, `reset()` + staging (`addFiles`).
  * T-001-06 adds the block-upload loop (TA-8.3): 8 MiB blocks staged per file with a worker pool of 4,
  * files serialized one at a time; progress is bytes-based and frozen on failure so `retry` resumes
- * from the last completed block (FR-001-5).
+ * from the last completed block (FR-001-5). T-001-08 adds per-block retry: each block gets up to 5 total
+ * attempts with backoff RETRY_BACKOFF_MS before the row turns failed; per-file attempt counts are
+ * tracked in `fileAttempts` for T-001-10's finalize payload (FR-001-6).
  */
 
 export type FileStatus = 'queued' | 'uploading' | 'done' | 'failed'
@@ -18,6 +20,10 @@ export const BLOCK_SIZE_BYTES = 8 * 1024 * 1024 // block size (browser upload)
 export const MAX_PARALLEL_BLOCKS = 4 // parallelism per file, files serialized
 /** FR-001-7: uploads above this never go as a single PUT — the block path is the only path. */
 export const CHUNK_THRESHOLD_BYTES = 10 * 1024 * 1024
+/** FR-001-6 (T-001-08): a block gets up to 5 total requests — the initial try plus one retry per delay below. */
+export const MAX_ATTEMPTS = 5
+/** Retry delays in ms, applied between consecutive attempts: 0.5 s → 4 s exponential (T-001-08). */
+export const RETRY_BACKOFF_MS = [500, 1000, 2000, 4000] as readonly number[]
 
 export interface StagedFile {
   id: string
@@ -47,6 +53,15 @@ export const stagedHandles = new Map<string, File>() // drop zone registers real
 const uploadUrls = new Map<string, string>()
 // Within-session resume (FR-001-5): successful blocks survive failure — the engine skips offsets already sent.
 const completedOffsets = new Map<string, Set<number>>()
+/** FR-001-6 telemetry plumbing (T-001-08 → T-001-10 finalize payload): per-file retry counts + last error code; stage failures only — commit retries are re-entry via `retry(fileId)`. */
+export const fileAttempts = new Map<string, { retries: number; lastErrorCode: string | null }>()
+/** Replaces a file's FR-001-6 record (a retry resets it so upload_failed counts stay per failure run). */
+function recordAttempts(id: string, retries: number, lastErrorCode: string | null): void {
+  fileAttempts.set(id, { retries, lastErrorCode })
+}
+/** Overridable sleep so tests can stub the backoff near-zero (T-001-08). */
+let sleepFn: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => { setTimeout(resolve, ms) })
+export const setSleepFnForTests = (fn: (ms: number) => Promise<void>): void => { sleepFn = fn }
 
 // Totals recomputed on every mutation (lockstep — T-001-04 pre-check reads them).
 function totals(files: StagedFile[]): UploadEngineState['overall'] {
@@ -102,15 +117,28 @@ async function uploadFile(
   let nextIndex = 0 // shared cursor — atomic between awaits in single-threaded JS (TA-8.3 pool)
   const worker = async (): Promise<boolean> => {
     for (;;) {
-      try {
-        const i = nextIndex++
-        if (i >= offsets.length) break
-        const off = offsets[i]
-        const len = Math.min(BLOCK_SIZE_BYTES, size - off)
-        await client.stageBlock(blockId(size, off), file.slice(off, off + len), len)
-        done.add(off)
-        setProgress(id, progressFor(id, size)) // bytes uploaded so far (TA-8.3 — bytes-based)
-      } catch { return false } // remaining blocks stay resumable; other workers finish their in-flight stages first
+      const i = nextIndex++
+      if (i >= offsets.length) break
+      const off = offsets[i]
+      const len = Math.min(BLOCK_SIZE_BYTES, size - off)
+      // FR-001-6: up to MAX_ATTEMPTS total requests per block; deterministic block IDs → re-issue is idempotent.
+      let staged = false
+      for (let attempt = 0; attempt < MAX_ATTEMPTS && !staged; attempt += 1) {
+        try {
+          await client.stageBlock(blockId(size, off), file.slice(off, off + len), len)
+          done.add(off)
+          setProgress(id, progressFor(id, size)) // bytes uploaded so far (TA-8.3 — bytes-based)
+          staged = true
+        } catch (error: unknown) {
+          const entry = fileAttempts.get(id) ?? { retries: 0, lastErrorCode: null } // record is re-armed by retry() before each run
+          if (attempt < MAX_ATTEMPTS - 1) {
+            entry.retries += 1 // a retry is coming — T-001-10's upload_failed count reads this
+            await sleepFn(RETRY_BACKOFF_MS[attempt]) // backoff between attempts; the final attempt waits nothing
+          }
+          recordAttempts(id, entry.retries, error instanceof Error ? error.name : 'unknown')
+        }
+      }
+      if (!staged) return false // all 5 attempts exhausted — remaining blocks stay resumable (FR-001-5/6)
     }
     return true
   }
@@ -119,7 +147,7 @@ async function uploadFile(
     const ok = await Promise.all(Array.from({ length: MAX_PARALLEL_BLOCKS }, () => worker()))
     if (!ok.every(Boolean)) throw new Error('block stage failed') // wait for ALL workers before returning — no stragglers into retry (FR-001-5)
   } catch {
-    setStatus(id, 'failed') // progress frozen at last completed bytes (T-001-08 adds backoff/retries)
+    setStatus(id, 'failed') // progress frozen at last completed bytes; row-local Retry (T-001-08)
     return false
   }
 
@@ -158,14 +186,16 @@ export const useUploadEngine = create<UploadEngineState & UploadEngineActions>((
       }
     })() // never rejects: per-file errors surface as failed status (TA-8.3)
   },
+  /** Retry (FR-001-6): re-enter uploadFile with a zeroed attempt record — finished blocks are skipped via completedOffsets, so no finished bytes re-uploaded. */
   retry: (fileId) => {
     const file = useUploadEngine.getState().files.find((f) => f.id === fileId)
     return (async () => {
       if (file?.status !== 'failed') return
+      recordAttempts(fileId, 0, null) // the retry re-arms the FR-001-6 counter — a subsequent failure is fresh telemetry data
       setStatus(fileId, 'uploading') // progress NOT reset — resume skips finished bytes (FR-001-5)
       await uploadFile(fileId, stagedHandles.get(fileId), file.size, uploadUrls.get(fileId))
     })()
   },
-  remove: (fileId) => { completedOffsets.delete(fileId); set((state) => { const files = state.files.filter((f) => f.id !== fileId); return { files, overall: totals(files) } }) },
-  reset: () => { stagedHandles.clear(); uploadUrls.clear(); completedOffsets.clear(); set({ files: [], overall: { sentBytes: 0, totalBytes: 0 } }) },
+  remove: (fileId) => { completedOffsets.delete(fileId); fileAttempts.delete(fileId); set((state) => { const files = state.files.filter((f) => f.id !== fileId); return { files, overall: totals(files) } }) },
+  reset: () => { stagedHandles.clear(); uploadUrls.clear(); completedOffsets.clear(); fileAttempts.clear(); set({ files: [], overall: { sentBytes: 0, totalBytes: 0 } }) },
 }))

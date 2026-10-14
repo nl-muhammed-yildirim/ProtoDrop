@@ -11,13 +11,16 @@ import { checkLimits, getPlanLimits, limitMessage } from '../../core/upload/plan
  * T-001-07 adds upload progress: an overall "Uploading… X of Y" line above the list
  * (the polite status region) plus per-row 3 px bar + percentage for rows that are
  * uploading or done, and a `--success` check on completed rows — all read live from
- * the store, no polling. The component stays render-only; Send.'s wiring is T-001-10.
+ * the store, no polling. T-001-08 adds row-local failure (FR-001-6): rows whose file failed
+ * all per-block retries turn `--danger` — name + "Upload failed — retry" text and a Retry button
+ * that re-enters the engine from the last completed block. The component stays render-only; Send.'s wiring is T-001-10.
  */
 
 export function StagingList() {
   const files = useUploadEngine((s) => s.files)
   const overall = useUploadEngine((s) => s.overall)
   const removeFile = useUploadEngine((s) => s.remove)
+  const retryFile = useUploadEngine((s) => s.retry)
 
   // Pure arithmetic on staged sizes; re-read every render (TA-8.3).
   const limits = getPlanLimits()
@@ -33,7 +36,7 @@ export function StagingList() {
       )}
       <ul className="sl-list">
         {files.map((f) => (
-          <li key={f.id} className={`sl-row${check.overFileIds.has(f.id) ? ' sl-row-over' : ''}`}>
+          <li key={f.id} className={`sl-row${check.overFileIds.has(f.id) ? ' sl-row-over' : ''}${f.status === 'failed' ? ' sl-row-failed' : ''}`}>
             <span className="sl-icon" aria-hidden="true">
               {/* generic file icon */}
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -53,6 +56,13 @@ export function StagingList() {
               </>
             )}
             {f.status === 'done' && <span className="sl-done" aria-hidden="true">✓</span>}
+            {/* FR-001-6 (T-001-08): row-local failure — danger text + Retry; the engine resumes from completed blocks. */}
+            {f.status === 'failed' && (
+              <>
+                <span className="sl-failed-msg">Upload failed — retry</span>
+                <button type="button" className="sl-retry" aria-label={`Retry ${f.name}`} onClick={() => void retryFile(f.id)}>Retry.</button>
+              </>
+            )}
             <button
               type="button"
               className="sl-remove"
