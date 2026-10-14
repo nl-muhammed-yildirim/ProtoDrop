@@ -2,10 +2,10 @@
 import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { act } from 'react-dom/test-utils'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import StagingList from './StagingList'
-import { useUploadEngine } from '../../core/upload/UploadEngine'
+import { useUploadEngine, type Draft } from '../../core/upload/UploadEngine'
 import { formatBytes } from '../../core/upload/formatBytes'
 import { resetPlanLimits, setPlanLimits } from '../../core/upload/planLimits'
 
@@ -27,6 +27,21 @@ function renderClient(el: React.ReactElement): string {
 
 function stage(name: string, size = 0): string[] {
   return useUploadEngine.getState().addFiles([{ name, size }])
+}
+// ── T-001-07 harness (local copy of the stub-fetch pattern — no cross-file coupling). ───────────────────────────
+ function stubFetch(responder?: (req: Request) => Response | Promise<Response>): void {
+   vi.stubGlobal(
+     'fetch',
+     async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+       // Re-wrap without the SDK's AbortSignal — jsdom realm mismatch: their signal fails `instanceof` against this realm's AbortSignal.
+       const req = new Request(typeof input === 'string' ? input : String(input), { method: init?.method ?? 'GET' })
+       return responder ? await responder(req) : new Response(null, { status: 201 })
+     },
+   )
+ }
+
+function makeDraft(urls: string[]): Draft {
+  return { draftId: 'd1', expiresInSec: 7200, files: urls.map((uploadUrl) => ({ fileId: crypto.randomUUID(), uploadUrl })) }
 }
 
 beforeEach(() => {
@@ -120,6 +135,62 @@ describe('StagingList', () => {
       expect(after).not.toContain('sl-limit-msg') // message cleared.
       const send = after.match(/class="btn-primary sl-send"[^>]*>/)![0]
       expect(send).not.toContain('disabled=""') // Send. re-enabled; list non-empty and in range.
+    })
+  })
+  describe('T-001-07 progress (FR-001-5)', () => {
+    const tick = (ms = 0) => new Promise<void>((r) => setTimeout(r, ms))
+    // Poll until A's status is 'done' — B is guaranteed in flight by then (A completes only after B's stage fetch issued).
+    async function waitUntilDone(id: string): Promise<void> {
+      for (let i = 0; i < 500 && useUploadEngine.getState().files.find((f) => f.id === id)?.status !== 'done'; i++) await tick(10)
+    }
+
+    it('rows show a live byte-based percentage and the overall line shows combined progress (AC-001-1)', async () => {
+      stubFetch()
+      const [idA] = useUploadEngine.getState().addFiles([
+        { name: 'a.bin', size: 48, file: new File(['x'.repeat(48)], 'a.bin') },
+        { name: 'b.bin', size: 48, file: new File(['y'.repeat(48)], 'b.bin') },
+      ])
+      void useUploadEngine.getState().start(makeDraft([`https://host/c/a?sv=2024&sp=cwr`, `https://host/c/b?sv=2024&sp=cwr`]))
+      await waitUntilDone(idA) // capture while B is still uploading.
+
+      const overall = useUploadEngine.getState().overall // read synchronously — no await between render and this line, so the bytes cannot move.
+      const html = renderClient(createElement(StagingList))
+      const rowB = html.split('<li class="sl-row')[1]! // A is done, B in flight — its percent reflects live bytes so far.
+      expect(rowB).toMatch(/class="sl-percent">\d+%/)
+      expect(rowB).toContain('aria-hidden="true">') // the 3 px track is hidden from AT — the percent carries the value.
+      expect(html).toContain(`Uploading… ${formatBytes(overall.sentBytes)} of ${formatBytes(overall.totalBytes)}`)
+    })
+
+    it('a completed row shows the done check while the next row begins filling (exit check 2)', async () => {
+      stubFetch((req) => (req.url.includes('/b?') ? new Promise<Response>(() => {}) : new Response(null, { status: 201 }))) // B's fetch never settles.
+      const [idA] = useUploadEngine.getState().addFiles([
+        { name: 'a.bin', size: 48, file: new File(['x'.repeat(48)], 'a.bin') },
+        { name: 'b.bin', size: 48, file: new File(['y'.repeat(48)], 'b.bin') },
+      ])
+      void useUploadEngine.getState().start(makeDraft([`https://host/c/a?sv=2024&sp=cwr`, `https://host/c/b?sv=2024&sp=cwr`]))
+      await waitUntilDone(idA) // A done, B in flight — the engine loop is mid-run.
+
+      const html = renderClient(createElement(StagingList))
+      const rows = html.split('<li class="sl-row').slice(1)
+      expect(rows[0]!).toContain('class="sl-done"') // A: done check.
+      expect(rows[0]!).not.toContain('aria-label="Remove b.bin"') // row 1 is really a's row, not the other one.
+      expect(rows[1]!).toContain('class="sl-progress-track"') // B begins filling — no polling: this came from store transitions alone.
+      expect(rows[1]!).not.toContain('class="sl-done"')
+    })
+
+    it('the polite status region changes only at block boundaries — no per-byte spam (F-TRF-016-3)', async () => {
+      const seen = new Set<string>() // distinct overall byte pairs across the whole run.
+      const unsub = useUploadEngine.subscribe((s) => seen.add(`${s.overall.sentBytes}:${s.overall.totalBytes}`))
+      const n = 4
+      stubFetch()
+      const entries: { name: string; size: number; file: File }[] = []
+      for (let i = 0; i < n; i++) entries.push({ name: `f${i}.bin`, size: 48, file: new File(['x'.repeat(48)], `f${i}.bin`) })
+      useUploadEngine.getState().addFiles(entries)
+      const urls = Array.from({ length: n }, (_, i) => `https://host/c/f${i}?sv=2024&sp=cwr`)
+      await useUploadEngine.getState().start(makeDraft(urls))
+      unsub()
+
+      expect(seen.size).toBeLessThanOrEqual(n + 1) // one new byte value per file completion — never per byte.
     })
   })
 })
