@@ -7,7 +7,7 @@ const AZURE_BROWSER_ALIASES: Array<[string, string]> = [
   ['@typespec/ts-http-runtime/internal/policies', '@typespec/ts-http-runtime/dist/browser/policies/internal.js'],
   ['@typespec/ts-http-runtime/internal/util', '@typespec/ts-http-runtime/dist/browser/util/internal.js'],
   ['@typespec/ts-http-runtime/internal/logger', '@typespec/ts-http-runtime/dist/browser/logger/internal.js'],
-  ['@azure/storage-blob', '@azure/storage-blob/dist/browser/index.js'],
+  ['@azure/storage-blob', '@azure/storage-blob/dist-esm/storage-blob/src/index.browser.js'],
   ['@azure/core-rest-pipeline', '@azure/core-rest-pipeline/dist/browser/index.js'],
   ['@azure/storage-common', '@azure/storage-common/dist/browser/index.js'],
   ['@typespec/ts-http-runtime', '@typespec/ts-http-runtime/dist/browser/index.js'],
@@ -34,6 +34,9 @@ export default defineConfig({
     alias: azureBrowserAliases(),
   },
   test: {
+    // The e2e specs run under the separate Playwright runner (playwright.config.ts), not Vitest.
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    exclude: ['node_modules', 'dist', 'e2e'],
     server: {
       deps: {
         // Let Vite (and the aliases above) process these packages in tests instead of plain Node

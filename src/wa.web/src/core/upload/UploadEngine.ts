@@ -86,9 +86,9 @@ function blockOffsets(size: number): number[] {
   return offsets
 }
 
-/** Deterministic per (file, offset); base64 of ASCII ≤64 bytes. */
+/** Deterministic per (file, offset); base64 of ASCII ≤64 bytes. The decoded ID must be the same length for every block of one blob — Azurite 3.37 rejects a new uncommitted block whose decoded ID length differs from the first staged one (LokiBlobMetadataStore L2408–2415) — so offset is fixed-width and fileSize rides along in a constant-per-blob form: total length = 14 + 1 + digits(fileSize). */
 function blockId(fileSize: number, offset: number): string {
-  return btoa(`${fileSize}:${offset}`)
+  return btoa(`${String(offset).padStart(14, '0')}:${fileSize}`)
 }
 
 /** Progress = completed bytes / size; the done set only grows within a run, so it never decreases. */

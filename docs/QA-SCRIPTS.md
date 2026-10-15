@@ -35,6 +35,7 @@ You (the human) are the QA for tasks whose exit checks say "manual pass in brows
 5. Check: link screen shows a `…/t/{8-char linkId}` URL with a copy field; copy button copies exactly that URL.
 
 **PASS criteria:** AC-001-1…001-4 — drop/paste/click all select; pre-check blocks a file >5 GB *before* upload; progress is per-file **and** overall; retry recovers an injected failure (DevTools → Network → set "Offline" mid-upload once, watch block-level retry, go back online).
+**PASS (T-001-09, 2026-10-15):** AC-001-1…AC-001-4 green under Playwright (`e2e/staging.spec.ts`, local stack Vite :5173 → API :8080 + Azurite): sparse uploads to per-file done (AC-001-1), free-plan limit blocks Send with the exact message (AC-001-2), injected stage failure exhausts 5 attempts and Retry recovers — also covers S-1.2's injected-failure check (AC-001-3), empty-folder drop skips without staging rows (AC-001-4).
 
 ### S-1.2 Injected upload failure (T-012 exit check)
 1. Start a ≥200 MB file upload.

@@ -94,7 +94,7 @@ export function DropZone() {
 
   function browse(e: FormEvent<HTMLInputElement>): void {
     const files = e.currentTarget.files ?? []
-    stageFiles(Array.from(files)) // FileList entries satisfy Entry via name/size/file.
+    stageFiles(Array.from(files).map((file) => ({ name: file.name, size: file.size, file }))) // raw File is not the Entry shape — no `.file` field; Array.from first (FileList has no map).
   }
 
   return (

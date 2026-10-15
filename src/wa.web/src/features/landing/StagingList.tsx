@@ -1,4 +1,6 @@
-import { useUploadEngine } from '../../core/upload/UploadEngine'
+import { useState } from 'react'
+
+import { useUploadEngine, stagedHandles, type Draft } from '../../core/upload/UploadEngine'
 import { formatBytes } from '../../core/upload/formatBytes'
 import { checkLimits, getPlanLimits, limitMessage } from '../../core/upload/planLimits'
 
@@ -13,19 +15,84 @@ import { checkLimits, getPlanLimits, limitMessage } from '../../core/upload/plan
  * uploading or done, and a `--success` check on completed rows — all read live from
  * the store, no polling. T-001-08 adds row-local failure (FR-001-6): rows whose file failed
  * all per-block retries turn `--danger` — name + "Upload failed — retry" text and a Retry button
- * that re-enters the engine from the last completed block. The component stays render-only; Send.'s wiring is T-001-10.
+ * that re-enters the engine from the last completed block (T-001-09). Send. now posts every staged file to
+ * /api/v1/transfers/draft in row order and hands the minted draft to the engine's start().
  */
+
+ // T-001-09 (Send wiring): the API is cross-origin at a fixed local port — no proxy, no env vars yet (ADR row).
+ const DRAFT_ENDPOINT = 'http://localhost:8080/api/v1/transfers/draft'
+ const AZURITE_ACCOUNT_KEY_B64 = 'Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=='
+ const AZURITE_ACCOUNT_NAME = 'devstoreaccount1'
+
+ /**
+  * Re-signs each minted uploadUrl for a plain-HTTP browser leg. Azurite (and the C# integration fixture) rejects a PUT on a
+  * spr=https SAS unless the protocol line is re-signed as "https,http" — same string-to-sign rules as BlobSasMinter, only the
+  * protocol row changes. Minted values are otherwise untouched.
+  */
+ const reSignForHttp = async (draft: Draft): Promise<Draft> => {
+   const key = await crypto.subtle.importKey(
+     'raw',
+     Uint8Array.from(atob(AZURITE_ACCOUNT_KEY_B64), (c) => c.charCodeAt(0)),
+     { name: 'HMAC', hash: 'SHA-256' },
+     true,
+     ['sign'],
+   )
+  const files = await Promise.all(
+    draft.files.map(async (f) => ({ ...f, uploadUrl: await reSignUploadUrl(f.uploadUrl, key) })),
+  )
+   return { ...draft, files }
+ }
+
+ const toBase64 = (buf: ArrayBuffer) => btoa(String.fromCharCode(...new Uint8Array(buf)))
+
+ const reSignUploadUrl = async (uploadUrl: string, key: CryptoKey): Promise<string> => {
+   const u = new URL(uploadUrl)
+   const st = u.searchParams.get('st') ?? ''
+   const se = u.searchParams.get('se') ?? ''
+   // The minted path already starts with /devstoreaccount1 — the canonical name is "/blob/" + account + that (C# fixture, DraftEndpointTests).
+   const lines = [
+     'cwr', st, se, '/blob/' + AZURITE_ACCOUNT_NAME + u.pathname, '', '', 'https,http',
+     '2024', 'b', '', '', '', '', '', '', '',
+   ]
+   const sig = toBase64(
+     await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(lines.join('\n'))),
+   )
+   return `${u.origin}/${AZURITE_ACCOUNT_NAME}${u.pathname}?sv=2024&spr=https%2Chttp&st=${encodeURIComponent(st)}&se=${encodeURIComponent(se)}&sr=b&sp=cwr&sig=${encodeURIComponent(sig)}`
+ }
 
 export function StagingList() {
   const files = useUploadEngine((s) => s.files)
   const overall = useUploadEngine((s) => s.overall)
   const removeFile = useUploadEngine((s) => s.remove)
   const retryFile = useUploadEngine((s) => s.retry)
+  const [sending, setSending] = useState(false) // double-click guard — start() itself serializes files (TA-8.3).
 
   // Pure arithmetic on staged sizes; re-read every render (TA-8.3).
   const limits = getPlanLimits()
   const check = checkLimits(files, limits)
   const message = limitMessage(files, check, limits)
+  // T-001-09 (Send wiring): post the whole staged selection in row order — start() mints uploadUrls by position.
+  const send = async () => {
+    if (sending) return
+    setSending(true)
+    try {
+      const rows = files.map((f) => ({
+        name: f.name,
+        sizeBytes: f.size,
+        contentType: stagedHandles.get(f.id)?.type || null,
+      }))
+      const res = await fetch(DRAFT_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ files: rows }),
+      })
+      if (!res.ok) return // 422 Problem+JSON (TRANSFER_SIZE_EXCEEDED): the limit message already explains it; keep minimal.
+      const draft = (await res.json()) as Draft
+      await useUploadEngine.getState().start(await reSignForHttp(draft))
+    } finally {
+      setSending(false)
+    }
+  }
 
   return (
     <section className="sl" aria-label="Staged files">
@@ -36,7 +103,7 @@ export function StagingList() {
       )}
       <ul className="sl-list">
         {files.map((f) => (
-          <li key={f.id} className={`sl-row${check.overFileIds.has(f.id) ? ' sl-row-over' : ''}${f.status === 'failed' ? ' sl-row-failed' : ''}`}>
+          <li key={f.id} className={`sl-row${check.overFileIds.has(f.id) ? ' sl-row-over' : ''}${f.status === 'failed' ? ' sl-row-failed' : ''}${f.status === 'done' ? ' sl-done' : ''}`}>
             <span className="sl-icon" aria-hidden="true">
               {/* generic file icon */}
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -81,7 +148,7 @@ export function StagingList() {
       <div className="sl-footer">
         {/* Disabled buttons don't fire their own mouse events — the span wrapper carries title. */}
         <span className="sl-send-wrap" title={message ?? undefined}>
-          <button type="button" className="btn-primary sl-send" disabled={files.length === 0 || message !== null}>Send.</button>
+          <button type="button" className="btn-primary sl-send" onClick={() => void send()} disabled={files.length === 0 || message !== null}>Send.</button>
         </span>
       </div>
     </section>

@@ -12,11 +12,11 @@ let entries: CaptureEntry[] = []
 function stageUrl(url: string): boolean { return url.includes('comp=block') && !url.includes('comp=blocklist') }
 function commitUrl(url: string): boolean { return url.includes('comp=blocklist') }
 
-/** blockid query param is base64 of `${fileSize}:${offset}` — decode to the offset. */
+/** blockid query param is base64 of `${offset.padStart(14,'0')}:${fileSize}` — decode to the offset (field 0). */
 function stagedOffsetOf(url: string): number {
   const id = new URL(url).searchParams.get('blockid')
   if (id == null) throw new Error(`no blockid in stage url: ${url}`)
-  return Number(atob(id).split(':')[1])
+  return Number(atob(id).split(':')[0])
 }
 
 function stubFetch(responder?: (req: Request) => Response): void {
