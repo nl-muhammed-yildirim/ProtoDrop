@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Playwright (T-001-09): local-stack artifacts, never committed.
+test-results/
+playwright-report/
