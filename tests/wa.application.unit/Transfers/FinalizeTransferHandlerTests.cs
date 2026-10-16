@@ -131,6 +131,37 @@ public class FinalizeTransferHandlerTests
     }
 
     [Fact]
+    public async Task Handle_LinkIdCollision_FirstRegenerates_SucceedsOnSecond()
+    {
+        _store.CollideOnce = true;
+
+        var draftId = Guid.NewGuid();
+        var file1 = new FinalizeFile { FileId = Guid.NewGuid(), Name = "a.txt", SizeBytes = 100, ContentType = "text/plain", Retries = 0 };
+        _blobStore.Blobs[BlobPaths.StagingFile(draftId, file1.FileId)] = new byte[100];
+
+        var result = await _handler.Handle(new FinalizeTransferCommand(draftId, "key-collide-retry", [file1]), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Single(_store.SavedTransfers);
+    }
+
+    [Fact]
+    public async Task Handle_LinkIdCollision_SecondCollision_Throws_InternalTelemetry()
+    {
+        _store.AlwaysCollide = true;
+
+        var draftId = Guid.NewGuid();
+        var file1 = new FinalizeFile { FileId = Guid.NewGuid(), Name = "a.txt", SizeBytes = 100, ContentType = "text/plain", Retries = 0 };
+        _blobStore.Blobs[BlobPaths.StagingFile(draftId, file1.FileId)] = new byte[100];
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _handler.Handle(new FinalizeTransferCommand(draftId, "key-collide", [file1]), CancellationToken.None));
+
+        Assert.Contains("LinkId collision", ex.Message);
+        Assert.Empty(_store.SavedTransfers);
+    }
+
+    [Fact]
     public async Task Handle_Success_EmitsUploadCompleted_with_correct_values()
     {
         var draftId = Guid.NewGuid();
@@ -157,13 +188,26 @@ public class FinalizeTransferHandlerTests
         public List<FileItem> SavedFileItems { get; } = [];
         public List<IdempotencyKey> SavedIdempotencyKeys { get; } = [];
 
+        /// <summary>Force every mint to collide (second-collision path).</summary>
+        public bool AlwaysCollide { get; set; }
+
+        /// <summary>Force exactly the first mint to collide, then succeed (regenerate-once path).</summary>
+        public bool CollideOnce { get; set; }
+
+        private int _linkIdChecks;
+
         public Transfer? SavedTransfer => SavedTransfers.LastOrDefault();
 
         public Task<IdempotencyKey?> FindByIdempotencyKeyAsync(string key, CancellationToken ct) =>
             Task.FromResult(SavedIdempotencyKeys.FirstOrDefault(k => k.Key == key));
 
-        public Task<bool> TransferExistsByLinkIdAsync(string linkId, CancellationToken ct) =>
-            Task.FromResult(SavedTransfers.Any(t => t.LinkId == linkId));
+        public Task<bool> TransferExistsByLinkIdAsync(string linkId, CancellationToken ct)
+        {
+            var call = _linkIdChecks++;
+            if (AlwaysCollide) return Task.FromResult(true);
+            if (CollideOnce && call == 0) return Task.FromResult(true);
+            return Task.FromResult(SavedTransfers.Any(t => t.LinkId == linkId));
+        }
 
         public Task SaveFinalizeAsync(Transfer transfer, IReadOnlyList<BlobRef> blobRefs, IReadOnlyList<FileItem> fileItems, IdempotencyKey idempotencyKey, CancellationToken ct)
         {
