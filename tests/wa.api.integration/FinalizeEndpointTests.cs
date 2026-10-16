@@ -166,6 +166,47 @@ public class FinalizeEndpointTests : IAsyncLifetime
         Assert.True(await blobClient.ExistsAsync());
     }
 
+    // ---- Exit check 4: TTL expiry — expired key is NOT replayed (T-002-02) ----
+
+    [Fact]
+    public async Task Finalize_Endpoint_ExpiredIdempotencyKey_Creates_new_transfer()
+    {
+        var (draftId, fileId) = await SetupDraftAndStagedBlobAsync("ttl.txt", "text/plain");
+        var stagedBytes = new byte[256];
+        RandomNumberGenerator.Fill(stagedBytes);
+
+        var stagingPath = BlobPaths.StagingFile(draftId, fileId);
+        using (var ms = new MemoryStream(stagedBytes))
+            await _svc.GetBlobContainerClient(BlobPaths.StagingContainer).GetBlobClient(stagingPath).UploadAsync(ms);
+
+        // Pre-insert an expired idempotency key into the DB.
+        var expiredKey = "key-expired-ttl";
+        _db.Set<IdempotencyKey>().Add(new IdempotencyKey
+        {
+            Key = expiredKey,
+            ResultJson = "{\"transferId\":\"00000000-0000-0000-0000-000000000000\"}",
+            StatusCode = 201,
+            CreatedAtUtc = DateTime.UtcNow.AddHours(-48),
+            ExpiresAtUtc = DateTime.UtcNow.AddHours(-24) // expired 24 h ago
+        });
+        await _db.SaveChangesAsync();
+
+        var payload = BuildPayload(fileId, "ttl.txt", stagedBytes.Length, "text/plain");
+
+        // POST with the expired key — should NOT replay; should create a new transfer.
+        using var response = await PostFinalizeAsync(draftId, payload, expiredKey);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        // A new Transfer row was created (the expired key did not short-circuit).
+        var count = await _db.Set<Transfer>().CountAsync();
+        Assert.Equal(1, count);
+
+        // The response has a real transfer ID (not the dummy from the expired entry).
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsByteArrayAsync());
+        var transferId = new Guid(doc.RootElement.GetProperty("id").GetString()!);
+        Assert.NotEqual(Guid.Empty, transferId);
+    }
+
     // ---- Helpers ----
 
     /// <summary>Create a draft via the existing endpoint and stage a blob at the canonical staging path. Returns (draftId, fileId).</summary>
