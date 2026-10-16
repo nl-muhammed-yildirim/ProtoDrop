@@ -57,6 +57,8 @@ builder.Services.AddSingleton(sp => new WaDbContext(sp.GetRequiredService<DbCont
 var limitsTtl = TimeSpan.FromSeconds(int.TryParse(builder.Configuration["Wa:Flags:TtlSeconds"], out var ttlSecs) ? ttlSecs : 30); // TA-3.4 — both caches share this value (Caches doc comment).
 builder.Services.AddSingleton<IPlansStore>(sp => new PlansStore(sp.GetRequiredService<WaDbContext>()));
 builder.Services.AddSingleton<IFlagsStore>(sp => new FlagsStore(sp.GetRequiredService<WaDbContext>()));
+// T-001-10 (TA-4.2#2): finalize handler's DB surface — thin adapter over the adapter-owned WaDbContext.
+builder.Services.AddSingleton<wa.application.UseCases.Transfers.ITransferStore>(sp => new wa.infrastructure.Persistence.TransferStore(sp.GetRequiredService<WaDbContext>()));
 builder.Services.AddSingleton(sp => new PlansCache(sp.GetRequiredService<IPlansStore>(), limitsTtl, () => DateTimeOffset.UtcNow));
 builder.Services.AddSingleton(sp => new FlagsCache(sp.GetRequiredService<IFlagsStore>(), limitsTtl, () => DateTimeOffset.UtcNow));
 builder.Services.AddSingleton<ILimitsProvider>(sp => new LimitsProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
@@ -116,6 +118,29 @@ app.MapPost("/api/v1/transfers/draft", async (CreateDraftCommand cmd, ISender se
         // The handler owns the size logic (TA-4.2a thin endpoint); 422 TRANSFER_SIZE_EXCEEDED via the closed list — GlobalErrorMiddleware already maps BusinessException → ProblemWriter bodies.
         throw new BusinessException(ProblemCodes.TransferSizeExceeded, "Selection exceeds plan limits.");
     return Results.Json(new { draftId = result.DraftId.ToString("n"), expiresInSec = result.ExpiresInSec, files = result.Files.Select(f => new { fileId = f.FileId.ToString("n"), uploadUrl = f.UploadUrl.ToString() }) }, statusCode: 201); // TA-4.2#1 exact wire shape — property names pinned at the single construction site (no global JSON policy in this app).
+});
+
+// T-001-10 (TA-4.2#2): idempotent finalize — server-side blob copy staging→transfers, create Transfer(Draft)+FileItems+BlobRefs, EC-002-1 replay.
+app.MapPost("/api/v1/transfers/draft/{draftId}/finalize", async (Guid draftId, HttpRequest request, ISender sender, CancellationToken ct) =>
+{
+    var idempotencyKey = request.Headers["Idempotency-Key"].FirstOrDefault() ?? string.Empty;
+    using var ms = new MemoryStream();
+    await request.Body.CopyToAsync(ms);
+    ms.Position = 0;
+    using var bodyDoc = System.Text.Json.JsonDocument.Parse(ms);
+    var files = bodyDoc.RootElement.GetProperty("files").EnumerateArray().Select(e => new FinalizeFile
+    {
+        FileId = Guid.Parse(e.GetProperty("fileId").GetString()!),
+        Name = e.GetProperty("name").GetString()!,
+        SizeBytes = e.GetProperty("sizeBytes").GetInt64(),
+        ContentType = e.TryGetProperty("contentType", out var ct) ? ct.GetString() : null,
+        Retries = e.TryGetProperty("retries", out var r) ? r.GetInt32() : 0
+    }).ToList();
+
+    var result = await sender.Send(new FinalizeTransferCommand(draftId, idempotencyKey, files), ct);
+    if (result is null)
+        throw new BusinessException(ProblemCodes.TransferNotFinalized, "Draft has no completed files.");
+    return Results.Json(new { id = result.TransferId.ToString("n"), linkId = result.LinkId, publicUrl = result.PublicUrl, status = "Draft", expiresAt = result.ExpiresAtUtc, totalBytes = result.TotalBytes, files = result.Files.Select(f => new { id = f.FileId.ToString("n"), name = f.Name, sizeBytes = f.SizeBytes, contentType = f.ContentType }) }, statusCode: 201);
 });
 
 app.Run();
