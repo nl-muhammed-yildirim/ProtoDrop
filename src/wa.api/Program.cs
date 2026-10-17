@@ -59,6 +59,8 @@ builder.Services.AddSingleton<IPlansStore>(sp => new PlansStore(sp.GetRequiredSe
 builder.Services.AddSingleton<IFlagsStore>(sp => new FlagsStore(sp.GetRequiredService<WaDbContext>()));
 // T-001-10 (TA-4.2#2): finalize handler's DB surface — thin adapter over the adapter-owned WaDbContext.
 builder.Services.AddSingleton<wa.application.UseCases.Transfers.ITransferStore>(sp => new wa.infrastructure.Persistence.TransferStore(sp.GetRequiredService<WaDbContext>()));
+// T-002-04 (TA-4.2#3): send handler's DB surface — thin adapter over the adapter-owned WaDbContext.
+builder.Services.AddSingleton<wa.application.UseCases.Transfers.ISendStore>(sp => new wa.infrastructure.Persistence.SendStore(sp.GetRequiredService<WaDbContext>()));
 // T-002-02 (TA-4.1.5): generic HTTP idempotency store — used by IdempotencyMiddleware for finalize + send endpoints.
 builder.Services.AddSingleton<IIdempotencyStore>(sp => new wa.infrastructure.Persistence.IdempotencyStore(sp.GetRequiredService<WaDbContext>()));
 builder.Services.AddSingleton(sp => new PlansCache(sp.GetRequiredService<IPlansStore>(), limitsTtl, () => DateTimeOffset.UtcNow));
@@ -145,6 +147,32 @@ app.MapPost("/api/v1/transfers/draft/{draftId}/finalize", async (Guid draftId, H
     if (result is null)
         throw new BusinessException(ProblemCodes.TransferNotFinalized, "Draft has no completed files.");
     return Results.Json(new { id = result.TransferId.ToString("n"), linkId = result.LinkId, publicUrl = result.PublicUrl, status = "Draft", expiresAt = result.ExpiresAtUtc, totalBytes = result.TotalBytes, files = result.Files.Select(f => new { id = f.FileId.ToString("n"), name = f.Name, sizeBytes = f.SizeBytes, contentType = f.ContentType }) }, statusCode: 201);
+});
+
+// T-002-04 (TA-4.2#3): activate a Draft transfer — store recipients, emit transfer.created via outbox.
+app.MapPost("/api/v1/transfers/{id}/send", async (Guid id, HttpRequest request, ISender sender, CancellationToken ct) =>
+{
+    using var ms = new MemoryStream();
+    await request.Body.CopyToAsync(ms);
+    ms.Position = 0;
+    using var bodyDoc = System.Text.Json.JsonDocument.Parse(ms);
+    var root = bodyDoc.RootElement;
+    var emails = root.TryGetProperty("emails", out var e) ? e.EnumerateArray().Select(x => x.GetString() ?? string.Empty).ToList() : (IReadOnlyList<string>)[];
+    var senderName = root.TryGetProperty("senderName", out var sn) ? sn.GetString() : null;
+    var senderEmail = root.TryGetProperty("senderEmail", out var se) ? se.GetString() : null;
+    var note = root.TryGetProperty("note", out var n) ? n.GetString() : null;
+
+    try
+    {
+        var result = await sender.Send(new SendTransferCommand(id, senderName, senderEmail, note, emails), ct);
+        if (result is null)
+            throw new BusinessException(ProblemCodes.NotFound, "Transfer not found.");
+        return Results.Json(new { id = result.TransferId.ToString("n"), linkId = result.LinkId, status = "Active", expiresAt = result.ExpiresAtUtc, totalBytes = result.TotalBytes, fileCount = result.FileCount, recipients = result.Recipients }, statusCode: 201);
+    }
+    catch (wa.application.UseCases.Transfers.TransferValidationException vex)
+    {
+        throw new BusinessException(ProblemCodes.Validation, vex.Message);
+    }
 });
 
 app.Run();
