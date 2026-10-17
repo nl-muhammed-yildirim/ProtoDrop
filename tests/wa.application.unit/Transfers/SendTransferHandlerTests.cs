@@ -246,6 +246,100 @@ public class SendTransferHandlerTests
         Assert.True(result!.ExpiresAtUtc >= before && result.ExpiresAtUtc <= after);
     }
 
+    [Fact]
+    public async Task Handle_WithPassword_StoresPbkdf2Hash_NotPlaintext()
+    {
+        var transferId = Guid.NewGuid();
+        _store.Transfer = new Transfer
+        {
+            Id = transferId,
+            LinkId = "ABCD1234",
+            Status = 0,
+            TotalBytes = 100,
+            FileCount = 1,
+            SenderName = "Guest",
+            CreatedAtUtc = DateTime.UtcNow
+        };
+
+        await _handler.Handle(
+            new SendTransferCommand(transferId, null, null, null, [], "s3cret"),
+            CancellationToken.None);
+
+        var hash = _store.Transfer!.PasswordHash;
+        Assert.NotNull(hash);
+        Assert.NotEqual("s3cret", hash);
+
+        // Verify the hash is a valid PBKDF2 hash for the password.
+        var hasher = new Microsoft.AspNetCore.Identity.PasswordHasher<string>();
+        var verifyResult = hasher.VerifyHashedPassword(transferId.ToString("n"), hash, "s3cret");
+        Assert.Equal(Microsoft.AspNetCore.Identity.PasswordVerificationResult.Success, verifyResult);
+    }
+
+    [Fact]
+    public async Task Handle_SamePassword_DifferentTransfers_ProduceDifferentHashes()
+    {
+        var transferId1 = Guid.NewGuid();
+        var transferId2 = Guid.NewGuid();
+
+        // First transfer.
+        _store.Transfer = new Transfer
+        {
+            Id = transferId1,
+            LinkId = "ABCD1234",
+            Status = 0,
+            TotalBytes = 100,
+            FileCount = 1,
+            SenderName = "Guest",
+            CreatedAtUtc = DateTime.UtcNow
+        };
+        await _handler.Handle(
+            new SendTransferCommand(transferId1, null, null, null, [], "samepass"),
+            CancellationToken.None);
+        var hash1 = _store.Transfer!.PasswordHash;
+
+        // Second transfer.
+        _store.Transfer = new Transfer
+        {
+            Id = transferId2,
+            LinkId = "WXYZ5678",
+            Status = 0,
+            TotalBytes = 100,
+            FileCount = 1,
+            SenderName = "Guest",
+            CreatedAtUtc = DateTime.UtcNow
+        };
+        await _handler.Handle(
+            new SendTransferCommand(transferId2, null, null, null, [], "samepass"),
+            CancellationToken.None);
+        var hash2 = _store.Transfer!.PasswordHash;
+
+        Assert.NotNull(hash1);
+        Assert.NotNull(hash2);
+        Assert.NotEqual(hash1, hash2); // per-transfer salt produces different hashes
+    }
+
+    [Fact]
+    public async Task Handle_NoPassword_LeavesColumnNull()
+    {
+        var transferId = Guid.NewGuid();
+        _store.Transfer = new Transfer
+        {
+            Id = transferId,
+            LinkId = "ABCD1234",
+            Status = 0,
+            TotalBytes = 100,
+            FileCount = 1,
+            SenderName = "Guest",
+            CreatedAtUtc = DateTime.UtcNow
+        };
+
+        await _handler.Handle(
+            new SendTransferCommand(transferId, null, null, null, []),
+            CancellationToken.None);
+
+        Assert.Null(_store.Transfer!.PasswordHash);
+    }
+
     // ---- Stubs ----
 
     private sealed class StubSendStore : ISendStore

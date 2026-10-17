@@ -161,10 +161,11 @@ app.MapPost("/api/v1/transfers/{id}/send", async (Guid id, HttpRequest request, 
     var senderName = root.TryGetProperty("senderName", out var sn) ? sn.GetString() : null;
     var senderEmail = root.TryGetProperty("senderEmail", out var se) ? se.GetString() : null;
     var note = root.TryGetProperty("note", out var n) ? n.GetString() : null;
+    var password = root.TryGetProperty("password", out var pw) ? pw.GetString() : null;
 
     try
     {
-        var result = await sender.Send(new SendTransferCommand(id, senderName, senderEmail, note, emails), ct);
+        var result = await sender.Send(new SendTransferCommand(id, senderName, senderEmail, note, emails, password), ct);
         if (result is null)
             throw new BusinessException(ProblemCodes.NotFound, "Transfer not found.");
         return Results.Json(new { id = result.TransferId.ToString("n"), linkId = result.LinkId, status = "Active", expiresAt = result.ExpiresAtUtc, totalBytes = result.TotalBytes, fileCount = result.FileCount, recipients = result.Recipients }, statusCode: 201);

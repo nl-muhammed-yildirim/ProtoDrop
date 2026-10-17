@@ -15,7 +15,8 @@ public sealed record SendTransferCommand(
     string? SenderName,
     string? SenderEmail,
     string? Note,
-    IReadOnlyList<string> Emails) : IRequest<SendTransferResult?>;
+    IReadOnlyList<string> Emails,
+    string? Password = null) : IRequest<SendTransferResult?>;
 
 /// <summary>POST /api/v1/transfers/{id}/send result (TA-4.2#3 response shape).</summary>
 public sealed record SendTransferResult(
@@ -101,6 +102,13 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
         transfer.SenderName = request.SenderName ?? "Anonymous";
         transfer.SenderEmail = request.SenderEmail;
         transfer.Note = request.Note;
+
+        // 5b. T-002-06: password hash — PBKDF2 via ASP.NET Identity PasswordHasher<string> (TA-9.1). Null → column stays null.
+        if (!string.IsNullOrEmpty(request.Password))
+        {
+            var hasher = new Microsoft.AspNetCore.Identity.PasswordHasher<string>();
+            transfer.PasswordHash = hasher.HashPassword(transfer.Id.ToString("n"), request.Password);
+        }
 
         // 6. One EmailRecipient row per unique address.
         var recipients = addresses.Select(a => new EmailRecipient
