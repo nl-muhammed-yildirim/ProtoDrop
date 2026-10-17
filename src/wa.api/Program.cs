@@ -61,6 +61,8 @@ builder.Services.AddSingleton<IFlagsStore>(sp => new FlagsStore(sp.GetRequiredSe
 builder.Services.AddSingleton<wa.application.UseCases.Transfers.ITransferStore>(sp => new wa.infrastructure.Persistence.TransferStore(sp.GetRequiredService<WaDbContext>()));
 // T-002-04 (TA-4.2#3): send handler's DB surface — thin adapter over the adapter-owned WaDbContext.
 builder.Services.AddSingleton<wa.application.UseCases.Transfers.ISendStore>(sp => new wa.infrastructure.Persistence.SendStore(sp.GetRequiredService<WaDbContext>()));
+// T-014 (TA-4.2#4): recipient-page handler's DB surface — thin adapter over the adapter-owned WaDbContext.
+builder.Services.AddSingleton<wa.application.UseCases.Transfers.IPublicTransferStore>(sp => new wa.infrastructure.Persistence.PublicTransferStore(sp.GetRequiredService<WaDbContext>()));
 // T-002-02 (TA-4.1.5): generic HTTP idempotency store — used by IdempotencyMiddleware for finalize + send endpoints.
 builder.Services.AddSingleton<IIdempotencyStore>(sp => new wa.infrastructure.Persistence.IdempotencyStore(sp.GetRequiredService<WaDbContext>()));
 builder.Services.AddSingleton(sp => new PlansCache(sp.GetRequiredService<IPlansStore>(), limitsTtl, () => DateTimeOffset.UtcNow));
@@ -175,6 +177,36 @@ app.MapPost("/api/v1/transfers/{id}/send", async (Guid id, HttpRequest request, 
         throw new BusinessException(ProblemCodes.Validation, vex.Message);
     }
 });
+
+// T-014 (TA-4.2#4): recipient metadata for GET /api/v1/public/transfers/{linkId} — no auth, no cookie; page views never mint SAS or consume a download.
+app.MapGet("/api/v1/public/transfers/{linkId}", async (string linkId, ISender sender, CancellationToken ct) =>
+{
+    var result = await sender.Send(new GetPublicTransferQuery(linkId), ct);
+    return result.State switch
+    {
+        PublicTransferState.Active => Results.Json(new
+        {
+            from = result.From, note = result.Note,
+            files = result.Files!.Select(f => new { fileId = f.FileId.ToString("n"), name = f.Name, sizeBytes = f.SizeBytes }),
+            hasDownloadAll = result.HasDownloadAll, downloadsLeft = result.DownloadsLeft, passwordRequired = result.PasswordRequired
+        }), // TA-4.2#4 exact wire shape — property names pinned at the single construction site (same style as endpoints 1–3)
+
+        // D8: status pin = 410 for both terminal expired shapes; the unknown case overrides to 404 below (FR-003-9: same body, different status line only).
+        PublicTransferState.Expired => Results.Json(ProblemWriter.Build(
+            ProblemCodes.StatusOf(ProblemCodes.TransferExpired), ProblemCodes.TransferExpired, ExpiredDetails(result.SenderEmail)), statusCode: 410),
+
+        PublicTransferState.DownloadLimit => Results.Json(
+            ProblemWriter.Build(410, ProblemCodes.MaxDownloadsReached, "All downloads have been used."), statusCode: 410), // 409→410 explicit override (task doc status mapping)
+
+        PublicTransferState.NotFound => Results.Json(
+            ProblemWriter.Build(404, ProblemCodes.TransferExpired, ExpiredDetails(null)), statusCode: 404) // FR-003-9: same body, different status line only
+    };
+});
+// FR-003-8/9 details text — the single string slot in the TA-4.1.3 Problem+JSON closed shape (the writer's signature has no per-field override).
+static string ExpiredDetails(string? senderEmail) =>
+    senderEmail is null
+        ? "This transfer has expired. Contact the sender for a new link."   // US-003-05 alternative flow: no fabricated address
+        : $"This transfer has expired. Contact {senderEmail} for a new link.";
 
 app.Run();
 

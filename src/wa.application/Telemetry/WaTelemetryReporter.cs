@@ -38,6 +38,10 @@ public sealed class WaTelemetryReporter
     public void UploadCompleted(long bytes, long durationMs, int retries) =>
         _logger.LogInformation("upload_completed {bytes} bytes in {durationMs} ms after {retries} retries", bytes, durationMs, retries);
 
+    /// <summary>Emit transfer_page_viewed with its one property — the linkId hash (TA-9.4 style: never the raw 8-char id in telemetry; T-003-01). Template text keeps the exact TA-10.2 name first — App Insights queries by it.</summary>
+    public void TransferPageViewed(string linkIdHash) =>
+        _logger.LogInformation("transfer_page_viewed {linkId}", linkIdHash);
+
     // ---- TA-9.4 PII slots — "the reporter's property slots are where those transforms live" ----
 
     /// <summary>TA-9.4: file name → SHA-256 (deterministic). Call this before putting a file name into an event property.</summary>

@@ -52,6 +52,21 @@ public class WaTelemetryReporterTests
         Assert.Equal(new object[] { 123456L, 789L, 2 }, entry.Args); // bytes, durationMs, retries in that order — M.E.L bakes args into FormattedLogValues; extraction below preserves their original order
     }
 
+    // ---- T-014 (TA-4.2#4): transfer_page_viewed carries the linkId hash as its one property (DECISION B) ----
+
+    [Fact]
+    public void TransferPageViewed_EmitsExactNameWithLinkIdHashProperty()
+    {
+        var logger = new RecordingLogger();
+        var reporter = new WaTelemetryReporter(logger, Key);
+
+        reporter.TransferPageViewed("deadbeef"); // the caller passes a PiiTransforms hash — never the raw linkId (TA-9.4 style)
+
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal("transfer_page_viewed deadbeef", entry.RenderedText); // exact template text: the closed-set name + the one {linkId} property (T-014, DECISION B)
+        Assert.Equal(new object[] { "deadbeef" }, entry.Args); // the hash is the only property — never the raw 8-char id (TA-9.4 style)
+    }
+
     // ---- Closed-set gate (EC-056-4: ad-hoc names fail here, not silently later in App Insights) ----
 
     [Fact]
