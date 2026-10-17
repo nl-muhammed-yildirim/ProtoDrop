@@ -1,0 +1,256 @@
+using System.Text;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using wa.application.Blob;
+using wa.application.Ports;
+using wa.application.Telemetry;
+using wa.application.UseCases.Transfers;
+using wa.domain;
+
+namespace wa.application.unit.Transfers;
+
+// T-001-10: the handler is the only business logic behind POST /api/v1/transfers/draft/{draftId}/finalize (TA-4.2a).
+// Idempotent finalize (EC-002-1), server-side blob copy staging→transfers, create Transfer(Draft)+FileItems+BlobRefs in one transaction, emit upload_completed.
+public class FinalizeTransferHandlerTests
+{
+    private readonly StubTransferStore _store;
+    private readonly StubBlobStore _blobStore;
+    private readonly RecordingLogger _logger;
+    private readonly FinalizeTransferHandler _handler;
+
+    public FinalizeTransferHandlerTests()
+    {
+        _store = new StubTransferStore();
+        _blobStore = new StubBlobStore();
+        _logger = new RecordingLogger();
+
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Wa:Url:Public"] = "http://localhost:5173" })
+            .Build();
+
+        var telemetry = new WaTelemetryReporter(_logger, Encoding.UTF8.GetBytes("test-key"));
+        _handler = new FinalizeTransferHandler(_store, _blobStore, config, telemetry, Microsoft.Extensions.Logging.Abstractions.NullLogger<FinalizeTransferHandler>.Instance);
+    }
+
+    [Fact]
+    public async Task Handle_HappyPath_CreatesTransfer_FileItems_BlobRefs_and_copies_blobs()
+    {
+        var draftId = Guid.NewGuid();
+        var file1 = new FinalizeFile { FileId = Guid.NewGuid(), Name = "a.txt", SizeBytes = 100, ContentType = "text/plain", Retries = 0 };
+        var file2 = new FinalizeFile { FileId = Guid.NewGuid(), Name = "b.png", SizeBytes = 200, ContentType = "image/png", Retries = 1 };
+
+        // Seed staging blobs.
+        _blobStore.Blobs[BlobPaths.StagingFile(draftId, file1.FileId)] = new byte[100];
+        _blobStore.Blobs[BlobPaths.StagingFile(draftId, file2.FileId)] = new byte[200];
+
+        var result = await _handler.Handle(new FinalizeTransferCommand(draftId, "key-1", [file1, file2]), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(0, result!.Status); // Draft
+        Assert.Equal(300, result.TotalBytes);
+        Assert.Equal(2, result.Files.Count);
+        Assert.StartsWith("http://localhost:5173/t/", result.PublicUrl);
+        Assert.EndsWith(result.LinkId, result.PublicUrl);
+
+        // DB assertions via the stub store.
+        var saved = _store.SavedTransfer;
+        Assert.NotNull(saved);
+        Assert.Equal(0, saved!.Status);
+        Assert.Equal(300, saved.TotalBytes);
+        Assert.Equal(2, saved.FileCount);
+        Assert.Equal("Guest", saved.SenderName);
+        Assert.Equal(1, saved.MaxDownloads);
+
+        Assert.Equal(2, _store.SavedFileItems.Count);
+        Assert.Equal(0, _store.SavedFileItems[0].SortOrder);
+        Assert.Equal("a.txt", _store.SavedFileItems[0].OriginalName);
+        Assert.Equal(100, _store.SavedFileItems[0].SizeBytes);
+        Assert.Equal(1, _store.SavedFileItems[1].SortOrder);
+        Assert.Equal("b.png", _store.SavedFileItems[1].OriginalName);
+
+        Assert.Equal(2, _store.SavedBlobRefs.Count);
+        Assert.All(_store.SavedBlobRefs, br => Assert.Equal(1, br.RefCount));
+
+        // Blob copy assertions.
+        Assert.True(_blobStore.Uploads.ContainsKey(BlobPaths.TransferFile(result.TransferId, file1.FileId)));
+        Assert.True(_blobStore.Uploads.ContainsKey(BlobPaths.TransferFile(result.TransferId, file2.FileId)));
+    }
+
+    [Fact]
+    public async Task Handle_IdempotentReplay_ReturnsIdenticalResult_without_duplicate_blob_copy()
+    {
+        var draftId = Guid.NewGuid();
+        var file1 = new FinalizeFile { FileId = Guid.NewGuid(), Name = "a.txt", SizeBytes = 100, ContentType = "text/plain", Retries = 0 };
+
+        _blobStore.Blobs[BlobPaths.StagingFile(draftId, file1.FileId)] = new byte[100];
+
+        var cmd = new FinalizeTransferCommand(draftId, "key-idem", [file1]);
+        var result1 = await _handler.Handle(cmd, CancellationToken.None);
+        Assert.NotNull(result1);
+
+        // Second call with same idempotency key — the stub store now has the idempotency key stored.
+        var result2 = await _handler.Handle(cmd, CancellationToken.None);
+        Assert.NotNull(result2);
+        Assert.Equal(result1!.TransferId, result2!.TransferId);
+        Assert.Equal(result1.LinkId, result2.LinkId);
+        Assert.Equal(result1.PublicUrl, result2.PublicUrl);
+        Assert.Equal(result1.TotalBytes, result2.TotalBytes);
+
+        // Only one save (one Transfer row).
+        Assert.Single(_store.SavedTransfers);
+
+        // Blob was copied only once.
+        var uploadPath = BlobPaths.TransferFile(result1.TransferId, file1.FileId);
+        Assert.Single(_blobStore.Uploads, kv => kv.Key == uploadPath);
+    }
+
+    [Fact]
+    public async Task Handle_ZeroFiles_ReturnsNull()
+    {
+        var draftId = Guid.NewGuid();
+        var result = await _handler.Handle(new FinalizeTransferCommand(draftId, "key-empty", []), CancellationToken.None);
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task Handle_BlobMissing_Throws_and_no_Transfer_saved()
+    {
+        var draftId = Guid.NewGuid();
+        var file1 = new FinalizeFile { FileId = Guid.NewGuid(), Name = "a.txt", SizeBytes = 100, Retries = 0 };
+        var file2 = new FinalizeFile { FileId = Guid.NewGuid(), Name = "b.txt", SizeBytes = 50, Retries = 0 };
+
+        // Only one blob seeded; the other is missing.
+        _blobStore.Blobs[BlobPaths.StagingFile(draftId, file1.FileId)] = new byte[100];
+        // No blob for file2.
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _handler.Handle(new FinalizeTransferCommand(draftId, "key-missing", [file1, file2]), CancellationToken.None));
+
+        // No transfer saved (blob copy failed before DB write).
+        Assert.Empty(_store.SavedTransfers);
+    }
+
+    [Fact]
+    public async Task Handle_LinkIdCollision_FirstRegenerates_SucceedsOnSecond()
+    {
+        _store.CollideOnce = true;
+
+        var draftId = Guid.NewGuid();
+        var file1 = new FinalizeFile { FileId = Guid.NewGuid(), Name = "a.txt", SizeBytes = 100, ContentType = "text/plain", Retries = 0 };
+        _blobStore.Blobs[BlobPaths.StagingFile(draftId, file1.FileId)] = new byte[100];
+
+        var result = await _handler.Handle(new FinalizeTransferCommand(draftId, "key-collide-retry", [file1]), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Single(_store.SavedTransfers);
+    }
+
+    [Fact]
+    public async Task Handle_LinkIdCollision_SecondCollision_Throws_InternalTelemetry()
+    {
+        _store.AlwaysCollide = true;
+
+        var draftId = Guid.NewGuid();
+        var file1 = new FinalizeFile { FileId = Guid.NewGuid(), Name = "a.txt", SizeBytes = 100, ContentType = "text/plain", Retries = 0 };
+        _blobStore.Blobs[BlobPaths.StagingFile(draftId, file1.FileId)] = new byte[100];
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _handler.Handle(new FinalizeTransferCommand(draftId, "key-collide", [file1]), CancellationToken.None));
+
+        Assert.Contains("LinkId collision", ex.Message);
+        Assert.Empty(_store.SavedTransfers);
+    }
+
+    [Fact]
+    public async Task Handle_Success_EmitsUploadCompleted_with_correct_values()
+    {
+        var draftId = Guid.NewGuid();
+        var file1 = new FinalizeFile { FileId = Guid.NewGuid(), Name = "a.txt", SizeBytes = 100, Retries = 2 };
+        var file2 = new FinalizeFile { FileId = Guid.NewGuid(), Name = "b.png", SizeBytes = 200, Retries = 3 };
+
+        _blobStore.Blobs[BlobPaths.StagingFile(draftId, file1.FileId)] = new byte[100];
+        _blobStore.Blobs[BlobPaths.StagingFile(draftId, file2.FileId)] = new byte[200];
+
+        await _handler.Handle(new FinalizeTransferCommand(draftId, "key-telemetry", [file1, file2]), CancellationToken.None);
+
+        // upload_completed {bytes} bytes in {durationMs} ms after {retries} retries
+        var entry = _logger.Entries.Single(e => e.RenderedText.StartsWith("upload_completed"));
+        Assert.Contains("300", entry.RenderedText); // totalBytes = 100 + 200
+        Assert.Contains("5", entry.RenderedText);   // totalRetries = 2 + 3
+    }
+
+    // ---- Stubs ----
+
+    private sealed class StubTransferStore : ITransferStore
+    {
+        public List<Transfer> SavedTransfers { get; } = [];
+        public List<BlobRef> SavedBlobRefs { get; } = [];
+        public List<FileItem> SavedFileItems { get; } = [];
+        public List<IdempotencyKey> SavedIdempotencyKeys { get; } = [];
+
+        /// <summary>Force every mint to collide (second-collision path).</summary>
+        public bool AlwaysCollide { get; set; }
+
+        /// <summary>Force exactly the first mint to collide, then succeed (regenerate-once path).</summary>
+        public bool CollideOnce { get; set; }
+
+        private int _linkIdChecks;
+
+        public Transfer? SavedTransfer => SavedTransfers.LastOrDefault();
+
+        public Task<IdempotencyKey?> FindByIdempotencyKeyAsync(string key, CancellationToken ct) =>
+            Task.FromResult(SavedIdempotencyKeys.FirstOrDefault(k => k.Key == key));
+
+        public Task<bool> TransferExistsByLinkIdAsync(string linkId, CancellationToken ct)
+        {
+            var call = _linkIdChecks++;
+            if (AlwaysCollide) return Task.FromResult(true);
+            if (CollideOnce && call == 0) return Task.FromResult(true);
+            return Task.FromResult(SavedTransfers.Any(t => t.LinkId == linkId));
+        }
+
+        public Task SaveFinalizeAsync(Transfer transfer, IReadOnlyList<BlobRef> blobRefs, IReadOnlyList<FileItem> fileItems, IdempotencyKey idempotencyKey, CancellationToken ct)
+        {
+            SavedTransfers.Add(transfer);
+            SavedBlobRefs.AddRange(blobRefs);
+            SavedFileItems.AddRange(fileItems);
+            SavedIdempotencyKeys.Add(idempotencyKey);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class StubBlobStore : IBlobStore
+    {
+        public Dictionary<string, byte[]> Blobs { get; } = new();
+        public Dictionary<string, byte[]> Uploads { get; } = new();
+
+        public Task UploadAsync(string path, Stream content, CancellationToken cancellationToken = default)
+        {
+            using var ms = new MemoryStream();
+            content.CopyTo(ms);
+            Uploads[path] = ms.ToArray();
+            return Task.CompletedTask;
+        }
+
+        public Task<Stream> DownloadAsync(string path, CancellationToken cancellationToken = default)
+        {
+            if (!Blobs.TryGetValue(path, out var bytes))
+                throw new KeyNotFoundException($"Blob not found: {path}");
+            return Task.FromResult<Stream>(new MemoryStream(bytes));
+        }
+    }
+
+    private sealed class RecordingLogger : ILogger<WaTelemetryReporter>
+    {
+        public record Entry(string RenderedText);
+
+        public List<Entry> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+            => Entries.Add(new Entry(formatter(state, exception)));
+        public void Log(LogLevel logLevel, EventId eventId, string? message, Exception? exception, params object?[] args)
+            => Entries.Add(new Entry(message ?? string.Empty));
+    }
+}

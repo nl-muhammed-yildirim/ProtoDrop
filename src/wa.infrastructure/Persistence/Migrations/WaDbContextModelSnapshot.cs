@@ -753,6 +753,9 @@ namespace wa.infrastructure.Persistence.Migrations
                     b.Property<string>("ResultJson")
                         .HasColumnType("NVARCHAR(MAX)");
 
+                    b.Property<int>("StatusCode")
+                        .HasColumnType("INT");
+
                     b.Property<Guid?>("TransferId")
                         .HasColumnType("uniqueidentifier");
 
