@@ -1,13 +1,8 @@
-import { useUploadEngine } from './core/upload/UploadEngine'
-import DropZone from './features/landing/DropZone'
-import StagingList from './features/landing/StagingList'
-
 export default function App() {
-  const hasFiles = useUploadEngine((s) => s.files.length > 0)
   return (
     <main>
-      <DropZone />
-      {hasFiles && <StagingList />}
+      <h1>ProtoDrop</h1>
+      <p>Landing stub — the full upload surface arrives with F-TRF-001.</p>
     </main>
   )
 }

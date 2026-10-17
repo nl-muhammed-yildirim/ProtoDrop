@@ -8,5 +8,3 @@
 *.csproj.user
 # Visual Studio
 **/.vs/
-.aider*
-/.omp

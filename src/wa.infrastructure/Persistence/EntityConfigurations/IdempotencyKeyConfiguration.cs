@@ -15,8 +15,5 @@ public sealed class IdempotencyKeyConfiguration : IEntityTypeConfiguration<Idemp
         b.Property(k => k.Key).HasColumnType("VARCHAR(128)").IsRequired();
 
         b.Property(k => k.ResultJson).HasColumnType("NVARCHAR(MAX)");
-
-        // T-002-02: HTTP status code to replay on idempotent hit.
-        b.Property(k => k.StatusCode).HasColumnType("INT").IsRequired();
     }
 }

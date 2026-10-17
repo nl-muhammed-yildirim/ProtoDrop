@@ -19,9 +19,9 @@
 
 ## Exit check
 
-- [x] "Copy link only" activates the transfer with zero EmailRecipient rows and copies the link (AC-002-3)
-- [x] Whitespace-only recipients field follows the same link-only path
-- [x] Confirmation screen shows the link + Copy + Send again after both email and link-only sends
+- [ ] "Copy link only" activates the transfer with zero EmailRecipient rows and copies the link (AC-002-3)
+- [ ] Whitespace-only recipients field follows the same link-only path
+- [ ] Confirmation screen shows the link + Copy + Send again after both email and link-only sends
 
 ## Implementation prompt
 

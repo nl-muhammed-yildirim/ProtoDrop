@@ -10,7 +10,4 @@ public class IdempotencyKey
     public DateTime CreatedAtUtc { get; set; }
     /// <summary>24 h TTL (TA-4.1.5).</summary>
     public DateTime ExpiresAtUtc { get; set; }
-
-    /// <summary>HTTP status code to replay on idempotent hit (T-002-02).</summary>
-    public int StatusCode { get; set; }
 }

@@ -91,6 +91,6 @@ AC-002-4: Collision on linkId (astronomically unlikely)
 | US-002-02 | T-002-05 Recipients field: parse, inline validation, MAX_EMAILS cap (FR-002-5) | `US-002-02-send-by-email/T-002-05-recipients-field-ui.md` | ☐ |
 | US-002-03 | T-002-06 Password at send: PBKDF2 hash into Transfer.PasswordHash (FR-002-3/4) | `US-002-03-password/T-002-06-password-hash-send.md` | ☐ |
 | US-002-04 | T-002-07 Sender name + note fields: pre-fill, 500-char counter (FR-002-4) | `US-002-04-sender-note/T-002-07-sender-name-note-ui.md` | ☐ |
-| US-002-05 | T-002-08 "Copy link only" + confirmation screen (FR-002-6/7, AC-002-3) | `US-002-05-link-only/T-002-08-copy-link-only-confirmation.md` | ☑ 2026-10-17 (f4d758f + fix 6ee0a7d, review PASS) |
+| US-002-05 | T-002-08 "Copy link only" + confirmation screen (FR-002-6/7, AC-002-3) | `US-002-05-link-only/T-002-08-copy-link-only-confirmation.md` | ☐ |
 
 **Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-011 and T-013 can be marked `done` in `Milestone-Backlog.md`.
