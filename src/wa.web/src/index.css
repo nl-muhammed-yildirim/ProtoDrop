@@ -460,3 +460,57 @@ main:has(.sl) .dz {
   color: var(--danger);
   font-size: var(--fs-small);
 }
+
+/* T-002-08: Send transfer + Copy link only row, and the in-place "Transfer sent." confirmation */
+.ls-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.ls-send-btn {
+  min-height: 44px;
+  padding: 12px 24px;
+  background: var(--accent);
+  color: #FFFFFF;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-body);
+  cursor: pointer;
+}
+
+.ls-send-btn:hover {
+  background: var(--accent-hover);
+}
+
+.ls-copyonly-btn {
+  min-height: 44px;
+  padding: 12px 24px;
+  background: transparent;
+  color: var(--fg-muted);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-body);
+  cursor: pointer;
+}
+
+.ls-copyonly-btn:hover {
+  color: var(--fg);
+}
+
+.ls-copyonly-btn:disabled,
+.ls-send-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.ls-sent-sub {
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+  text-align: center;
+}
+
+.ls-send-error {
+  color: var(--danger);
+  font-size: var(--fs-small);
+}
