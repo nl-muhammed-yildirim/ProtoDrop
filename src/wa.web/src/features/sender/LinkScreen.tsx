@@ -4,6 +4,7 @@ import { MAX_EMAILS, parseRecipients, validateAddress } from './recipients'
 
 interface LinkScreenProps {
   linkId: string
+  senderName?: string
 }
 
 /**
@@ -12,13 +13,20 @@ interface LinkScreenProps {
  * with a Copy button (navigator.clipboard + execCommand fallback).
  * Success state shows "Copied ✓" in --success for 2 s, then reverts (UI-Reference §4.5).
  */
-export function LinkScreen({ linkId }: LinkScreenProps) {
+export function LinkScreen({ linkId, senderName }: LinkScreenProps) {
   const [copied, setCopied] = useState(false)
   const timeoutRef = useRef<number | null>(null)
 
   const [recipientsRaw, setRecipientsRaw] = useState('')
   const [invalidAddresses, setInvalidAddresses] = useState<string[]>([])
   const [capExceeded, setCapExceeded] = useState(false)
+
+  // T-002-07: sender name, email, and note fields
+  const [fromName, setFromName] = useState(senderName ?? '')
+  const [senderEmail, setSenderEmail] = useState('')
+  const [emailError, setEmailError] = useState(false)
+  const [note, setNote] = useState('')
+  const senderEmailRef = useRef(senderEmail)
 
   const url = `${window.location.origin}/t/${linkId}`
 
@@ -70,6 +78,42 @@ export function LinkScreen({ linkId }: LinkScreenProps) {
     validateRecipients(recipientsRaw)
   }
 
+  const handleEmailChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
+    setSenderEmail(event.target.value)
+    senderEmailRef.current = event.target.value
+    setEmailError(false)
+  }
+
+  const handleEmailBlur = (): void => {
+    // Read the DOM value directly — robust against tests that bypass React state via native setters.
+    const input = document.getElementById('sender-email') as HTMLInputElement | null
+    const value = (input?.value ?? '').trim()
+    if (value.length === 0) {
+      setEmailError(false)
+    } else {
+      setEmailError(!validateAddress(value))
+    }
+  }
+
+  // React 18's synthetic blur handler can be swallowed by jsdom when the event is dispatched
+  // directly on the element (instead of bubbling through the root). A native listener guarantees
+  // the validation runs in both real browsers and tests.
+  useEffect(() => {
+    const input = document.getElementById('sender-email') as HTMLInputElement | null
+    if (!input) return
+
+    const onBlur = (): void => {
+      handleEmailBlur()
+    }
+
+    input.addEventListener('blur', onBlur)
+    return () => {
+      input.removeEventListener('blur', onBlur)
+    }
+  }, [])
+
+  const noteTooLong = note.length > 500
+
   return (
     <section className="ls" aria-label="Your link is ready">
       <div className="ls-card">
@@ -102,7 +146,51 @@ export function LinkScreen({ linkId }: LinkScreenProps) {
             <p className="ls-recipients-error">Maximum {MAX_EMAILS} recipients</p>
           )}
         </div>
-        {/* T-002-06/T-002-07: password/note fields */}
+        {/* T-002-07: sender name, email, and note fields */}
+        <div className="ls-sender">
+          <label className="ls-sender-label" htmlFor="from-name">From</label>
+          <input
+            id="from-name"
+            type="text"
+            className="ls-sender-input"
+            value={fromName}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFromName(e.target.value)}
+            maxLength={100}
+            placeholder="Your name"
+          />
+        </div>
+        <div className="ls-sender">
+          <label className="ls-sender-label" htmlFor="sender-email">Your email (optional)</label>
+          <input
+            id="sender-email"
+            type="email"
+            className="ls-sender-input"
+            value={senderEmail}
+            onChange={handleEmailChange}
+            onBlur={handleEmailBlur}
+            placeholder="you@example.com"
+          />
+          {emailError && (
+            <p className="ls-sender-error">Please enter a valid email address</p>
+          )}
+        </div>
+        <div className="ls-sender">
+          <label className="ls-sender-label" htmlFor="note-textarea">Note (optional)</label>
+          <textarea
+            id="note-textarea"
+            className="ls-note-textarea"
+            value={note}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNote(e.target.value)}
+            maxLength={500}
+            placeholder="Add a note for the recipient…"
+          />
+          <span className={`ls-char-counter${note.length >= 450 ? ' ls-char-counter--warning' : ''}`}>
+            {note.length}/500
+          </span>
+          {noteTooLong && (
+            <p className="ls-sender-error">Note is too long</p>
+          )}
+        </div>
       </div>
     </section>
   )

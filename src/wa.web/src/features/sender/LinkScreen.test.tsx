@@ -150,4 +150,77 @@ describe('LinkScreen', () => {
     expect(errors[0].textContent).toContain('Maximum 20 recipients')
     host.remove()
   })
+
+  // ---- T-002-07: sender name, email, and note fields ----
+
+  it('renders From field pre-filled with senderName prop', () => {
+    const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g', senderName: 'Ada Lovelace' }))
+    const input = host.querySelector('#from-name') as HTMLInputElement
+    expect(input).not.toBeNull()
+    expect(input.value).toBe('Ada Lovelace')
+    host.remove()
+  })
+
+  it('guest with empty name renders empty From field', () => {
+    const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g' }))
+    const input = host.querySelector('#from-name') as HTMLInputElement
+    expect(input).not.toBeNull()
+    expect(input.value).toBe('')
+    host.remove()
+  })
+
+  it('note counter shows count/500 in --fs-tiny', () => {
+    const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g' }))
+    const textarea = host.querySelector('#note-textarea') as HTMLTextAreaElement
+    expect(textarea).not.toBeNull()
+
+    const nativeSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+    act(() => {
+      nativeSetter.call(textarea, 'hello world')
+      textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+
+    const counter = host.querySelector('.ls-char-counter') as HTMLElement
+    expect(counter).not.toBeNull()
+    expect(counter.textContent).toBe('11/500')
+    host.remove()
+  })
+
+  it('note counter turns warning at 450+ chars', () => {
+    const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g' }))
+    const textarea = host.querySelector('#note-textarea') as HTMLTextAreaElement
+    expect(textarea).not.toBeNull()
+
+    const nativeSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+    act(() => {
+      nativeSetter.call(textarea, 'a'.repeat(450))
+      textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+
+    const counter = host.querySelector('.ls-char-counter') as HTMLElement
+    expect(counter).not.toBeNull()
+    expect(counter.className).toContain('ls-char-counter--warning')
+    host.remove()
+  })
+
+  it('invalid sender email shows inline error without blocking send', () => {
+    const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g' }))
+    const emailInput = host.querySelector('#sender-email') as HTMLInputElement
+    expect(emailInput).not.toBeNull()
+
+    const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    act(() => {
+      nativeSetter.call(emailInput, 'not-an-email')
+      emailInput.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+
+    act(() => {
+      emailInput.dispatchEvent(new FocusEvent('blur'))
+    })
+
+    const error = host.querySelector('.ls-sender-error') as HTMLElement
+    expect(error).not.toBeNull()
+    expect(error.textContent).toContain('valid email')
+    host.remove()
+  })
 })

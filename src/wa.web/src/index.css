@@ -411,3 +411,52 @@ main:has(.sl) .dz {
   font-size: var(--fs-small);
   margin-top: 4px;
 }
+
+/* T-002-07: sender name, email, and note fields */
+.ls-sender {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ls-sender-label {
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+}
+
+.ls-sender-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  background: var(--bg-subtle);
+  color: var(--fg);
+}
+
+.ls-note-textarea {
+  width: 100%;
+  min-height: 72px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  background: var(--bg-subtle);
+  color: var(--fg);
+  resize: vertical;
+}
+
+.ls-char-counter {
+  font-size: var(--fs-tiny);
+  color: var(--fg-muted);
+  text-align: right;
+}
+
+.ls-char-counter--warning {
+  color: var(--warning);
+}
+
+.ls-sender-error {
+  color: var(--danger);
+  font-size: var(--fs-small);
+}
