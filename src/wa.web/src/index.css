@@ -312,3 +312,66 @@ main:has(.sl) .dz {
   padding: 24px 32px;
   gap: 12px;
 }
+
+/* §5.2 Link screen card */
+.ls {
+  width: 100%;
+  max-width: 560px;
+}
+
+.ls-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ls-heading {
+  margin: 0;
+  font-size: var(--fs-h1);
+  line-height: 1.25;
+  text-align: center;
+}
+
+.ls-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.ls-url {
+  flex: 1;
+  font-size: var(--fs-small);
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ls-copy-btn {
+  min-height: 36px;
+  padding: 8px 16px;
+  background: var(--accent);
+  color: #FFFFFF;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+
+.ls-copy-btn:hover {
+  background: var(--accent-hover);
+}
+
+.ls-copy-success {
+  color: var(--success);
+  font-size: var(--fs-small);
+  text-align: center;
+  margin-top: 4px;
+}
