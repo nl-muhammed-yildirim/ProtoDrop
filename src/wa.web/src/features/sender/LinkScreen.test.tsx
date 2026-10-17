@@ -393,6 +393,24 @@ describe('LinkScreen', () => {
       host.remove()
     })
 
+    it('a fetch() rejection (network down) keeps the form and shows an inline error, no confirmation', async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined)
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, writable: true })
+      vi.stubGlobal('fetch', () => Promise.reject(new TypeError('Failed to fetch')))
+
+      const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g', transferId: '1' }))
+      const copyOnly = host.querySelector('.ls-copyonly-btn') as HTMLButtonElement
+      await act(async () => {
+        copyOnly.click()
+      })
+
+      expect(host.innerHTML).toContain('Your link is ready') // form still visible
+      const error = host.querySelector('.ls-send-error[role="alert"]') as HTMLElement
+      expect(error).not.toBeNull()
+      expect(host.innerHTML).not.toContain('Transfer sent.')
+      host.remove()
+    })
+
     it('invalid recipients disable both send buttons', () => {
       const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g', transferId: '1' }))
       setRecipients(host, 'bad')

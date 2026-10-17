@@ -464,6 +464,7 @@ main:has(.sl) .dz {
 /* T-002-08: Send transfer + Copy link only row, and the in-place "Transfer sent." confirmation */
 .ls-actions {
   display: flex;
+  justify-content: center;
   gap: 8px;
 }
 

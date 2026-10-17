@@ -49,8 +49,8 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain }: Link
   const [note, setNote] = useState('')
   const senderEmailRef = useRef(senderEmail)
 
-  // T-002-08: send + confirmation state (FR-002-6/7).
-  const [sendState, setSendState] = useState<{ phase: SendPhase; response: SendResponse | null }>({ phase: 'form', response: null })
+  // T-002-08: send + confirmation state (FR-002-6/7) — phase only; the SendResponse body is intentionally not stored.
+  const [sendState, setSendState] = useState<SendPhase>('form')
   const [sending, setSending] = useState(false) // double-click guard — endpoint 3 is idempotent per key anyway (TA-4.1.5).
   const [sendError, setSendError] = useState<string | null>(null)
 
@@ -151,25 +151,33 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain }: Link
     setSending(true)
     setSendError(null)
     try {
-      const res = await fetch(SEND_ENDPOINT.replace('{id}', transferId), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Idempotency-Key': crypto.randomUUID(),
-        },
-        body: JSON.stringify({
-          emails,
-          senderName: blankOr(fromName),
-          senderEmail: blankOr(senderEmail),
-          note: blankOr(note),
-        }),
-      })
+      let res: Response
+      try {
+        res = await fetch(SEND_ENDPOINT.replace('{id}', transferId), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Key': crypto.randomUUID(),
+          },
+          body: JSON.stringify({
+            emails,
+            senderName: blankOr(fromName),
+            senderEmail: blankOr(senderEmail),
+            note: blankOr(note),
+          }),
+        })
+      } catch {
+        // fetch() rejection (network down / CORS / dev server not up on :8080) — same inline error as the non-ok path.
+        setSendError('Sending failed. Please try again.')
+        return false
+      }
       if (!res.ok) {
         setSendError('Sending failed. Please try again.')
         return false
       }
       const response = (await res.json()) as SendResponse
-      setSendState({ phase: 'sent', response })
+      void response // T-002-08: phase-only state — the body is cast for the record but intentionally never read.
+      setSendState('sent')
       return true
     } finally {
       setSending(false)
@@ -191,9 +199,9 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain }: Link
   }
 
   return (
-    <section className="ls" aria-label="Your link is ready">
+    <section className="ls" aria-label={sendState === 'sent' ? 'Transfer sent.' : 'Your link is ready'}>
       <div className="ls-card">
-        {sendState.phase === 'sent' ? (
+        {sendState === 'sent' ? (
           // T-002-08 (FR-002-7): confirmation screen — in-place swap, no route navigation.
           <>
             <h1 className="ls-heading">Transfer sent.</h1>
