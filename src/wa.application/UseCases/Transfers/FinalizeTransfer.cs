@@ -164,7 +164,8 @@ public sealed class FinalizeTransferHandler : IRequestHandler<FinalizeTransferCo
             ResultJson = JsonSerializer.Serialize(result),
             TransferId = transferId,
             CreatedAtUtc = now,
-            ExpiresAtUtc = now.AddHours(24)
+            ExpiresAtUtc = now.AddHours(24),
+            StatusCode = 201 // T-002-02: middleware replays this status on idempotent hit
         };
 
         await _store.SaveFinalizeAsync(transfer, blobRefs, fileItems, idempotencyKey, cancellationToken);

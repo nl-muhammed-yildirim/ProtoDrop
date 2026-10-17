@@ -312,3 +312,206 @@ main:has(.sl) .dz {
   padding: 24px 32px;
   gap: 12px;
 }
+
+/* §5.2 Link screen card */
+.ls {
+  width: 100%;
+  max-width: 560px;
+}
+
+.ls-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ls-heading {
+  margin: 0;
+  font-size: var(--fs-h1);
+  line-height: 1.25;
+  text-align: center;
+}
+
+.ls-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.ls-url {
+  flex: 1;
+  font-size: var(--fs-small);
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ls-copy-btn {
+  min-height: 36px;
+  padding: 8px 16px;
+  background: var(--accent);
+  color: #FFFFFF;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+
+.ls-copy-btn:hover {
+  background: var(--accent-hover);
+}
+
+.ls-copy-success {
+  color: var(--success);
+  font-size: var(--fs-small);
+  text-align: center;
+  margin-top: 4px;
+}
+
+/* T-002-05: recipients field inside the link screen card */
+.ls-recipients {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ls-recipients-label {
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+}
+
+.ls-recipients-textarea {
+  width: 100%;
+  min-height: 72px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  background: var(--bg-subtle);
+  color: var(--fg);
+  resize: vertical;
+}
+
+.ls-recipients-helper {
+  font-size: var(--fs-tiny);
+  color: var(--fg-muted);
+  margin-top: 4px;
+}
+
+.ls-recipients-error {
+  color: var(--danger);
+  font-size: var(--fs-small);
+  margin-top: 4px;
+}
+
+/* T-002-07: sender name, email, and note fields */
+.ls-sender {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ls-sender-label {
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+}
+
+.ls-sender-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  background: var(--bg-subtle);
+  color: var(--fg);
+}
+
+.ls-note-textarea {
+  width: 100%;
+  min-height: 72px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  background: var(--bg-subtle);
+  color: var(--fg);
+  resize: vertical;
+}
+
+.ls-char-counter {
+  font-size: var(--fs-tiny);
+  color: var(--fg-muted);
+  text-align: right;
+}
+
+.ls-char-counter--warning {
+  color: var(--warning);
+}
+
+.ls-sender-error {
+  color: var(--danger);
+  font-size: var(--fs-small);
+}
+
+/* T-002-08: Send transfer + Copy link only row, and the in-place "Transfer sent." confirmation */
+.ls-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.ls-send-btn {
+  min-height: 44px;
+  padding: 12px 24px;
+  background: var(--accent);
+  color: #FFFFFF;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-body);
+  cursor: pointer;
+}
+
+.ls-send-btn:hover {
+  background: var(--accent-hover);
+}
+
+.ls-copyonly-btn {
+  min-height: 44px;
+  padding: 12px 24px;
+  background: transparent;
+  color: var(--fg-muted);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-body);
+  cursor: pointer;
+}
+
+.ls-copyonly-btn:hover {
+  color: var(--fg);
+}
+
+.ls-copyonly-btn:disabled,
+.ls-send-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.ls-sent-sub {
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+  text-align: center;
+}
+
+.ls-send-error {
+  color: var(--danger);
+  font-size: var(--fs-small);
+}
