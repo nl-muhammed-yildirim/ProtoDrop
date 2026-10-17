@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
-import { createElement } from 'react'
+import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
-import { act } from 'react-dom/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { parseRecipients, validateAddress } from './recipients'
 import LinkScreen from './LinkScreen'
 
 ;(globalThis as unknown as Record<string, boolean>).IS_REACT_ACT_ENVIRONMENT = true
@@ -93,6 +93,61 @@ describe('LinkScreen', () => {
     expect(text).not.toContain('#')
     // Exact shape: origin + /t/ + linkId.
     expect(text).toBe(`${window.location.origin}/t/Xy9zWv3u`)
+    host.remove()
+  })
+
+  it('renders the recipients textarea with helper text', () => {
+    const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g' }))
+    const textarea = host.querySelector('.ls-recipients-textarea') as HTMLTextAreaElement
+    expect(textarea).not.toBeNull()
+    expect(host.innerHTML).toContain('One per line — you can also separate with commas.')
+    host.remove()
+  })
+
+  it('parses comma-separated addresses and ignores trailing spaces', () => {
+    const parsed = parseRecipients('a@x.com, b@y.com ')
+    expect(parsed).toEqual(['a@x.com', 'b@y.com'])
+    expect(validateAddress('a@x.com')).toBe(true)
+    expect(validateAddress('b@y.com')).toBe(true)
+  })
+
+  it('shows a per-address inline error for invalid addresses while valid ones proceed', () => {
+    const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g' }))
+    const textarea = host.querySelector('.ls-recipients-textarea') as HTMLTextAreaElement
+
+    const nativeSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+    act(() => {
+      nativeSetter.call(textarea, 'bad-address\nok@x.com')
+      textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+
+    act(() => {
+      textarea.dispatchEvent(new FocusEvent('blur'))
+    })
+
+    const errors = host.querySelectorAll('.ls-recipients-error')
+    expect(errors.length).toBe(1)
+    expect(errors[0].textContent).toBe('bad-address')
+    host.remove()
+  })
+
+  it('shows an inline cap error when more than 20 unique valid addresses are entered', () => {
+    const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g' }))
+    const textarea = host.querySelector('.ls-recipients-textarea') as HTMLTextAreaElement
+
+    const nativeSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+    act(() => {
+      nativeSetter.call(textarea, Array.from({ length: 25 }, (_, i) => `user${i}@x.com`).join('\n'))
+      textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+
+    act(() => {
+      textarea.dispatchEvent(new FocusEvent('blur'))
+    })
+
+    const errors = host.querySelectorAll('.ls-recipients-error')
+    expect(errors.length).toBe(1)
+    expect(errors[0].textContent).toContain('Maximum 20 recipients')
     host.remove()
   })
 })

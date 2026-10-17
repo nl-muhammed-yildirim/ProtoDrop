@@ -375,3 +375,39 @@ main:has(.sl) .dz {
   text-align: center;
   margin-top: 4px;
 }
+
+/* T-002-05: recipients field inside the link screen card */
+.ls-recipients {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ls-recipients-label {
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+}
+
+.ls-recipients-textarea {
+  width: 100%;
+  min-height: 72px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  background: var(--bg-subtle);
+  color: var(--fg);
+  resize: vertical;
+}
+
+.ls-recipients-helper {
+  font-size: var(--fs-tiny);
+  color: var(--fg-muted);
+  margin-top: 4px;
+}
+
+.ls-recipients-error {
+  color: var(--danger);
+  font-size: var(--fs-small);
+  margin-top: 4px;
+}

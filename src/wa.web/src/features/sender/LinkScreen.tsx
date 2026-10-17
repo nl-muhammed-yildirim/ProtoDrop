@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { MAX_EMAILS, parseRecipients, validateAddress } from './recipients'
+
 interface LinkScreenProps {
   linkId: string
 }
@@ -13,6 +15,10 @@ interface LinkScreenProps {
 export function LinkScreen({ linkId }: LinkScreenProps) {
   const [copied, setCopied] = useState(false)
   const timeoutRef = useRef<number | null>(null)
+
+  const [recipientsRaw, setRecipientsRaw] = useState('')
+  const [invalidAddresses, setInvalidAddresses] = useState<string[]>([])
+  const [capExceeded, setCapExceeded] = useState(false)
 
   const url = `${window.location.origin}/t/${linkId}`
 
@@ -47,6 +53,23 @@ export function LinkScreen({ linkId }: LinkScreenProps) {
     }
   }
 
+  const validateRecipients = (raw: string): void => {
+    const parsed = parseRecipients(raw)
+    const invalid = parsed.filter((addr) => !validateAddress(addr))
+    setInvalidAddresses(invalid)
+    setCapExceeded(parsed.length > MAX_EMAILS)
+  }
+
+  const handleRecipientsChange = (event: React.ChangeEvent<HTMLTextAreaElement>): void => {
+    const value = event.target.value
+    setRecipientsRaw(value)
+    validateRecipients(value)
+  }
+
+  const handleRecipientsBlur = (): void => {
+    validateRecipients(recipientsRaw)
+  }
+
   return (
     <section className="ls" aria-label="Your link is ready">
       <div className="ls-card">
@@ -60,7 +83,26 @@ export function LinkScreen({ linkId }: LinkScreenProps) {
         {copied && (
           <p className="ls-copy-success" role="status">Copied ✓</p>
         )}
-        {/* T-002-05…T-002-07: recipients/password/note fields */}
+        {/* T-002-05: recipients field — parse + validate on blur; per-address inline errors, no blocking modal */}
+        <div className="ls-recipients">
+          <label className="ls-recipients-label" htmlFor="recipients-textarea">Recipients</label>
+          <textarea
+            id="recipients-textarea"
+            className="ls-recipients-textarea"
+            value={recipientsRaw}
+            onChange={handleRecipientsChange}
+            onBlur={handleRecipientsBlur}
+            placeholder="one@address.com"
+          />
+          <p className="ls-recipients-helper">One per line — you can also separate with commas.</p>
+          {invalidAddresses.map((addr) => (
+            <p key={addr} className="ls-recipients-error">{addr}</p>
+          ))}
+          {capExceeded && (
+            <p className="ls-recipients-error">Maximum {MAX_EMAILS} recipients</p>
+          )}
+        </div>
+        {/* T-002-06/T-002-07: password/note fields */}
       </div>
     </section>
   )
