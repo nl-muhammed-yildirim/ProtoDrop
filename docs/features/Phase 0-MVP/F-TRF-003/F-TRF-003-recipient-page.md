@@ -100,10 +100,10 @@ AC-003-5: Download limit reached
 
 | Story | Task | File | Status |
 |---|---|---|---|
-| US-003-01 | T-003-01 Endpoint 4: GetPublicTransferQuery, recipient metadata (T-014) | `US-003-01-open-link/T-003-01-get-public-transfer-endpoint.md` | ☐ |
-| US-003-01 | T-003-02 Recipient page UI: file list, From header, note (FR-003-1/2) | `US-003-01-open-link/T-003-02-recipient-page-ui.md` | ☐ |
-| US-003-05 | T-003-03 Terminal-state screens: expired / not-found / download-limit + "Downloads left" (FR-003-5/8/9) | `US-003-05-remaining-expired/T-003-03-terminal-state-screens.md` | ☐ |
-| US-003-04 | T-003-04 Endpoint 5: unlock, PBKDF2 verify → 7-day JWT (T-015) | `US-003-04-unlock-password/T-003-04-unlock-endpoint-jwt.md` | ☐ |
+| US-003-01 | T-003-01 Endpoint 4: GetPublicTransferQuery, recipient metadata (T-014) | `US-003-01-open-link/T-003-01-get-public-transfer-endpoint.md` | ☑ 2026-10-18 (3768ba9 + fix a915a8a, review PASS) |
+| US-003-01 | T-003-02 Recipient page UI: file list, From header, note (FR-003-1/2) | `US-003-01-open-link/T-003-02-recipient-page-ui.md` | ☑ 2026-10-18 (54013ba + fix 1b4871a, review PASS) |
+| US-003-05 | T-003-03 Terminal-state screens: expired / not-found / download-limit + "Downloads left" (FR-003-5/8/9) | `US-003-05-remaining-expired/T-003-03-terminal-state-screens.md` | ☑ 2026-10-18 (46238a1, review PASS) |
+| US-003-04 | T-003-04 Endpoint 5: unlock, PBKDF2 verify → 7-day JWT (T-015) | `US-003-04-unlock-password/T-003-04-unlock-endpoint-jwt.md` | ☑ 2026-10-18 (4bb8496 + fix 8a1c35a, review PASS) |
 | US-003-04 | T-003-05 Password gate UI: single card, shake on wrong, sessionStorage token (FR-003-6) | `US-003-04-unlock-password/T-003-05-password-gate-ui.md` | ☐ |
 | US-003-03 | T-003-06 Endpoint 6: single-file SAS mint, DownloadsCount + cap check (T-016) | `US-003-03-download-individual/T-003-06-single-file-sas-endpoint.md` | ☐ |
 | US-003-07 | T-003-07 Growth loop: "Send something" panel + terminal-state CTA (FR-003-7) | `US-003-07-growth-loop/T-003-07-growth-loop-panel.md` | ☐ |
