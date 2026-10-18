@@ -1,4 +1,5 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
 
 import { formatBytes } from '../../core/upload/formatBytes'
 import { useRecipientStore } from './RecipientStore'
@@ -15,6 +16,11 @@ interface RecipientPageProps {
  * T-003-03 (FR-003-8/9): expired and download-limit render one shared terminal screen (icon, one line from the
  * store's Problem+JSON details, one action) — no file list, no sizes; 'expired' covers both 410 and 404 so those
  * screens stay byte-identical by construction. The "Send something" anchor is a placeholder — T-003-07 wires it.
+ * T-003-05 (FR-003-6, AC-003-2 client half): when passwordRequired === true the ACTIVE screen renders ONLY the
+ * centered password card — no file list, no sizes, nothing beyond the sender name. Submit → endpoint 5; correct
+ * entry stores the JWT in sessionStorage and re-queries with ?t= (no re-prompt on same-tab refresh); wrong entry
+ * shakes + role=alert "Wrong password" while staying gated. Terminal states always take precedence over the gate —
+ * the T-003-03 shared screen wins whenever status !== 'active' (T-003-04 emits terminal codes over the wire).
  * **No sign-up wall** — FR-003-2.
  * The linkId arrives by prop from App (recipientRoute.ts matches the pathname — no window here).
  */
@@ -26,6 +32,13 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
   const hasDownloadAll = useRecipientStore((s) => s.hasDownloadAll)
   const downloadsLeft = useRecipientStore((s) => s.downloadsLeft)
   const terminalMessage = useRecipientStore((s) => s.terminalMessage)
+  const passwordRequired = useRecipientStore((s) => s.passwordRequired)
+  const unlocking = useRecipientStore((s) => s.unlocking)
+  const unlockError = useRecipientStore((s) => s.unlockError)
+
+  // T-003-05 (FR-003-6): gate-local state — the password value resets on unmount/remount by construction.
+  const [value, setValue] = useState('')
+  const [show, setShow] = useState(false)
 
   // T-003-02: mount-time load; reset on unmount keeps tests hermetic (UploadEngine's test-cleanup convention).
   useEffect(() => {
@@ -36,6 +49,12 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
   // T-003-06 / F-TRF-004 (T-017): real download wiring arrives later — the page view itself must not mint SAS (TA-4.2#4).
   const handleDownload = () => {}
   const handleDownloadAll = () => {}
+
+  // T-003-05 (AC-003-2): submit → endpoint 5; the store owns token storage + the ?t= re-query. Never rejects.
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    void useRecipientStore.getState().unlock(linkId, value)
+  }
 
   if (status === 'loading') {
     return <p className="rp-loading" role="status">Loading…</p>
@@ -54,6 +73,7 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
     // T-003-03 (FR-003-8/9, UI-Reference §4.6): one shared terminal screen — icon, one line (server Problem+JSON
     // details verbatim), one action. Expired vs download-limit differ only in the stored message; the 404 and
     // email-less 410 bodies are both email-less, so their screens stay byte-identical by construction.
+    // T-003-05: this branch also wins over a gated transfer — terminal states take precedence over the password gate.
     return (
       <section className="rp rp-terminal" aria-label="Transfer unavailable">
         <span className="rp-icon rp-terminal-icon" aria-hidden="true">
@@ -66,6 +86,58 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
         <h1 className="rp-heading">{terminalMessage}</h1>
         {/* T-003-07 (growth loop) wires this CTA — placeholder anchor to / at this task. */}
         <a className="btn-primary rp-terminal-action" href="/">Send something</a>
+      </section>
+    )
+  }
+
+  if (status === 'active' && passwordRequired) {
+    // T-003-05 (FR-003-6): the gate — the ONLY content on a gated transfer is this card: sender name + form.
+    // No note, no file list, no sizes, nothing to enumerate or leak (byte-leak audit in RecipientPage.test.tsx).
+    return (
+      <section className="rp rp-gate" aria-label={`From ${from} — password required`}>
+        <h1 className="rp-heading">From: {from}</h1>
+        <form className="rp-password-card" onSubmit={handleSubmit}>
+          <label className="rp-password-label" htmlFor="rp-password-input">Password</label>
+          <div className={`rp-password-row${unlockError ? ' rp-shake' : ''}`}>
+            <input
+              id="rp-password-input"
+              type={show ? 'text' : 'password'}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              className="rp-password-input"
+              autoComplete="current-password"
+            />
+            <button
+              type="button"
+              className="rp-password-toggle"
+              aria-label={show ? 'Hide password' : 'Show password'}
+              aria-pressed={show}
+              onClick={() => setShow((s) => !s)}
+            >
+              {show ? (
+                // feather eye-off — inline, features self-contained (TA-8.2).
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                  <path d="M14.12 14.12A3 3 0 1 1 10.9 10.9" />
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                </svg>
+              ) : (
+                // feather eye — inline, features self-contained (TA-8.2).
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              )}
+            </button>
+          </div>
+          {unlockError && (
+            <p className="rp-password-error" role="alert">{unlockError}</p>
+          )}
+          <button type="submit" className="btn-primary rp-password-submit" disabled={unlocking || value.length === 0}>
+            Unlock
+          </button>
+        </form>
       </section>
     )
   }

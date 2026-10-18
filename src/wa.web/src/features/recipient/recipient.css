@@ -146,3 +146,91 @@
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* T-003-05 (FR-003-6): password gate — the single centered card on a gated transfer. Only this section and its
+   contents render (RecipientPage.tsx owns the branching) — no file list, no sizes, nothing to leak. */
+.rp-gate {
+  /* Inherits .rp's 560px centered column — the card centers with the rest of the page. */
+}
+
+.rp-password-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rp-password-label {
+  color: var(--fg-muted);
+  font-size: var(--fs-small);
+}
+
+/* Row wrapper — position:relative so the toggle can overlay the input's right edge (44×44 target). */
+.rp-password-row {
+  position: relative;
+}
+
+.rp-password-input {
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding-right: 52px; /* clears the absolutely-positioned toggle — no overlap on any width */
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  font-size: var(--fs-body);
+}
+
+.rp-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.rp-password-toggle:hover {
+  color: var(--fg);
+}
+
+/* Wrong password — role=alert text is always present (motion-safe: only the shake is gated below). */
+.rp-password-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--fs-small);
+}
+
+/* Full-width primary submit — same .btn-primary base as Download all. */
+.rp-password-submit {
+  width: 100%;
+}
+
+.rp-password-input:focus-visible,
+.rp-password-toggle:focus-visible,
+.rp-password-submit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Shake on wrong password — @media wrapper matches the .dz-toast precedent (index.css); reduced motion → text only. */
+@media (prefers-reduced-motion: no-preference) {
+  .rp-shake {
+    animation: rp-shake 400ms ease-in-out;
+  }
+}
+
+@keyframes rp-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  50% { transform: translateX(4px); }
+  75% { transform: translateX(-4px); }
+}

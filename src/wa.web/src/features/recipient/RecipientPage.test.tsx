@@ -433,3 +433,359 @@ describe('RecipientPage (App at /t/{linkId} — T-003-02)', () => {
     host.remove()
   })
 })
+
+describe('RecipientPage (T-003-05 — password gate UI)', () => {
+  const gatedBody = (): PublicTransferBody => activeBody({ passwordRequired: true })
+
+  // Dispatching stub: POST /unlock → { token }; GET endpoint 4 gated when the URL lacks ?t=, ungated with ?t=tok123.
+  function stubDispatchingFetch(): void {
+    vi.stubGlobal(
+      'fetch',
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        if ((init?.method ?? '').toUpperCase() === 'POST') {
+          return new Response(JSON.stringify({ token: 'tok123' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+        }
+        const url = String(input)
+        const hasToken = url.includes('?t=tok123')
+        return new Response(JSON.stringify(activeBody({ passwordRequired: !hasToken })), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      },
+    )
+  }
+
+  const isGatedActive = (): boolean => useRecipientStore.getState().status === 'active' && useRecipientStore.getState().passwordRequired === true
+  const isUngatedActive = (): boolean => useRecipientStore.getState().status === 'active' && !useRecipientStore.getState().passwordRequired
+
+  /** Fills the controlled password input (LinkScreen.test native value setter idiom) and dispatches React's input event. */
+  function typePassword(host: HTMLDivElement, text: string): void {
+    const input = host.querySelector('#rp-password-input') as HTMLInputElement
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    set.call(input, text)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  }
+
+  beforeEach(() => {
+    window.history.pushState('', '', `/t/${LINK_ID}`)
+  })
+
+  afterEach(() => {
+    for (const root of roots.splice(0)) act(() => { root.unmount() }) // cleanup runs reset() inside act.
+    useRecipientStore.getState().reset()
+    window.sessionStorage.clear()
+    window.history.replaceState(null, '', '/')
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('gated render shows only the password card — no file list, no sizes, one fetch (exit check 1 + no-byte-leak)', async () => {
+    const calls: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      async (input: RequestInfo | URL) => {
+        calls.push(String(input))
+        return new Response(JSON.stringify(gatedBody()), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      },
+    )
+
+    const host = await renderApp(isGatedActive)
+
+    expect(host.querySelector('.rp-heading')?.textContent).toBe('From: Studio Nova')
+    // FR-003-6 byte-leak audit — nothing beyond sender name + form.
+    expect(host.querySelectorAll('.rp-row')).toHaveLength(0)
+    expect(host.querySelectorAll('.rp-size')).toHaveLength(0)
+    expect(host.querySelectorAll('.rp-note')).toHaveLength(0)
+    expect(host.querySelectorAll('.rp-download, .rp-download-all')).toHaveLength(0)
+    expect(host.querySelectorAll('.rp-downloads-left')).toHaveLength(0)
+    // Exactly endpoint 4 — no unlock call on mount.
+    expect(calls).toEqual([`http://localhost:8080/api/v1/public/transfers/${LINK_ID}`])
+    host.remove()
+  })
+
+  it('field shape: single current-password input, toggle, full-width primary submit disabled when empty (AC-003-2)', async () => {
+    stubFetch(200, gatedBody())
+
+    const host = await renderApp(isGatedActive)
+
+    const inputs = Array.from(host.querySelectorAll('input'))
+    expect(inputs).toHaveLength(1)
+    expect(inputs[0].getAttribute('type')).toBe('password')
+    expect(inputs[0].getAttribute('autocomplete')).toBe('current-password')
+
+    const toggle = host.querySelector('.rp-password-toggle') as HTMLButtonElement
+    expect(toggle.getAttribute('aria-label')).toBe('Show password')
+
+    let submit = host.querySelector('.rp-password-submit') as HTMLButtonElement
+    expect(submit.classList.contains('btn-primary')).toBe(true)
+    expect(submit.textContent).toBe('Unlock')
+    expect(submit.disabled).toBe(true) // empty value → disabled
+
+    typePassword(host, 'secret')
+    await act(async () => { await Promise.resolve() })
+    submit = host.querySelector('.rp-password-submit') as HTMLButtonElement
+    expect(submit.disabled).toBe(false) // enabled after typing
+    host.remove()
+  })
+
+  it('toggle flips type password→text→password and updates aria-label/aria-pressed each click', async () => {
+    stubFetch(200, gatedBody())
+
+    const host = await renderApp(isGatedActive)
+    const input = host.querySelector('#rp-password-input') as HTMLInputElement
+    const toggle = host.querySelector('.rp-password-toggle') as HTMLButtonElement
+
+    expect(input.getAttribute('type')).toBe('password')
+    expect(toggle.getAttribute('aria-pressed')).toBe('false')
+
+    await act(async () => { toggle.click() })
+    expect(input.getAttribute('type')).toBe('text')
+    expect(toggle.getAttribute('aria-label')).toBe('Hide password')
+    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+
+    await act(async () => { toggle.click() })
+    expect(input.getAttribute('type')).toBe('password')
+    expect(toggle.getAttribute('aria-label')).toBe('Show password')
+    expect(toggle.getAttribute('aria-pressed')).toBe('false')
+    host.remove()
+  })
+
+  it('correct password → token in sessionStorage, ?t= re-query, file list renders (exit check 2 + AC-003-2)', async () => {
+    const calls: Array<{ url: string; method: string; body?: unknown }> = []
+    vi.stubGlobal(
+      'fetch',
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        const hasToken = url.includes('?t=tok123')
+        calls.push({ url, method: (init?.method ?? 'GET').toUpperCase(), body: init?.body })
+        if ((init?.method ?? '').toUpperCase() === 'POST') {
+          return new Response(JSON.stringify({ token: 'tok123' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+        }
+        return new Response(JSON.stringify(activeBody({ passwordRequired: !hasToken })), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      },
+    )
+
+    const host = await renderApp(isGatedActive)
+    typePassword(host, 'secret')
+    await act(async () => { await Promise.resolve() })
+    await act(async () => {
+      (host.querySelector('.rp-password-card') as HTMLFormElement).requestSubmit()
+      for (let i = 0; i < 400 && !isUngatedActive(); i++) {
+        await Promise.resolve()
+      }
+    })
+
+    expect(host.querySelectorAll('.rp-row')).toHaveLength(2)
+    expect(window.sessionStorage.getItem(`pd.unlock.${LINK_ID}`)).toBe('tok123')
+    const unlockCalls = calls.filter((c) => c.url.endsWith('/unlock'))
+    expect(unlockCalls).toHaveLength(1) // exactly one POST
+    expect(JSON.parse(String(unlockCalls[0].body))).toEqual({ password: 'secret' })
+    const get4 = calls.filter((c) => c.method === 'GET')
+    expect(get4.at(-1)?.url).toBe(`http://localhost:8080/api/v1/public/transfers/${LINK_ID}?t=tok123`) // re-query carries ?t=
+    host.remove()
+  })
+
+  it('same-tab refresh: seeded sessionStorage → ungated in exactly one fetch, no re-prompt (AC-003-2)', async () => {
+    window.sessionStorage.setItem(`pd.unlock.${LINK_ID}`, 'tok123')
+    const calls: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      async (input: RequestInfo | URL) => {
+        calls.push(String(input))
+        const url = String(input)
+        return new Response(JSON.stringify(activeBody({ passwordRequired: !url.includes('?t=tok123') })), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      },
+    )
+
+    const host = await renderApp(isUngatedActive)
+
+    expect(host.querySelectorAll('.rp-row')).toHaveLength(2)
+    // Exactly one fetch — endpoint 4 WITH ?t=; the gate never rendered, no unlock POST.
+    expect(calls).toEqual([`http://localhost:8080/api/v1/public/transfers/${LINK_ID}?t=tok123`])
+    host.remove()
+  })
+
+  it('wrong password → shake + role=alert "Wrong password", still gated, no token (AC-003-2)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        if ((init?.method ?? '').toUpperCase() === 'POST') {
+          return new Response(JSON.stringify({ type: 'https://example.com/errors/wrong-password', title: 'Wrong password', status: 401, code: 'WRONG_PASSWORD', details: 'Wrong password' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/problem+json' },
+          })
+        }
+        return new Response(JSON.stringify(gatedBody()), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      },
+    )
+
+    const host = await renderApp(isGatedActive)
+    typePassword(host, 'nope')
+    await act(async () => { await Promise.resolve() })
+    await act(async () => {
+      ;(host.querySelector('.rp-password-card') as HTMLFormElement).requestSubmit()
+      while (!useRecipientStore.getState().unlockError) {
+        await Promise.resolve()
+      }
+    })
+
+    expect(host.querySelector('.rp-password-row')!.className).toContain('rp-shake')
+    const alert = host.querySelector('.rp-password-error') as HTMLParagraphElement
+    expect(alert.getAttribute('role')).toBe('alert')
+    expect(alert.textContent).toBe('Wrong password')
+    expect(useRecipientStore.getState().status).toBe('active') // still gated — no lockout, retry stays live.
+    expect(useRecipientStore.getState().passwordRequired).toBe(true)
+    expect(host.querySelectorAll('.rp-row')).toHaveLength(0)
+    expect(window.sessionStorage.getItem(`pd.unlock.${LINK_ID}`)).toBeNull()
+    expect((host.querySelector('#rp-password-input') as HTMLInputElement).value).toBe('nope') // input preserved
+    host.remove()
+  })
+
+  it('a 401 omitting details falls back to client copy "Wrong password"', async () => {
+    vi.stubGlobal(
+      'fetch',
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        if ((init?.method ?? '').toUpperCase() === 'POST') {
+          return new Response(JSON.stringify({ type: 'https://example.com/errors/wrong-password', title: 'Wrong password', status: 401, code: 'WRONG_PASSWORD' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/problem+json' },
+          })
+        }
+        return new Response(JSON.stringify(gatedBody()), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      },
+    )
+
+    const host = await renderApp(isGatedActive)
+    typePassword(host, 'nope')
+    await act(async () => { await Promise.resolve() })
+    await act(async () => {
+      ;(host.querySelector('.rp-password-card') as HTMLFormElement).requestSubmit()
+      while (!useRecipientStore.getState().unlockError) {
+        await Promise.resolve()
+      }
+    })
+
+    expect((host.querySelector('.rp-password-error') as HTMLParagraphElement).textContent).toBe('Wrong password') // fallback copy
+    host.remove()
+  })
+
+  it('no lockout: retry after a wrong password succeeds in the same mounted tree (AC-003-2)', async () => {
+    let posts = 0
+    vi.stubGlobal(
+      'fetch',
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        const method = (init?.method ?? '').toUpperCase()
+        if (method === 'POST') {
+          posts++
+          if (posts === 1) {
+            return new Response(JSON.stringify({ code: 'WRONG_PASSWORD', details: 'Wrong password' }), {
+              status: 401,
+              headers: { 'Content-Type': 'application/problem+json' },
+            })
+          }
+          return new Response(JSON.stringify({ token: 'tok123' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+        }
+        const url = String(_input)
+        return new Response(JSON.stringify(activeBody({ passwordRequired: !url.includes('?t=tok123') })), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      },
+    )
+
+    const host = await renderApp(isGatedActive)
+
+    // First attempt — wrong password.
+    typePassword(host, 'wrong')
+    await act(async () => { await Promise.resolve() })
+    await act(async () => {
+      ;(host.querySelector('.rp-password-card') as HTMLFormElement).requestSubmit()
+      while (!useRecipientStore.getState().unlockError) {
+        await Promise.resolve()
+      }
+    })
+    expect(host.querySelector('.rp-password-error')?.textContent).toBe('Wrong password')
+
+    // Second attempt — correct. Same tree, no remount.
+    typePassword(host, 'secret')
+    const form = host.querySelector('.rp-password-card') as HTMLFormElement
+    await act(async () => {
+      form.requestSubmit()
+      for (let i = 0; i < 400 && !isUngatedActive(); i++) {
+        await Promise.resolve()
+      }
+    })
+
+    expect(host.querySelectorAll('.rp-row')).toHaveLength(2)
+    expect(host.querySelector('.rp-password-card')).toBeNull() // the gate is gone — file list renders.
+    host.remove()
+  })
+
+  it('D6 precedence: terminal TRANSFER_EXPIRED from unlock beats the gate (T-003-03 wins)', async () => {
+    const details = 'This transfer has expired. Contact alice@example.com for a new link.'
+    vi.stubGlobal(
+      'fetch',
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        const method = (init?.method ?? '').toUpperCase()
+        if (method === 'POST') {
+          return new Response(JSON.stringify({ code: 'TRANSFER_EXPIRED', details }), {
+            status: 410,
+            headers: { 'Content-Type': 'application/problem+json' },
+          })
+        }
+        return new Response(JSON.stringify(gatedBody()), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      },
+    )
+
+    const host = await renderApp(isGatedActive)
+    typePassword(host, 'secret')
+    await act(async () => { await Promise.resolve() })
+    // The unlock POST returns the terminal 410 — poll the terminal status (the store never re-queries on terminal).
+    const isTerminal = (): boolean => useRecipientStore.getState().status === 'expired' || useRecipientStore.getState().status === 'downloadLimit'
+    await act(async () => {
+      ;(host.querySelector('.rp-password-card') as HTMLFormElement).requestSubmit()
+      for (let i = 0; i < 400 && !isTerminal(); i++) {
+        await Promise.resolve()
+      }
+    })
+
+    expect(useRecipientStore.getState().status).toBe('expired')
+    expect(host.querySelector('.rp-heading')?.textContent).toBe(details) // terminal screen wins — details verbatim
+    expect(host.querySelectorAll('#rp-password-input')).toHaveLength(0) // no password input left in the DOM
+    host.remove()
+  })
+
+  it('EC-003-2 tab isolation: cleared sessionStorage re-prompts at the same URL', async () => {
+    stubDispatchingFetch()
+
+    // First "tab" — unlock writes the token.
+    const host = await renderApp(isGatedActive)
+    typePassword(host, 'secret')
+    await act(async () => { await Promise.resolve() })
+    await act(async () => {
+      ;(host.querySelector('.rp-password-card') as HTMLFormElement).requestSubmit()
+      for (let i = 0; i < 400 && !isUngatedActive(); i++) {
+        await Promise.resolve()
+      }
+    })
+    expect(host.querySelectorAll('.rp-row')).toHaveLength(2)
+    expect(window.sessionStorage.getItem(`pd.unlock.${LINK_ID}`)).toBe('tok123')
+    host.remove()
+
+    // Simulate a second tab: unmount + cleared sessionStorage (same URL — beforeEach's pushState is re-asserted here).
+    await act(async () => { useRecipientStore.getState().reset() })
+    window.sessionStorage.clear()
+    window.history.pushState('', '', `/t/${LINK_ID}`)
+
+    const host2 = await renderApp(isGatedActive)
+    expect(host2.querySelector('#rp-password-input')).not.toBeNull() // gate renders again — re-prompted by design
+    expect(host2.querySelectorAll('.rp-row')).toHaveLength(0)
+    host2.remove()
+  })
+})
