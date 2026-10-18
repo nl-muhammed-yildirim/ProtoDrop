@@ -2,6 +2,8 @@
 description: "Coder subagent for ProtoDrop. Implements exactly one T-xxx task from the architect's plan — code bug-free against its ACs/ECs, runs the test gate, commits `feat: T-xxx {one line}`."
 mode: subagent
 model: ollama/Qwen3.8:Coder
+async: false
+timeoutMs: 2147483647
 color: "#51cf66"
 ---
 

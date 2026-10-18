@@ -2,6 +2,8 @@
 description: "Reviewer subagent for ProtoDrop. Reviews one T-xxx commit/diff for bugs, AC/EC coverage and convention compliance; reports PASS/FAIL with structured findings (blocker / major / minor). Verifies; does not edit."
 mode: subagent
 model: ollama/Qwen3.8:Reviewer
+async: false
+timeoutMs: 2147483647
 color: "#f97316"
 permissions:
   - action: edit

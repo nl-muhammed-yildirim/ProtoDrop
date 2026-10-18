@@ -2,6 +2,8 @@
 description: "Plan subagent for ProtoDrop. Turns one T-xxx backlog row into a concrete design and implementation plan grounded in TA-* / feature specs; emits the plan for the coder to execute without editing code."
 mode: subagent
 model: ollama/Qwen3.8:Architect
+async: false
+timeoutMs: 2147483647
 color: "#9775fa"
 permissions:
   - action: edit

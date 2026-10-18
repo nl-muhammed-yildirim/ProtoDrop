@@ -15,5 +15,6 @@ Cycle per task: **architect (plan) → coder (develop) → reviewer (review)** �
 
 ## Subagents
 - No parallel subagent calls: spawn only ONE at a time; wait for its completion before spawning the next (local-model context).
+- **Synchronous local runs**: agents run on this machine — launch them with `async: false` (foreground) and no timeout. Foreground is pinned by machine config (`~/.pi/agent/extensions/subagent/config.json`: `asyncByDefault: false`, `timeoutMs: 2147483647`) and in each `.pi/agents/*.md` frontmatter; Pi's per-request idle timeout is disabled (`httpIdleTimeoutMs: 0` in `~/.pi/agent/settings.json`). A subagent that finishes wakes the parent natively — just wait for completion, do not poll or re-spawn.
 - Child sessions start blank — every spawn must carry full task context: T-xxx ID, scope + exit check from the backlog row, ACs/ECs list, relevant TA-* sections, and any plan or findings text.
 - One T-xxx task at a time in backlog order (first non-`done` row); no task crosses its backlog row silently — escalations surface to the user (`DECISION:` format per `docs/AGENT.md` §8).
