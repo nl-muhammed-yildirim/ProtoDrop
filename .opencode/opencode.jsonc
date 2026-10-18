@@ -1,0 +1,6 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  // Default to the Orchestrator for sessions started in this project; it drives
+  // the architect -> coder -> reviewer pipeline (see .opencode/agents/*.md).
+  "default_agent": "orchestrator"
+}
