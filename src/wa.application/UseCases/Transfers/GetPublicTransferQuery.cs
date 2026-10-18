@@ -7,8 +7,11 @@ using wa.domain.ValueObjects;
 
 namespace wa.application.UseCases.Transfers;
 
-/// <summary>GET /api/v1/public/transfers/{linkId} request (TA-4.2#4).</summary>
-public sealed record GetPublicTransferQuery(string LinkId) : IRequest<GetPublicTransferResult>;
+/// <summary>
+/// GET /api/v1/public/transfers/{linkId} request (TA-4.2#4). Token = the optional ?t= unlock JWT (T-003-04, TA-9.6#1) —
+/// default null so all existing call sites compile unchanged; only the Program.cs endpoint 5 wiring fills it.
+/// </summary>
+public sealed record GetPublicTransferQuery(string LinkId, string? Token = null) : IRequest<GetPublicTransferResult>;
 
 /// <summary>A file row of the active transfer — plain projection, no EF entity (golden rule 8: no DbContext in use cases).</summary>
 public sealed record PublicFileItem(Guid FileId, string Name, long SizeBytes);
@@ -36,17 +39,20 @@ public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransfer
     private readonly IPublicTransferStore _store;
     private readonly ILimitsProvider _limits;
     private readonly WaTelemetryReporter _telemetry;
+    private readonly IUnlockTokenMinter _tokens;
     private readonly ILogger<GetPublicTransferHandler> _logger;
 
     public GetPublicTransferHandler(
         IPublicTransferStore store,
         ILimitsProvider limits,
         WaTelemetryReporter telemetry,
+        IUnlockTokenMinter tokens,
         ILogger<GetPublicTransferHandler> logger)
     {
         _store = store;
         _limits = limits;
         _telemetry = telemetry;
+        _tokens = tokens;
         _logger = logger;
     }
 
@@ -74,6 +80,12 @@ public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransfer
         if (transfer.Status == 3)
             return new GetPublicTransferResult(PublicTransferState.DownloadLimit, SenderEmail: transfer.SenderEmail);
 
+        // T-003-04 (TA-9.6#1): a valid ?t= token flips passwordRequired to false — no re-prompt on refresh.
+        // An invalid/expired/wrong-sub/junk token behaves EXACTLY like an absent one (flag stays true, same body — TA-9.6 enumeration safety).
+        // Status already won above (D6): the token only matters in this Active branch, so a terminal state always wins over it (US-003-05).
+        var gated = transfer.PasswordHash is not null;
+        var passwordRequired = gated && (_tokens.Verify(request.Token, request.LinkId) == false);
+
         // Active — full metadata payload; no SAS minted at page view, no download consumed.
         var limits = await _limits.Resolve(ILimitsProvider.GuestPlanCode, cancellationToken); // no auth on this endpoint → guest/free plan (TA-3.4: never a literal).
         return new GetPublicTransferResult(
@@ -83,7 +95,7 @@ public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransfer
             Files: files,
             HasDownloadAll: transfer.FileCount >= 2 && transfer.TotalBytes <= limits.MaxZipSize,
             DownloadsLeft: transfer.MaxDownloads == -1 ? null : transfer.MaxDownloads - transfer.DownloadsCount, // the same column TA-7.2's flip uses — page and cap stay consistent
-            PasswordRequired: transfer.PasswordHash is not null);
+            PasswordRequired: passwordRequired);
     }
 
     /// <summary>8 chars from the LinkId charset (TA-9.6) — anything else is treated as unknown on purpose.</summary>

@@ -14,16 +14,19 @@ public class GetPublicTransferHandlerTests
 {
     private readonly StubPublicTransferStore _store;
     private readonly TelemetryRecorder _telemetryLogger;
+    private readonly StubUnlockTokenMinter _minter;
     private readonly GetPublicTransferHandler _handler;
 
     public GetPublicTransferHandlerTests()
     {
         _store = new StubPublicTransferStore();
         _telemetryLogger = new TelemetryRecorder();
+        _minter = new StubUnlockTokenMinter();
         _handler = new GetPublicTransferHandler(
             _store,
             NewLimits(maxZipSize: 4294967296), // free-plan seeded values (TA-3.4: no literals in handler code — the stub is test data)
             new WaTelemetryReporter(_telemetryLogger, System.Text.Encoding.UTF8.GetBytes("unit-test-key")),
+            _minter,
             NullLogger<GetPublicTransferHandler>.Instance);
     }
 
@@ -222,6 +225,78 @@ public class GetPublicTransferHandlerTests
         Assert.Equal(status == 4, emittedNotFound); // transfer_not_found only on the NotFound branch — never for Active/Expired/DownloadLimit
     }
 
+    // ---- T-003-04 (TA-9.6#1): ?t= unlock-token acceptance — a valid token flips passwordRequired to false ----
+
+    [Fact]
+    public async Task Handle_Active_Gated_ValidToken_ReturnsPasswordRequiredFalse()
+    {
+        _store.SetupActive(files: [], maxDownloads: 1, downloadsCount: 0, passwordHash: "hash"); // gated
+        _minter.VerifyResult = true; // token is valid (sub matches)
+
+        var result = await _handler.Handle(new GetPublicTransferQuery("abcdefgh", Token: "valid.jwt.token"), CancellationToken.None);
+
+        Assert.Equal(PublicTransferState.Active, result.State);
+        Assert.False(result.PasswordRequired); // no re-prompt — a refresh in the same tab skips the card (AC-003-2 server half)
+    }
+
+    [Fact]
+    public async Task Handle_Active_Gated_JunkToken_ReturnsPasswordRequiredTrue()
+    {
+        _store.SetupActive(files: [], maxDownloads: 1, downloadsCount: 0, passwordHash: "hash"); // gated
+        _minter.VerifyResult = false; // junk/tampered/expired/wrong-sub token → behaves like absent
+
+        var result = await _handler.Handle(new GetPublicTransferQuery("abcdefgh", Token: "garbage"), CancellationToken.None);
+
+        Assert.Equal(PublicTransferState.Active, result.State);
+        Assert.True(result.PasswordRequired); // still gated — a bad token is indistinguishable from none (TA-9.6 enumeration safety)
+    }
+
+    [Fact]
+    public async Task Handle_Active_Gated_TokenPresentButWrongSub_ReturnsPasswordRequiredTrue()
+    {
+        _store.SetupActive(files: [], maxDownloads: 1, downloadsCount: 0, passwordHash: "hash"); // gated
+        _minter.VerifyResult = false; // token is well-formed but sub mismatch → Verify returns false
+
+        var result = await _handler.Handle(new GetPublicTransferQuery("abcdefgh", Token: "valid-jwt-but-different-sub"), CancellationToken.None);
+
+        Assert.True(result.PasswordRequired); // wrong-sub token behaves like absent (D4)
+    }
+
+    [Fact]
+    public async Task Handle_Active_Ungated_AnyToken_ReturnsPasswordRequiredFalse()
+    {
+        _store.SetupActive(files: [], maxDownloads: 1, downloadsCount: 0, passwordHash: null); // not gated — no PasswordHash
+        _minter.VerifyResult = true; // irrelevant — ungated means no prompt regardless
+
+        var result = await _handler.Handle(new GetPublicTransferQuery("abcdefgh", Token: "whatever"), CancellationToken.None);
+
+        Assert.False(result.PasswordRequired); // ungated + any token → false (D4 formula: gated=false short-circuits)
+    }
+
+    [Fact]
+    public async Task Handle_Active_Gated_NullToken_ReturnsPasswordRequiredTrue()
+    {
+        _store.SetupActive(files: [], maxDownloads: 1, downloadsCount: 0, passwordHash: "hash"); // gated
+        // Token null — the default for all existing call sites.
+
+        var result = await _handler.Handle(new GetPublicTransferQuery("abcdefgh"), CancellationToken.None);
+
+        Assert.True(result.PasswordRequired); // no token → still gated (original behavior preserved)
+    }
+
+    [Fact]
+    public async Task Handle_Active_Gated_ValidTokenOnExpiredStatus_ReturnsExpired_NoTokenShortCircuit()
+    {
+        _store.SetupStatus(status: 2, senderEmail: "alice@example.com"); // Status=2 Expired — terminal wins (D6/US-003-05)
+        _minter.VerifyResult = true; // token is valid but should be ignored — status check runs BEFORE token logic
+
+        var result = await _handler.Handle(new GetPublicTransferQuery("abcdefgh", Token: "valid.jwt.token"), CancellationToken.None);
+
+        Assert.Equal(PublicTransferState.Expired, result.State); // the 410 expired screen beats a valid token (US-003-05)
+        Assert.Null(result.Files); // no file rows on a terminal state (no byte leak)
+        Assert.Equal("alice@example.com", result.SenderEmail);
+    }
+
     // ---- Stubs ----
 
     private sealed class StubPublicTransferStore : IPublicTransferStore
@@ -273,6 +348,16 @@ public class GetPublicTransferHandlerTests
 
         public Task<LimitsRecord> Resolve(string planCode, CancellationToken cancellationToken) =>
             Task.FromResult(new LimitsRecord { MaxZipSize = MaxZipSize });
+    }
+
+    /// <summary>T-003-04: stub for IUnlockTokenMinter — returns a configurable verify result so tests can exercise the token branch.</summary>
+    private sealed class StubUnlockTokenMinter : IUnlockTokenMinter
+    {
+        public bool VerifyResult { get; set; } = false;
+
+        public string Mint(string linkId) => $"stub.jwt.{linkId}"; // never called in these tests (no unlock minting here)
+
+        public bool Verify(string? token, string expectedSub) => VerifyResult; // the test controls this to simulate valid/junk/expired tokens
     }
 
     /// <summary>Records exactly what M.E.L hands to the logger: rendered text + pre-formatted args (same style as WaTelemetryReporterTests).</summary>
