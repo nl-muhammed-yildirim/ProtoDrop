@@ -521,8 +521,10 @@ describe('RecipientPage (T-003-05 — password gate UI)', () => {
     expect(submit.textContent).toBe('Unlock')
     expect(submit.disabled).toBe(true) // empty value → disabled
 
-    typePassword(host, 'secret')
-    await act(async () => { await Promise.resolve() })
+    await act(async () => {
+      typePassword(host, 'secret')
+      await Promise.resolve() // flush the controlled input's setValue update inside an act scope.
+    })
     submit = host.querySelector('.rp-password-submit') as HTMLButtonElement
     expect(submit.disabled).toBe(false) // enabled after typing
     host.remove()
@@ -569,8 +571,10 @@ describe('RecipientPage (T-003-05 — password gate UI)', () => {
     )
 
     const host = await renderApp(isGatedActive)
-    typePassword(host, 'secret')
-    await act(async () => { await Promise.resolve() })
+    await act(async () => {
+      typePassword(host, 'secret')
+      await Promise.resolve() // flush the controlled input's setValue update inside an act scope.
+    })
     await act(async () => {
       (host.querySelector('.rp-password-card') as HTMLFormElement).requestSubmit()
       for (let i = 0; i < 400 && !isUngatedActive(); i++) {
@@ -626,8 +630,10 @@ describe('RecipientPage (T-003-05 — password gate UI)', () => {
     )
 
     const host = await renderApp(isGatedActive)
-    typePassword(host, 'nope')
-    await act(async () => { await Promise.resolve() })
+    await act(async () => {
+      typePassword(host, 'nope')
+      await Promise.resolve() // flush the controlled input's setValue update inside an act scope.
+    })
     await act(async () => {
       ;(host.querySelector('.rp-password-card') as HTMLFormElement).requestSubmit()
       while (!useRecipientStore.getState().unlockError) {
@@ -662,8 +668,10 @@ describe('RecipientPage (T-003-05 — password gate UI)', () => {
     )
 
     const host = await renderApp(isGatedActive)
-    typePassword(host, 'nope')
-    await act(async () => { await Promise.resolve() })
+    await act(async () => {
+      typePassword(host, 'nope')
+      await Promise.resolve() // flush the controlled input's setValue update inside an act scope.
+    })
     await act(async () => {
       ;(host.querySelector('.rp-password-card') as HTMLFormElement).requestSubmit()
       while (!useRecipientStore.getState().unlockError) {
@@ -702,8 +710,10 @@ describe('RecipientPage (T-003-05 — password gate UI)', () => {
     const host = await renderApp(isGatedActive)
 
     // First attempt — wrong password.
-    typePassword(host, 'wrong')
-    await act(async () => { await Promise.resolve() })
+    await act(async () => {
+      typePassword(host, 'wrong')
+      await Promise.resolve() // flush the controlled input's setValue update inside an act scope.
+    })
     await act(async () => {
       ;(host.querySelector('.rp-password-card') as HTMLFormElement).requestSubmit()
       while (!useRecipientStore.getState().unlockError) {
@@ -713,7 +723,10 @@ describe('RecipientPage (T-003-05 — password gate UI)', () => {
     expect(host.querySelector('.rp-password-error')?.textContent).toBe('Wrong password')
 
     // Second attempt — correct. Same tree, no remount.
-    typePassword(host, 'secret')
+    await act(async () => {
+      typePassword(host, 'secret')
+      await Promise.resolve() // flush the controlled input's setValue update inside an act scope.
+    })
     const form = host.querySelector('.rp-password-card') as HTMLFormElement
     await act(async () => {
       form.requestSubmit()
@@ -744,8 +757,10 @@ describe('RecipientPage (T-003-05 — password gate UI)', () => {
     )
 
     const host = await renderApp(isGatedActive)
-    typePassword(host, 'secret')
-    await act(async () => { await Promise.resolve() })
+    await act(async () => {
+      typePassword(host, 'secret')
+      await Promise.resolve() // flush the controlled input's setValue update inside an act scope.
+    })
     // The unlock POST returns the terminal 410 — poll the terminal status (the store never re-queries on terminal).
     const isTerminal = (): boolean => useRecipientStore.getState().status === 'expired' || useRecipientStore.getState().status === 'downloadLimit'
     await act(async () => {
@@ -766,8 +781,10 @@ describe('RecipientPage (T-003-05 — password gate UI)', () => {
 
     // First "tab" — unlock writes the token.
     const host = await renderApp(isGatedActive)
-    typePassword(host, 'secret')
-    await act(async () => { await Promise.resolve() })
+    await act(async () => {
+      typePassword(host, 'secret')
+      await Promise.resolve() // flush the controlled input's setValue update inside an act scope.
+    })
     await act(async () => {
       ;(host.querySelector('.rp-password-card') as HTMLFormElement).requestSubmit()
       for (let i = 0; i < 400 && !isUngatedActive(); i++) {
