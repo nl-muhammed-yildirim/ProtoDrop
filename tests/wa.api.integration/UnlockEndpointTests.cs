@@ -122,7 +122,8 @@ public class UnlockEndpointTests : IAsyncLifetime
         var claims2 = DecodeJwtPayload(token, out _);
         var expSeconds = claims2.GetProperty("exp").GetInt64();
         var nowSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        // TA-9.1: exp is exactly now + 7 days (no approximation — the unit tests pin this precisely via an injectable clock).
+        // TA-9.1: exp is exactly now + 7 days — this integration test bounds the window at ±2s; the EXACT pin (Assert.Equal with a pinned
+        // injectable clock) lives in UnlockTokenTests.Mint_ExactExpClaim_IsNowPlusSevenDaysViaPinnedClock (D3).
         Assert.InRange(expSeconds, nowSeconds + (7 * 86400 - 2), nowSeconds + (7 * 86400 + 2));
     }
 
@@ -225,6 +226,35 @@ public class UnlockEndpointTests : IAsyncLifetime
 
         using var doc = JsonDocument.Parse(await response.Content.ReadAsByteArrayAsync());
         Assert.Equal(ProblemCodes.TransferExpired, doc.RootElement.GetProperty("code").GetString()); // same code as expired/unknown (DECISION A)
+    }
+
+    [Fact]
+    public async Task UnknownLinkId_Returns404_BodyByteIdenticalToEndpoint4UnknownCase()
+    {
+        // M1 fix: plan §5 row 7 — endpoint 5's unknown-linkId case must be byte-identical to endpoint 4's (FR-003-9 single-body invariant).
+        const string traceparent = "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbccccddeeff01-01"; // D8: same W3C trace id → matching correlationId
+
+        using var unknownReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/public/transfers/zzz99999/unlock");
+        unknownReq.Headers.Add("traceparent", traceparent);
+        unknownReq.Content = new StringContent(JsonSerializer.Serialize(new { password = "whatever" }), Encoding.UTF8, "application/json");
+        using var unknownRes = await _client.SendAsync(unknownReq);
+        Assert.Equal(HttpStatusCode.NotFound, unknownRes.StatusCode); // 404 — the unknown-case status
+
+        using var getReq = new HttpRequestMessage(HttpMethod.Get, "/api/v1/public/transfers/zzz99999");
+        getReq.Headers.Add("traceparent", traceparent);
+        using var getRes = await _client.SendAsync(getReq);
+        Assert.Equal(HttpStatusCode.NotFound, getRes.StatusCode);
+
+        // Both bodies parse as Problem+JSON with code TRANSFER_EXPIRED.
+        using (var unlockDoc = JsonDocument.Parse(await unknownRes.Content.ReadAsByteArrayAsync()))
+            Assert.Equal(ProblemCodes.TransferExpired, unlockDoc.RootElement.GetProperty("code").GetString());
+        using (var getDoc = JsonDocument.Parse(await getRes.Content.ReadAsByteArrayAsync()))
+            Assert.Equal(ProblemCodes.TransferExpired, getDoc.RootElement.GetProperty("code").GetString());
+
+        // Byte-identical bodies: the unlock path and endpoint 4's unknown case must produce exactly the same bytes (FR-003-9).
+        var unlockBody = await unknownRes.Content.ReadAsByteArrayAsync();
+        var getBody = await getRes.Content.ReadAsByteArrayAsync();
+        Assert.Equal(getBody, unlockBody); // FR-003-9: single body for the unknown case across both endpoints
     }
 
     // ---- Exit check 4: both telemetry events fire without ever carrying the password value (TA-9.4) ----
