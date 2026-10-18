@@ -34,6 +34,18 @@ function stubFetch(status: number, body: PublicTransferBody): void {
   )
 }
 
+/** T-003-03 (TA-4.1.3): endpoint 4's terminal Problem+JSON stub — codes pinned at wa.domain/Errors/ProblemCodes.cs. */
+function stubFetchProblem(status: number, code: string, details: string): void {
+  vi.stubGlobal(
+    'fetch',
+    async () =>
+      new Response(JSON.stringify({ type: 'https://example.com/errors/transfer-expired', title: 'Transfer expired', status, code, details }), {
+        status,
+        headers: { 'Content-Type': 'application/problem+json' },
+      }),
+  )
+}
+
 /**
  * Renders <App /> and, in the same act scope, polls the store until settled() holds. The recipient page's
  * load() resolves through the stub fetch in a few microtask turns — React 18 requires those store updates to
@@ -55,6 +67,8 @@ async function renderApp(settled: () => boolean): Promise<HTMLDivElement> {
 
 const isActive = (): boolean => useRecipientStore.getState().status === 'active'
 const isError = (): boolean => useRecipientStore.getState().status === 'error'
+// T-003-03: the shared terminal branch — expired (410/404) and download-limit (410).
+const isTerminal = (): boolean => useRecipientStore.getState().status === 'expired' || useRecipientStore.getState().status === 'downloadLimit'
 
 const activeBody = (overrides?: Partial<PublicTransferBody>): PublicTransferBody => ({
   from: 'Studio Nova',
@@ -212,7 +226,8 @@ describe('RecipientPage (App at /t/{linkId} — T-003-02)', () => {
     host.remove()
   })
 
-  it('shows the error state for a 410 response (T-003-03 will replace with dedicated screens)', async () => {
+  it('shows the error state for a 410 response without a terminal code (non-Problem bodies stay generic)', async () => {
+    // No 'code' field — not one of TA-4.1.3's terminal codes, so the store keeps the generic error shape.
     vi.stubGlobal(
       'fetch',
       async () =>
@@ -227,6 +242,115 @@ describe('RecipientPage (App at /t/{linkId} — T-003-02)', () => {
     expect(host.querySelector('.rp-error')?.textContent).toBe('Something went wrong')
     expect(host.querySelectorAll('.rp-row')).toHaveLength(0) // no file leak on the error state
     expect(/sign up|create account/i.test(host.textContent ?? '')).toBe(false)
+    host.remove()
+  })
+
+  it('renders the expired screen for 410 with sender email in details (AC-003-3)', async () => {
+    stubFetchProblem(410, 'TRANSFER_EXPIRED', 'This transfer has expired. Contact alice@example.com for a new link.')
+
+    const host = await renderApp(isTerminal)
+
+    expect(useRecipientStore.getState().status).toBe('expired')
+    // §4.6 shape: icon, one line (server details verbatim), one action; no file list or From heading.
+    const message = 'This transfer has expired. Contact alice@example.com for a new link.'
+    expect(host.querySelector('.rp-heading')?.textContent).toBe(message)
+    const action = host.querySelector('.rp-terminal-action') as HTMLAnchorElement
+    expect(action.textContent).toBe('Send something')
+    expect(action.getAttribute('href')).toBe('/')
+    expect(host.querySelectorAll('.rp-row')).toHaveLength(0)
+    host.remove()
+  })
+
+  it('renders the identical screen for 404 (unknown linkId) — only HTTP status differs (AC-003-4, FR-003-9)', async () => {
+    // Both bodies are email-less (the server never sends an email for NotFound — ExpiredDetails(null)),
+    // so the rendered .rp-terminal section must be byte-identical across 410 and 404.
+    const details = 'This transfer has expired. Contact the sender for a new link.'
+    stubFetchProblem(410, 'TRANSFER_EXPIRED', details)
+    const host410 = await renderApp(isTerminal)
+    expect(host410.querySelector('.rp-terminal')).not.toBeNull()
+    const html410 = host410.querySelector('.rp-terminal')!.outerHTML
+    await act(async () => { useRecipientStore.getState().reset() })
+
+    stubFetchProblem(404, 'TRANSFER_EXPIRED', details)
+    const host404 = await renderApp(isTerminal)
+    expect(host404.querySelector('.rp-terminal')).not.toBeNull()
+    expect(host404.querySelector('.rp-terminal')!.outerHTML).toBe(html410) // byte-identical — no ID enumeration
+    expect(host404.querySelectorAll('.rp-row')).toHaveLength(0)
+    host410.remove()
+    host404.remove()
+  })
+
+  it('renders the download-limit screen for 410 MAX_DOWNLOADS_REACHED with sender email (AC-003-5)', async () => {
+    stubFetchProblem(410, 'MAX_DOWNLOADS_REACHED', 'All downloads have been used. Contact alice@example.com for a new link.')
+
+    const host = await renderApp(isTerminal)
+
+    expect(useRecipientStore.getState().status).toBe('downloadLimit')
+    expect(host.querySelector('.rp-heading')?.textContent).toBe('All downloads have been used. Contact alice@example.com for a new link.')
+    const action = host.querySelector('.rp-terminal-action') as HTMLAnchorElement
+    expect(action.textContent).toBe('Send something')
+    expect(host.querySelectorAll('.rp-row')).toHaveLength(0)
+    host.remove()
+  })
+
+  it('renders the download-limit screen without a fabricated address when email is null (AC-003-5 alt flow)', async () => {
+    stubFetchProblem(410, 'MAX_DOWNLOADS_REACHED', 'All downloads have been used. Contact the sender for a new link.')
+
+    const host = await renderApp(isTerminal)
+
+    // Details render verbatim — the screen must not contain a fabricated address.
+    expect(host.querySelector('.rp-heading')?.textContent).toBe('All downloads have been used. Contact the sender for a new link.')
+    expect((host.textContent ?? '').includes('@')).toBe(false)
+    host.remove()
+  })
+
+  it('byte-leak audit: no file list, no sizes, no extra requests on any terminal screen (TA-4.2#4)', async () => {
+    const cases: Array<[number, string, string]> = [
+      [410, 'TRANSFER_EXPIRED', 'This transfer has expired. Contact alice@example.com for a new link.'],
+      [404, 'TRANSFER_EXPIRED', 'This transfer has expired. Contact the sender for a new link.'],
+      [410, 'MAX_DOWNLOADS_REACHED', 'All downloads have been used. Contact alice@example.com for a new link.'],
+    ]
+
+    for (const [status, code, details] of cases) {
+      const calls: string[] = []
+      vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+        calls.push(String(input))
+        return new Response(JSON.stringify({ code, details }), { status, headers: { 'Content-Type': 'application/problem+json' } })
+      })
+
+      const host = await renderApp(isTerminal)
+
+      expect(host.querySelectorAll('.rp-row')).toHaveLength(0) // no file list
+      expect(host.querySelectorAll('.rp-size')).toHaveLength(0) // no sizes
+      expect(host.querySelectorAll('.rp-download, .rp-download-all')).toHaveLength(0) // no Download controls — nothing to mint a SAS for
+      expect(calls).toEqual([`http://localhost:8080/api/v1/public/transfers/${LINK_ID}`]) // exactly one fetch — endpoint 4 only
+      host.remove()
+      await act(async () => { useRecipientStore.getState().reset() })
+    }
+  })
+
+  it('shows "Downloads left: N" under the list for finite caps (FR-003-5)', async () => {
+    stubFetch(200, activeBody({ downloadsLeft: 86 }))
+    const host = await renderApp(isActive)
+
+    expect(host.querySelector('.rp-downloads-left')?.textContent).toBe('Downloads left: 86')
+    host.remove()
+    await act(async () => { useRecipientStore.getState().reset() })
+
+    // Edge of the visibility rule — one remaining still shows (0 is already the terminal limit screen).
+    stubFetch(200, activeBody({ downloadsLeft: 1 }))
+    const host2 = await renderApp(isActive)
+
+    expect(host2.querySelector('.rp-downloads-left')?.textContent).toBe('Downloads left: 1')
+    host2.remove()
+  })
+
+  it('hides "Downloads left" for Business (∞) — downloadsLeft null', async () => {
+    stubFetch(200, activeBody({ downloadsLeft: null }))
+
+    const host = await renderApp(isActive)
+
+    expect(host.querySelector('.rp-downloads-left')).toBeNull()
     host.remove()
   })
 

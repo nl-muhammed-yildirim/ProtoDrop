@@ -21,7 +21,7 @@
   text-align: center;
 }
 
-/* Error state — centered muted card; T-003-03 replaces with dedicated terminal screens. */
+/* Error state — centered muted card; the dedicated terminal screens live in .rp-terminal below (T-003-03). */
 .rp-error {
   color: var(--fg);
 }
@@ -112,8 +112,37 @@
   width: 100%;
 }
 
+/* T-003-03 (FR-003-5): "Downloads left: N" under the list, --fs-small, only for finite caps. */
+.rp-downloads-left {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: var(--fs-small);
+  text-align: center;
+}
+
+/* T-003-03 (FR-003-8/9, UI-Reference §4.6): shared terminal screen — icon, one line, one action.
+   Expired / unknown / download-limit all render this shape; only the line's text differs. */
+.rp-terminal {
+  gap: 24px;
+}
+
+/* Icon slot — reuses .rp-icon's muted color, centered for the single-screen state. */
+.rp-terminal-icon {
+  justify-content: center;
+}
+
+/* One action — "Send something" as the §4.6 primary anchor (T-003-07 wires it). */
+.rp-terminal-action {
+  align-self: center;
+}
+
 .rp-download:focus-visible,
 .rp-download-all:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.rp-terminal-action:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
