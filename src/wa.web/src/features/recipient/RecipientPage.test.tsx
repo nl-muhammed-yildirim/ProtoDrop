@@ -258,6 +258,8 @@ describe('RecipientPage (App at /t/{linkId} — T-003-02)', () => {
 
   it('matchLinkPath accepts only /t/[8-char Crockford base32 charset] and extracts the linkId', () => {
     expect(matchLinkPath('/t/ab3def5g')).toBe('ab3def5g')
+    expect(matchLinkPath('/t/tab3def5')).toBe('tab3def5') // t is minted (T-003-02-fix: reviewer blocker)
+    expect(matchLinkPath('/t/vab3def5')).toBe('vab3def5') // v is minted (T-003-02-fix: reviewer blocker)
     expect(matchLinkPath('/')).toBeNull()
     expect(matchLinkPath('/t/')).toBeNull()
     expect(matchLinkPath('/t/Ab3dEf5g')).toBeNull() // uppercase never minted (LinkId.cs charset)
@@ -265,6 +267,30 @@ describe('RecipientPage (App at /t/{linkId} — T-003-02)', () => {
     expect(matchLinkPath('/t/ab3def5gH')).toBeNull() // 9 chars
     expect(matchLinkPath('/t/ab3def5g/')).toBeNull() // trailing slash
     expect(matchLinkPath('/t/ab3def5')).toBeNull() // 7 chars
+  })
+
+  it('linkIds containing t or v route to the active recipient page, not the landing page (T-003-02-fix)', async () => {
+    const calls: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      async (input: RequestInfo | URL) => {
+        calls.push(String(input))
+        return new Response(JSON.stringify(activeBody()), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      },
+    )
+
+    // 8-char linkIds — the reviewer's /t/tab3def5g example is 9 chars (invalid), so use tab3def5 / vab3def5.
+    for (const linkId of ['tab3def5', 'vab3def5']) {
+      // App reads window.location.pathname on mount — render a fresh tree per linkId (beforeEach's pushState is overwritten).
+      window.history.pushState('', '', `/t/${linkId}`)
+      const host = await renderApp(isActive)
+      expect(host.querySelector('.rp-heading')?.textContent).toBe('From: Studio Nova')
+      expect(host.querySelector('.dz-title')).toBeNull() // not the landing page
+      expect(calls.at(-1)).toBe(`http://localhost:8080/api/v1/public/transfers/${linkId}`) // endpoint 4 got the t/v linkId
+      host.remove()
+      // The root is still subscribed (afterEach unmounts), so reset lands in an act scope — same contract as the reset test below.
+      await act(async () => { useRecipientStore.getState().reset() })
+    }
   })
 
   it('reset restores the loading shape (store contract for test hermeticity)', async () => {

@@ -7,7 +7,9 @@
  * real charset means malformed URLs fall through to the landing page instead of a bogus transfer fetch.
  */
 
-export const RECIPIENT_PATH_RE = /^\/t\/([0-9a-hjkmnpqrswxyz]{8})$/
+// T-003-02-fix: the class MUST equal LinkId.Charset (wa.domain/ValueObjects/LinkId.cs, authoritative over the task doc) —
+// recipientRoute.test.ts reads that file and re-matches every charset character, so the two can't drift again.
+export const RECIPIENT_PATH_RE = /^\/t\/([0-9a-hjkmnpqrstvwxyz]{8})$/
 
 export function matchLinkPath(pathname: string): string | null {
   const m = pathname.match(RECIPIENT_PATH_RE)
