@@ -149,6 +149,24 @@ public class GetPublicTransferHandlerTests
     }
 
     [Fact]
+    public async Task Handle_MalformedLinkId_CorrectLength_BadChar_PostQueryFilter_ReturnsNotFound_TelemetryEmitted()
+    {
+        // "abcdefg!" is length 8 with one char outside LinkId.Charset — the stub returns a row (it models a directly-seeded CHAR(8) value),
+        // so this exercises the post-query filter (transfer is not null && !IsWellFormedLinkId → NotFound) rather than the stub-null branch.
+        _store.SetupActive(files: [], maxDownloads: 1, downloadsCount: 0, passwordHash: null);
+
+        var result = await _handler.Handle(new GetPublicTransferQuery("abcdefg!"), CancellationToken.None);
+
+        Assert.Equal(PublicTransferState.NotFound, result.State);
+        Assert.Null(result.SenderEmail); // identical Problem+JSON body to expired-with-no-email (FR-003-9)
+        Assert.Null(result.Files);
+
+        // AC-003-4: transfer_page_viewed on every load (emitted once); transfer_not_found emitted on the NotFound branch.
+        Assert.Single(_telemetryLogger.Entries, e => e.RenderedText.StartsWith(TelemetryEvents.TransferPageViewed));
+        Assert.Single(_telemetryLogger.Entries, e => e.RenderedText == TelemetryEvents.TransferNotFound);
+    }
+
+    [Fact]
     public async Task Handle_DeletedStatus_ReturnsNotFound()
     {
         _store.SetupStatus(status: 4); // f-delete-transfers (TA-6.4): hard-deletes FileItems + Status=4 → indistinguishable unknown (DECISION A)

@@ -196,7 +196,7 @@ app.MapGet("/api/v1/public/transfers/{linkId}", async (string linkId, ISender se
             ProblemCodes.StatusOf(ProblemCodes.TransferExpired), ProblemCodes.TransferExpired, ExpiredDetails(result.SenderEmail)), statusCode: 410),
 
         PublicTransferState.DownloadLimit => Results.Json(
-            ProblemWriter.Build(410, ProblemCodes.MaxDownloadsReached, "All downloads have been used."), statusCode: 410), // 409→410 explicit override (task doc status mapping)
+            ProblemWriter.Build(410, ProblemCodes.MaxDownloadsReached, DownloadLimitDetails(result.SenderEmail)), statusCode: 410), // 409→410 explicit override (task doc status mapping)
 
         PublicTransferState.NotFound => Results.Json(
             ProblemWriter.Build(404, ProblemCodes.TransferExpired, ExpiredDetails(null)), statusCode: 404) // FR-003-9: same body, different status line only
@@ -207,6 +207,12 @@ static string ExpiredDetails(string? senderEmail) =>
     senderEmail is null
         ? "This transfer has expired. Contact the sender for a new link."   // US-003-05 alternative flow: no fabricated address
         : $"This transfer has expired. Contact {senderEmail} for a new link.";
+
+// AC-003-5 / F-TRF-005-4 details text — sender email when provided; plain message when null (no fabricated address, same style as ExpiredDetails).
+static string DownloadLimitDetails(string? senderEmail) =>
+    senderEmail is null
+        ? "All downloads have been used."
+        : $"All downloads have been used. Contact {senderEmail} for a new link.";
 
 app.Run();
 

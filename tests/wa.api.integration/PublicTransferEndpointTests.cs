@@ -220,12 +220,55 @@ public class PublicTransferEndpointTests : IAsyncLifetime
         var root = doc.RootElement;
         Assert.Equal("MAX_DOWNLOADS_REACHED", root.GetProperty("code").GetString()); // the closed list — no new code (D2)
         Assert.Equal(410, root.GetProperty("status").GetInt32());
-        Assert.Equal("All downloads have been used.", root.GetProperty("details").GetString());
+        Assert.Equal("All downloads have been used.", root.GetProperty("details").GetString()); // AC-003-5 alternative flow: SenderEmail null → plain message, no fabricated address
 
         // AC-003-5: no file list.
         Assert.False(doc.RootElement.TryGetProperty("files", out _));
 
         Assert.Equal(0, await _db.Set<DownloadEvent>().CountAsync(e => e.TransferId == transferId));
+    }
+
+    // ---- AC-003-5 / F-TRF-005-4: download-limit details include the sender email when provided ----
+
+    [Fact]
+    public async Task DownloadLimit_410_SenderEmailIncludedInDetails_WhenProvided()
+    {
+        var transferId = await SeedTransferAsync(status: 3, linkId: "q2w2t2d2", maxDownloads: 1, downloadsCount: 1, senderEmail: "alice@example.com");
+
+        using var response = await _client.GetAsync("/api/v1/public/transfers/q2w2t2d2");
+        Assert.Equal(HttpStatusCode.Gone, response.StatusCode); // 410
+
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsByteArrayAsync());
+        var root = doc.RootElement;
+        Assert.Equal("MAX_DOWNLOADS_REACHED", root.GetProperty("code").GetString());
+        Assert.Equal("All downloads have been used. Contact alice@example.com for a new link.", root.GetProperty("details").GetString()); // F-TRF-005-4: sender email when provided
+
+        // AC-003-5: no file list.
+        Assert.False(doc.RootElement.TryGetProperty("files", out _));
+
+        Assert.Equal(0, await _db.Set<DownloadEvent>().CountAsync(e => e.TransferId == transferId));
+    }
+
+    // ---- FR-003-2 / plan §3: files returned ordered by SortOrder — rows seeded out-of-order (inserted reversed) ----
+
+    [Fact]
+    public async Task Active_FilesReturnedSortedBySortOrder_WhenSeededOutOfOrder()
+    {
+        var transferId = await SeedTransferAsync(status: 1, linkId: "s0r4q3d5", maxDownloads: 5, downloadsCount: 2, totalBytes: 0);
+
+        // Insertion order (i) deliberately contradicts SortOrder: the first inserted row has SortOrder=2, etc.
+        var firstInserted = (fileId: Guid.NewGuid(), name: "third-by-sort.txt", sizeBytes: 300L, sortOrder: 2);
+        var secondInserted = (fileId: Guid.NewGuid(), name: "first-by-sort.txt", sizeBytes: 100L, sortOrder: 0);
+        var thirdInserted = (fileId: Guid.NewGuid(), name: "second-by-sort.txt", sizeBytes: 200L, sortOrder: 1);
+        await SeedFileItemsAsync(transferId, [firstInserted, secondInserted, thirdInserted]);
+
+        using var response = await _client.GetAsync("/api/v1/public/transfers/s0r4q3d5");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsByteArrayAsync());
+        // GET returns files sorted by SortOrder ascending through the real adapter — not insertion order.
+        Assert.Equal(["first-by-sort.txt", "second-by-sort.txt", "third-by-sort.txt"],
+            doc.RootElement.GetProperty("files").EnumerateArray().Select(f => f.GetProperty("name").GetString()).ToArray());
     }
 
     // ---- F-TRF-003 test plan: Deleted → 404 + same shape as unknown (DECISION A: Status=4 maps to the unknown branch) ----
@@ -272,11 +315,14 @@ public class PublicTransferEndpointTests : IAsyncLifetime
     }
 
     private async Task SeedFileItemsAsync(Guid transferId, (Guid fileId, string name, long sizeBytes)[] files)
+        => await SeedFileItemsAsync(transferId, files.Select(f => (f.fileId, f.name, f.sizeBytes, sortOrder: -1)).ToArray());
+
+    private async Task SeedFileItemsAsync(Guid transferId, (Guid fileId, string name, long sizeBytes, int sortOrder)[] files)
     {
         // UQ_FileItem_T_B: (TransferId, BlobRefId) is unique — one BlobRef per FileItem (same style as FinalizeTransfer).
         for (var i = 0; i < files.Length; i++)
         {
-            var (fileId, name, sizeBytes) = files[i];
+            var (fileId, name, sizeBytes, sortOrder) = files[i];
             var blobRef = new BlobRef
             {
                 Id = Guid.NewGuid(),
@@ -294,7 +340,7 @@ public class PublicTransferEndpointTests : IAsyncLifetime
                 OriginalName = name,
                 SizeBytes = sizeBytes,
                 ContentType = "text/plain",
-                SortOrder = i // distinct ascending — the adapter orders by SortOrder (TA-4.2#4)
+                SortOrder = sortOrder >= 0 ? sortOrder : i // explicit when provided (out-of-order tests); distinct ascending otherwise (TA-4.2#4)
             });
         }
         // Keep Transfer columns consistent with the FileItem rows (same as finalize does in production):

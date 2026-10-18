@@ -55,7 +55,7 @@ public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransfer
         // TA-4.2#4 emits column: transfer_page_viewed on every load — the linkId hash, never the raw 8-char id (TA-9.4 style).
         _telemetry.TransferPageViewed(PiiTransforms.FileName(request.LinkId));
 
-        // Cheap pre-filter (D5): malformed IDs answer unknown without reaching the SQL comparison — no ID enumeration via format errors.
+        // D5 post-query filter: rows matched by a linkId outside the 8-char charset are treated as unknown — no ID enumeration via format errors.
         var (transfer, files) = await _store.GetByLinkIdAsync(request.LinkId, cancellationToken);
         if (transfer is not null && !IsWellFormedLinkId(request.LinkId))
             transfer = null;
