@@ -33,6 +33,8 @@ builder.Services.AddSingleton<wa.application.Ports.ISbHealthProbe, SbHealthProbe
 builder.Services.AddSingleton(new DbContextOptionsBuilder<WaDbContext>()
     .UseSqlServer(builder.Configuration.GetConnectionString("WaDb")).Options);
 builder.Services.AddSingleton<wa.infrastructure.Persistence.AppDbContextFactory>();
+// SbEventPublisher (T-054-03) resolves the interface — register under both types.
+builder.Services.AddSingleton<IDbContextFactory<WaDbContext>, wa.infrastructure.Persistence.AppDbContextFactory>();
 // T-054-05 (TA-0.2 rule 7): no "is this the fake?" branch in production code — DI picks the adapter on the connection string.
 var sbConnString = builder.Configuration["Wa:ServiceBus:ConnectionString"];
 if (string.IsNullOrEmpty(sbConnString))

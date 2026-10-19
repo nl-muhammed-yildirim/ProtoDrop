@@ -28,7 +28,25 @@ public sealed class TransferStore : ITransferStore
             _db.Set<BlobRef>().Add(br);
         foreach (var fi in fileItems)
             _db.Set<FileItem>().Add(fi);
-        _db.Set<IdempotencyKey>().Add(idempotencyKey);
+
+        // Singleton context (adapter-owned): the handler's own FindByIdempotencyKeyAsync may already
+        // have tracked a row for this key (e.g. an expired key pre-seeded by T-002-04). Reuse that
+        // instance instead of Add — a second tracked instance with the same PK ('Key') throws an EF
+        // identity conflict, and a blind INSERT would hit PK_Idem at the DB level.
+        var existing = _db.Set<IdempotencyKey>().Local.FirstOrDefault(k => k.Key == idempotencyKey.Key)
+            ?? await _db.Set<IdempotencyKey>().FirstOrDefaultAsync(k => k.Key == idempotencyKey.Key, ct);
+        if (existing is not null)
+        {
+            existing.ResultJson = idempotencyKey.ResultJson;
+            existing.TransferId = idempotencyKey.TransferId;
+            existing.StatusCode = idempotencyKey.StatusCode;
+            existing.ExpiresAtUtc = idempotencyKey.ExpiresAtUtc;
+        }
+        else
+        {
+            _db.Set<IdempotencyKey>().Add(idempotencyKey);
+        }
+
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
     }

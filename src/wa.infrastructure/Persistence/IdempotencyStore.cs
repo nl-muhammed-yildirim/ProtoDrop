@@ -25,15 +25,32 @@ public sealed class IdempotencyStore : IIdempotencyStore
 
     public async Task SaveAsync(string key, string resultJson, int statusCode, CancellationToken ct)
     {
-        var now = DateTime.UtcNow;
-        _db.Set<IdempotencyKey>().Add(new IdempotencyKey
+        // Singleton context (adapter-owned): the finalize handler may already have tracked an
+        // IdempotencyKey row for this key in its own transaction. Reuse that instance instead of
+        // Add — a second tracked instance with the same PK ('Key') throws an EF identity conflict.
+        var existing = _db.Set<IdempotencyKey>().Local.FirstOrDefault(k => k.Key == key)
+            ?? await _db.Set<IdempotencyKey>().FirstOrDefaultAsync(k => k.Key == key, ct);
+
+        if (existing is not null)
         {
-            Key = key,
-            ResultJson = resultJson,
-            StatusCode = statusCode,
-            CreatedAtUtc = now,
-            ExpiresAtUtc = now.AddHours(24) // TA-4.1.5: 24 h TTL contract
-        });
+            // Overwrite with the middleware-captured outcome (actual status + body).
+            existing.ResultJson = resultJson;
+            existing.StatusCode = statusCode;
+            existing.ExpiresAtUtc = DateTime.UtcNow.AddHours(24); // TA-4.1.5: 24 h TTL from first use
+        }
+        else
+        {
+            var now = DateTime.UtcNow;
+            _db.Set<IdempotencyKey>().Add(new IdempotencyKey
+            {
+                Key = key,
+                ResultJson = resultJson,
+                StatusCode = statusCode,
+                CreatedAtUtc = now,
+                ExpiresAtUtc = now.AddHours(24) // TA-4.1.5: 24 h TTL contract
+            });
+        }
+
         await _db.SaveChangesAsync(ct);
     }
 }

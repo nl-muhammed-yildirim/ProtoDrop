@@ -8,6 +8,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- T-003-06 (CI gate): xUnit runner config — must live in the output dir. Each test class boots its own Azurite +
+         SQL 2022 per TA-14.3 and points PROCESS-GLOBAL env vars (Wa__Blob__, ConnectionStrings__) at them, so parallel
+         collection execution stomps those across classes; run single-threaded.
+    -->
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
