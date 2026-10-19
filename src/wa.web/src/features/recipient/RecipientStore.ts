@@ -24,6 +24,8 @@ export type RecipientStatus = 'loading' | 'active' | 'error' | 'expired' | 'down
 const PUBLIC_TRANSFER_ENDPOINT = 'http://localhost:8080/api/v1/public/transfers/{linkId}'
 // T-003-05 (TA-4.2#5): endpoint 5 — the only client-side consumer of the unlock token; no auth, no cookie, no SAS.
 const UNLOCK_ENDPOINT = 'http://localhost:8080/api/v1/public/transfers/{linkId}/unlock'
+// T-003-06 (TA-4.2#6): endpoint 6 — mint a 30-minute read SAS; the browser streams the blob directly against storage.
+const DOWNLOAD_URL_ENDPOINT = 'http://localhost:8080/api/v1/public/transfers/{linkId}/files/{fileId}/download-url'
 const LOAD_TIMEOUT_MS = 30_000
 const ERROR_MESSAGE = 'Something went wrong'
 
@@ -86,6 +88,10 @@ interface RecipientState {
   unlocking: boolean
   /** T-003-05 (AC-003-2): wrong-password alert text (server details or fallback copy); null = no error. */
   unlockError: string | null
+  /** T-003-06: the fileId currently downloading — its row renders the in-flight indicator (UI notes). */
+  downloadingFileId: string | null
+  /** T-003-06 (US-003-03 alt flow): the fileId whose mint failed — its row shows "File temporarily unavailable." */
+  downloadErrorFileId: string | null
   error: string | null
 }
 
@@ -93,6 +99,8 @@ interface RecipientActions {
   load(linkId: string): Promise<void>
   /** T-003-05 (AC-003-2): POST endpoint 5 with the password; success stores the token and re-queries endpoint 4. */
   unlock(linkId: string, password: string): Promise<void>
+  /** T-003-06: GET endpoint 6 with the stored ?t= token → browser navigates to the minted SAS (streams directly from storage). */
+  download(linkId: string, fileId: string): void
   /** Aborts the in-flight load and restores the loading shape — keeps renders hermetic (UploadEngine reset style). */
   reset(): void
 }
@@ -111,6 +119,8 @@ const LOADING_SHAPE = {
   terminalMessage: null as string | null,
   unlocking: false,
   unlockError: null as string | null,
+  downloadingFileId: null as string | null,
+  downloadErrorFileId: null as string | null,
   error: null as string | null,
 }
 
@@ -236,5 +246,47 @@ export const useRecipientStore = create<RecipientState & RecipientActions>((set,
     activeController?.abort() // never let an aborted load's response land after unmount.
     activeController = null
     set({ ...LOADING_SHAPE })
+  },
+  download: (linkId, fileId) => {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), LOAD_TIMEOUT_MS)
+    set({ downloadingFileId: fileId, downloadErrorFileId: null }) // row indicator on; clears any previous per-row error
+    ;(async () => {
+      try {
+        // T-003-05 (AC-003-2): endpoint 6 accepts the same-tab stored unlock token (?t=) — gated transfers download too.
+        const token = readUnlockToken(linkId)
+        const url = DOWNLOAD_URL_ENDPOINT
+          .replace('{linkId}', linkId)
+          .replace('{fileId}', fileId)
+          + (token !== null ? `?t=${encodeURIComponent(token)}` : '')
+        const res = await fetch(url, { signal: controller.signal })
+        if (!res.ok) {
+          const problem = (await res.json()) as { code?: string; details?: string } | null
+          const terminal = classifyProblem(problem)
+          if (terminal !== null) {
+            // T-003-03 precedence: a terminal code (e.g. cap reached on this very mint) wins — the shared screen replaces the list.
+            set({ ...LOADING_SHAPE, status: terminal.status, terminalMessage: terminal.message })
+            return
+          }
+          // US-003-03 alt flow / F-TRF-013 MVP (503 + INTERNAL): storage degraded — row-level "File temporarily unavailable."
+          set({ downloadingFileId: null, downloadErrorFileId: fileId })
+          return
+        }
+        const body = (await res.json()) as { url: string; expiresAt: string | null }
+        // T-016 (TA-4.2#6): the browser streams the blob directly against storage — no fetch-blob (up to ~5 GB of memory),
+        // no download attribute (cross-origin navigation ignores it); Content-Disposition attachment does the naming.
+        window.location.href = body.url
+        // Exit check: "Downloads left" decrements by 1 when the cap is finite — the server counted at mint time.
+        const { downloadsLeft } = get()
+        if (downloadsLeft !== null) set({ downloadingFileId: null, downloadsLeft: downloadsLeft - 1 })
+      } catch (err) {
+        // AbortError means unmounted/superseded — no row error for a cancelled page.
+        if (!(err instanceof Error && err.name === 'AbortError')) {
+          set({ downloadingFileId: null, downloadErrorFileId: fileId })
+        }
+      } finally {
+        clearTimeout(timer)
+      }
+    })()
   },
 }))

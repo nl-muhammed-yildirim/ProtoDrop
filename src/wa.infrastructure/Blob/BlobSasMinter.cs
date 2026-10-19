@@ -69,15 +69,24 @@ public sealed class BlobSasMinter
             BlobPaths.StagingFile(new Guid(draftId), new Guid(fileId)),
             permissions: "cwr",
             expiresOn: _now().Add(DraftTtl),
-            startsOn: _now());
+            startsOn: _now(),
+            respContentDisposition: null);
 
     /// <summary>TA-3.6 recipient single file (<c>transfers</c> container): permissions <c>r</c>, 30 min, no start bound.</summary>
     public Uri MintRecipientFile(string transferId, string fileId)
+        => MintRecipientFile(transferId, fileId, respContentDisposition: null);
+
+    /// <summary>
+    /// T-003-06 (TA-4.2#6): mint a 30-minute read SAS on one transfer file with an original-filename Content-Disposition
+    /// override (EC-003-3, RFC 5987 <c>filename*</c>). The override is part of the string-to-sign, so it must be provided at mint time.
+    /// </summary>
+    public Uri MintRecipientFile(string transferId, string fileId, string? respContentDisposition)
         => Mint(
             BlobPaths.TransferFile(new Guid(transferId), new Guid(fileId)),
             permissions: "r",
             expiresOn: _now().Add(RecipientTtl),
-            startsOn: null);
+            startsOn: null,
+            respContentDisposition);
 
     /// <summary>TA-3.6 recipient zip (<c>transfers</c> container): permissions <c>r</c>, 30 min, no start bound.</summary>
     public Uri MintRecipientZip(string transferId)
@@ -85,10 +94,11 @@ public sealed class BlobSasMinter
             BlobPaths.TransferZip(new Guid(transferId)),
             permissions: "r",
             expiresOn: _now().Add(RecipientTtl),
-            startsOn: null);
+            startsOn: null,
+            respContentDisposition: null);
 
     private Uri Mint(
-        string path, string permissions, DateTimeOffset expiresOn, DateTimeOffset? startsOn)
+        string path, string permissions, DateTimeOffset expiresOn, DateTimeOffset? startsOn, string? respContentDisposition)
     {
         // TA-3.5 layout: the first path segment is the container; the rest is
         // the blob name (which itself may contain virtual directories).
@@ -101,6 +111,10 @@ public sealed class BlobSasMinter
             BlobContainerName = container,
             BlobName = blobName,
         };
+
+        // T-003-06: the resp-content-disposition override is signed into the string-to-sign; must be provided at mint time.
+        if (!string.IsNullOrEmpty(respContentDisposition))
+            builder.ContentDisposition = respContentDisposition;
 
         // Raw (un-normalized) permission string: TA-3.6 literal "cwr"/"r".
         builder.SetPermissions(permissions);

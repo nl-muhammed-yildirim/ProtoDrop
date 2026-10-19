@@ -259,6 +259,31 @@ app.MapPost("/api/v1/public/transfers/{linkId}/unlock", async (string linkId, Ht
     }
 });
 
+// T-003-06 (TA-4.2#6): mint a 30-minute read SAS on one transfer file; the browser streams directly from storage.
+// Terminal states map to endpoint 4's canonical Problem+JSON bodies (FR-003-9 byte identity); ?t= unlock JWT accepted.
+app.MapGet("/api/v1/public/transfers/{linkId}/files/{fileId}/download-url", async (string linkId, string fileId, HttpRequest request, ISender sender, CancellationToken ct) =>
+{
+    var result = await sender.Send(new GetFileDownloadUrlQuery(
+        linkId,
+        fileId,
+        Token: request.Query["t"].FirstOrDefault(),
+        ClientIp: request.HttpContext.Connection.RemoteIpAddress?.ToString(),
+        UserAgent: request.Headers.UserAgent.ToString()), ct);
+    return result.State switch
+    {
+        // TA-4.2#6 exact wire shape — exactly { url, expiresAt } (02-feature-plan §F-TRF-003 pinned); nothing else.
+        FileDownloadState.Ok => Results.Json(new { url = result.Url!.ToString(), expiresAt = result.ExpiresAt!.Value }),
+
+        // D6: terminal-before-auth — canonical bodies, same as endpoint 4 (FR-003-9).
+        FileDownloadState.NotFound => Results.Json(ProblemWriter.Build(404, ProblemCodes.TransferExpired, ExpiredDetails(null)), statusCode: 404),
+        FileDownloadState.Expired => Results.Json(ProblemWriter.Build(410, ProblemCodes.TransferExpired, ExpiredDetails(result.SenderEmail)), statusCode: 410),
+        FileDownloadState.DownloadLimit => Results.Json(ProblemWriter.Build(410, ProblemCodes.MaxDownloadsReached, DownloadLimitDetails(result.SenderEmail)), statusCode: 410),
+
+        // TA-9.6#1: gated transfer minted without a valid ?t= → 401 UNAUTHENTICATED (never a file-list-shaped error).
+        FileDownloadState.Unauthenticated => Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401)
+    };
+});
+
 app.Run();
 
 // Empty partial class so WebApplicationFactory<Program> can resolve the entry point.

@@ -35,6 +35,9 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
   const passwordRequired = useRecipientStore((s) => s.passwordRequired)
   const unlocking = useRecipientStore((s) => s.unlocking)
   const unlockError = useRecipientStore((s) => s.unlockError)
+  // T-003-06: per-row download indicator (UI notes: subtle progress/indicator; no page-level blocking UI).
+  const downloadingFileId = useRecipientStore((s) => s.downloadingFileId)
+  const downloadErrorFileId = useRecipientStore((s) => s.downloadErrorFileId)
 
   // T-003-05 (FR-003-6): gate-local state — the password value resets on unmount/remount by construction.
   const [value, setValue] = useState('')
@@ -46,8 +49,10 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
     return () => useRecipientStore.getState().reset()
   }, [linkId])
 
-  // T-003-06 / F-TRF-004 (T-017): real download wiring arrives later — the page view itself must not mint SAS (TA-4.2#4).
-  const handleDownload = () => {}
+  // T-003-06 (AC-003-1 client half): real download wiring — per-row Download button calls endpoint 6.
+  const handleDownload = (fileId: string) => {
+    void useRecipientStore.getState().download(linkId, fileId)
+  }
   const handleDownloadAll = () => {}
 
   // T-003-05 (AC-003-2): submit → endpoint 5; the store owns token storage + the ?t= re-query. Never rejects.
@@ -160,9 +165,14 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
               </svg>
             </span>
             <span className="rp-name" title={f.name}>{f.name}</span>
+            {/* T-003-06 (US-003-03 alt flow): storage degraded — the row's mint failed; the rest of the page keeps working. */}
+            {downloadErrorFileId === f.fileId && (
+              <p className="rp-download-error" role="alert">File temporarily unavailable.</p>
+            )}
             <span className="rp-size">{formatBytes(f.sizeBytes)}</span>
-            <button type="button" className="rp-download" aria-label={`Download ${f.name}, ${formatBytes(f.sizeBytes)}`} onClick={handleDownload}>
-              Download
+            {/* T-003-06 (UI notes): subtle in-flight indicator on the row while endpoint 6 is minting — no page-level blocking UI. */}
+            <button type="button" className="rp-download" disabled={downloadingFileId !== null} aria-label={`Download ${f.name}, ${formatBytes(f.sizeBytes)}`} onClick={() => handleDownload(f.fileId)}>
+              {downloadingFileId === f.fileId ? 'Downloading…' : 'Download'}
             </button>
           </li>
         ))}

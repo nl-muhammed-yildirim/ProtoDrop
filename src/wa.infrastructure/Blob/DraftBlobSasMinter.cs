@@ -13,4 +13,7 @@ public sealed class DraftBlobSasMinter : IBlobSasMinter
 
     /// <inheritdoc/>
     public Uri MintDraftUpload(string draftId, string fileId) => _inner.MintDraftUpload(draftId, fileId);
+
+    /// <summary>T-003-06 (TA-4.2#6): 30-minute read SAS on one transfer file with the original-filename Content-Disposition override.</summary>
+    public Uri MintRecipientFile(string transferId, string fileId, string respContentDisposition) => _inner.MintRecipientFile(transferId, fileId, respContentDisposition);
 }

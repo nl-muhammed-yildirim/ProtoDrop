@@ -806,3 +806,140 @@ describe('RecipientPage (T-003-05 — password gate UI)', () => {
     host2.remove()
   })
 })
+
+describe('RecipientPage (T-003-06 — per-file download wiring)', () => {
+  const SAS_URL = 'https://azurite.example.com/transfers/fake-sas?sig=abc'
+
+  // Dispatching stub: endpoint 4 → active body; endpoint 6 → minted { url, expiresAt } (TA-4.2#6 wire shape).
+  function stubDownloadFetch(status = 200): void {
+    vi.stubGlobal(
+      'fetch',
+      async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/download-url')) {
+          return new Response(JSON.stringify({ url: SAS_URL, expiresAt: '2030-01-01T00:30:00Z' }), { status, headers: { 'Content-Type': 'application/json' } })
+        }
+        return new Response(JSON.stringify(activeBody()), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      },
+    )
+  }
+
+  beforeEach(() => {
+    window.history.pushState('', '', `/t/${LINK_ID}`)
+  })
+
+  afterEach(() => {
+    for (const root of roots.splice(0)) act(() => { root.unmount() })
+    useRecipientStore.getState().reset()
+    window.sessionStorage.clear()
+    window.history.replaceState(null, '', '/')
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('Download click → endpoint 6 fetch + browser navigation to the minted SAS (exit check: direct streaming)', async () => {
+    // jsdom can't navigate — capture window.location.href via a fake getter so the store's
+    // `window.location.href = body.url` lands in our setter instead of jsdom's "Not implemented" error.
+    const realLocation = window.location as unknown
+    const currentPathname: string | undefined = (realLocation as Location).pathname
+    const fakeLocation: Record<string, unknown> = {}
+    let assignedHref: string | null = null
+    Object.defineProperty(fakeLocation, 'href', {
+      configurable: true,
+      get: () => '',
+      set: (v: string) => { assignedHref = v },
+    })
+    // Keep the current pathname so App's matchLinkPath still sees the /t/{linkId} route while mounted.
+    Object.defineProperty(fakeLocation, 'pathname', { configurable: true, get: () => currentPathname })
+    Object.defineProperty(window, 'location', { configurable: true, get: () => fakeLocation })
+    try {
+      stubDownloadFetch()
+
+      const host = await renderApp(isActive)
+      const btn = host.querySelector('.rp-download') as HTMLButtonElement
+      await act(async () => {
+        btn.click() // user action → store.download (the endpoint 6 fetch lands inside this act scope).
+        for (let i = 0; i < 400 && assignedHref === null; i++) { await Promise.resolve() }
+      })
+
+      expect(assignedHref).toBe(SAS_URL) // browser navigates to the minted SAS — direct streaming, no blob fetch.
+      // The store still shows active with the same files (no terminal state).
+      expect(useRecipientStore.getState().status).toBe('active')
+      host.remove()
+    } finally {
+      Object.defineProperty(window, 'location', { configurable: true, value: realLocation })
+    }
+  })
+
+  it('410 TRANSFER_EXPIRED from endpoint 6 → terminal expired screen (D6 precedence)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/download-url')) {
+          return new Response(JSON.stringify({ code: 'TRANSFER_EXPIRED', details: 'This transfer has expired.' }), { status: 410, headers: { 'Content-Type': 'application/problem+json' } })
+        }
+        return new Response(JSON.stringify(activeBody()), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      },
+    )
+
+    const host = await renderApp(isActive)
+    const btn = host.querySelector('.rp-download') as HTMLButtonElement
+    await act(async () => {
+      btn.click()
+      for (let i = 0; i < 400 && useRecipientStore.getState().status !== 'expired'; i++) { await Promise.resolve() }
+    })
+
+    expect(useRecipientStore.getState().status).toBe('expired') // terminal screen wins — D6 precedence.
+    host.remove()
+  })
+
+  it('503 INTERNAL from endpoint 6 → row-level "File temporarily unavailable" (US-003-03 alt flow)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/download-url')) {
+          return new Response(JSON.stringify({ code: 'INTERNAL', details: 'Internal server error' }), { status: 503, headers: { 'Content-Type': 'application/problem+json' } })
+        }
+        return new Response(JSON.stringify(activeBody()), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      },
+    )
+
+    const host = await renderApp(isActive)
+    const btn = host.querySelector('.rp-download') as HTMLButtonElement
+    await act(async () => {
+      btn.click()
+      for (let i = 0; i < 400 && useRecipientStore.getState().downloadErrorFileId !== null; i++) { await Promise.resolve() }
+    })
+
+    expect(useRecipientStore.getState().status).toBe('active') // page still works — row-level error only.
+    expect(host.querySelector('.rp-download-error')?.textContent).toBe('File temporarily unavailable.')
+    host.remove()
+  })
+
+  it('in-flight download shows "Downloading…" and disables the button (UI notes: no blocking UI)', async () => {
+    // Never-resolving fetch for endpoint 6 — the in-flight state persists.
+    vi.stubGlobal(
+      'fetch',
+      async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/download-url')) return new Promise<never>(() => {}) // never resolves
+        return new Response(JSON.stringify(activeBody()), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      },
+    )
+
+    const host = await renderApp(isActive)
+    const btn = host.querySelector('.rp-download') as HTMLButtonElement
+    await act(async () => {
+      btn.click()
+      for (let i = 0; i < 400 && useRecipientStore.getState().downloadingFileId !== null; i++) { await Promise.resolve() }
+    })
+
+    expect(useRecipientStore.getState().downloadingFileId).toBe('f1') // the first file's fileId.
+    const btnAfter = host.querySelector('.rp-download') as HTMLButtonElement
+    expect(btnAfter.textContent).toBe('Downloading…') // in-flight indicator on the row.
+    expect(btnAfter.disabled).toBe(true) // button disabled while in flight (the known minor all-rows-disabled behavior).
+    host.remove()
+  })
+})
