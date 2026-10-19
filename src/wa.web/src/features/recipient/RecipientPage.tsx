@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
-import type { FormEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { FormEvent, MouseEvent } from 'react'
 
 import { formatBytes } from '../../core/upload/formatBytes'
+import { trackGrowthCta } from './growthTelemetry'
 import { useRecipientStore } from './RecipientStore'
 
 interface RecipientPageProps {
@@ -22,6 +23,12 @@ interface RecipientPageProps {
  * shakes + role=alert "Wrong password" while staying gated. Terminal states always take precedence over the gate —
  * the T-003-03 shared screen wins whenever status !== 'active' (T-003-04 emits terminal codes over the wire).
  * **No sign-up wall** — FR-003-2.
+ * T-003-07 (FR-003-7): growth loop — a full download (every requested file completed; client state only, the store
+ * owns downloadedFileIds/growthPanelVisible) reveals the "Send something" panel below the file list exactly once per
+ * page instance (partials never trigger it; re-downloads never re-announce). The terminal screen's single "Send
+ * something" anchor is this CTA too. Both CTAs push '/' + dispatch popstate — App swaps to the upload surface in-tree,
+ * no full reload, staged files survive; no unlock token or recipient state transfers (pure pathname change).
+ * growthTelemetry: growth_cta_shown / growth_cta_clicked with source 'post-download' | 'terminal-state' (TA-10.2).
  * The linkId arrives by prop from App (recipientRoute.ts matches the pathname — no window here).
  */
 export function RecipientPage({ linkId }: RecipientPageProps) {
@@ -43,17 +50,54 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
   const [value, setValue] = useState('')
   const [show, setShow] = useState(false)
 
+  // T-003-07 (FR-003-7): ref-guards so growth_cta_shown fires exactly once per page instance per source — the store's
+  // edge-trigger keeps the panel visible forever after the flip; the effect below only fires on that flip.
+  const postDownloadShownRef = useRef(false)
+  const terminalShownRef = useRef(false)
+
   // T-003-02: mount-time load; reset on unmount keeps tests hermetic (UploadEngine's test-cleanup convention).
   useEffect(() => {
     void useRecipientStore.getState().load(linkId)
     return () => useRecipientStore.getState().reset()
   }, [linkId])
 
+  // T-003-07 (FR-003-7): growth_cta_shown post-download — fires when the panel first becomes visible (full download
+  // completed); the ref-guard means re-downloads (panel already up) never re-fire.
+  const growthPanelVisible = useRecipientStore((s) => s.growthPanelVisible)
+  useEffect(() => {
+    if (growthPanelVisible && !postDownloadShownRef.current) {
+      postDownloadShownRef.current = true
+      trackGrowthCta('growth_cta_shown', 'post-download')
+    }
+  }, [growthPanelVisible])
+  // T-003-07 (FR-003-7): growth_cta_shown terminal-state — fires on mount of the shared terminal branch (expired /
+  // unknown / download-limit); exactly once per page instance (ref-guard).
+  const isTerminal = status === 'expired' || status === 'downloadLimit'
+  useEffect(() => {
+    if (isTerminal && !terminalShownRef.current) {
+      terminalShownRef.current = true
+      trackGrowthCta('growth_cta_shown', 'terminal-state')
+    }
+  }, [isTerminal])
+
   // T-003-06 (AC-003-1 client half): real download wiring — per-row Download button calls endpoint 6.
   const handleDownload = (fileId: string) => {
     void useRecipientStore.getState().download(linkId, fileId)
   }
   const handleDownloadAll = () => {}
+  // T-017 (F-TRF-004) will replace this no-op — zip download-all reuses the store's per-file completion path with all fileIds.
+
+  // T-003-07 (FR-003-7): shared growth-CTA navigation — pushState('/') + a synthetic popstate swaps App to the upload
+  // surface in-tree (its popstate listener reads the new pathname). No full reload → UploadEngine staging survives;
+  // no unlock token or recipient state transfers (they are never read here — pure pathname change, US-003-07 EC).
+  const handleGrowthCtaClick = (source: 'post-download' | 'terminal-state') => {
+    return (e: MouseEvent<Element>) => {
+      e.preventDefault()
+      trackGrowthCta('growth_cta_clicked', source)
+      window.history.pushState('', '', '/')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    }
+  }
 
   // T-003-05 (AC-003-2): submit → endpoint 5; the store owns token storage + the ?t= re-query. Never rejects.
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
@@ -89,8 +133,8 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
           </svg>
         </span>
         <h1 className="rp-heading">{terminalMessage}</h1>
-        {/* T-003-07 (growth loop) wires this CTA — placeholder anchor to / at this task. */}
-        <a className="btn-primary rp-terminal-action" href="/">Send something</a>
+        {/* T-003-07 (FR-003-8/9): the terminal screen's single action — this CTA to the upload surface. */}
+        <a className="btn-primary rp-terminal-action" href="/" onClick={handleGrowthCtaClick('terminal-state')}>Send something</a>
       </section>
     )
   }
@@ -185,6 +229,13 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
       * shown only for finite caps past the first download (a 0 remaining is already the terminal limit screen). */}
       {downloadsLeft !== null && downloadsLeft > 0 && (
         <p className="rp-downloads-left">Downloads left: {downloadsLeft}</p>
+      )}
+      {/* T-003-07 (FR-003-7): growth panel — shown once per full download, below the file list; partials never render it. */}
+      {growthPanelVisible && (
+        <div className="rp-growth" role="region" aria-label="Send something">
+          <p className="rp-growth-copy">Ready to send some of your own?</p>
+          <button type="button" className="btn-primary rp-growth-cta" onClick={handleGrowthCtaClick('post-download')}>Send something</button>
+        </div>
       )}
     </section>
   )

@@ -92,6 +92,10 @@ interface RecipientState {
   downloadingFileId: string | null
   /** T-003-06 (US-003-03 alt flow): the fileId whose mint failed — its row shows "File temporarily unavailable." */
   downloadErrorFileId: string | null
+  /** T-003-07 (FR-003-7): fileIds completed via endpoint 6's success path — monotonic within a page instance. */
+  downloadedFileIds: string[]
+  /** T-003-07 (FR-003-7): edge-triggered when a full download completes on an active transfer — the panel then stays visible. */
+  growthPanelVisible: boolean
   error: string | null
 }
 
@@ -121,6 +125,8 @@ const LOADING_SHAPE = {
   unlockError: null as string | null,
   downloadingFileId: null as string | null,
   downloadErrorFileId: null as string | null,
+  downloadedFileIds: [] as string[],
+  growthPanelVisible: false,
   error: null as string | null,
 }
 
@@ -277,8 +283,21 @@ export const useRecipientStore = create<RecipientState & RecipientActions>((set,
         // no download attribute (cross-origin navigation ignores it); Content-Disposition attachment does the naming.
         window.location.href = body.url
         // Exit check: "Downloads left" decrements by 1 when the cap is finite — the server counted at mint time.
-        const { downloadsLeft } = get()
+        const { status, files, downloadedFileIds, downloadsLeft, growthPanelVisible } = get()
         if (downloadsLeft !== null) set({ downloadingFileId: null, downloadsLeft: downloadsLeft - 1 })
+        // T-003-07 (FR-003-7): "full download" = every requested file completed — client-side state only, no round-trip.
+        // Re-downloads don't re-append (already-complete stays true either way); T-017's zip completion reuses this path
+        // with all fileIds so the predicate covers zip with zero extra fields. Partial downloads never flip it.
+        const nextDownloadedFileIds = downloadedFileIds.includes(fileId)
+          ? downloadedFileIds
+          : [...downloadedFileIds, fileId]
+        const fullyDownloaded = files.length > 0 && files.every((f) => nextDownloadedFileIds.includes(f.fileId))
+        set({
+          downloadedFileIds: nextDownloadedFileIds,
+          // Edge-triggered once when the predicate flips false→true; a reload clears both fields (fresh page view is a
+          // fresh potential announcement), so re-downloads after the flip never hide or re-announce the panel.
+          growthPanelVisible: status === 'active' && (growthPanelVisible || fullyDownloaded),
+        })
       } catch (err) {
         // AbortError means unmounted/superseded — no row error for a cancelled page.
         if (!(err instanceof Error && err.name === 'AbortError')) {

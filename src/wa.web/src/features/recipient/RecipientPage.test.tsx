@@ -4,8 +4,10 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from '../../App'
+import { useUploadEngine } from '../../core/upload/UploadEngine'
 import { useRecipientStore } from './RecipientStore'
 import { matchLinkPath } from './recipientRoute'
+import { growthTelemetryLog } from './growthTelemetry'
 
 ;(globalThis as unknown as Record<string, boolean>).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -941,5 +943,231 @@ describe('RecipientPage (T-003-06 — per-file download wiring)', () => {
     expect(btnAfter.textContent).toBe('Downloading…') // in-flight indicator on the row.
     expect(btnAfter.disabled).toBe(true) // button disabled while in flight (the known minor all-rows-disabled behavior).
     host.remove()
+  })
+})
+
+describe('RecipientPage (T-003-07 — growth loop)', () => {
+  const SAS_URL = 'https://azurite.example.com/transfers/fake-sas?sig=abc'
+
+  // Dispatching stub: endpoint 4 → active body; endpoint 6 → minted { url, expiresAt } (TA-4.2#6 wire shape).
+  function stubDownloadFetch(): void {
+    vi.stubGlobal(
+      'fetch',
+      async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/download-url')) {
+          return new Response(JSON.stringify({ url: SAS_URL, expiresAt: '2030-01-01T00:30:00Z' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+        }
+        return new Response(JSON.stringify(activeBody()), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      },
+    )
+  }
+
+  /**
+   * jsdom can't navigate — fake window.location.href via a configurable getter (same idiom as the T-003-06 download test).
+   * pathname still reads through to jsdom's real history so the CTA's pushState('/') is seen by App's popstate handler.
+   */
+  function stubLocation(): { restore: () => void } {
+    const realLocation = window.location as unknown
+    const fakeLocation: Record<string, unknown> = {}
+    Object.defineProperty(fakeLocation, 'href', {
+      configurable: true,
+      get: () => '',
+      // Navigation captured — nothing to record for the growth CTA tests.
+      set() { /* no-op */ },
+    })
+    const real = window.location as unknown as Location
+    Object.defineProperty(fakeLocation, 'pathname', { configurable: true, get: () => real.pathname })
+    Object.defineProperty(window, 'location', { configurable: true, get: () => fakeLocation })
+    return { restore: () => Object.defineProperty(window, 'location', { configurable: true, value: realLocation }) }
+  }
+
+  /** Downloads every file row in order until the store reports them all completed (the full-download path). */
+  async function downloadAllFiles(host: HTMLDivElement): Promise<void> {
+    const total = useRecipientStore.getState().files.length
+    let downloaded = 0
+    while (downloaded < total) {
+      const buttons = Array.from(host.querySelectorAll('.rp-download')) as HTMLButtonElement[]
+      await act(async () => {
+        buttons[downloaded].click()
+        for (let i = 0; i < 400 && useRecipientStore.getState().downloadedFileIds.length < downloaded + 1; i++) { await Promise.resolve() }
+      })
+      downloaded += 1
+    }
+  }
+
+  beforeEach(() => {
+    window.history.pushState('', '', `/t/${LINK_ID}`)
+    growthTelemetryLog.splice(0) // module-level record — keep tests hermetic.
+  })
+
+  afterEach(() => {
+    for (const root of roots.splice(0)) act(() => { root.unmount() }) // cleanup runs reset() inside act.
+    useRecipientStore.getState().reset()
+    useUploadEngine.getState().reset() // seeded staging rows must not leak across tests.
+    window.sessionStorage.clear()
+    window.history.replaceState(null, '', '/')
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('full download (both files) → panel visible + exactly one growth_cta_shown post-download (AC full-download)', async () => {
+    const loc = stubLocation()
+    try {
+      stubDownloadFetch()
+
+      const host = await renderApp(isActive)
+      // f1 — a partial download: no panel yet.
+      const first = host.querySelector('.rp-download') as HTMLButtonElement
+      await act(async () => {
+        first.click()
+        for (let i = 0; i < 400 && useRecipientStore.getState().downloadedFileIds.length < 1; i++) { await Promise.resolve() }
+      })
+      expect(host.querySelector('.rp-growth')).toBeNull() // partial — the page stays in its normal state.
+
+      // f2 — completes the full download.
+      const second = host.querySelectorAll('.rp-download')[1] as HTMLButtonElement
+      await act(async () => {
+        second.click()
+        for (let i = 0; i < 400 && useRecipientStore.getState().downloadedFileIds.length < 2; i++) { await Promise.resolve() }
+      })
+
+      const panel = host.querySelector('.rp-growth')
+      expect(panel).not.toBeNull()
+      expect((panel as HTMLElement).querySelector('button')?.textContent).toBe('Send something')
+      const shownPostDownload = growthTelemetryLog.filter((e) => e.event === 'growth_cta_shown' && e.source === 'post-download')
+      expect(shownPostDownload).toHaveLength(1) // exactly one — the panel announced once.
+      host.remove()
+    } finally {
+      loc.restore()
+    }
+  })
+
+  it('partial download (1 of 5 files) → no panel, zero telemetry (EC partial)', async () => {
+    const loc = stubLocation()
+    try {
+      vi.stubGlobal(
+        'fetch',
+        async (input: RequestInfo | URL) => {
+          const url = String(input)
+          if (url.includes('/download-url')) {
+            return new Response(JSON.stringify({ url: SAS_URL, expiresAt: '2030-01-01T00:30:00Z' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+          }
+          const body = activeBody({
+            files: ['f1', 'f2', 'f3', 'f4', 'f5'].map((id) => ({ fileId: id, name: `${id}.bin`, sizeBytes: 1024 })),
+          })
+          return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+        },
+      )
+
+      const host = await renderApp(isActive)
+      const btn = host.querySelector('.rp-download') as HTMLButtonElement
+      await act(async () => {
+        btn.click()
+        for (let i = 0; i < 400 && useRecipientStore.getState().downloadedFileIds.length < 1; i++) { await Promise.resolve() }
+      })
+
+      expect(host.querySelector('.rp-growth')).toBeNull() // 1 of 5 — the panel must NOT appear.
+      expect(growthTelemetryLog).toHaveLength(0) // zero telemetry events at all.
+      host.remove()
+    } finally {
+      loc.restore()
+    }
+  })
+
+  it('re-download after completion → panel stays, growth_cta_shown still exactly one (EC no re-announce)', async () => {
+    const loc = stubLocation()
+    try {
+      stubDownloadFetch()
+
+      const host = await renderApp(isActive)
+      await downloadAllFiles(host) // f1 + f2 → full download.
+      expect(host.querySelector('.rp-growth')).not.toBeNull()
+      expect(growthTelemetryLog.filter((e) => e.event === 'growth_cta_shown' && e.source === 'post-download')).toHaveLength(1)
+
+      // Re-download f1 — the panel never hides and never re-announces.
+      const first = host.querySelector('.rp-download') as HTMLButtonElement
+      await act(async () => {
+        first.click()
+        // The dedupe keeps downloadedFileIds.length at 2 — poll for the settled state (no in-flight row) instead.
+        for (let i = 0; i < 400 && useRecipientStore.getState().downloadingFileId !== null; i++) { await Promise.resolve() }
+        for (let i = 0; i < 10; i++) { await Promise.resolve() } // flush: store update → React commit.
+      })
+      expect(host.querySelector('.rp-growth')).not.toBeNull() // still visible.
+      expect(growthTelemetryLog.filter((e) => e.event === 'growth_cta_shown' && e.source === 'post-download')).toHaveLength(1) // still exactly one.
+      host.remove()
+    } finally {
+      loc.restore()
+    }
+  })
+
+  it('expired + download-limit terminals → growth_cta_shown terminal-state once each (AC terminal)', async () => {
+    for (const [code, status] of [['TRANSFER_EXPIRED', 'expired'], ['MAX_DOWNLOADS_REACHED', 'downloadLimit']] as const) {
+      stubFetchProblem(410, code, 'This transfer has expired. Contact the sender for a new link.')
+      const host = await renderApp(isTerminal)
+      expect(useRecipientStore.getState().status).toBe(status)
+      const shown = growthTelemetryLog.filter((e) => e.event === 'growth_cta_shown' && e.source === 'terminal-state')
+      expect(shown).toHaveLength(1) // exactly one per page instance.
+      host.remove()
+      await act(async () => { useRecipientStore.getState().reset() })
+      growthTelemetryLog.splice(0)
+    }
+  })
+
+  it('panel CTA click → clicked post-download, upload surface renders in same tree, staging survives, no token (EC token/staging)', async () => {
+    // Seed the UploadEngine so the landing surface has staged rows to preserve.
+    useUploadEngine.getState().addFiles([{ name: 'a.txt', size: 10 }, { name: 'b.png', size: 5 }])
+    const loc = stubLocation()
+    try {
+      stubDownloadFetch()
+
+      const host = await renderApp(isActive)
+      await downloadAllFiles(host) // full download → panel up.
+      expect(host.querySelector('.rp-growth')).not.toBeNull()
+
+      // Click the growth CTA — App's popstate handler swaps to the upload surface in-tree (no full reload).
+      const cta = host.querySelector('.rp-growth button') as HTMLButtonElement
+      await act(async () => {
+        cta.click()
+        for (let i = 0; i < 400 && host.querySelector('.dz-title') === null; i++) { await Promise.resolve() }
+      })
+
+      expect(host.querySelector('.dz-title')).not.toBeNull() // upload surface — the drop zone is ready.
+      expect(host.querySelectorAll('.sl-row')).toHaveLength(2) // staged rows survive — no reload, no reset.
+      expect(host.querySelector('.rp-growth')).toBeNull() // recipient page is gone.
+      const clicked = growthTelemetryLog.filter((e) => e.event === 'growth_cta_clicked' && e.source === 'post-download')
+      expect(clicked).toHaveLength(1)
+      // No unlock token or recipient state transfers — pure pathname change (US-003-07 EC).
+      expect(window.sessionStorage.getItem(`pd.unlock.${LINK_ID}`)).toBeNull()
+      expect(useRecipientStore.getState().status).toBe('loading') // reset on unmount.
+      host.remove()
+    } finally {
+      loc.restore()
+    }
+  })
+
+  it('terminal CTA click → clicked terminal-state + upload surface renders (AC terminal → upload surface)', async () => {
+    useUploadEngine.getState().addFiles([{ name: 'a.txt', size: 10 }, { name: 'b.png', size: 5 }])
+    const loc = stubLocation()
+    try {
+      stubFetchProblem(410, 'TRANSFER_EXPIRED', 'This transfer has expired. Contact the sender for a new link.')
+
+      const host = await renderApp(isTerminal)
+      const cta = host.querySelector('.rp-terminal-action') as HTMLAnchorElement
+      expect(cta).not.toBeNull()
+
+      await act(async () => {
+        cta.click()
+        for (let i = 0; i < 400 && host.querySelector('.dz-title') === null; i++) { await Promise.resolve() }
+      })
+
+      expect(host.querySelector('.dz-title')).not.toBeNull() // upload surface renders.
+      expect(host.querySelectorAll('.sl-row')).toHaveLength(2) // staged rows survive.
+      const clicked = growthTelemetryLog.filter((e) => e.event === 'growth_cta_clicked' && e.source === 'terminal-state')
+      expect(clicked).toHaveLength(1)
+      host.remove()
+    } finally {
+      loc.restore()
+    }
   })
 })
