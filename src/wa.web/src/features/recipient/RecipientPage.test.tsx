@@ -1253,7 +1253,12 @@ describe('RecipientPage (T-003-08 — mobile sticky bar, store-driven DOM)', () 
         for (let i = 0; i < 400 && assignedHref === null; i++) { await Promise.resolve() }
       })
 
-      expect(assignedHref).toBe(SAS_URL) // the minted SAS — endpoint 6 was called for the single file.
+      // T-003-08-fix (T-055-05/TA-14.3, StagingList precedent): the store re-addresses + protocol-re-signs
+      // the minted read SAS for local Azurite — pin the RE-ADDRESSED form, not the raw minted URL.
+      const expectedOriginPath = 'http://127.0.0.1:10000/devstoreaccount1/transfers/fake-sas?'
+      expect(typeof assignedHref).toBe('string')
+      expect((assignedHref as unknown as string).startsWith(expectedOriginPath)).toBe(true)
+      expect(assignedHref as unknown as string).toContain('spr=https%2Chttp') // the plain-HTTP leg's protocol line.
       expect(useRecipientStore.getState().status).toBe('active') // still active after a successful mint.
       host.remove()
     } finally {
