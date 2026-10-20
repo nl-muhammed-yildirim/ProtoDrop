@@ -138,7 +138,10 @@ public sealed class FinalizeTransferHandler : IRequestHandler<FinalizeTransferCo
 
             var fileItem = new FileItem
             {
-                Id = Guid.NewGuid(),
+                // T-003-09-fix: reuse the draft fileId — finalize copies blobs to BlobPaths.TransferFile(transferId, file.FileId),
+                // so endpoint 6's minted SAS (keyed on FileItem.Id) only resolves when FileItem.Id == draft fileId. The fresh
+                // Guid.NewGuid() here minted for a path that never exists → EC-003-1 / all real downloads 404'd.
+                Id = file.FileId,
                 TransferId = transferId,
                 BlobRefId = blobRef.Id,
                 OriginalName = file.Name,
