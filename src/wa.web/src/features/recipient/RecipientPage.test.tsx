@@ -864,7 +864,13 @@ describe('RecipientPage (T-003-06 — per-file download wiring)', () => {
         for (let i = 0; i < 400 && assignedHref === null; i++) { await Promise.resolve() }
       })
 
-      expect(assignedHref).toBe(SAS_URL) // browser navigates to the minted SAS — direct streaming, no blob fetch.
+      // T-003-08-fix (T-055-05/TA-14.3, StagingList precedent): the browser navigates to the RE-ADDRESSED Azurite form —
+      // origin + /devstoreaccount1 path segment + protocol re-sign "https,http" (hermetic: crypto.subtle runs in jsdom tests).
+      const expectedOriginPath = 'http://127.0.0.1:10000/devstoreaccount1/transfers/fake-sas?'
+      // TS narrows assignedHref to null after the polling loop — expect(unknown) bypasses the cast without one.
+      expect(typeof assignedHref).toBe('string')
+      expect((assignedHref as unknown as string).startsWith(expectedOriginPath)).toBe(true)
+      expect(assignedHref as unknown as string).toContain('spr=https%2Chttp') // the plain-HTTP leg's protocol line.
       // The store still shows active with the same files (no terminal state).
       expect(useRecipientStore.getState().status).toBe('active')
       host.remove()
