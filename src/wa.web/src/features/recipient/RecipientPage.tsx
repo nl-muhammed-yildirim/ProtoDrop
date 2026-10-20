@@ -86,6 +86,8 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
   }
   const handleDownloadAll = () => {}
   // T-017 (F-TRF-004) will replace this no-op — zip download-all reuses the store's per-file completion path with all fileIds.
+  // T-003-08 (FR-003-10): the mobile sticky bar's Download all shares this handler — CSS hides one of the two buttons, so
+  // one handler covers both; the bar's button lives at the end of the section in the JSX below.
 
   // T-003-07 (FR-003-7): shared growth-CTA navigation — pushState('/') + a synthetic popstate swaps App to the upload
   // surface in-tree (its popstate listener reads the new pathname). No full reload → UploadEngine staging survives;
@@ -237,6 +239,23 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
           <button type="button" className="btn-primary rp-growth-cta" onClick={handleGrowthCtaClick('post-download')}>Send something</button>
         </div>
       )}
+      {/* T-003-08 (FR-003-10): mobile ≤640 px — sticky Download bar (CSS hides it at >640 px, shows it at ≤640 px).
+         The in-flow Download all is hidden at ≤640 px; this bar's button takes over. No conditional rendering —
+         the in-flow button stays where it is; CSS visibility rules handle which one is seen. */}
+      <div className="rp-sticky">
+        {hasDownloadAll ? (
+          <button type="button" className="btn-primary" onClick={handleDownloadAll}>Download all</button>
+        ) : files.length > 0 ? (
+          <button
+            type="button"
+            className="btn-primary"
+            aria-label={`Download ${files[0].name}, ${formatBytes(files[0].sizeBytes)}`}
+            onClick={() => handleDownload(files[0].fileId)}
+          >
+            Download
+          </button>
+        ) : null}
+      </div>
     </section>
   )
 }

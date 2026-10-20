@@ -171,7 +171,6 @@
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-
 /* T-003-05 (FR-003-6): password gate — the single centered card on a gated transfer. Only this section and its
    contents render (RecipientPage.tsx owns the branching) — no file list, no sizes, nothing to leak. */
 .rp-gate {
@@ -258,4 +257,47 @@
   25% { transform: translateX(-4px); }
   50% { transform: translateX(4px); }
   75% { transform: translateX(-4px); }
+}
+
+/* T-003-08 (FR-003-10): mobile ≤640 px — single column, sticky Download bar. Base rules stay byte-unchanged;
+   everything here is in-flow (no z-index). The page reserves bottom padding so the bar never overlaps the last
+   row / growth panel; var(--bg) is opaque so content scrolls under the bar (TA-8.4; tokens only — index.css :root). */
+.rp-sticky {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .rp {
+    padding-bottom: 96px;
+  }
+
+  /* The in-flow Download all is the desktop/mobile duplicate — the sticky bar's button replaces it at ≤640 px. */
+  .rp-download-all {
+    display: none;
+  }
+
+  .rp-sticky {
+    display: flex;
+    position: sticky;
+    bottom: 0;
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+  }
+
+  .rp-sticky .btn-primary {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  /* Kills the 300 ms tap-zoom delay on iOS; no hover-dependent affordances are added (F-TRF-017-5). */
+  .rp-download,
+  .rp-sticky .btn-primary {
+    touch-action: manipulation;
+  }
+
+  /* Guards against iOS UA padding growth — the input stays exactly 44 px tall at var(--fs-body) (no zoom-on-focus). */
+  .rp-password-input {
+    height: 44px;
+  }
 }

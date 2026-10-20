@@ -1171,3 +1171,97 @@ describe('RecipientPage (T-003-07 — growth loop)', () => {
     }
   })
 })
+
+describe('RecipientPage (T-003-08 — mobile sticky bar, store-driven DOM)', () => {
+  const SAS_URL = 'https://azurite.example.com/transfers/fake-sas?sig=abc'
+
+  beforeEach(() => {
+    window.history.pushState('', '', `/t/${LINK_ID}`)
+  })
+
+  afterEach(() => {
+    for (const root of roots.splice(0)) act(() => { root.unmount() }) // cleanup runs reset() inside act.
+    useRecipientStore.getState().reset()
+    window.sessionStorage.clear()
+    window.history.replaceState(null, '/')
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('active 2-file render → .rp-sticky present with a "Download all" button; in-flow .rp-download-all stays in DOM (both coexist)', async () => {
+    stubFetch(200, activeBody()) // hasDownloadAll: true, two files — the default body.
+
+    const host = await renderApp(isActive)
+
+    const sticky = host.querySelector('.rp-sticky')
+    expect(sticky).not.toBeNull()
+    expect(sticky!.textContent).toBe('Download all') // the bar's button is the Download-all one (same handler as in-flow).
+    // The in-flow Download all is still there — CSS hides it at ≤640 px, never conditional rendering.
+    const inFlow = host.querySelector('.rp-download-all') as HTMLButtonElement
+    expect(inFlow).not.toBeNull()
+    expect(host.querySelectorAll('.rp-sticky, .rp-download-all')).toHaveLength(2) // exactly both — nothing extra.
+    host.remove()
+  })
+
+  it('active single-file render → sticky bar button labelled "Download {name}, {size}"; click mints endpoint 6 SAS for that file', async () => {
+    // jsdom can't navigate — capture window.location.href via a fake getter so the store's
+    // `window.location.href = body.url` lands in our setter (the T-003-06 download test's idiom).
+    const realLocation = window.location as unknown
+    const currentPathname: string | undefined = (realLocation as Location).pathname
+    const fakeLocation: Record<string, unknown> = {}
+    let assignedHref: string | null = null
+    Object.defineProperty(fakeLocation, 'href', {
+      configurable: true,
+      get: () => '',
+      set: (v: string) => { assignedHref = v },
+    })
+    // Keep the current pathname so App's matchLinkPath still sees the /t/{linkId} route while mounted.
+    Object.defineProperty(fakeLocation, 'pathname', { configurable: true, get: () => currentPathname })
+    Object.defineProperty(window, 'location', { configurable: true, get: () => fakeLocation })
+    try {
+      // Single-file body (hasDownloadAll: false) — the bar's button is the single-file Download instead.
+      vi.stubGlobal(
+        'fetch',
+        async (input: RequestInfo | URL) => {
+          const url = String(input)
+          if (url.includes('/download-url')) {
+            return new Response(JSON.stringify({ url: SAS_URL, expiresAt: '2030-01-01T00:30:00Z' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+          }
+          const body = activeBody({
+            files: [{ fileId: 'f1', name: 'render.mp4', sizeBytes: 2_147_483_648 }],
+            hasDownloadAll: false,
+          })
+          return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+        },
+      )
+
+      const host = await renderApp(isActive)
+
+      const stickyBtn = host.querySelector('.rp-sticky .btn-primary') as HTMLButtonElement
+      expect(stickyBtn).not.toBeNull()
+      // The exact aria-label convention (mirrors the row's existing label ~line 219).
+      expect(stickyBtn.getAttribute('aria-label')).toBe('Download render.mp4, 2.00 GB')
+
+      await act(async () => {
+        stickyBtn.click() // user action → store.download (the endpoint 6 fetch lands inside this act scope).
+        for (let i = 0; i < 400 && assignedHref === null; i++) { await Promise.resolve() }
+      })
+
+      expect(assignedHref).toBe(SAS_URL) // the minted SAS — endpoint 6 was called for the single file.
+      expect(useRecipientStore.getState().status).toBe('active') // still active after a successful mint.
+      host.remove()
+    } finally {
+      Object.defineProperty(window, 'location', { configurable: true, value: realLocation })
+    }
+  })
+
+  it('password-gated render → no .rp-sticky (the bar lives in the active section only)', async () => {
+    stubFetch(200, activeBody({ passwordRequired: true })) // gated body — renders only the gate.
+
+    const host = await renderApp(isActive)
+
+    expect(host.querySelector('.rp-sticky')).toBeNull() // the bar is not in the gate's DOM.
+    host.remove()
+  })
+})
+
