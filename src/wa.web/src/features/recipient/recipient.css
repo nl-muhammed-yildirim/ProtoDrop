@@ -260,8 +260,12 @@
 }
 
 /* T-003-08 (FR-003-10): mobile ≤640 px — single column, sticky Download bar. Base rules stay byte-unchanged;
-   everything here is in-flow (no z-index). The page reserves bottom padding so the bar never overlaps the last
-   row / growth panel; var(--bg) is opaque so content scrolls under the bar (TA-8.4; tokens only — index.css :root). */
+   the bar itself is `position: fixed` — FR-003-10 says "sticky at the bottom of **the viewport**", and in-flow
+   `position: sticky; bottom: 0` only pins when `.rp` overflows the viewport (probed: 2 small files → docH ==
+   viewport 780 → bar sits mid-page; 15 rows → overflows → pins exactly 780). `fixed; left/right/bottom: 0`
+   pins to the exact viewport bottom for both short and long content. The page reserves bottom padding so the
+   bar never overlaps the last row / growth panel; var(--bg) is opaque so content scrolls under the bar
+   (TA-8.4; tokens only — index.css :root). */
 .rp-sticky {
   display: none;
 }
@@ -276,9 +280,14 @@
     display: none;
   }
 
+  /* Viewport-pinned bottom (T-003-08-fix): `fixed` supersedes D1's in-flow `sticky` — FR-003-10 "bottom of the
+     viewport" + "page scrolls under it" only holds when the bar is off the flow; probed both cases (n=2 / n=15).
+     .rp's 96 px padding-bottom still reserves the no-overlap gap. */
   .rp-sticky {
     display: flex;
-    position: sticky;
+    position: fixed;
+    left: 0;
+    right: 0;
     bottom: 0;
     padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
     background: var(--bg);
