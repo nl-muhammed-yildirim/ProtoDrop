@@ -13,3 +13,7 @@
 /.pi
 /.opencode/agents
 /.github/agents
+/.agents/agents
+/.goosehints
+/api.err.log
+/api.log
