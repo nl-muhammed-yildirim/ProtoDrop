@@ -106,9 +106,7 @@ public class FinalizeEndpointTests : IAsyncLifetime
         var (draftId, fileId) = await SetupDraftAndStagedBlobAsync("payload.bin", "application/octet-stream");
         var stagedBytes = BuildPayload();
         // Re-upload the exact bytes we want to verify.
-        var stagingPath = BlobPaths.StagingFile(draftId, fileId);
-        using (var ms = new MemoryStream(stagedBytes))
-            await _svc.GetBlobContainerClient(BlobPaths.StagingContainer).GetBlobClient(stagingPath).UploadAsync(ms);
+        await UploadStagingAsync(draftId, fileId, stagedBytes);
 
         var payload = BuildPayload(fileId, "payload.bin", stagedBytes.Length, "application/octet-stream");
         using var response = await PostFinalizeAsync(draftId, payload, "key-bytes");
@@ -135,9 +133,7 @@ public class FinalizeEndpointTests : IAsyncLifetime
         var stagedBytes = new byte[512];
         RandomNumberGenerator.Fill(stagedBytes);
 
-        var stagingPath = BlobPaths.StagingFile(draftId, fileId);
-        using (var ms = new MemoryStream(stagedBytes))
-            await _svc.GetBlobContainerClient(BlobPaths.StagingContainer).GetBlobClient(stagingPath).UploadAsync(ms);
+        await UploadStagingAsync(draftId, fileId, stagedBytes);
 
         var payload = BuildPayload(fileId, "idem.txt", stagedBytes.Length, "text/plain");
 
@@ -161,8 +157,9 @@ public class FinalizeEndpointTests : IAsyncLifetime
         // Blob was copied only once — verify by checking the transfer path exists (it does) and that there's only one Transfer.
         using var doc = JsonDocument.Parse(body1);
         var transferId = new Guid(doc.RootElement.GetProperty("id").GetString()!);
-        var transferPath = BlobPaths.TransferFile(transferId, fileId);
-        var blobClient = _svc.GetBlobContainerClient(BlobPaths.TransfersContainer).GetBlobClient(transferPath);
+        var fullPath = BlobPaths.TransferFile(transferId, fileId); // "transfers/{t}/files/{f}" — first segment IS the container
+        var cut = fullPath.IndexOf('/');
+        var blobClient = _svc.GetBlobContainerClient(fullPath[..cut]).GetBlobClient(fullPath[(cut + 1)..]);
         Assert.True(await blobClient.ExistsAsync());
     }
 
@@ -175,9 +172,7 @@ public class FinalizeEndpointTests : IAsyncLifetime
         var stagedBytes = new byte[256];
         RandomNumberGenerator.Fill(stagedBytes);
 
-        var stagingPath = BlobPaths.StagingFile(draftId, fileId);
-        using (var ms = new MemoryStream(stagedBytes))
-            await _svc.GetBlobContainerClient(BlobPaths.StagingContainer).GetBlobClient(stagingPath).UploadAsync(ms);
+        await UploadStagingAsync(draftId, fileId, stagedBytes);
 
         // Pre-insert an expired idempotency key into the DB.
         var expiredKey = "key-expired-ttl";
@@ -222,13 +217,26 @@ public class FinalizeEndpointTests : IAsyncLifetime
         var fileId = new Guid(draftDoc.RootElement.GetProperty("files")[0].GetProperty("fileId").GetString()!);
 
         // Upload a blob to staging directly (simpler than SAS round-trip for integration tests).
-        var stagingPath = BlobPaths.StagingFile(draftId, fileId);
         var bytes = new byte[1024];
         RandomNumberGenerator.Fill(bytes);
-        using (var ms = new MemoryStream(bytes))
-            await _svc.GetBlobContainerClient(BlobPaths.StagingContainer).GetBlobClient(stagingPath).UploadAsync(ms);
+        await UploadStagingAsync(draftId, fileId, bytes);
 
         return (draftId, fileId);
+    }
+
+    /// <summary>
+    /// Upload bytes at the canonical staging row (TA-3.5): the blob name INSIDE the container is everything after the
+    /// first path segment — the app's AzureBlobStore.SplitPath reads it that way.
+    /// </summary>
+    private async Task UploadStagingAsync(Guid draftId, Guid fileId, byte[] bytes)
+    {
+        var path = BlobPaths.StagingFile(draftId, fileId);
+        var cut = path.IndexOf('/');
+        using var ms = new MemoryStream(bytes);
+        // (Stream, blobExists:true, ct) — the app adapter's exact overload: overwrite semantics. The single-arg
+        // UploadAsync(Stream) probes existence first and 409s on re-upload (byte-exact tests re-write staged bytes).
+        await _svc.GetBlobContainerClient(path[..cut]).GetBlobClient(path[(cut + 1)..])
+            .UploadAsync(ms, true, default);
     }
 
     private static string BuildPayload(Guid fileId, string name, long sizeBytes, string? contentType) =>

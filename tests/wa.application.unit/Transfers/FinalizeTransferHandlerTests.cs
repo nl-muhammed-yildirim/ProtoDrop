@@ -62,6 +62,10 @@ public class FinalizeTransferHandlerTests
         Assert.Equal(1, saved.MaxDownloads);
 
         Assert.Equal(2, _store.SavedFileItems.Count);
+        // T-003-09-fix: FileItem.Id must equal the request's FileId — finalize copies blobs to BlobPaths.TransferFile(transferId,
+        // file.FileId), so endpoint 6's minted SAS (keyed on FileItem.Id) only resolves when the two match.
+        Assert.Equal(file1.FileId, _store.SavedFileItems[0].Id);
+        Assert.Equal(file2.FileId, _store.SavedFileItems[1].Id);
         Assert.Equal(0, _store.SavedFileItems[0].SortOrder);
         Assert.Equal("a.txt", _store.SavedFileItems[0].OriginalName);
         Assert.Equal(100, _store.SavedFileItems[0].SizeBytes);

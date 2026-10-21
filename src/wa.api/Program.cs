@@ -33,6 +33,8 @@ builder.Services.AddSingleton<wa.application.Ports.ISbHealthProbe, SbHealthProbe
 builder.Services.AddSingleton(new DbContextOptionsBuilder<WaDbContext>()
     .UseSqlServer(builder.Configuration.GetConnectionString("WaDb")).Options);
 builder.Services.AddSingleton<wa.infrastructure.Persistence.AppDbContextFactory>();
+// SbEventPublisher (T-054-03) resolves the interface — register under both types.
+builder.Services.AddSingleton<IDbContextFactory<WaDbContext>, wa.infrastructure.Persistence.AppDbContextFactory>();
 // T-054-05 (TA-0.2 rule 7): no "is this the fake?" branch in production code — DI picks the adapter on the connection string.
 var sbConnString = builder.Configuration["Wa:ServiceBus:ConnectionString"];
 if (string.IsNullOrEmpty(sbConnString))
@@ -61,6 +63,8 @@ builder.Services.AddSingleton<IFlagsStore>(sp => new FlagsStore(sp.GetRequiredSe
 builder.Services.AddSingleton<wa.application.UseCases.Transfers.ITransferStore>(sp => new wa.infrastructure.Persistence.TransferStore(sp.GetRequiredService<WaDbContext>()));
 // T-002-04 (TA-4.2#3): send handler's DB surface — thin adapter over the adapter-owned WaDbContext.
 builder.Services.AddSingleton<wa.application.UseCases.Transfers.ISendStore>(sp => new wa.infrastructure.Persistence.SendStore(sp.GetRequiredService<WaDbContext>()));
+// T-014 (TA-4.2#4): recipient-page handler's DB surface — thin adapter over the adapter-owned WaDbContext.
+builder.Services.AddSingleton<wa.application.UseCases.Transfers.IPublicTransferStore>(sp => new wa.infrastructure.Persistence.PublicTransferStore(sp.GetRequiredService<WaDbContext>()));
 // T-002-02 (TA-4.1.5): generic HTTP idempotency store — used by IdempotencyMiddleware for finalize + send endpoints.
 builder.Services.AddSingleton<IIdempotencyStore>(sp => new wa.infrastructure.Persistence.IdempotencyStore(sp.GetRequiredService<WaDbContext>()));
 builder.Services.AddSingleton(sp => new PlansCache(sp.GetRequiredService<IPlansStore>(), limitsTtl, () => DateTimeOffset.UtcNow));
@@ -92,6 +96,10 @@ builder.Services.Configure<IpRateLimitOptions>(opts =>
 builder.Services.AddSingleton<wa.application.Telemetry.WaTelemetryReporter>(sp => new wa.application.Telemetry.WaTelemetryReporter(
     sp.GetRequiredService<ILogger<wa.application.Telemetry.WaTelemetryReporter>>(),
     System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Wa:Jwt:Secret"]!))); // TA-9.4: the IP HMAC key IS Wa:Jwt:Secret — UTF-8 of the raw string (same key T-008's session cookie signs with, TA-9.1)
+// T-003-04 (TA-4.2#5): unlock-JWT minter — BCL-only HS256, the SAME Wa:Jwt:Secret bytes (TA-9.1: "same key T-008's session cookie signs with").
+// Injectable clock arg is () => DateTimeOffset.UtcNow in production; unit tests pin exp via their own instance (D3).
+builder.Services.AddSingleton<IUnlockTokenMinter>(sp => new UnlockTokenService(
+    System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Wa:Jwt:Secret"]!), () => DateTimeOffset.UtcNow));
 var app = builder.Build();
 // TA-4.1.6 (T-056-03): allow-list CORS only — configured origins via Wa:Cors:AllowedOrigins, no wildcard, preflight cached 1 h.
 app.UseMiddleware<CorsAllowListMiddleware>();
@@ -174,6 +182,106 @@ app.MapPost("/api/v1/transfers/{id}/send", async (Guid id, HttpRequest request, 
     {
         throw new BusinessException(ProblemCodes.Validation, vex.Message);
     }
+});
+
+// T-014 (TA-4.2#4): recipient metadata for GET /api/v1/public/transfers/{linkId} — no auth, no cookie; page views never mint SAS or consume a download.
+app.MapGet("/api/v1/public/transfers/{linkId}", async (string linkId, HttpRequest request, ISender sender, CancellationToken ct) =>
+{
+    // T-003-04 (TA-9.6#1): the ?t= unlock token is read here and passed to the handler — a valid token flips passwordRequired to false.
+    var result = await sender.Send(new GetPublicTransferQuery(linkId, request.Query["t"].FirstOrDefault()), ct);
+    return result.State switch
+    {
+        PublicTransferState.Active => Results.Json(new
+        {
+            from = result.From, note = result.Note,
+            files = result.Files!.Select(f => new { fileId = f.FileId.ToString("n"), name = f.Name, sizeBytes = f.SizeBytes }),
+            hasDownloadAll = result.HasDownloadAll, downloadsLeft = result.DownloadsLeft, passwordRequired = result.PasswordRequired
+        }), // TA-4.2#4 exact wire shape — property names pinned at the single construction site (same style as endpoints 1–3)
+
+        // D8: status pin = 410 for both terminal expired shapes; the unknown case overrides to 404 below (FR-003-9: same body, different status line only).
+        PublicTransferState.Expired => Results.Json(ProblemWriter.Build(
+            ProblemCodes.StatusOf(ProblemCodes.TransferExpired), ProblemCodes.TransferExpired, ExpiredDetails(result.SenderEmail)), statusCode: 410),
+
+        PublicTransferState.DownloadLimit => Results.Json(
+            ProblemWriter.Build(410, ProblemCodes.MaxDownloadsReached, DownloadLimitDetails(result.SenderEmail)), statusCode: 410), // 409→410 explicit override (task doc status mapping)
+
+        PublicTransferState.NotFound => Results.Json(
+            ProblemWriter.Build(404, ProblemCodes.TransferExpired, ExpiredDetails(null)), statusCode: 404) // FR-003-9: same body, different status line only
+    };
+});
+// FR-003-8/9 details text — the single string slot in the TA-4.1.3 Problem+JSON closed shape (the writer's signature has no per-field override).
+static string ExpiredDetails(string? senderEmail) =>
+    senderEmail is null
+        ? "This transfer has expired. Contact the sender for a new link."   // US-003-05 alternative flow: no fabricated address
+        : $"This transfer has expired. Contact {senderEmail} for a new link.";
+
+// AC-003-5 / F-TRF-005-4 details text — sender email when provided; plain message when null (no fabricated address, same style as ExpiredDetails).
+static string DownloadLimitDetails(string? senderEmail) =>
+    senderEmail is null
+        ? "All downloads have been used."
+        : $"All downloads have been used. Contact {senderEmail} for a new link.";
+
+// T-003-04 (TA-4.2#5): unlock a gated transfer — PBKDF2-SHA256 verify (same hasher + user-id keying as send time) → 7-day HS256 JWT.
+// No Set-Cookie, no extra properties (T-003-05: the token lives client-side in sessionStorage); endpoint 4's ?t= accepts it.
+app.MapPost("/api/v1/public/transfers/{linkId}/unlock", async (string linkId, HttpRequest request, ISender sender, CancellationToken ct) =>
+{
+    // Same JsonDocument style as the send endpoint: empty body → password stays null → the handler throws the VALIDATION application-level exception (D1).
+    string? password = null;
+    using var ms = new MemoryStream();
+    await request.Body.CopyToAsync(ms);
+    if (ms.Length > 0)
+    {
+        ms.Position = 0;
+        using var bodyDoc = System.Text.Json.JsonDocument.Parse(ms);
+        password = bodyDoc.RootElement.TryGetProperty("password", out var pw) ? pw.GetString() : null;
+    }
+
+    try
+    {
+        var result = await sender.Send(new UnlockTransferCommand(linkId, password), ct);
+        return result.State switch
+        {
+            // TA-4.2#5 exact wire shape — { token } only.
+            UnlockState.Active => Results.Json(new { token = result.Token }),
+            // D2.6: the auth failure is a result-state (not an exception) — Program.cs owns the 401 body; title pinned by the closed table.
+            UnlockState.WrongPassword => Results.Json(ProblemWriter.Build(401, ProblemCodes.WrongPassword, ProblemCodes.TitleOf(ProblemCodes.WrongPassword)), statusCode: 401),
+            // FR-003-9 single-body invariant — byte-equal to endpoint 4's unknown-linkId case (status line is the only diff).
+            UnlockState.NotFound => Results.Json(ProblemWriter.Build(404, ProblemCodes.TransferExpired, ExpiredDetails(null)), statusCode: 404),
+            // D6: status-before-password — terminal rows map to their canonical bodies regardless of credentials.
+            UnlockState.Expired => Results.Json(ProblemWriter.Build(410, ProblemCodes.TransferExpired, ExpiredDetails(result.SenderEmail)), statusCode: 410),
+            UnlockState.DownloadLimit => Results.Json(ProblemWriter.Build(410, ProblemCodes.MaxDownloadsReached, DownloadLimitDetails(result.SenderEmail)), statusCode: 410)
+        };
+    }
+    catch (wa.application.UseCases.Transfers.UnlockPasswordMissingException vex)
+    {
+        // D1: application-level exception → VALIDATION with errors[] — the only code with per-field details; BusinessException stays in wa.api.Middleware.
+        throw new BusinessException(ProblemCodes.Validation, vex.Message) { Errors = [new ProblemFieldError("password", vex.Message)] };
+    }
+});
+
+// T-003-06 (TA-4.2#6): mint a 30-minute read SAS on one transfer file; the browser streams directly from storage.
+// Terminal states map to endpoint 4's canonical Problem+JSON bodies (FR-003-9 byte identity); ?t= unlock JWT accepted.
+app.MapGet("/api/v1/public/transfers/{linkId}/files/{fileId}/download-url", async (string linkId, string fileId, HttpRequest request, ISender sender, CancellationToken ct) =>
+{
+    var result = await sender.Send(new GetFileDownloadUrlQuery(
+        linkId,
+        fileId,
+        Token: request.Query["t"].FirstOrDefault(),
+        ClientIp: request.HttpContext.Connection.RemoteIpAddress?.ToString(),
+        UserAgent: request.Headers.UserAgent.ToString()), ct);
+    return result.State switch
+    {
+        // TA-4.2#6 exact wire shape — exactly { url, expiresAt } (02-feature-plan §F-TRF-003 pinned); nothing else.
+        FileDownloadState.Ok => Results.Json(new { url = result.Url!.ToString(), expiresAt = result.ExpiresAt!.Value }),
+
+        // D6: terminal-before-auth — canonical bodies, same as endpoint 4 (FR-003-9).
+        FileDownloadState.NotFound => Results.Json(ProblemWriter.Build(404, ProblemCodes.TransferExpired, ExpiredDetails(null)), statusCode: 404),
+        FileDownloadState.Expired => Results.Json(ProblemWriter.Build(410, ProblemCodes.TransferExpired, ExpiredDetails(result.SenderEmail)), statusCode: 410),
+        FileDownloadState.DownloadLimit => Results.Json(ProblemWriter.Build(410, ProblemCodes.MaxDownloadsReached, DownloadLimitDetails(result.SenderEmail)), statusCode: 410),
+
+        // TA-9.6#1: gated transfer minted without a valid ?t= → 401 UNAUTHENTICATED (never a file-list-shaped error).
+        FileDownloadState.Unauthenticated => Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401)
+    };
 });
 
 app.Run();

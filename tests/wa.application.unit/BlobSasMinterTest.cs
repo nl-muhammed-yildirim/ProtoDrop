@@ -62,6 +62,37 @@ public class BlobSasMinterTest : IDisposable
         assertValidSignature(q, $"/blob/blob.local.test.example/transfers/{TrnId}/files/{FldId}");
     }
 
+    /// <summary>
+    /// T-003-06 (EC-003-3): the 3-arg mint with an RFC 5987 resp-content-disposition override must sign the rs-cd line
+    /// into the string-to-sign. Azurite honors rs-cd, so a tampered sig would be rejected at stream time — this test
+    /// pins that the signature is valid for EXACTLY this disposition (and not the empty one from the 2-arg overload).
+    /// </summary>
+    [Fact]
+    public void RecipientFile_SAS_WithContentDisposition_PinsRsCdAndSignature()
+    {
+        const string fileName = "Q4 report (final) v2.pdf";
+        var url = _minter.MintRecipientFile(TrnId, FldId, respContentDisposition: $"attachment;filename*=UTF-8''{Uri.EscapeDataString(fileName)}").ToString();
+        var q = Query(url);
+
+        Assert.Equal("r", q["sp"]);                          // TA-3.6 recipient file: blob scope r
+        Assert.Equal("b", q["sr"]);                         // blob resource (TA-3.5)
+        Assert.Equal("2024", q["sv"]);                      // sv = spec literal (TA-3.6 "Version 2024")
+        Assert.Equal(Now.AddMinutes(30).ToString("yyyy-MM-ddTHH:mm:ssZ"), q["se"]);  // 30min TTL (TA-3.6)
+        Assert.False(q.ContainsKey("st"));                   // no st for recipients (TA-3.6)
+
+        // The content-disposition override is pinned bit-exact under the rscd token (EC-003-3: the browser's
+        // Content-Disposition round-trips through this override — part of the string-to-sign).
+        Assert.Equal($"attachment;filename*=UTF-8''{Uri.EscapeDataString(fileName)}", q["rscd"]);
+
+        // Independent re-sign with the rs-cd line in the string-to-sign — proves the sig covers exactly this disposition.
+        var sst = Sign(
+            permissions: q["sp"], start: q.ContainsKey("st") ? q["st"] : "", expiry: q["se"],
+            path: $"/blob/blob.local.test.example/transfers/{TrnId}/files/{FldId}",
+            ipRange: q.GetValueOrDefault("sip", ""), protocol: "https", resourceType: "b",
+            accountKey: _accountKey, respContentDisposition: q["rscd"]);
+        Assert.Equal(Convert.ToBase64String(sst), q["sig"]); // FR-055-6 style — the emitted sig verifies against an independent HMAC
+    }
+
     [Fact]
     public void RecipientZip_SAS_pins_r_scope_30min_window_and_no_st()
     {
@@ -95,13 +126,15 @@ public class BlobSasMinterTest : IDisposable
 
     // Independent re-signing: HMAC-SHA256 over the exact TA-3.6 16-line string-to-sign (blob scope).
     // sv line is the spec literal "2024" (TA-3.6 — not the SDK's internal build date).
+    // respContentDisposition is optional (T-003-06): when given, it substitutes for the empty content-disposition
+    // line in the string-to-sign — the same slot the minter fills via builder.ContentDisposition before ToSasQueryParameters.
     private static byte[] Sign(string permissions, string start, string expiry, string path,
-        string ipRange, string protocol, string resourceType, byte[] accountKey)
+        string ipRange, string protocol, string resourceType, byte[] accountKey, string? respContentDisposition = null)
     {
         var sst = string.Join("\n",
             permissions, start, expiry, path, "", ipRange, protocol, "2024", resourceType,
-            // 7 trailing empty lines (snapshot/encryption scope/cache control/content disposition/content encoding/content language/content type):
-            "", "", "", "", "", "", "");
+            // 7 trailing lines (snapshot/encryption scope/cache control/content disposition/content encoding/content language/content type):
+            "", "", "", respContentDisposition ?? "", "", "", "");
 
         using var h = new HMACSHA256(accountKey);
         return h.ComputeHash(Encoding.UTF8.GetBytes(sst));

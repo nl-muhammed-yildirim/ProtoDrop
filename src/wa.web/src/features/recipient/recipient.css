@@ -1,0 +1,312 @@
+/* T-003-02 (FR-003-1/2): recipient page at /t/{linkId} — design tokens only (no hardcoded colors). */
+
+.rp {
+  width: 100%;
+  max-width: 560px; /* same as .ls / .dz */
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rp-loading {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: var(--fs-body);
+}
+
+.rp-heading {
+  margin: 0;
+  font-size: var(--fs-h1);
+  line-height: 1.25;
+  text-align: center;
+}
+
+/* Error state — centered muted card; the dedicated terminal screens live in .rp-terminal below (T-003-03). */
+.rp-error {
+  color: var(--fg);
+}
+
+.rp-sub {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: var(--fs-small);
+  text-align: center;
+}
+
+/* Note — --bg-subtle blockquote (UI-Reference §5.3); overflow-wrap keeps long unbroken URLs from breaking layout. */
+.rp-note {
+  margin: 0;
+  background: var(--bg-subtle);
+  border-left: 3px solid var(--accent-soft);
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  color: var(--fg-muted);
+  font-size: var(--fs-small);
+  overflow-wrap: anywhere;
+}
+
+/* File rows — same pattern as .sl-list / .sl-row. */
+.rp-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rp-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.rp-icon {
+  color: var(--fg-muted);
+  display: flex;
+  align-items: center;
+}
+
+/* Ellipsis + overflow-wrap so long names truncate instead of breaking the row. */
+.rp-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow-wrap: anywhere;
+}
+
+.rp-size {
+  color: var(--fg-muted);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+
+/* Per-row Download — 44px min target like .sl-remove (existing pattern). */
+.rp-download {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: var(--fs-small);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.rp-download:hover {
+  background: var(--bg-elevated);
+  color: var(--fg);
+}
+
+/* Download all — primary button after the list (FR-003-1). */
+.rp-download-all {
+  width: 100%;
+}
+
+/* T-003-03 (FR-003-5): "Downloads left: N" under the list, --fs-small, only for finite caps. */
+.rp-downloads-left {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: var(--fs-small);
+  text-align: center;
+}
+
+/* T-003-03 (FR-003-8/9, UI-Reference §4.6): shared terminal screen — icon, one line, one action.
+   Expired / unknown / download-limit all render this shape; only the line's text differs. */
+.rp-terminal {
+  gap: 24px;
+}
+
+/* Icon slot — reuses .rp-icon's muted color, centered for the single-screen state. */
+.rp-terminal-icon {
+  justify-content: center;
+}
+
+/* One action — "Send something" as the §4.6 primary anchor (T-003-07 wires it). */
+.rp-terminal-action {
+  align-self: center;
+}
+
+/* T-003-07 (FR-003-7): growth panel — subtle card below the file list after a full download.
+   Mirrors .rp-note's --bg-subtle radius/padding conventions; one line + primary CTA. */
+.rp-growth {
+  background: var(--bg-subtle);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* One line — calm question form (UI-Reference §7): no exclamation points. */
+.rp-growth-copy {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: var(--fs-small);
+  text-align: center;
+}
+
+/* Primary CTA — same .btn-primary base as Download all / Unlock. */
+.rp-growth-cta {
+  width: 100%;
+}
+
+.rp-download:focus-visible,
+.rp-download-all:focus-visible,
+.rp-growth-cta:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.rp-terminal-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* T-003-05 (FR-003-6): password gate — the single centered card on a gated transfer. Only this section and its
+   contents render (RecipientPage.tsx owns the branching) — no file list, no sizes, nothing to leak. */
+.rp-gate {
+  /* Inherits .rp's 560px centered column — the card centers with the rest of the page. */
+}
+
+.rp-password-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rp-password-label {
+  color: var(--fg-muted);
+  font-size: var(--fs-small);
+}
+
+/* Row wrapper — position:relative so the toggle can overlay the input's right edge (44×44 target). */
+.rp-password-row {
+  position: relative;
+}
+
+.rp-password-input {
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding-right: 52px; /* clears the absolutely-positioned toggle — no overlap on any width */
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  font-size: var(--fs-body);
+}
+
+.rp-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.rp-password-toggle:hover {
+  color: var(--fg);
+}
+
+/* Wrong password — role=alert text is always present (motion-safe: only the shake is gated below). */
+.rp-password-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--fs-small);
+}
+
+/* Full-width primary submit — same .btn-primary base as Download all. */
+.rp-password-submit {
+  width: 100%;
+}
+
+.rp-password-input:focus-visible,
+.rp-password-toggle:focus-visible,
+.rp-password-submit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Shake on wrong password — @media wrapper matches the .dz-toast precedent (index.css); reduced motion → text only. */
+@media (prefers-reduced-motion: no-preference) {
+  .rp-shake {
+    animation: rp-shake 400ms ease-in-out;
+  }
+}
+
+@keyframes rp-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  50% { transform: translateX(4px); }
+  75% { transform: translateX(-4px); }
+}
+
+/* T-003-08 (FR-003-10): mobile ≤640 px — single column, sticky Download bar. Base rules stay byte-unchanged;
+   the bar itself is `position: fixed` — FR-003-10 says "sticky at the bottom of **the viewport**", and in-flow
+   `position: sticky; bottom: 0` only pins when `.rp` overflows the viewport (probed: 2 small files → docH ==
+   viewport 780 → bar sits mid-page; 15 rows → overflows → pins exactly 780). `fixed; left/right/bottom: 0`
+   pins to the exact viewport bottom for both short and long content. The page reserves bottom padding so the
+   bar never overlaps the last row / growth panel; var(--bg) is opaque so content scrolls under the bar
+   (TA-8.4; tokens only — index.css :root). */
+.rp-sticky {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .rp {
+    padding-bottom: 96px;
+  }
+
+  /* The in-flow Download all is the desktop/mobile duplicate — the sticky bar's button replaces it at ≤640 px. */
+  .rp-download-all {
+    display: none;
+  }
+
+  /* Viewport-pinned bottom (T-003-08-fix): `fixed` supersedes D1's in-flow `sticky` — FR-003-10 "bottom of the
+     viewport" + "page scrolls under it" only holds when the bar is off the flow; probed both cases (n=2 / n=15).
+     .rp's 96 px padding-bottom still reserves the no-overlap gap. */
+  .rp-sticky {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+  }
+
+  .rp-sticky .btn-primary {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  /* Kills the 300 ms tap-zoom delay on iOS; no hover-dependent affordances are added (F-TRF-017-5). */
+  .rp-download,
+  .rp-sticky .btn-primary {
+    touch-action: manipulation;
+  }
+
+  /* Guards against iOS UA padding growth — the input stays exactly 44 px tall at var(--fs-body) (no zoom-on-focus). */
+  .rp-password-input {
+    height: 44px;
+  }
+}

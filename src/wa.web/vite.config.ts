@@ -37,6 +37,13 @@ export default defineConfig({
     // The e2e specs run under the separate Playwright runner (playwright.config.ts), not Vitest.
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['node_modules', 'dist', 'e2e'],
+    alias: {
+      // T-003-09's mssql devDependency pulls the buffer@6 polyfill (via @tediousjs/connection-string),
+      // which shadows Node's builtin "buffer" in Vitest and lacks .constants — PooledBuffer reads
+      // buffer.constants.MAX_LENGTH at module scope. Alias to the real builtin for tests only;
+      // Vite build + Playwright are unaffected (no alias here).
+      'buffer': 'node:buffer',
+    },
     server: {
       deps: {
         // Let Vite (and the aliases above) process these packages in tests instead of plain Node

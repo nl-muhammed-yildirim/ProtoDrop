@@ -40,6 +40,9 @@ public class SendEndpointTests : IAsyncLifetime
         Environment.SetEnvironmentVariable("Wa__Blob__AccountKey", AzuriteBuilder.AccountKey);
         Environment.SetEnvironmentVariable("Wa__Jwt__Secret", "test-jwt-secret");
         Environment.SetEnvironmentVariable("Wa__Url__Public", "http://localhost:5173");
+        // TA-4.1.7 / EC-054-1: the outbox row commits via SbEventPublisher's own AppDbContextFactory context
+        // BEFORE broker publish; an unreachable (dummy) connection string exercises that path deterministically.
+        Environment.SetEnvironmentVariable("Wa__ServiceBus__ConnectionString", "Endpoint=" + _accountUrl + ";SharedAccessKeyName=Dummy;SharedAccessKey=dummy");
 
         _sql = new MsSqlBuilder().WithImage("mcr.microsoft.com/mssql/server:2022-latest").Build();
         await _sql.StartAsync();
@@ -143,8 +146,10 @@ public class SendEndpointTests : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        // Find the outbox row.
-        var domainEvent = await _db.Set<DomainEvent>().FirstOrDefaultAsync(e => e.EventType == "transfer.created");
+        // Find the outbox row for THIS transfer — envelope PartitionKey = transfer.LinkId (TA-5.2), unique per test.
+        var dbTransfer = await _db.Set<Transfer>().FirstAsync(t => t.Id == transferId);
+        var domainEvent = await _db.Set<DomainEvent>()
+            .FirstOrDefaultAsync(e => e.EventType == "transfer.created" && e.PartitionKey == dbTransfer.LinkId);
         Assert.NotNull(domainEvent);
 
         // Parse the envelope JSON and verify the payload shape.
@@ -200,12 +205,15 @@ public class SendEndpointTests : IAsyncLifetime
         var draftId = new Guid(draftDoc.RootElement.GetProperty("draftId").GetString()!);
         var fileId = new Guid(draftDoc.RootElement.GetProperty("files")[0].GetProperty("fileId").GetString()!);
 
-        // Upload a blob to staging.
+        // Upload a blob to staging — canonical TA-3.5 split (TA-3.5): the first path segment is the container,
+        // the rest the blob name — AzureBlobStore.SplitPath reads it that way, so we must write it that way.
         var stagingPath = BlobPaths.StagingFile(draftId, fileId);
         var bytes = new byte[512];
         RandomNumberGenerator.Fill(bytes);
+        var cut = stagingPath.IndexOf('/');
         using (var ms = new MemoryStream(bytes))
-            await _svc.GetBlobContainerClient(BlobPaths.StagingContainer).GetBlobClient(stagingPath).UploadAsync(ms);
+            await _svc.GetBlobContainerClient(stagingPath[..cut]).GetBlobClient(stagingPath[(cut + 1)..])
+                .UploadAsync(ms, true, default);
 
         // Finalize.
         var finalizePayload = JsonSerializer.Serialize(new { files = new[] { new { fileId, name = "test.txt", sizeBytes = 512L, contentType = "text/plain", retries = 0 } } });

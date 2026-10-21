@@ -130,6 +130,10 @@ public class CreateDraftHandlerTests
             Mints.Add((draftId, fileId));
             return new Uri($"http://staging/{draftId}/f/{fileId}?sv=2024&sp=cwr");
         }
+
+        // T-003-06: the interface gained the 3-arg recipient mint — unused by CreateDraft (endpoint 1), kept for completeness.
+        public Uri MintRecipientFile(string transferId, string fileId, string respContentDisposition)
+            => new Uri($"http://transfers/{transferId}/files/{fileId}?sv=2024&sp=r&rs-content-disposition={Uri.EscapeDataString(respContentDisposition)}");
     }
 
     /// <summary>Records the exact rendered text M.E.L hands to a logger — enough to assert the closed event name without a full pipeline (T-056 owns template shape).</summary>
