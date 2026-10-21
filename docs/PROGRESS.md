@@ -1,12 +1,12 @@
 # PROGRESS.md — Session State (read at every session start)
 
-**Last updated:** 2026-10-18
+**Last updated:** 2026-10-20
 
 ## 1. Current task
 
-**T-015 (F-TRF-003)** — Recipient download page: T-003-04 done (endpoint 5 unlock + 7-day JWT, review PASS). **Next:** T-003-05 password gate UI (`US-003-04-unlock-password/T-003-05-password-gate-ui.md`), then T-016 = T-003-06 single-file SAS endpoint, T-003-07 growth loop, T-003-08 mobile layout, T-003-09 Playwright E2E.
+**F-TRF-003 complete** — T-003-01…T-003-09 all done, review PASS. Branch `feature/F-TRF-003` ready to push + PR → `feature/F-TRF`. **Next:** push branch, open PR (target `feature/F-TRF`; CI only triggers on PRs to `main`).
 
-**Branch state:** `feature/F-TRF-003` (based on `feature/F-TRF`) holds T-003-01…T-003-04. Fine-grained state: F-TRF-003 spec table — T-003-01 (3768ba9 + fix a915a8a), T-003-02 (54013ba + fix 1b4871a), T-003-03 (46238a1), T-003-04 (4bb8496 + fix 8a1c35a) all review PASS. Known rulings: endpoint-4 gated pages keep the full payload; valid `?t=` token flips `passwordRequired` false (T-003-01 pinned wire-shape tests stay green); unlock telemetry is property-free (`password_correct`/`password_wrong`, TA-9.4).
+**Branch state:** `feature/F-TRF-003` (based on `feature/F-TRF`) holds T-003-01…T-003-09. Fine-grained state: F-TRF-003 spec table — T-003-01 (3768ba9 + fix a915a8a), T-003-02 (54013ba + fix 1b4871a), T-003-03 (46238a1), T-003-04 (4bb8496 + fix 8a1c35a), T-003-05 (2c59592 + fix d1c56d2), T-003-06 (6bb6b56 + fix b54b23a), T-003-07 (16cf1a3), T-003-08 (cd2e9cb + fixes 5363386/ad6fe26/58f454c), T-003-09 (a092b51 + fixes f781005/32edc8c) — all review PASS. Known rulings: endpoint-4 gated pages keep the full payload; valid `?t=` token flips `passwordRequired` false (T-003-01 pinned wire-shape tests stay green); unlock telemetry is property-free (`password_correct`/`password_wrong`, TA-9.4). T-003-06 minor finding accepted: `download_completed` not emitted (M0 — no client telemetry pipeline, ADR row 2026-10-20).
 ---
 
 ## 2. Completed tasks (append-only)
@@ -21,3 +21,5 @@
 | T-012 (T-001-07…09) | 2026-10-15 | Progress UI, per-block retry backoff + row-local Retry button, Playwright E2E (AC-001-1…4) |
 | T-002-01…T-002-08 (F-TRF-002) | 2026-10-15/17 | LinkId VO + retry-once, Idempotency-Key middleware, endpoint 3 SendTransferCommand (AC-002-2/3), link screen UI: copy field, recipients cap, PBKDF2 password, sender name+note, Copy link only + confirmation (AC-002-1…3 client half). T-002-08 went through the full architect→coder→reviewer pipeline (f4d758f + fix 6ee0a7d, review PASS) |
 | T-003-01…T-003-04 (F-TRF-003) | 2026-10-18 | Endpoint 4 GetPublicTransferQuery + FR-003-9 terminal states; recipient page UI (route charset drift-guard); terminal-state screens + Downloads-left line; endpoint 5 unlock PBKDF2 verify → 7-day HS256 JWT + endpoint-4 `?t=` acceptance. All review PASS — details in F-TRF-003 spec table |
+| T-003-05…T-003-07 (F-TRF-003) | 2026-10-19 | Password gate UI (shake on wrong, sessionStorage token); endpoint 6 single-file SAS mint — atomic DownloadsCount + idempotent Status=3 cap flip in store, RFC 5987 Content-Disposition; growth-loop "Send something" panel + terminal-state CTA with feature-local telemetry. All review PASS — details in F-TRF-003 spec table |
+| T-003-08…T-003-09 (F-TRF-003) | 2026-10-20 | Mobile ≤640 px single-column + sticky download bar pinned to viewport bottom (`position: fixed` supersedes D1 in-flow sticky — FR-003-10 "bottom of the viewport"); recipient download re-addresses + protocol-re-signs minted read SAS for local Azurite (T-055-05/TA-14.3, mirrors StagingList); Playwright E2E AC-003-1…AC-003-5 + EC-003-1 500 MB Range-resume byte-identical + TTFB < 500 ms (78 ms measured). T-003-09 fixes: FileItem.Id reuses draft fileId so blob path matches minted SAS path; Vitest `'buffer'` → `node:buffer` test.alias (mssql polyfill shadowed Node builtin, broke jsdom suite collection). All review PASS — details in F-TRF-003 spec table |

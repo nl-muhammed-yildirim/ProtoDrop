@@ -104,10 +104,10 @@ AC-003-5: Download limit reached
 | US-003-01 | T-003-02 Recipient page UI: file list, From header, note (FR-003-1/2) | `US-003-01-open-link/T-003-02-recipient-page-ui.md` | ☑ 2026-10-18 (54013ba + fix 1b4871a, review PASS) |
 | US-003-05 | T-003-03 Terminal-state screens: expired / not-found / download-limit + "Downloads left" (FR-003-5/8/9) | `US-003-05-remaining-expired/T-003-03-terminal-state-screens.md` | ☑ 2026-10-18 (46238a1, review PASS) |
 | US-003-04 | T-003-04 Endpoint 5: unlock, PBKDF2 verify → 7-day JWT (T-015) | `US-003-04-unlock-password/T-003-04-unlock-endpoint-jwt.md` | ☑ 2026-10-18 (4bb8496 + fix 8a1c35a, review PASS) |
-| US-003-04 | T-003-05 Password gate UI: single card, shake on wrong, sessionStorage token (FR-003-6) | `US-003-04-unlock-password/T-003-05-password-gate-ui.md` | ☐ |
-| US-003-03 | T-003-06 Endpoint 6: single-file SAS mint, DownloadsCount + cap check (T-016) | `US-003-03-download-individual/T-003-06-single-file-sas-endpoint.md` | ☐ |
-| US-003-07 | T-003-07 Growth loop: "Send something" panel + terminal-state CTA (FR-003-7) | `US-003-07-growth-loop/T-003-07-growth-loop-panel.md` | ☐ |
-| US-003-06 | T-003-08 Mobile layout: single column, sticky download button (FR-003-10) | `US-003-06-mobile-download/T-003-08-mobile-layout-sticky.md` | ☐ |
-| US-003-01 | T-003-09 E2E (Playwright): AC-003-1…AC-003-5 + Range-resume (T-014 exit check) | `US-003-01-open-link/T-003-09-e2e-playwright.md` | ☐ |
+| US-003-04 | T-003-05 Password gate UI: single card, shake on wrong, sessionStorage token (FR-003-6) | `US-003-04-unlock-password/T-003-05-password-gate-ui.md` | ☑ 2026-10-19 (2c59592 + fix d1c56d2, review PASS) |
+| US-003-03 | T-003-06 Endpoint 6: single-file SAS mint, DownloadsCount + cap check (T-016) | `US-003-03-download-individual/T-003-06-single-file-sas-endpoint.md` | ☑ 2026-10-19 (6bb6b56 + fix b54b23a, review PASS; minor: download_completed not emitted — M0 no client telemetry pipeline, ADR row) |
+| US-003-07 | T-003-07 Growth loop: "Send something" panel + terminal-state CTA (FR-003-7) | `US-003-07-growth-loop/T-003-07-growth-loop-panel.md` | ☑ 2026-10-19 (16cf1a3, review PASS) |
+| US-003-06 | T-003-08 Mobile layout: single column, sticky download button (FR-003-10) | `US-003-06-mobile-download/T-003-08-mobile-layout-sticky.md` | ☑ 2026-10-20 (cd2e9cb + fixes 5363386/ad6fe26/58f454c, review PASS) |
+| US-003-01 | T-003-09 E2E (Playwright): AC-003-1…AC-003-5 + Range-resume (T-014 exit check) | `US-003-01-open-link/T-003-09-e2e-playwright.md` | ☑ 2026-10-20 (a092b51 + fixes f781005/32edc8c, review PASS) |
 
 **Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-014, T-015 and T-016 can be marked `done` in `Milestone-Backlog.md`. (Download-all / zip generation is F-TRF-004 — T-017.)
