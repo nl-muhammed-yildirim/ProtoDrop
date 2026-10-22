@@ -22,6 +22,18 @@ public interface IPublicTransferStore
         string? ipHash,
         string? uaHash,
         CancellationToken ct);
+
+    /// <summary>
+    /// T-004-02 (TA-7.2): atomically record a zip download against the transfer's cap.
+    /// Same as RecordSingleFileDownloadAsync but with fileId = null (download-all).
+    /// The increment + DownloadEvent insert are transactional; the status flip to 3 (DownloadLimit) happens idempotently
+    /// when the cap is reached — no worker owns this transition (US-005-03 technical note).
+    /// </summary>
+    Task<SingleFileDownloadResult> RecordZipDownloadAsync(
+        Guid transferId,
+        string? ipHash,
+        string? uaHash,
+        CancellationToken ct);
 }
 
 /// <summary>T-003-06 (TA-7.2 step 4) — the outcome of an atomic cap-checked increment.</summary>

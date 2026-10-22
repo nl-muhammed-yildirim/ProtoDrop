@@ -317,6 +317,9 @@ public class GetPublicTransferHandlerTests
         public Task<SingleFileDownloadResult> RecordSingleFileDownloadAsync(Guid transferId, Guid fileId, string? ipHash, string? uaHash, CancellationToken ct) =>
             Task.FromException<SingleFileDownloadResult>(new NotSupportedException("Not used by GetPublicTransferHandler (T-014); T-003-06's handler tests carry their own stub."));
 
+        public Task<SingleFileDownloadResult> RecordZipDownloadAsync(Guid transferId, string? ipHash, string? uaHash, CancellationToken ct) =>
+            Task.FromException<SingleFileDownloadResult>(new NotSupportedException("Not used by GetPublicTransferHandler (T-014); T-004-02's handler tests carry their own stub."));
+
         public void SetupActive(IReadOnlyList<PublicFileItem> files, int maxDownloads, int downloadsCount, string? passwordHash) =>
             SetupStatus(status: 1, senderEmail: "alice@example.com", files: files, maxDownloads: maxDownloads, downloadsCount: downloadsCount, passwordHash: passwordHash);
 

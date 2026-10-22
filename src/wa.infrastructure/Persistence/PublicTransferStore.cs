@@ -82,4 +82,53 @@ public sealed class PublicTransferStore : IPublicTransferStore
         await _db.SaveChangesAsync(ct);
         return new SingleFileDownloadResult(SingleFileDownloadOutcome.Recorded);
     }
+
+    /// <summary>
+    /// T-004-02 (TA-7.2): atomically record a zip download against the transfer's cap.
+    /// Same as RecordSingleFileDownloadAsync but with fileId = null (download-all).
+    /// The increment is a guarded ExecuteUpdate (no read-then-write race — a burst of parallel mints can never count past MaxDownloads);
+    /// when the guard rejects, the status flips to 3 via US-005-03's literal idempotent UPDATE (the flip happens here, not in a worker).
+    /// DownloadEvent insertion follows a successful increment only — a rejected mint leaves no trace.
+    /// </summary>
+    public async Task<SingleFileDownloadResult> RecordZipDownloadAsync(
+        Guid transferId,
+        string? ipHash,
+        string? uaHash,
+        CancellationToken ct)
+    {
+        // TA-7.2 step 4: the guard runs in the UPDATE itself — rowsAffected==1 iff the download is within cap at execution time.
+        var rowsAffected = await _db.Set<Transfer>()
+            .Where(t => t.Id == transferId && (t.MaxDownloads < 0 || t.DownloadsCount < t.MaxDownloads))
+            .ExecuteUpdateAsync(setter => setter.SetProperty(t => t.DownloadsCount, t => t.DownloadsCount + 1), ct);
+
+        if (rowsAffected is not 1)
+        {
+            // US-005-03 technical note literal: idempotent flip — Status=3 + ExpiredAtUtc set when it flips (grace clock starts),
+            // WHERE Id=@id AND Status=1 so concurrent racers all write the same value.
+            _ = await _db.Database.ExecuteSqlRawAsync(
+                "UPDATE [Transfer] SET [Status]=3, [ExpiredAtUtc]=COALESCE([ExpiredAtUtc], GETUTCDATE()) WHERE [Id] = {0} AND [Status] = 1",
+                [transferId], ct);
+
+            // The raw-SQL UPDATE bypasses the change tracker: if this transfer is tracked in the singleton context, detach it so
+            // later SaveChanges can't resurrect the old Status/DownloadsCount (GetByLinkIdAsync reads untracked — see its summary).
+            var tracked = _db.Set<Transfer>().Local.FirstOrDefault(t => t.Id == transferId);
+            if (tracked is not null)
+                _db.Set<Transfer>().Local.Remove(tracked);
+
+            return new SingleFileDownloadResult(SingleFileDownloadOutcome.CapReached);
+        }
+
+        // Within cap: the DownloadEvent row (TA-3.2; IpHash/UaHash already PII-transformed upstream — TA-9.4/10.5).
+        // FileId = null for download-all (TA-3.2: NULL = download-all).
+        _db.Set<DownloadEvent>().Add(new DownloadEvent
+        {
+            TransferId = transferId,
+            FileId = null, // download-all
+            IpHash = ipHash,
+            UaHash = uaHash,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        await _db.SaveChangesAsync(ct);
+        return new SingleFileDownloadResult(SingleFileDownloadOutcome.Recorded);
+    }
 }
