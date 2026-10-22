@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Net;
 using System.Security.Cryptography;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -48,16 +49,16 @@ public class ZipFunction
     [Function("Zip")]
     public async Task<HttpResponseData> Run(
         FunctionContext context,
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "zip/{transferId}")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "zip/{transferId}")] HttpRequestData req, string transferIdParam)
     {
         // Auth: check x-zip-sign header against config using timing-safe comparison
         var expectedSign = _config["Wa:Zip:SignKey"];
-        if (expectedSign is null || !req.Headers.TryGetValues("x-zip-sign", out var signValues) || !VerifySignature(true, string.Join(",", signValues), expectedSign))
+        var signValues = req.Headers.GetValues("x-zip-sign");
+        if (expectedSign is null || signValues is null || !VerifySignature(true, string.Join(",", signValues), expectedSign))
             return CreateProblemResponse(req, 401, ProblemCodes.Unauthenticated, "Invalid or missing signature.");
 
-        // Parse transferId as Guid → 404 if malformed
-        var transferIdParam = req.Url.Query["transferId"]?.ToString();
-        if (transferIdParam is null || !Guid.TryParse(transferIdParam, out var id))
+        // Parse transferId as Guid → 404 if malformed (bound from route template zip/{transferId})
+        if (!Guid.TryParse(transferIdParam, out var id))
             return CreateProblemResponse(req, 404, ProblemCodes.NotFound, "Transfer not found.");
 
         // Load files by transfer Id
@@ -193,12 +194,20 @@ public class ZipFunction
             details
         };
 
-        return req.CreateResponse(status, System.Text.Json.JsonSerializer.Serialize(payload));
+        var json = System.Text.Json.JsonSerializer.Serialize(payload);
+        var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(json));
+        var response = req.CreateResponse((HttpStatusCode)status);
+        response.Body = stream;
+        return response;
     }
 
     private static Microsoft.Azure.Functions.Worker.Http.HttpResponseData CreateSuccessResponse(Microsoft.Azure.Functions.Worker.Http.HttpRequestData req, Uri url)
     {
         var payload = new { url = url.ToString() };
-        return req.CreateResponse(200, System.Text.Json.JsonSerializer.Serialize(payload));
+        var json = System.Text.Json.JsonSerializer.Serialize(payload);
+        var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(json));
+        var response = req.CreateResponse(HttpStatusCode.OK);
+        response.Body = stream;
+        return response;
     }
 }

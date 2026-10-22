@@ -1,5 +1,7 @@
 using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Core;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -10,7 +12,7 @@ using wa.infrastructure.Blob;
 using wa.infrastructure.Persistence;
 
 var host = new HostBuilder()
-    .ConfigureFunctionsWebApplication()
+    .ConfigureAppConfiguration(config => config.AddEnvironmentVariables())
     .ConfigureServices(services =>
     {
         // DbContext for the zip function
