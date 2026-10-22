@@ -42,6 +42,10 @@ public sealed class WaTelemetryReporter
     public void ZipGenerated(long sizeBytes, long durationMs) =>
         _logger.LogInformation("zip_generated {sizeBytes} bytes in {durationMs} ms", sizeBytes, durationMs);
 
+    /// <summary>Emit expiry_job_lag_seconds metric (TA-10.2). Alert P1 at > 1800s (TA-10.3).</summary>
+    public void ExpiryJobLag(long seconds) =>
+        _logger.LogInformation("expiry_job_lag_seconds {seconds}", seconds);
+
     /// <summary>Emit transfer_page_viewed with its one property — the linkId hash (TA-9.4 style: never the raw 8-char id in telemetry; T-003-01). Template text keeps the exact TA-10.2 name first — App Insights queries by it.</summary>
     public void TransferPageViewed(string linkIdHash) =>
         _logger.LogInformation("transfer_page_viewed {linkId}", linkIdHash);
