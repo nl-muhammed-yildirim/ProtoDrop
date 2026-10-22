@@ -66,6 +66,25 @@ public sealed class AzureBlobStore : IBlobStore
         return download.Value.Content;
     }
 
+    public async Task<bool> ExistsAsync(
+        string path, CancellationToken cancellationToken = default)
+    {
+        var (container, blobName) = SplitPath(path);
+        var exists = await _svc.GetBlobContainerClient(container)
+            .GetBlobClient(blobName)
+            .ExistsAsync(cancellationToken);
+        return exists.Value;
+    }
+
+    public Task DeleteAsync(
+        string path, CancellationToken cancellationToken = default)
+    {
+        var (container, blobName) = SplitPath(path);
+        return _svc.GetBlobContainerClient(container)
+            .GetBlobClient(blobName)
+            .DeleteIfExistsAsync(cancellationToken: cancellationToken);
+    }
+
     private static (string container, string blobName) SplitPath(string path)
     {
         var cut = path.IndexOf('/');

@@ -38,6 +38,10 @@ public sealed class WaTelemetryReporter
     public void UploadCompleted(long bytes, long durationMs, int retries) =>
         _logger.LogInformation("upload_completed {bytes} bytes in {durationMs} ms after {retries} retries", bytes, durationMs, retries);
 
+    /// <summary>Emit zip_generated with its two properties — sizeBytes and durationMs (T-004-01).</summary>
+    public void ZipGenerated(long sizeBytes, long durationMs) =>
+        _logger.LogInformation("zip_generated {sizeBytes} bytes in {durationMs} ms", sizeBytes, durationMs);
+
     /// <summary>Emit transfer_page_viewed with its one property — the linkId hash (TA-9.4 style: never the raw 8-char id in telemetry; T-003-01). Template text keeps the exact TA-10.2 name first — App Insights queries by it.</summary>
     public void TransferPageViewed(string linkIdHash) =>
         _logger.LogInformation("transfer_page_viewed {linkId}", linkIdHash);

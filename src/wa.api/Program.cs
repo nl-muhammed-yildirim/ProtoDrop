@@ -284,6 +284,33 @@ app.MapGet("/api/v1/public/transfers/{linkId}/files/{fileId}/download-url", asyn
     };
 });
 
+// T-004-02 (TA-4.2#7): mint a 30-minute read SAS on the whole-transfer zip if it exists, otherwise trigger f-zip generation
+// (fire-and-forget) and return 202 with pollAfterSec. Terminal states map to endpoint 4's canonical Problem+JSON bodies (FR-003-9 byte identity); ?t= unlock JWT accepted.
+app.MapGet("/api/v1/public/transfers/{linkId}/download-all-url", async (string linkId, HttpRequest request, ISender sender, CancellationToken ct) =>
+{
+    var result = await sender.Send(new GetDownloadAllUrlQuery(
+        linkId,
+        Token: request.Query["t"].FirstOrDefault(),
+        ClientIp: request.HttpContext.Connection.RemoteIpAddress?.ToString(),
+        UserAgent: request.Headers.UserAgent.ToString()), ct);
+    return result.State switch
+    {
+        // TA-4.2#7 exact wire shape — exactly { url } when the zip is ready (200).
+        DownloadAllState.Ok => Results.Json(new { url = result.Url!.ToString() }),
+
+        // TA-4.2#7 exact wire shape — exactly { pollAfterSec } when the zip is being generated (202).
+        DownloadAllState.Generating => Results.Json(new { pollAfterSec = result.PollAfterSec!.Value }, statusCode: 202),
+
+        // D6: terminal-before-auth — canonical bodies, same as endpoint 4 (FR-003-9).
+        DownloadAllState.NotFound => Results.Json(ProblemWriter.Build(404, ProblemCodes.TransferExpired, ExpiredDetails(null)), statusCode: 404),
+        DownloadAllState.Expired => Results.Json(ProblemWriter.Build(410, ProblemCodes.TransferExpired, ExpiredDetails(result.SenderEmail)), statusCode: 410),
+        DownloadAllState.DownloadLimit => Results.Json(ProblemWriter.Build(410, ProblemCodes.MaxDownloadsReached, DownloadLimitDetails(result.SenderEmail)), statusCode: 410),
+
+        // TA-9.6#1: gated transfer minted without a valid ?t= → 401 UNAUTHENTICATED (never a file-list-shaped error).
+        DownloadAllState.Unauthenticated => Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401)
+    };
+});
+
 app.Run();
 
 // Empty partial class so WebApplicationFactory<Program> can resolve the entry point.

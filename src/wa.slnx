@@ -14,5 +14,6 @@
     <Project Path="../tests/wa.api.integration/wa.api.integration.csproj" />
     <Project Path="../tests/wa.application.unit/wa.application.unit.csproj" />
     <Project Path="../tests/wa.domain.unit/wa.domain.unit.csproj" />
+    <Project Path="../tests/wa.workers.unit/wa.workers.unit.csproj" />
   </Folder>
 </Solution>

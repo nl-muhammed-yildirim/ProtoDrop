@@ -16,4 +16,10 @@ public interface IBlobStore
     /// <summary>Download a blob at its canonical path; returns the exact bytes (AC-055-1).</summary>
     /// <returns>A stream with the blob content. The caller must dispose it.</returns>
     Task<Stream> DownloadAsync(string path, CancellationToken cancellationToken = default);
+
+    /// <summary>Check if a blob exists at its canonical path.</summary>
+    Task<bool> ExistsAsync(string path, CancellationToken cancellationToken = default);
+
+    /// <summary>Delete a blob at its canonical path (no-op if it doesn't exist).</summary>
+    Task DeleteAsync(string path, CancellationToken cancellationToken = default);
 }

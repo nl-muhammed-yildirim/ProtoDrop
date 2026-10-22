@@ -242,6 +242,15 @@ public class FinalizeTransferHandlerTests
                 throw new KeyNotFoundException($"Blob not found: {path}");
             return Task.FromResult<Stream>(new MemoryStream(bytes));
         }
+
+        public Task<bool> ExistsAsync(string path, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Blobs.ContainsKey(path));
+
+        public Task DeleteAsync(string path, CancellationToken cancellationToken = default)
+        {
+            Blobs.Remove(path);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class RecordingLogger : ILogger<WaTelemetryReporter>

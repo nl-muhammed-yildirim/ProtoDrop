@@ -296,6 +296,9 @@ public class GetFileDownloadUrlHandlerTests
             return Task.FromResult(new SingleFileDownloadResult(RecordOutcome));
         }
 
+        public Task<SingleFileDownloadResult> RecordZipDownloadAsync(Guid transferId, string? ipHash, string? uaHash, CancellationToken ct) =>
+            Task.FromResult(new SingleFileDownloadResult(RecordOutcome)); // not called by this handler (T-004-02 is a separate endpoint)
+
         public void SetupActive(IReadOnlyList<PublicFileItem> files, int maxDownloads, int downloadsCount, string? passwordHash = null) =>
             SetupStatus(status: 1, senderEmail: "alice@example.com", files: files, maxDownloads: maxDownloads, downloadsCount: downloadsCount, passwordHash: passwordHash);
 
@@ -334,6 +337,8 @@ public class GetFileDownloadUrlHandlerTests
             Calls.Add((transferId, fileId, respContentDisposition));
             return new Uri("https://blob.example/sas?sig=test"); // the Ok-path URL — asserted non-null
         }
+
+        public Uri MintRecipientZip(string transferId) => new("https://blob.example/zip-sas?sig=test"); // not called by this handler (T-004-02 is a separate endpoint)
     }
 
     private sealed class StubUnlockTokenMinter : IUnlockTokenMinter
