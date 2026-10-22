@@ -1,0 +1,9 @@
+{
+  "version": "2.0",
+  "extensions": {
+    "http": {
+      "maxConcurrency": 4,
+      "timeout": "60:00:00"
+    }
+  }
+}

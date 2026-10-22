@@ -12,4 +12,7 @@ public interface IBlobSasMinter
     /// string-to-sign, so it must be provided at mint time; the browser then streams the blob directly (no server proxying).
     /// </summary>
     Uri MintRecipientFile(string transferId, string fileId, string respContentDisposition);
+
+    /// <summary>T-004-01: mints a 30-minute read SAS for the whole-transfer zip (transfers container, permissions r).</summary>
+    Uri MintRecipientZip(string transferId);
 }
