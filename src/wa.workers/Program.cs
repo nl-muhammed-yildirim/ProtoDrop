@@ -77,6 +77,13 @@ var host = new HostBuilder()
             sp.GetRequiredService<IBlobStore>(),
             sp.GetRequiredService<wa.application.Telemetry.WaTelemetryReporter>(),
             sp.GetRequiredService<ILogger<DeleteExpiredTransfersHandler>>()));
+
+        // T-005-03: f-delete-blobs job
+        services.AddSingleton<IBlobDeletionStore>(sp => new BlobDeletionStore(sp.GetRequiredService<WaDbContext>()));
+        services.AddSingleton<DeleteOrphanBlobsHandler>(sp => new DeleteOrphanBlobsHandler(
+            sp.GetRequiredService<IBlobDeletionStore>(),
+            sp.GetRequiredService<IBlobStore>(),
+            sp.GetRequiredService<ILogger<DeleteOrphanBlobsHandler>>()));
     })
     .Build();
 
