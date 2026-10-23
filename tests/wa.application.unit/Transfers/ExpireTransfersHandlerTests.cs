@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using wa.application.Ports;
 using wa.application.Telemetry;
 using wa.application.UseCases.Transfers;
@@ -28,11 +28,12 @@ public class ExpireTransfersHandlerTests
         _store.ClaimResult = true;
         _store.Batches = new List<List<ExpiryBatchRow>>
         {
-            [
+            new()
+            {
                 new ExpiryBatchRow(Guid.NewGuid(), "ABCD1234"),
                 new ExpiryBatchRow(Guid.NewGuid(), "EFGH5678"),
                 new ExpiryBatchRow(Guid.NewGuid(), "IJKL9012")
-            ]
+            }
         };
 
         var count = await _handler.RunAsync(now, CancellationToken.None);

@@ -1,5 +1,4 @@
 using Microsoft.Azure.Functions.Worker;
-using Microsoft.Azure.Functions.Worker.Timer;
 using Microsoft.Extensions.Logging;
 using wa.application.UseCases.Transfers;
 
@@ -23,7 +22,7 @@ public class ExpireFunction
     [Function("Expire")]
     public async Task Run(
         FunctionContext context,
-        [TimerTrigger("0 */15 * * * *", Schedule = new() { TimeZoneId = "UTC" })] TimerTriggerAttribute trigger)
+        [TimerTrigger("0 */15 * * * *")] TimerTriggerAttribute trigger)
     {
         var now = DateTime.UtcNow;
         try

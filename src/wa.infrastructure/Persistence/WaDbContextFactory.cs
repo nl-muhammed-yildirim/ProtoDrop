@@ -11,4 +11,7 @@ public sealed class WaDbContextFactory : IDbContextFactory<WaDbContext>
 
     public Task<WaDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(new WaDbContext(_options));
+
+    // Sync overload required by EF Core 10's IDbContextFactory<T>.
+    public WaDbContext CreateDbContext() => new(_options);
 }

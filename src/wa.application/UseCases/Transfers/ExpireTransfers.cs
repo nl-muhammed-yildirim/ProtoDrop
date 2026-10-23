@@ -74,7 +74,7 @@ public sealed class ExpireTransfersHandler
             }
 
             // 5. Emit metric (TA-10.2).
-            var lagSeconds = totalExpired > 0 ? (long)(nowUtc - SkewTolerance).TotalSeconds : 0;
+            var lagSeconds = totalExpired > 0 ? (nowUtc - SkewTolerance).Ticks / TimeSpan.TicksPerSecond : 0;
             _telemetry.ExpiryJobLag(lagSeconds);
 
             return totalExpired;

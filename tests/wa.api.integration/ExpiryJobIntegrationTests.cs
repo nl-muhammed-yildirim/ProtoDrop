@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.MsSql;
 using wa.application.UseCases.Transfers;
@@ -130,7 +131,7 @@ public class ExpiryJobIntegrationTests : IAsyncLifetime
             var batch = Enumerable.Range(i, 500).Select(j => new Transfer
             {
                 Id = Guid.NewGuid(),
-                LinkId = Convert.ToHexString(Guid.NewGuid().Bytes)[..8],
+                LinkId = Convert.ToHexString(Guid.NewGuid().ToByteArray())[..8],
                 Status = 1,
                 ExpiresAtUtc = now.AddDays(-7),
                 MaxDownloads = 100,
