@@ -9,6 +9,7 @@ using wa.application.Limits;
 using wa.application.Ports;
 using wa.application.UseCases.Transfers;
 using wa.infrastructure.Blob;
+using wa.infrastructure.Events;
 using wa.infrastructure.Persistence;
 
 var host = new HostBuilder()
@@ -44,6 +45,38 @@ var host = new HostBuilder()
         var hmacKey = System.Text.Encoding.UTF8.GetBytes(Environment.GetEnvironmentVariable("Wa:Jwt:Secret") ?? "");
         services.AddSingleton<wa.application.Telemetry.WaTelemetryReporter>(sp => new wa.application.Telemetry.WaTelemetryReporter(
             sp.GetRequiredService<ILogger<wa.application.Telemetry.WaTelemetryReporter>>(), hmacKey));
+
+        // DbContext factory (for SbEventPublisher outbox writes)
+        services.AddSingleton<IDbContextFactory<WaDbContext>>(new AppDbContextFactory(
+            new DbContextOptionsBuilder<WaDbContext>()
+                .UseSqlServer(Environment.GetEnvironmentVariable("WaDb") ?? "").Options));
+
+        // Event publisher: SB in prod, in-memory fallback for local dev (TA-0.2 rule 7).
+        var sbConnString = Environment.GetEnvironmentVariable("Wa:ServiceBus:ConnectionString");
+        if (!string.IsNullOrEmpty(sbConnString))
+            services.AddSingleton<IEventPublisher>(sp => new SbEventPublisher(
+                sp.GetRequiredService<IConfiguration>(),
+                sp.GetRequiredService<ILogger<SbEventPublisher>>(),
+                sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+        else
+            services.AddSingleton<IEventPublisher>(new InMemoryEventPublisher());
+
+        // T-005-01: f-expire job
+        services.AddSingleton<IExpiryStore>(sp => new ExpiryStore(sp.GetRequiredService<WaDbContext>()));
+        services.AddSingleton<ExpireTransfersHandler>(sp => new ExpireTransfersHandler(
+            sp.GetRequiredService<IExpiryStore>(),
+            sp.GetRequiredService<IEventPublisher>(),
+            sp.GetRequiredService<wa.application.Telemetry.WaTelemetryReporter>(),
+            sp.GetRequiredService<ILogger<ExpireTransfersHandler>>()));
+
+        // T-005-02: f-delete-transfers job
+        services.AddSingleton<IExpiryDeletionStore>(sp => new ExpiryDeletionStore(sp.GetRequiredService<WaDbContext>()));
+        services.AddSingleton<DeleteExpiredTransfersHandler>(sp => new DeleteExpiredTransfersHandler(
+            sp.GetRequiredService<IExpiryDeletionStore>(),
+            sp.GetRequiredService<IEventPublisher>(),
+            sp.GetRequiredService<IBlobStore>(),
+            sp.GetRequiredService<wa.application.Telemetry.WaTelemetryReporter>(),
+            sp.GetRequiredService<ILogger<DeleteExpiredTransfersHandler>>()));
     })
     .Build();
 
