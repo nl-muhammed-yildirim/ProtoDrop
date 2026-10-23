@@ -1,3 +1,4 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using wa.application.UseCases.Transfers;
 using wa.domain;
@@ -17,19 +18,15 @@ public sealed class BlobDeletionStore : IBlobDeletionStore
     {
         try
         {
-            _db.Set<JobRun>().Add(new JobRun
-            {
-                JobKey = "delete-blobs",
-                RunAtUtc = runWindowStartUtc,
-                LockUntilUtc = lockUntilUtc
-            });
-            await _db.SaveChangesAsync(ct);
+            // Raw SQL INSERT — bypasses the EF change tracker (singleton DbContext shared across invocations).
+            await _db.Database.ExecuteSqlRawAsync(
+                "INSERT INTO [JobRun] ([JobKey], [RunAtUtc], [LockUntilUtc]) VALUES ({0}, {1}, {2})",
+                ["delete-blobs", runWindowStartUtc, lockUntilUtc], ct);
             return true;
         }
-        catch (DbUpdateException)
+        catch (SqlException ex) when (ex.Number == 2627 || ex.Number == 2601)
         {
             // Duplicate PK_JobRun — another instance claimed this window. Normal in scale-out.
-            _db.Set<JobRun>().Local.Clear();
             return false;
         }
     }

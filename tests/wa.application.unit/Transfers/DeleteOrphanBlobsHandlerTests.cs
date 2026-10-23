@@ -65,7 +65,7 @@ public class DeleteOrphanBlobsHandlerTests
     }
 
     [Fact]
-    public async Task Run_UnexpectedPath_Skipped_WithLog()
+    public async Task Run_UnexpectedPath_Skipped_BlobDelete_RowStillRemoved()
     {
         var now = DateTime.UtcNow;
         _store.ClaimResult = true;
@@ -83,12 +83,12 @@ public class DeleteOrphanBlobsHandlerTests
 
         var count = await _handler.RunAsync(now, CancellationToken.None);
 
-        // Both counted as processed (the unexpected one is skipped but still row-deleted? No — spec says skip).
-        // Actually re-reading: "skip paths not starting with transfers/ — log UNEXPECTED_BLOB_PATH"
-        // The blob is NOT deleted and the row IS NOT removed (it's a safety skip, not an error).
-        Assert.Equal(2, count); // both counted in total (the handler counts batch.Count)
+        // Both counted in total (the handler counts batch.Count).
+        Assert.Equal(2, count);
         // Only the valid one was actually blob-deleted.
         Assert.Single(_blobStore.DeletedPaths);
+        // Both rows are deleted — the unexpected path row is removed to prevent infinite re-scan (FR-005-7).
+        Assert.Equal(2, _store.DeletedRowIds.Count);
     }
 
     [Fact]

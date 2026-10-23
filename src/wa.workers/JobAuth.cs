@@ -27,6 +27,7 @@ public static class JobAuth
         var json = System.Text.Json.JsonSerializer.Serialize(payload);
         var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(json));
         var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
+        response.Headers.Add("Content-Type", "application/json");
         response.Body = stream;
         return response;
     }
@@ -38,6 +39,7 @@ public static class JobAuth
         var json = System.Text.Json.JsonSerializer.Serialize(payload);
         var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(json));
         var response = req.CreateResponse((System.Net.HttpStatusCode)status);
+        response.Headers.Add("Content-Type", "application/json");
         response.Body = stream;
         return response;
     }

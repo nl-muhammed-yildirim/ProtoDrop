@@ -46,10 +46,12 @@ public sealed class DeleteOrphanBlobsHandler
 
                 foreach (var blob in batch)
                 {
-                    // 3. Safety: skip paths not starting with "transfers/" — log UNEXPECTED_BLOB_PATH.
+                    // 3. Safety: skip blob deletion for paths not starting with "transfers/" — log UNEXPECTED_BLOB_PATH.
+                    //    Still delete the row to prevent infinite re-scan (FR-005-7).
                     if (!blob.BlobPath.StartsWith("transfers/", StringComparison.Ordinal))
                     {
                         _logger.LogWarning("UNEXPECTED_BLOB_PATH: {BlobPath} does not start with 'transfers/'", blob.BlobPath);
+                        await _store.DeleteRowAsync(blob.Id, ct);
                         continue;
                     }
 
