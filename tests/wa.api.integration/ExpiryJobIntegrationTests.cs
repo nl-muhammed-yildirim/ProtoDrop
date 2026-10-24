@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.MsSql;
 using wa.application.UseCases.Transfers;
@@ -17,6 +18,8 @@ public class ExpiryJobIntegrationTests : IAsyncLifetime
 {
     private WaDbContext _db = null!;
     private string _connString = null!;
+    // T-054 outbox pattern (same as SendEndpointTests): SbEventPublisher commits the DomainEvent row via its own context.
+    private SbEventPublisher _publisher = null!;
 
     public async Task InitializeAsync()
     {
@@ -30,6 +33,17 @@ public class ExpiryJobIntegrationTests : IAsyncLifetime
             .UseSqlServer(_connString)
             .Options);
         await _db.Database.MigrateAsync();
+
+        // T-054 outbox pattern (same as SendEndpointTests): SbEventPublisher commits the DomainEvent row via its own context.
+        var sbConfig = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Wa:ServiceBus:ConnectionString"] = "Endpoint=tcp://127.0.0.1:9;SharedAccessKeyName=Dummy;SharedAccessKey=dummy" // unreachable — outbox row still commits (TA-4.1.7)
+            }).Build();
+        _publisher = new SbEventPublisher(
+            sbConfig,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<SbEventPublisher>.Instance,
+            new WaDbContextFactory(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(_connString).Options));
     }
 
     public async Task DisposeAsync() => await _db.DisposeAsync();
@@ -37,11 +51,11 @@ public class ExpiryJobIntegrationTests : IAsyncLifetime
     private ExpireTransfersHandler BuildHandler(WaDbContext db)
     {
         var store = new ExpiryStore(db);
-        var publisher = new InMemoryEventPublisher(TimeSpan.FromMinutes(5), () => DateTimeOffset.UtcNow);
+        // Outbox-backed publisher (T-054): writes the TA-5.2 envelope into DomainEvent via its own context, then publishes to an unreachable broker — row stays unpublished but committed.
         var telemetry = new wa.application.Telemetry.WaTelemetryReporter(
             Microsoft.Extensions.Logging.Abstractions.NullLogger<wa.application.Telemetry.WaTelemetryReporter>.Instance,
             new byte[32]);
-        return new ExpireTransfersHandler(store, publisher, telemetry,
+        return new ExpireTransfersHandler(store, _publisher, telemetry,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<ExpireTransfersHandler>.Instance);
     }
 

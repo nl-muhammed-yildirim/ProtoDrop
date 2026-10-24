@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.MsSql;
 using wa.application.UseCases.Transfers;
@@ -19,6 +20,8 @@ public class DeleteTransfersJobIntegrationTests : IAsyncLifetime
 {
     private WaDbContext _db = null!;
     private string _connString = null!;
+    // T-054 outbox pattern (same as SendEndpointTests): SbEventPublisher commits the DomainEvent row via its own context.
+    private SbEventPublisher _publisher = null!;
 
     public async Task InitializeAsync()
     {
@@ -32,6 +35,17 @@ public class DeleteTransfersJobIntegrationTests : IAsyncLifetime
             .UseSqlServer(_connString)
             .Options);
         await _db.Database.MigrateAsync();
+
+        // T-054 outbox pattern (same as SendEndpointTests): SbEventPublisher commits the DomainEvent row via its own context.
+        var sbConfig = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Wa:ServiceBus:ConnectionString"] = "Endpoint=tcp://127.0.0.1:9;SharedAccessKeyName=Dummy;SharedAccessKey=dummy" // unreachable — outbox row still commits (TA-4.1.7)
+            }).Build();
+        _publisher = new SbEventPublisher(
+            sbConfig,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<SbEventPublisher>.Instance,
+            new WaDbContextFactory(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(_connString).Options));
     }
 
     public async Task DisposeAsync() => await _db.DisposeAsync();
@@ -39,13 +53,13 @@ public class DeleteTransfersJobIntegrationTests : IAsyncLifetime
     private DeleteExpiredTransfersHandler BuildHandler(WaDbContext db)
     {
         var store = new ExpiryDeletionStore(db);
-        var publisher = new InMemoryEventPublisher(TimeSpan.FromMinutes(5), () => DateTimeOffset.UtcNow);
+        // Outbox-backed publisher (T-054): writes the TA-5.2 envelope into DomainEvent via its own context, then publishes to an unreachable broker — row stays unpublished but committed.
         var telemetry = new wa.application.Telemetry.WaTelemetryReporter(
             Microsoft.Extensions.Logging.Abstractions.NullLogger<wa.application.Telemetry.WaTelemetryReporter>.Instance,
             new byte[32]);
         // Stub blob store — no Azurite in this test; just verify it's called without error.
         var blobStore = new NoOpBlobStore();
-        return new DeleteExpiredTransfersHandler(store, publisher, blobStore, telemetry,
+        return new DeleteExpiredTransfersHandler(store, _publisher, blobStore, telemetry,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<DeleteExpiredTransfersHandler>.Instance);
     }
 
