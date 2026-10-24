@@ -9,6 +9,10 @@
     <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.21.0" />
     <!-- TA-3.5/TA-3.6 blob foundation (F-FND-007); ADR row in docs/Open-Decisions-and-Constants.md Part 3. -->
     <PackageReference Include="Azure.Storage.Blobs" Version="12.29.2" />
+    <!-- T-006-01: Azure Communication Services for email sending -->
+    <PackageReference Include="Azure.Communication.Email" Version="1.1.0" />
+    <!-- T-006-01: Stubble template engine -->
+    <PackageReference Include="Stubble.Core" Version="1.10.8" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.12" />
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />

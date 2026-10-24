@@ -84,6 +84,30 @@ var host = new HostBuilder()
             sp.GetRequiredService<IBlobDeletionStore>(),
             sp.GetRequiredService<IBlobStore>(),
             sp.GetRequiredService<ILogger<DeleteOrphanBlobsHandler>>()));
+
+        // T-006-01: f-email consumer
+        services.AddSingleton<EventDeduplicator>(sp => new EventDeduplicator(() => DateTimeOffset.UtcNow));
+        services.AddSingleton<IEmailStore>(sp => new EmailStore(sp.GetRequiredService<WaDbContext>()));
+        services.AddSingleton<ITemplateRenderer>(sp => new StubbleTemplateRenderer());
+
+        // IEmailSender selection: log if Wa:Email:Sender=="log" else CommunicationHubEmailSender (TA-0.2 rule 7).
+        var emailSenderType = Environment.GetEnvironmentVariable("Wa:Email:Sender");
+        if (emailSenderType == "log")
+            services.AddSingleton<IEmailSender>(sp => new LogEmailSender(sp.GetRequiredService<ILogger<LogEmailSender>>()));
+        else
+            services.AddSingleton<IEmailSender>(sp => new CommunicationHubEmailSender(
+                Environment.GetEnvironmentVariable("Wa:Email:FromAddress") ?? "no-reply@protodrop.com",
+                sp.GetRequiredService<ILogger<CommunicationHubEmailSender>>()));
+
+        services.AddSingleton<SendNotificationEmailsHandler>(sp => new SendNotificationEmailsHandler(
+            sp.GetRequiredService<IEmailStore>(),
+            sp.GetRequiredService<IEmailSender>(),
+            sp.GetRequiredService<ITemplateRenderer>(),
+            sp.GetRequiredService<IEventPublisher>(),
+            sp.GetRequiredService<EventDeduplicator>(),
+            sp.GetRequiredService<wa.application.Telemetry.WaTelemetryReporter>(),
+            sp.GetRequiredService<IConfiguration>(),
+            sp.GetRequiredService<ILogger<SendNotificationEmailsHandler>>()));
     })
     .Build();
 

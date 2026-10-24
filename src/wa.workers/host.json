@@ -4,6 +4,9 @@
     "http": {
       "maxConcurrency": 4,
       "timeout": "60:00:00"
+    },
+    "serviceBus": {
+      "maxConcurrentCalls": 10
     }
   }
 }
