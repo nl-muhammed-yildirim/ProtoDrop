@@ -202,6 +202,9 @@ public class UnsubscribeEndpointTests : IAsyncLifetime
         {
             builder.ConfigureServices(services =>
             {
+                // T-006 review: UnsubscribeService logs via ILogger<UnsubscribeService> (Program.cs DI), not the WaTelemetryReporter.
+                services.RemoveAll<ILogger<wa.infrastructure.Persistence.UnsubscribeService>>();
+                services.AddSingleton<ILogger<wa.infrastructure.Persistence.UnsubscribeService>>(_ => new CaptureLogger());
                 services.RemoveAll<ILogger<WaTelemetryReporter>>();
                 services.AddSingleton<ILogger<WaTelemetryReporter>>(_ => new CaptureLogger());
                 services.RemoveAll<WaTelemetryReporter>(); // Program.cs's singleton was already registered — this later registration wins for all consumers
@@ -214,7 +217,8 @@ public class UnsubscribeEndpointTests : IAsyncLifetime
     }
 
     /// <summary>Captures every rendered log line into the shared list (warn telemetry assertions read it).</summary>
-    private sealed class CaptureLogger : ILogger<WaTelemetryReporter>
+    // T-006 review: implements both logger interfaces — UnsubscribeService logs via ILogger<UnsubscribeService>, admin routes via WaTelemetryReporter.
+    private sealed class CaptureLogger : ILogger<WaTelemetryReporter>, ILogger<wa.infrastructure.Persistence.UnsubscribeService>
     {
         public IDisposable BeginScope<TState>(TState state) where TState : notnull => NullScope.Instance;
 
