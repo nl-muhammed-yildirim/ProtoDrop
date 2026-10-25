@@ -5,10 +5,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using wa.application.Events;
 using wa.application.Limits;
 using wa.application.Ports;
 using wa.application.UseCases.Transfers;
 using wa.infrastructure.Blob;
+using wa.infrastructure.Email;
 using wa.infrastructure.Events;
 using wa.infrastructure.Persistence;
 

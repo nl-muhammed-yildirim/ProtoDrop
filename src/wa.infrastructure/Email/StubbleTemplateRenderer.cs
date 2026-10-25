@@ -35,8 +35,8 @@ public sealed class StubbleTemplateRenderer : ITemplateRenderer
             ExpiryDays = data.ExpiryDays
         };
 
-        var htmlBody = Stubble.RenderTemplate(_htmlTemplate, templateData);
-        var textBody = Stubble.RenderTemplate(_textTemplate, templateData);
+        var htmlBody = StaticStubbleRenderer.Render(_htmlTemplate, templateData);
+        var textBody = StaticStubbleRenderer.Render(_textTemplate, templateData);
         var subject = $"Transfer from {data.SenderName}";
 
         return (subject, htmlBody, textBody);

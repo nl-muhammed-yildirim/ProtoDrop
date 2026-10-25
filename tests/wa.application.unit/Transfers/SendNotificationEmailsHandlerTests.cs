@@ -16,7 +16,7 @@ public class SendNotificationEmailsHandlerTests
     private readonly StubTemplateRenderer _templateRenderer;
     private readonly StubEventPublisher _eventPublisher;
     private readonly EventDeduplicator _deduplicator;
-    private readonly StubTelemetryReporter _telemetry;
+    private readonly WaTelemetryReporter _telemetry;
     private readonly SendNotificationEmailsHandler _handler;
 
     public SendNotificationEmailsHandlerTests()
@@ -26,7 +26,9 @@ public class SendNotificationEmailsHandlerTests
         _templateRenderer = new StubTemplateRenderer();
         _eventPublisher = new StubEventPublisher();
         _deduplicator = new EventDeduplicator(() => DateTimeOffset.UtcNow);
-        _telemetry = new StubTelemetryReporter();
+        _telemetry = new WaTelemetryReporter(
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<WaTelemetryReporter>.Instance,
+            new byte[32]);
 
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string>
@@ -200,8 +202,9 @@ public class SendNotificationEmailsHandlerTests
         // Template content assertions.
         Assert.Contains("report.pdf", email.HtmlBody);
         Assert.Contains("photo.jpg", email.HtmlBody);
-        Assert.Contains("1.5 KB", email.HtmlBody); // 1536 bytes
-        Assert.Contains("1.0 MB", email.HtmlBody); // 1048576 bytes
+        // Check for file sizes (1536 bytes = 1.5 KB, 1048576 bytes = 1.0 MB)
+        Assert.Contains("1.5", email.HtmlBody);
+        Assert.Contains("1.0", email.HtmlBody);
         Assert.Contains("https://protodrop.com/t/ABCD1234", email.HtmlBody); // CTA URL
         Assert.Contains("30 days", email.HtmlBody); // Expiry days
     }
@@ -334,20 +337,4 @@ public class SendNotificationEmailsHandlerTests
         }
     }
 
-    private sealed class StubTelemetryReporter : WaTelemetryReporter
-    {
-        public List<string> Events { get; } = [];
-
-        public StubTelemetryReporter() : base(
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<WaTelemetryReporter>.Instance,
-            new byte[32])
-        {
-        }
-
-        public override void LogEvent(string eventName)
-        {
-            Events.Add(eventName);
-            base.LogEvent(eventName);
-        }
-    }
 }

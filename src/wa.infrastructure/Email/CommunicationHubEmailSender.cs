@@ -21,21 +21,23 @@ public sealed class CommunicationHubEmailSender : IEmailSender
 
     public async Task SendAsync(EmailMessage message, CancellationToken ct)
     {
-        var content = new Azure.Communication.Email.EmailContent
+        var content = new Azure.Communication.Email.EmailContent(message.Subject)
         {
-            Subject = message.Subject,
-            HtmlContent = message.HtmlBody,
-            TextContent = message.TextBody
+            Html = message.HtmlBody,
+            PlainText = message.TextBody
         };
+
+        var recipients = new Azure.Communication.Email.EmailRecipients(
+            new[] { new Azure.Communication.Email.EmailAddress(message.To) });
 
         var emailMsg = new Azure.Communication.Email.EmailMessage(
             _fromAddress,
-            message.To,
+            recipients,
             content);
 
         if (!string.IsNullOrEmpty(message.ReplyTo))
-            emailMsg.ReplyTo = [message.ReplyTo];
+            emailMsg.ReplyTo.Add(new Azure.Communication.Email.EmailAddress(message.ReplyTo));
 
-        await _emailClient.SendAsync(emailMsg, ct);
+        await _emailClient.SendAsync(Azure.WaitUntil.Completed, emailMsg, ct);
     }
 }
