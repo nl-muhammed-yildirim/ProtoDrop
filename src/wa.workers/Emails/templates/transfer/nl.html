@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Overdracht van {{SenderName}}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 20px 0;">
+        <tr>
+            <td align="center">
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <tr>
+                        <td style="padding: 32px;">
+                            <h1 style="margin: 0 0 24px 0; font-size: 24px; color: #1a1a1a;">Hallo,</h1>
+
+                            <p style="margin: 0 0 16px 0; font-size: 16px; line-height: 1.5; color: #333333;">
+                                {{SenderName}} heeft bestanden met je gedeeld.
+                            </p>
+
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin: 24px 0;">
+                                {{#Files}}
+                                <tr>
+                                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; font-size: 14px; color: #333333;">
+                                        <span style="font-weight: 500;">{{Name}}</span><br>
+                                        <span style="color: #666666; font-size: 12px;">{{Size}}</span>
+                                    </td>
+                                </tr>
+                                {{/Files}}
+                            </table>
+
+                            <div style="text-align: center; margin: 32px 0;">
+                                <a href="{{CtaUrl}}" style="display: inline-block; padding: 12px 32px; background-color: #4a90e2; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: 500;">
+                                    Bestanden downloaden
+                                </a>
+                            </div>
+
+                            <p style="margin: 32px 0 0 0; font-size: 12px; color: #666666; text-align: center;">
+                                Deze link verloopt over {{ExpiryDays}} dagen.
+                            </p>
+
+                            <p style="margin: 16px 0 0 0; font-size: 12px; color: #999999; text-align: center;">
+                                <a href="#" style="color: #999999; text-decoration: underline;">Afmelden</a>
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

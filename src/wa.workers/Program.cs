@@ -90,7 +90,7 @@ var host = new HostBuilder()
         // T-006-01: f-email consumer
         services.AddSingleton<EventDeduplicator>(sp => new EventDeduplicator(() => DateTimeOffset.UtcNow));
         services.AddSingleton<IEmailStore>(sp => new EmailStore(sp.GetRequiredService<WaDbContext>()));
-        services.AddSingleton<ITemplateRenderer>(sp => new StubbleTemplateRenderer());
+        services.AddSingleton<ITemplateRenderer>(sp => new StubbleTemplateRenderer(sp.GetRequiredService<ILogger<StubbleTemplateRenderer>>()));
 
         // IEmailSender selection: log if Wa:Email:Sender=="log" else CommunicationHubEmailSender (TA-0.2 rule 7).
         var emailSenderType = Environment.GetEnvironmentVariable("Wa:Email:Sender");

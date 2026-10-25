@@ -10,8 +10,8 @@ public sealed record TemplateData(
     string CtaUrl,
     int ExpiryDays);
 
-/// <summary>Template rendering port — implemented by StubbleTemplateRenderer.</summary>
+/// <summary>Template rendering port — implemented by StubbleTemplateRenderer. T-006-04: per-language rendering with locale parameter.</summary>
 public interface ITemplateRenderer
 {
-    (string Subject, string HtmlBody, string TextBody) Render(TemplateData data);
+    (string Subject, string HtmlBody, string TextBody) Render(TemplateData data, string locale);
 }

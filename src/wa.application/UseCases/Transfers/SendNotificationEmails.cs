@@ -91,7 +91,7 @@ public sealed class SendNotificationEmailsHandler
         var addressesToCheck = unNotified.Select(r => r.Address).ToList();
         var suppressed = await _store.GetSuppressedAddressesAsync(addressesToCheck, context.SenderEmail, ct);
 
-        // 7. Render template once (same data for all recipients in one transfer).
+        // 7. Prepare template data (same for all recipients; rendered per-recipient with their locale — T-006-04).
         var expiryDays = (int)Math.Ceiling((context.ExpiresAtUtc - DateTime.UtcNow).TotalDays);
         var publicOrigin = _config["Wa:Url:Public"] ?? "http://localhost:5173";
         var ctaUrl = $"{publicOrigin}/t/{context.LinkId}";
@@ -100,7 +100,6 @@ public sealed class SendNotificationEmailsHandler
             context.Files,
             ctaUrl,
             expiryDays);
-        var (subject, htmlBody, textBody) = _templateRenderer.Render(templateData);
 
         // 8. Send emails.
         var fromAddress = _config["Wa:Email:FromAddress"] ?? "no-reply@protodrop.com";
@@ -120,6 +119,10 @@ public sealed class SendNotificationEmailsHandler
             {
                 continue;
             }
+
+            // T-006-04: Render per-recipient with their preferred locale (fallback handled inside renderer).
+            var locale = recipient.PreferredLanguage ?? "en";
+            var (subject, htmlBody, textBody) = _templateRenderer.Render(templateData, locale);
 
             try
             {

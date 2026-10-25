@@ -311,6 +311,56 @@ public class SendNotificationEmailsHandlerTests
         Assert.Equal(2, doc.RootElement.GetProperty("attempt").GetInt32());
     }
 
+    [Fact]
+    public async Task Handle_RecipientWithPreferredLanguage_de_GetsGermanLocalePassedToRenderer()
+    {
+        // T-006-04: recipient with PreferredLanguage="de" → renderer called with locale "de".
+        var transferId = Guid.NewGuid();
+        _store.Context = new EmailTransferContext(
+            transferId,
+            "Alice",
+            null,
+            DateTime.UtcNow.AddDays(30),
+            "ABCD1234",
+            [new FileEntry("report.pdf", 1536)]);
+
+        _store.Recipients = new List<EmailRecipient>
+        {
+            new() { Id = Guid.NewGuid(), TransferId = transferId, Address = "a@x.com", PreferredLanguage = "de" }
+        };
+
+        var envelope = CreateEnvelope(transferId, ["a@x.com"]);
+        await _handler.HandleAsync(envelope, 1, 5, CancellationToken.None);
+
+        Assert.Single(_emailSender.Sent);
+        Assert.Equal("de", _templateRenderer.LastLocale);
+    }
+
+    [Fact]
+    public async Task Handle_RecipientWithoutPreferredLanguage_GetsEnglishDefault()
+    {
+        // T-006-04: recipient with null PreferredLanguage → renderer called with locale "en".
+        var transferId = Guid.NewGuid();
+        _store.Context = new EmailTransferContext(
+            transferId,
+            "Alice",
+            null,
+            DateTime.UtcNow.AddDays(30),
+            "ABCD1234",
+            [new FileEntry("report.pdf", 1536)]);
+
+        _store.Recipients = new List<EmailRecipient>
+        {
+            new() { Id = Guid.NewGuid(), TransferId = transferId, Address = "a@x.com" } // PreferredLanguage is null
+        };
+
+        var envelope = CreateEnvelope(transferId, ["a@x.com"]);
+        await _handler.HandleAsync(envelope, 1, 5, CancellationToken.None);
+
+        Assert.Single(_emailSender.Sent);
+        Assert.Equal("en", _templateRenderer.LastLocale);
+    }
+
     private static EventEnvelope CreateEnvelope(Guid transferId, string[] emails)
     {
         var payload = new
@@ -384,8 +434,12 @@ public class SendNotificationEmailsHandlerTests
 
     private sealed class StubTemplateRenderer : ITemplateRenderer
     {
-        public (string Subject, string HtmlBody, string TextBody) Render(TemplateData data)
+        public string? LastLocale { get; private set; }
+
+        public (string Subject, string HtmlBody, string TextBody) Render(TemplateData data, string locale)
         {
+            LastLocale = locale;
+
             var html = $"""
                 <html>
                     <body>
