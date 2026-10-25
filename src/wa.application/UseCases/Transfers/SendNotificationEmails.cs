@@ -44,7 +44,7 @@ public sealed class SendNotificationEmailsHandler
         _logger = logger;
     }
 
-    public async Task HandleAsync(EventEnvelope envelope, CancellationToken ct)
+    public async Task HandleAsync(EventEnvelope envelope, int attempt, int maxDeliveryCount, CancellationToken ct)
     {
         // 1. Deserialize payload → transferId + emails[].
         var payloadJson = JsonSerializer.Serialize(envelope.Payload);
@@ -147,7 +147,7 @@ public sealed class SendNotificationEmailsHandler
                     {
                         transferId = context.TransferId,
                         to = recipient.Address,
-                        attempt = 1
+                        attempt = attempt
                     }
                 };
                 await _eventPublisher.PublishAsync(emailSentEnvelope, ct);
@@ -157,8 +157,34 @@ public sealed class SendNotificationEmailsHandler
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "f-email: failed to send email to {Address}", recipient.Address);
-                // Continue with other recipients — one failure doesn't block others.
+                _logger.LogError(ex, "f-email: failed to send email to {Address} attempt {Attempt}", recipient.Address, attempt);
+
+                if (attempt == maxDeliveryCount)
+                {
+                    // Final failure (TA-5.1): broker dead-letters after this throw — emit the observables first.
+                    var reason = ex.GetType().Name; // no Azure SDK dep in wa.application (dependency rule TA-0.2); full detail is in the log line
+                    var emailFailedEnvelope = new EventEnvelope
+                    {
+                        EventId = Guid.NewGuid(),
+                        Type = EventType.EmailFailed,
+                        Version = 1,
+                        OccurredAtUtc = DateTime.UtcNow,
+                        CorrelationId = envelope.CorrelationId,
+                        PartitionKey = context.LinkId,
+                        Payload = new
+                        {
+                            transferId = context.TransferId,
+                            to = recipient.Address,
+                            attempt = maxDeliveryCount,
+                            reason
+                        }
+                    };
+                    await _eventPublisher.PublishAsync(emailFailedEnvelope, ct);
+                    _telemetry.LogEvent(TelemetryEvents.DlqCount); // dlq_count > 0 alert (P2, TA-10.3)
+                    _telemetry.EmailFailures1h(); // email_failures_1h metric, threshold 50/h (TA-10.3)
+                }
+
+                throw; // transient → redeliver; on last attempt the broker dead-letters (MaxDeliveryCount 5 ⇒ 3 visible retries, backoff ≈ 1 min / 10 min / 1 h — FR-006-4)
             }
         }
 

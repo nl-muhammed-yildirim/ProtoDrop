@@ -46,6 +46,10 @@ public sealed class WaTelemetryReporter
     public void ExpiryJobLag(long seconds) =>
         _logger.LogInformation("expiry_job_lag_seconds {seconds}", seconds);
 
+    /// <summary>Emit email_failures_1h metric (TA-10.2). Alert P2 at > 50/h (TA-10.3).</summary>
+    public void EmailFailures1h() =>
+        _logger.LogInformation("email_failures_1h {count}", 1);
+
     /// <summary>Emit transfer_page_viewed with its one property — the linkId hash (TA-9.4 style: never the raw 8-char id in telemetry; T-003-01). Template text keeps the exact TA-10.2 name first — App Insights queries by it.</summary>
     public void TransferPageViewed(string linkIdHash) =>
         _logger.LogInformation("transfer_page_viewed {linkId}", linkIdHash);

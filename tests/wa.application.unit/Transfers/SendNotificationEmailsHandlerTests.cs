@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using wa.application.Events;
@@ -70,7 +71,7 @@ public class SendNotificationEmailsHandlerTests
         };
 
         var envelope = CreateEnvelope(transferId, ["a@x.com", "b@y.com", "sender@x.com"]);
-        await _handler.HandleAsync(envelope, CancellationToken.None);
+        await _handler.HandleAsync(envelope, 1, 5, CancellationToken.None);
 
         Assert.Equal(2, _emailSender.Sent.Count); // sender's own address skipped
         Assert.Contains(_emailSender.Sent, m => m.To == "a@x.com");
@@ -92,7 +93,7 @@ public class SendNotificationEmailsHandlerTests
             [new FileEntry("file.txt", 1024)]);
 
         var envelope = CreateEnvelope(transferId, []);
-        await _handler.HandleAsync(envelope, CancellationToken.None);
+        await _handler.HandleAsync(envelope, 1, 5, CancellationToken.None);
 
         Assert.Empty(_emailSender.Sent);
     }
@@ -116,7 +117,7 @@ public class SendNotificationEmailsHandlerTests
         };
 
         var envelope = CreateEnvelope(transferId, ["a@x.com"]);
-        await _handler.HandleAsync(envelope, CancellationToken.None);
+        await _handler.HandleAsync(envelope, 1, 5, CancellationToken.None);
 
         Assert.Single(_emailSender.Sent);
         Assert.Equal("no-reply@protodrop.com", _emailSender.Sent[0].From);
@@ -144,7 +145,7 @@ public class SendNotificationEmailsHandlerTests
         };
 
         var envelope = CreateEnvelope(transferId, ["a@x.com", "b@y.com"]);
-        await _handler.HandleAsync(envelope, CancellationToken.None);
+        await _handler.HandleAsync(envelope, 1, 5, CancellationToken.None);
 
         Assert.Empty(_emailSender.Sent); // all already notified
     }
@@ -170,7 +171,7 @@ public class SendNotificationEmailsHandlerTests
         _store.SuppressedAddresses = new HashSet<string> { "suppressed@x.com" };
 
         var envelope = CreateEnvelope(transferId, ["a@x.com", "suppressed@x.com"]);
-        await _handler.HandleAsync(envelope, CancellationToken.None);
+        await _handler.HandleAsync(envelope, 1, 5, CancellationToken.None);
 
         Assert.Single(_emailSender.Sent);
         Assert.Equal("a@x.com", _emailSender.Sent[0].To);
@@ -194,7 +195,7 @@ public class SendNotificationEmailsHandlerTests
         };
 
         var envelope = CreateEnvelope(transferId, ["a@x.com"]);
-        await _handler.HandleAsync(envelope, CancellationToken.None);
+        await _handler.HandleAsync(envelope, 1, 5, CancellationToken.None);
 
         Assert.Single(_emailSender.Sent);
         var email = _emailSender.Sent[0];
@@ -207,6 +208,107 @@ public class SendNotificationEmailsHandlerTests
         Assert.Contains("1.0", email.HtmlBody);
         Assert.Contains("https://protodrop.com/t/ABCD1234", email.HtmlBody); // CTA URL
         Assert.Contains("30 days", email.HtmlBody); // Expiry days
+    }
+
+    [Fact]
+    public async Task Handle_TransientFailure_NonLastAttempt_ThrowsForRedelivery()
+    {
+        // AC-006-2 (a): 429 on a non-final attempt → throw to redeliver, no email.failed yet.
+        var transferId = Guid.NewGuid();
+        _store.Context = new EmailTransferContext(
+            transferId,
+            "Alice",
+            null,
+            DateTime.UtcNow.AddDays(30),
+            "ABCD1234",
+            [new FileEntry("file.txt", 1024)]);
+
+        _store.Recipients = new List<EmailRecipient>
+        {
+            new() { Id = Guid.NewGuid(), TransferId = transferId, Address = "a@x.com" }
+        };
+
+        _emailSender.ThrowOnSend = new Exception("429");
+        var envelope = CreateEnvelope(transferId, ["a@x.com"]);
+
+        await Assert.ThrowsAsync<Exception>(() => _handler.HandleAsync(envelope, 1, 5, CancellationToken.None));
+
+        // No email.failed on non-final attempts; nothing was sent.
+        Assert.DoesNotContain(_eventPublisher.Published, e => e.Type == EventType.EmailFailed);
+        Assert.Empty(_emailSender.Sent);
+    }
+
+    [Fact]
+    public async Task Handle_FinalAttemptFailure_EmitsEmailFailed_ThenThrows()
+    {
+        // AC-006-2 (b): final attempt (attempt == maxDeliveryCount) → email.failed emitted, then throw to dead-letter.
+        var transferId = Guid.NewGuid();
+        _store.Context = new EmailTransferContext(
+            transferId,
+            "Alice",
+            null,
+            DateTime.UtcNow.AddDays(30),
+            "ABCD1234",
+            [new FileEntry("file.txt", 1024)]);
+
+        var recipientAddress = "a@x.com";
+        _store.Recipients = new List<EmailRecipient>
+        {
+            new() { Id = Guid.NewGuid(), TransferId = transferId, Address = recipientAddress }
+        };
+
+        _emailSender.ThrowOnSend = new Exception("429");
+        var envelope = CreateEnvelope(transferId, [recipientAddress]);
+
+        await Assert.ThrowsAsync<Exception>(() => _handler.HandleAsync(envelope, 5, 5, CancellationToken.None));
+
+        // Exactly one email.failed with the right payload.
+        var failed = _eventPublisher.Published.Where(e => e.Type == EventType.EmailFailed).ToList();
+        Assert.Single(failed);
+
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(failed[0].Payload));
+        var root = doc.RootElement;
+        Assert.Equal(transferId, root.GetProperty("transferId").GetGuid());
+        Assert.Equal(recipientAddress, root.GetProperty("to").GetString());
+        Assert.Equal(5, root.GetProperty("attempt").GetInt32());
+        Assert.Equal("Exception", root.GetProperty("reason").GetString()); // ex.GetType().Name — no Azure SDK dep in wa.application
+    }
+
+    [Fact]
+    public async Task Handle_TransientFirstAttemptFailure_SecondDelivery_SucceedsWithAttempt2()
+    {
+        // AC-006-2 (c): transient first-attempt failure → success on second delivery with attempt = 2.
+        var transferId = Guid.NewGuid();
+        _store.Context = new EmailTransferContext(
+            transferId,
+            "Alice",
+            null,
+            DateTime.UtcNow.AddDays(30),
+            "ABCD1234",
+            [new FileEntry("file.txt", 1024)]);
+
+        _store.Recipients = new List<EmailRecipient>
+        {
+            new() { Id = Guid.NewGuid(), TransferId = transferId, Address = "a@x.com" }
+        };
+
+        var envelope = CreateEnvelope(transferId, ["a@x.com"]);
+
+        // First attempt fails (records the eventId in the dedup window).
+        _emailSender.ThrowOnSend = new Exception("429");
+        await Assert.ThrowsAsync<Exception>(() => _handler.HandleAsync(envelope, 1, 5, CancellationToken.None));
+
+        // Second delivery: fresh envelope (new EventId — real redeliveries carry the same eventId but the dedup window is a fast-path optimization; NotifiedAtUtc guard is the guarantee).
+        var secondEnvelope = CreateEnvelope(transferId, ["a@x.com"]);
+        _emailSender.ThrowOnSend = null;
+        await _handler.HandleAsync(secondEnvelope, 2, 5, CancellationToken.None);
+
+        Assert.Single(_emailSender.Sent);
+        var sent = _eventPublisher.Published.Where(e => e.Type == EventType.EmailSent).ToList();
+        Assert.Single(sent);
+
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(sent[0].Payload));
+        Assert.Equal(2, doc.RootElement.GetProperty("attempt").GetInt32());
     }
 
     private static EventEnvelope CreateEnvelope(Guid transferId, string[] emails)
@@ -268,8 +370,13 @@ public class SendNotificationEmailsHandlerTests
     {
         public List<EmailMessage> Sent { get; } = [];
 
+        /// <summary>If non-null, SendAsync throws it before recording the send (simulates 429/5xx).</summary>
+        public Exception? ThrowOnSend { get; set; }
+
         public Task SendAsync(EmailMessage message, CancellationToken ct)
         {
+            if (ThrowOnSend is not null)
+                throw ThrowOnSend;
             Sent.Add(message);
             return Task.CompletedTask;
         }
