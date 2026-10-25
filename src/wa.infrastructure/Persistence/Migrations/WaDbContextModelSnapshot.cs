@@ -260,6 +260,9 @@ namespace wa.infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("NotifiedAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("PreferredLanguage")
+                        .HasColumnType("VARCHAR(8)");
+
                     b.Property<Guid>("TransferId")
                         .HasColumnType("uniqueidentifier");
 
