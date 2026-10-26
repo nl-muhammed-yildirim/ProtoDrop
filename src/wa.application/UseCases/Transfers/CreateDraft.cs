@@ -19,7 +19,7 @@ public sealed class CreateDraftFile
 }
 
 /// <summary>POST /api/v1/transfers/draft request — the full staged-file selection (TA-4.2#1).</summary>
-public sealed record CreateDraftCommand(IReadOnlyList<CreateDraftFile> Files) : IRequest<CreateDraftResult?>;
+public sealed record CreateDraftCommand(IReadOnlyList<CreateDraftFile> Files) : IRequest<CreateDraftResult>;
 
 /// <summary>Per-file mint outcome: the browser uploads to <see cref="UploadUrl"/> under its own identity.</summary>
 public sealed record DraftFile(Guid FileId, Uri UploadUrl);
@@ -30,7 +30,7 @@ public sealed record CreateDraftResult(Guid DraftId, int ExpiresInSec, IReadOnly
 /// <summary>
 /// TA-4.2a — the only business logic behind POST /api/v1/transfers/draft: resolve guest limits (never literals), check the whole selection against MAX_TRANSFER_SIZE and per-file MAX_SINGLE_FILE, mint one staging SAS per file, emit upload_started once. Returns null when oversized — the endpoint throws BusinessException(ProblemCodes.TransferSizeExceeded) from there; no new tables/migrations (T-001-05).
 /// </summary>
-public sealed class CreateDraftHandler : IRequestHandler<CreateDraftCommand, CreateDraftResult?>
+public sealed class CreateDraftHandler : IRequestHandler<CreateDraftCommand, CreateDraftResult>
 {
     private readonly ILimitsProvider _limits;
     private readonly IBlobSasMinter _minter;
@@ -45,7 +45,7 @@ public sealed class CreateDraftHandler : IRequestHandler<CreateDraftCommand, Cre
         _logger = logger;
     }
 
-    public async Task<CreateDraftResult?> Handle(CreateDraftCommand request, CancellationToken cancellationToken)
+    public async Task<CreateDraftResult> Handle(CreateDraftCommand request, CancellationToken cancellationToken)
     {
         var free = await _limits.Resolve(ILimitsProvider.GuestPlanCode, cancellationToken); // DB failure / unknown plan propagate (AC-053-4, EC-053-3).
 
@@ -69,7 +69,11 @@ public sealed class CreateDraftHandler : IRequestHandler<CreateDraftCommand, Cre
                 ? $"total {totalBytes} exceeds transfer limit {free.MaxTransferSize}"
                 : $"file '{_telemetry.FileNameSlot(request.Files[overIndex].Name)}' is {request.Files[overIndex].SizeBytes} bytes, limit is {free.MaxSingleFile}";
             _logger.LogWarning("Draft rejected: {Detail}", detail);
-            return null;
+
+            throw new TransferSizeExceededException(
+                totalBytes, free.MaxTransferSize,
+                overIndex >= 0 ? request.Files[overIndex].SizeBytes : 0,
+                free.MaxSingleFile);
         }
 
         var draftId = Guid.NewGuid();
@@ -86,4 +90,32 @@ public sealed class CreateDraftHandler : IRequestHandler<CreateDraftCommand, Cre
 
         return new CreateDraftResult(draftId, 7200, files); // 7200 = TA-3.6's 2 h draft-upload TTL in seconds (constant, not a plan limit).
     }
+}
+
+/// <summary>
+/// Thrown by CreateDraftHandler when the selection exceeds MAX_TRANSFER_SIZE or a single file exceeds MAX_SINGLE_FILE.
+/// The endpoint catches this and throws BusinessException(ProblemCodes.TransferSizeExceeded, ex.Message).
+/// </summary>
+public sealed class TransferSizeExceededException : Exception
+{
+    public long TotalBytes { get; }
+    public long MaxTransferSize { get; }
+    public long SingleFileBytes { get; }   // 0 when the total (not a single file) is the violation.
+    public long MaxSingleFile { get; }
+
+    internal TransferSizeExceededException(long totalBytes, long maxTransferSize, long singleFileBytes, long maxSingleFile)
+        : base(BuildMessage(totalBytes, maxTransferSize, singleFileBytes, maxSingleFile))
+    {
+        TotalBytes = totalBytes;
+        MaxTransferSize = maxTransferSize;
+        SingleFileBytes = singleFileBytes;
+        MaxSingleFile = maxSingleFile;
+    }
+
+    private static string BuildMessage(long totalBytes, long maxTransferSize, long singleFileBytes, long maxSingleFile) =>
+        singleFileBytes > 0
+            ? $"File size {FormatGib(singleFileBytes)} exceeds the {FormatGib(maxSingleFile)} limit."
+            : $"Transfer size {FormatGib(totalBytes)} exceeds the {FormatGib(maxTransferSize)} limit.";
+
+    internal static string FormatGib(long bytes) => (bytes / 1073741824.0).ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + " GB";
 }

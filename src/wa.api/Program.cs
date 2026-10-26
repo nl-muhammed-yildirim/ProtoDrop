@@ -134,10 +134,17 @@ app.MapGet("/health", async (ISender sender, CancellationToken ct) =>
 });
 app.MapPost("/api/v1/transfers/draft", async (CreateDraftCommand cmd, ISender sender, CancellationToken ct) =>
 {
-    var result = await sender.Send(cmd, ct);
-    if (result is null)
+    CreateDraftResult result;
+    try
+    {
+        result = await sender.Send(cmd, ct);
+    }
+    catch (TransferSizeExceededException ex)
+    {
         // The handler owns the size logic (TA-4.2a thin endpoint); 422 TRANSFER_SIZE_EXCEEDED via the closed list — GlobalErrorMiddleware already maps BusinessException → ProblemWriter bodies.
-        throw new BusinessException(ProblemCodes.TransferSizeExceeded, "Selection exceeds plan limits.");
+        throw new BusinessException(ProblemCodes.TransferSizeExceeded, ex.Message);
+    }
+
     return Results.Json(new { draftId = result.DraftId.ToString("n"), expiresInSec = result.ExpiresInSec, files = result.Files.Select(f => new { fileId = f.FileId.ToString("n"), uploadUrl = f.UploadUrl.ToString() }) }, statusCode: 201); // TA-4.2#1 exact wire shape — property names pinned at the single construction site (no global JSON policy in this app).
 });
 
