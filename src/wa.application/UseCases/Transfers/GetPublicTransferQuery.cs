@@ -94,7 +94,8 @@ public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransfer
             Note: transfer.Note,
             Files: files,
             HasDownloadAll: transfer.FileCount >= 2 && transfer.TotalBytes <= limits.MaxZipSize,
-            DownloadsLeft: transfer.MaxDownloads == -1 ? null : transfer.MaxDownloads - transfer.DownloadsCount, // the same column TA-7.2's flip uses — page and cap stay consistent
+            // T-007-01: the -1 sentinel is the same column TA-7.2's flip uses — page and cap stay consistent (T-007-01 helper).
+            DownloadsLeft: limits.IsMaxDownloadsInfinite() ? null : transfer.MaxDownloads - transfer.DownloadsCount,
             PasswordRequired: passwordRequired);
     }
 

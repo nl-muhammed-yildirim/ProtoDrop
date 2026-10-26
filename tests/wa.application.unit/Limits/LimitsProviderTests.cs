@@ -141,6 +141,56 @@ public class LimitsProviderTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => provider.Resolve("free", CancellationToken.None));
     }
 
+    [Fact]
+    public async Task Resolve_InfinitySentinels_BusinessIsInfinite_FreeIsNot() // T-007-01: -1 = ∞ sentinel handling — Business MAX_DOWNLOADS resolves to an infinite sentinel.
+    {
+        var provider = CreateProvider();
+
+        var business = await provider.Resolve("business", CancellationToken.None);
+        Assert.True(business.IsMaxDownloadsInfinite()); // -1 sentinel → IsMaxDownloadsInfinite() true (T-007-01).
+        Assert.True(business.IsActiveTransfersMaxInfinite()); // -1 sentinel → IsMaxDownloadsInfinite() true (T-007-01).
+
+        var free = await provider.Resolve("free", CancellationToken.None);
+        Assert.False(free.IsMaxDownloadsInfinite()); // 100 is not -1 → false.
+        Assert.False(free.IsActiveTransfersMaxInfinite()); // 20 is not -1 → false.
+    }
+
+    [Fact]
+    public async Task Resolve_TtlExpiry_PicksUpChangedFlagValue() // T-007-01: TTL expiry honored — after 30 s a changed flag value is picked up (test fakes the clock).
+    {
+        var clock = new FakeClock(DateTimeOffset.UtcNow);
+        var planStore = new StubPlansStore();
+        var flagStore = new StubFlagsStore(new[]
+        {
+            Flag("limits.free.maxDownloads", "100"), // initial value.
+        });
+
+        var provider = new LimitsProvider(
+            new PlansCache(planStore, Ttl, () => clock.Now),
+            new FlagsCache(flagStore, Ttl, () => clock.Now));
+
+        // First resolve: within TTL, uses cached flag value.
+        var first = await provider.Resolve("free", CancellationToken.None);
+        Assert.Equal(100, first.MaxDownloads);
+
+        // Change the flag value (simulating a DB update).
+        flagStore.Rows = new[]
+        {
+            Flag("limits.free.maxDownloads", "200"), // changed value.
+        };
+
+        // Still within TTL: should still see the old cached value.
+        var second = await provider.Resolve("free", CancellationToken.None);
+        Assert.Equal(100, second.MaxDownloads); // cached — TTL not yet expired.
+
+        // Advance clock past TTL.
+        clock.Advance(Ttl + TimeSpan.FromSeconds(1));
+
+        // Now the cache should refetch and see the new value.
+        var third = await provider.Resolve("free", CancellationToken.None);
+        Assert.Equal(200, third.MaxDownloads); // TTL expired — new value picked up.
+    }
+
     // ── builders ──────────────────────────────────────────────────────────────
 
     private static LimitsProvider CreateProvider(
@@ -190,6 +240,8 @@ public class LimitsProviderTests
 
     private sealed class StubFlagsStore(IReadOnlyList<FeatureFlag> rows) : IFlagsStore
     {
-        public Task<IReadOnlyList<FeatureFlag>> GetAllAsync(CancellationToken cancellationToken) => Task.FromResult(rows);
+        public IReadOnlyList<FeatureFlag> Rows { get; set; } = rows;
+
+        public Task<IReadOnlyList<FeatureFlag>> GetAllAsync(CancellationToken cancellationToken) => Task.FromResult(Rows);
     }
 }
