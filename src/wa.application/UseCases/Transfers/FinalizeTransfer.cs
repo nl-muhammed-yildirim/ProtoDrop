@@ -4,6 +4,7 @@ using MediatR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using wa.application.Blob;
+using wa.application.Limits;
 using wa.application.Ports;
 using wa.application.Telemetry;
 using wa.domain;
@@ -21,7 +22,7 @@ public sealed class FinalizeFile
 }
 
 /// <summary>POST /api/v1/transfers/draft/{draftId}/finalize request (TA-4.2#2).</summary>
-public sealed record FinalizeTransferCommand(Guid DraftId, string IdempotencyKey, IReadOnlyList<FinalizeFile> Files) : IRequest<FinalizeTransferResult?>;
+public sealed record FinalizeTransferCommand(Guid DraftId, string IdempotencyKey, IReadOnlyList<FinalizeFile> Files, Guid? OwnerAppUserId = null) : IRequest<FinalizeTransferResult?>;
 
 /// <summary>A file in the finalized transfer result.</summary>
 public sealed record FinalizedFile(Guid FileId, string Name, long SizeBytes, string? ContentType);
@@ -45,6 +46,7 @@ public sealed class FinalizeTransferHandler : IRequestHandler<FinalizeTransferCo
 {
     private readonly ITransferStore _store;
     private readonly IBlobStore _blobStore;
+    private readonly ILimitsProvider _limits;
     private readonly string _publicUrl;
     private readonly WaTelemetryReporter _telemetry;
     private readonly ILogger<FinalizeTransferHandler> _logger;
@@ -52,12 +54,14 @@ public sealed class FinalizeTransferHandler : IRequestHandler<FinalizeTransferCo
     public FinalizeTransferHandler(
         ITransferStore store,
         IBlobStore blobStore,
+        ILimitsProvider limits,
         IConfiguration configuration,
         WaTelemetryReporter telemetry,
         ILogger<FinalizeTransferHandler> logger)
     {
         _store = store;
         _blobStore = blobStore;
+        _limits = limits;
         _publicUrl = configuration["Wa:Url:Public"] ?? "http://localhost:5173";
         _telemetry = telemetry;
         _logger = logger;
@@ -91,6 +95,20 @@ public sealed class FinalizeTransferHandler : IRequestHandler<FinalizeTransferCo
         var totalBytes = request.Files.Sum(f => f.SizeBytes);
         var totalRetries = request.Files.Sum(f => f.Retries);
 
+        // T-007-03: account-level checks (guests skip — EC-007-3).
+        if (request.OwnerAppUserId is not null)
+        {
+            var limits = await _limits.Resolve(ILimitsProvider.GuestPlanCode, cancellationToken);
+
+            long activeBytes = await _store.GetActiveStorageBytesAsync(request.OwnerAppUserId.Value, cancellationToken);
+            if (activeBytes + totalBytes > limits.StorageQuota)
+                throw new StorageQuotaExceededException(activeBytes, totalBytes, limits.StorageQuota);
+
+            int activeCount = await _store.GetActiveTransferCountAsync(request.OwnerAppUserId.Value, cancellationToken);
+            if (!limits.IsActiveTransfersMaxInfinite() && activeCount >= limits.ActiveTransfersMax)
+                throw new ActiveTransfersExceededException(activeCount, limits.ActiveTransfersMax);
+        }
+
         // 4. Blob copy FIRST (before any DB writes): staging → transfers. If a blob is missing, the whole finalize fails cleanly with no DB side effects.
         var stopwatch = Stopwatch.StartNew();
         foreach (var file in request.Files)
@@ -102,6 +120,11 @@ public sealed class FinalizeTransferHandler : IRequestHandler<FinalizeTransferCo
             var ms = new MemoryStream();
             await stream.CopyToAsync(ms, cancellationToken);
             ms.Position = 0;
+
+            // T-007-03: blob size truth — declared SizeBytes must match actual (±0 tolerance).
+            if (ms.Length != file.SizeBytes)
+                throw new BlobSizeMismatchException(file.Name, file.SizeBytes, ms.Length);
+
             await _blobStore.UploadAsync(transferPath, ms, cancellationToken);
         }
         stopwatch.Stop();
@@ -177,5 +200,51 @@ public sealed class FinalizeTransferHandler : IRequestHandler<FinalizeTransferCo
         _telemetry.UploadCompleted(totalBytes, stopwatch.ElapsedMilliseconds, totalRetries);
 
         return result;
+    }
+}
+
+/// <summary>Thrown when the account's active storage + this transfer exceeds STORAGE_QUOTA.</summary>
+public sealed class StorageQuotaExceededException : Exception
+{
+    public long CurrentBytes { get; }
+    public long NewTransferBytes { get; }
+    public long QuotaBytes { get; }
+
+    internal StorageQuotaExceededException(long currentBytes, long newTransferBytes, long quotaBytes)
+        : base($"Storage full — {(currentBytes + newTransferBytes) / 1073741824.0:F1} GB of {quotaBytes / 1073741824.0:F1} GB in use.")
+    {
+        CurrentBytes = currentBytes;
+        NewTransferBytes = newTransferBytes;
+        QuotaBytes = quotaBytes;
+    }
+}
+
+/// <summary>Thrown when the account has reached ACTIVE_TRANSFERS_MAX.</summary>
+public sealed class ActiveTransfersExceededException : Exception
+{
+    public int CurrentCount { get; }
+    public int MaxActiveTransfers { get; }
+
+    internal ActiveTransfersExceededException(int currentCount, int maxActiveTransfers)
+        : base($"You have {currentCount} active transfers (limit {maxActiveTransfers}).")
+    {
+        CurrentCount = currentCount;
+        MaxActiveTransfers = maxActiveTransfers;
+    }
+}
+
+/// <summary>Thrown when a blob's actual size doesn't match the declared SizeBytes.</summary>
+public sealed class BlobSizeMismatchException : Exception
+{
+    public string FileName { get; }
+    public long DeclaredBytes { get; }
+    public long ActualBytes { get; }
+
+    internal BlobSizeMismatchException(string fileName, long declaredBytes, long actualBytes)
+        : base($"File '{fileName}' is {actualBytes} bytes on the server but was declared as {declaredBytes} bytes.")
+    {
+        FileName = fileName;
+        DeclaredBytes = declaredBytes;
+        ActualBytes = actualBytes;
     }
 }

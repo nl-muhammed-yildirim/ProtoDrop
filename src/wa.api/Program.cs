@@ -165,10 +165,25 @@ app.MapPost("/api/v1/transfers/draft/{draftId}/finalize", async (Guid draftId, H
         Retries = e.TryGetProperty("retries", out var r) ? r.GetInt32() : 0
     }).ToList();
 
-    var result = await sender.Send(new FinalizeTransferCommand(draftId, idempotencyKey, files), ct);
-    if (result is null)
-        throw new BusinessException(ProblemCodes.TransferNotFinalized, "Draft has no completed files.");
-    return Results.Json(new { id = result.TransferId.ToString("n"), linkId = result.LinkId, publicUrl = result.PublicUrl, status = "Draft", expiresAt = result.ExpiresAtUtc, totalBytes = result.TotalBytes, files = result.Files.Select(f => new { id = f.FileId.ToString("n"), name = f.Name, sizeBytes = f.SizeBytes, contentType = f.ContentType }) }, statusCode: 201);
+    try
+    {
+        var result = await sender.Send(new FinalizeTransferCommand(draftId, idempotencyKey, files), ct);
+        if (result is null)
+            throw new BusinessException(ProblemCodes.TransferNotFinalized, "Draft has no completed files.");
+        return Results.Json(new { id = result.TransferId.ToString("n"), linkId = result.LinkId, publicUrl = result.PublicUrl, status = "Draft", expiresAt = result.ExpiresAtUtc, totalBytes = result.TotalBytes, files = result.Files.Select(f => new { id = f.FileId.ToString("n"), name = f.Name, sizeBytes = f.SizeBytes, contentType = f.ContentType }) }, statusCode: 201);
+    }
+    catch (StorageQuotaExceededException ex) when (ex is not null)
+    {
+        throw new BusinessException(ProblemCodes.StorageQuotaExceeded, ex.Message);
+    }
+    catch (ActiveTransfersExceededException ex) when (ex is not null)
+    {
+        throw new BusinessException(ProblemCodes.Validation, ex.Message);
+    }
+    catch (BlobSizeMismatchException ex) when (ex is not null)
+    {
+        throw new BusinessException(ProblemCodes.Validation, ex.Message);
+    }
 });
 
 // T-002-04 (TA-4.2#3): activate a Draft transfer — store recipients, emit transfer.created via outbox.

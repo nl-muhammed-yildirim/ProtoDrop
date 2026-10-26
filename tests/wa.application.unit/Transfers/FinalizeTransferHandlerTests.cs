@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using wa.application.Blob;
+using wa.application.Limits;
 using wa.application.Ports;
 using wa.application.Telemetry;
 using wa.application.UseCases.Transfers;
@@ -29,7 +30,13 @@ public class FinalizeTransferHandlerTests
             .Build();
 
         var telemetry = new WaTelemetryReporter(_logger, Encoding.UTF8.GetBytes("test-key"));
-        _handler = new FinalizeTransferHandler(_store, _blobStore, config, telemetry, Microsoft.Extensions.Logging.Abstractions.NullLogger<FinalizeTransferHandler>.Instance);
+        _handler = new FinalizeTransferHandler(
+            _store,
+            _blobStore,
+            new StubLimitsProvider(),
+            config,
+            telemetry,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<FinalizeTransferHandler>.Instance);
     }
 
     [Fact]
@@ -183,6 +190,94 @@ public class FinalizeTransferHandlerTests
         Assert.Contains("5", entry.RenderedText);   // totalRetries = 2 + 3
     }
 
+    [Fact]
+    public async Task Handle_StorageQuotaExceeded_Throws_WithNumbers()
+    {
+        var ownerId = Guid.NewGuid();
+        var draftId = Guid.NewGuid();
+        var file1 = new FinalizeFile { FileId = Guid.NewGuid(), Name = "a.txt", SizeBytes = 200_000_000, Retries = 0 }; // 200 MB
+
+        _blobStore.Blobs[BlobPaths.StagingFile(draftId, file1.FileId)] = new byte[200_000_000];
+
+        // Stub: active storage is 5.2 GB (just under 5 GB quota), adding 200 MB pushes over.
+        _store.ActiveStorageBytes = 5_200_000_000;
+
+        var ex = await Assert.ThrowsAsync<StorageQuotaExceededException>(() =>
+            _handler.Handle(new FinalizeTransferCommand(draftId, "key-quota", [file1], ownerId), CancellationToken.None));
+
+        Assert.Equal(5_200_000_000, ex.CurrentBytes);
+        Assert.Equal(200_000_000, ex.NewTransferBytes);
+        Assert.Equal(5_368_709_120, ex.QuotaBytes); // 5 GB from StubLimitsProvider default
+        Assert.Contains("Storage full", ex.Message);
+        Assert.Empty(_store.SavedTransfers);
+    }
+
+    [Fact]
+    public async Task Handle_ActiveTransfersAtLimit_Throws_NamesLimit()
+    {
+        var ownerId = Guid.NewGuid();
+        var draftId = Guid.NewGuid();
+        var file1 = new FinalizeFile { FileId = Guid.NewGuid(), Name = "a.txt", SizeBytes = 100, Retries = 0 };
+
+        _blobStore.Blobs[BlobPaths.StagingFile(draftId, file1.FileId)] = new byte[100];
+
+        // Stub: active count is at the limit (20).
+        _store.ActiveTransferCount = 20;
+
+        var ex = await Assert.ThrowsAsync<ActiveTransfersExceededException>(() =>
+            _handler.Handle(new FinalizeTransferCommand(draftId, "key-active", [file1], ownerId), CancellationToken.None));
+
+        Assert.Equal(20, ex.CurrentCount);
+        Assert.Equal(20, ex.MaxActiveTransfers);
+        Assert.Contains("You have 20 active transfers (limit 20).", ex.Message);
+        Assert.Empty(_store.SavedTransfers);
+    }
+
+    [Fact]
+    public async Task Handle_BlobSizeMismatch_Throws_NamesFile()
+    {
+        var draftId = Guid.NewGuid();
+        var file1 = new FinalizeFile { FileId = Guid.NewGuid(), Name = "a.txt", SizeBytes = 100, Retries = 0 };
+
+        // Blob is actually 300 bytes but declared as 100.
+        _blobStore.Blobs[BlobPaths.StagingFile(draftId, file1.FileId)] = new byte[300];
+
+        var ex = await Assert.ThrowsAsync<BlobSizeMismatchException>(() =>
+            _handler.Handle(new FinalizeTransferCommand(draftId, "key-mismatch", [file1]), CancellationToken.None));
+
+        Assert.Equal("a.txt", ex.FileName);
+        Assert.Equal(100, ex.DeclaredBytes);
+        Assert.Equal(300, ex.ActualBytes);
+        Assert.Contains("File 'a.txt' is 300 bytes on the server but was declared as 100 bytes.", ex.Message);
+        Assert.Empty(_store.SavedTransfers);
+    }
+
+    [Fact]
+    public async Task Handle_Guest_SkipsAccountChecks()
+    {
+        var draftId = Guid.NewGuid();
+        var file1 = new FinalizeFile { FileId = Guid.NewGuid(), Name = "a.txt", SizeBytes = 100, Retries = 0 };
+
+        _blobStore.Blobs[BlobPaths.StagingFile(draftId, file1.FileId)] = new byte[100];
+
+        // Stub that throws if called — proves guests skip account checks.
+        var throwingStore = new ThrowingTransferStore();
+        var handler = new FinalizeTransferHandler(
+            throwingStore,
+            _blobStore,
+            new StubLimitsProvider(),
+            new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?> { ["Wa:Url:Public"] = "http://localhost:5173" })
+                .Build(),
+            new WaTelemetryReporter(_logger, Encoding.UTF8.GetBytes("test-key")),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<FinalizeTransferHandler>.Instance);
+
+        var result = await handler.Handle(new FinalizeTransferCommand(draftId, "key-guest", [file1]), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(0, result!.Status); // Draft
+    }
+
     // ---- Stubs ----
 
     private sealed class StubTransferStore : ITransferStore
@@ -201,6 +296,10 @@ public class FinalizeTransferHandlerTests
         private int _linkIdChecks;
 
         public Transfer? SavedTransfer => SavedTransfers.LastOrDefault();
+
+        // T-007-03: account-level checks — default 0/0 for existing tests.
+        public long ActiveStorageBytes { get; set; } = 0;
+        public int ActiveTransferCount { get; set; } = 0;
 
         public Task<IdempotencyKey?> FindByIdempotencyKeyAsync(string key, CancellationToken ct) =>
             Task.FromResult(SavedIdempotencyKeys.FirstOrDefault(k => k.Key == key));
@@ -221,6 +320,44 @@ public class FinalizeTransferHandlerTests
             SavedIdempotencyKeys.Add(idempotencyKey);
             return Task.CompletedTask;
         }
+
+        public Task<long> GetActiveStorageBytesAsync(Guid ownerId, CancellationToken ct) =>
+            Task.FromResult(ActiveStorageBytes);
+
+        public Task<int> GetActiveTransferCountAsync(Guid ownerId, CancellationToken ct) =>
+            Task.FromResult(ActiveTransferCount);
+    }
+
+    private sealed class StubLimitsProvider : ILimitsProvider
+    {
+        public LimitsRecord Record { get; set; } = new()
+        {
+            MaxTransferSize = 5_368_709_120, // 5 GB
+            MaxSingleFile = 5_368_709_120,
+            StorageQuota = 5_368_709_120, // 5 GB
+            ActiveTransfersMax = 20
+        };
+
+        public Task<LimitsRecord> Resolve(string planCode, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Record);
+    }
+
+    private sealed class ThrowingTransferStore : ITransferStore
+    {
+        public Task<IdempotencyKey?> FindByIdempotencyKeyAsync(string key, CancellationToken ct) =>
+            Task.FromResult<IdempotencyKey?>(null);
+
+        public Task<bool> TransferExistsByLinkIdAsync(string linkId, CancellationToken ct) =>
+            Task.FromResult(false);
+
+        public Task SaveFinalizeAsync(Transfer transfer, IReadOnlyList<BlobRef> blobRefs, IReadOnlyList<FileItem> fileItems, IdempotencyKey idempotencyKey, CancellationToken ct) =>
+            Task.CompletedTask;
+
+        public Task<long> GetActiveStorageBytesAsync(Guid ownerId, CancellationToken ct) =>
+            throw new InvalidOperationException("GetActiveStorageBytesAsync called for guest — should not be called.");
+
+        public Task<int> GetActiveTransferCountAsync(Guid ownerId, CancellationToken ct) =>
+            throw new InvalidOperationException("GetActiveTransferCountAsync called for guest — should not be called.");
     }
 
     private sealed class StubBlobStore : IBlobStore
