@@ -1,0 +1,15 @@
+Olá,
+
+{{SenderName}} compartilhou ficheiros consigo.
+
+Ficheiros:
+{{#Files}}
+- {{Name}} ({{Size}})
+{{/Files}}
+
+Transfira os seus ficheiros:
+{{CtaUrl}}
+
+Esta ligação expira em {{ExpiryDays}} dias.
+
+Para cancelar a subscrição, responda a este e-mail ou contacte o suporte.

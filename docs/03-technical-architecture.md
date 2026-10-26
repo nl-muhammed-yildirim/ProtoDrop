@@ -1022,6 +1022,8 @@ The table below is canonical. Full ADR files land in `docs/adr/` when an ADR is 
 | ADR-014 | Monorepo (`src/` + `web/` + `infra/` + `tests/`) | Polyrepo per service | One CI, atomic schema+API changes |
 | ADR-015 | **Clean (onion) architecture**: `wa.domain → wa.application → wa.infrastructure → wa.api / wa.workers`; EF confined to `wa.infrastructure/Persistence` (new v0.2) | Flat `wa.core`; 2-project core | Ports/adapters make each layer testable; EF never leaks to domain/use cases |
 | ADR-016 | **CQRS via MediatR 12.5**: one `IRequest`/handler per use case in `wa.application/UseCases/`; domain events via `IEventPublisher` (MediatR-free) (new v0.2) | MediatR `INotification` domain events; custom home-grown mediator | Frozen, known API; pipeline owns cross-cutting; 12.5 is the last stable line before 13.x breaking changes |
+| ADR-017 | Azure.Communication.Email SDK for f-email sender (v1.1.0) | Direct SMTP; SendGrid; raw REST calls | Azure-native (ADR-011), typed SDK, per-recipient attrs for i18n later |
+| ADR-018 | Stubble.Core for email template rendering (v1.10.8) | Razor templates; inline strings in code | Mustache is simple enough for M0 single-language; file-based templates live in Emails/templates/ (TA-6.7) |
 
 ---
 

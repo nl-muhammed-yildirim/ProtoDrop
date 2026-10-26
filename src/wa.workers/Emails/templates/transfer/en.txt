@@ -1,0 +1,15 @@
+Hi,
+
+{{SenderName}} has shared files with you.
+
+Files:
+{{#Files}}
+- {{Name}} ({{Size}})
+{{/Files}}
+
+Download your files:
+{{CtaUrl}}
+
+This link expires in {{ExpiryDays}} days.
+
+To unsubscribe, reply to this email or contact support.

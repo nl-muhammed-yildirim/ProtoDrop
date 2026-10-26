@@ -1,0 +1,15 @@
+Hola,
+
+{{SenderName}} ha compartido archivos contigo.
+
+Archivos:
+{{#Files}}
+- {{Name}} ({{Size}})
+{{/Files}}
+
+Descarga tus archivos:
+{{CtaUrl}}
+
+Este enlace expira en {{ExpiryDays}} días.
+
+Para cancelar tu suscripción, responde a este correo o contacta al soporte.

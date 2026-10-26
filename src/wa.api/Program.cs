@@ -10,7 +10,9 @@ using wa.application.Ports;
 using wa.application.UseCases.Health;
 using wa.application.UseCases.Sample;
 using wa.application.UseCases.Transfers;
+using wa.domain; // T-006-03: EmailSuppression entity type for admin routes
 using wa.domain.Errors; // T-056-02: /health catch writes through ProblemWriter (closed code list)
+using wa.domain.Telemetry; // T-006-03: admin_action event name for suppression removal
 using wa.infrastructure.Blob;
 using wa.infrastructure.Events;
 using wa.infrastructure.Persistence;
@@ -100,6 +102,11 @@ builder.Services.AddSingleton<wa.application.Telemetry.WaTelemetryReporter>(sp =
 // Injectable clock arg is () => DateTimeOffset.UtcNow in production; unit tests pin exp via their own instance (D3).
 builder.Services.AddSingleton<IUnlockTokenMinter>(sp => new UnlockTokenService(
     System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Wa:Jwt:Secret"]!), () => DateTimeOffset.UtcNow));
+// T-006-03 (TA-6.7): unsubscribe token verification + suppression insert — BCL-only HMAC, same Wa:Jwt:Secret key bytes.
+builder.Services.AddSingleton<wa.infrastructure.Persistence.UnsubscribeService>(sp => new wa.infrastructure.Persistence.UnsubscribeService(
+    sp.GetRequiredService<WaDbContext>(),
+    System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Wa:Jwt:Secret"]!),
+    sp.GetRequiredService<ILogger<wa.infrastructure.Persistence.UnsubscribeService>>()));
 var app = builder.Build();
 // TA-4.1.6 (T-056-03): allow-list CORS only — configured origins via Wa:Cors:AllowedOrigins, no wildcard, preflight cached 1 h.
 app.UseMiddleware<CorsAllowListMiddleware>();
@@ -309,6 +316,36 @@ app.MapGet("/api/v1/public/transfers/{linkId}/download-all-url", async (string l
         // TA-9.6#1: gated transfer minted without a valid ?t= → 401 UNAUTHENTICATED (never a file-list-shaped error).
         DownloadAllState.Unauthenticated => Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401)
     };
+});
+
+// T-006-03 (FR-006-5): public unsubscribe — GET /unsubscribe/{token}. Token = Base64Url(payload).Base64Url(HMACSHA256(payload, Wa:Jwt:Secret)).
+// Payload = "address|senderEmail". On success: insert EmailSuppression (idempotent via UQ_ES) + 200. Tampered/unknown → 404 + warn telemetry.
+app.MapGet("/unsubscribe/{token}", async (string token, wa.infrastructure.Persistence.UnsubscribeService unsubscribe, CancellationToken ct) =>
+{
+    var result = await unsubscribe.HandleAsync(token, ct);
+    return result.Success
+        ? Results.Ok() // 200 — the SPA shows the success card + redirects to /
+        : Results.NotFound(ProblemWriter.Build(404, ProblemCodes.NotFound, "Not found.")); // 404 — don't leak detail (TA-9.6)
+});
+
+// T-006-03 (FR-006-5, US-011-04): admin suppression list — F-TRF-011 owns the UI; this is the API surface.
+app.MapGet("/api/v1/admin/suppressions", async (WaDbContext db, CancellationToken ct) =>
+{
+    var rows = await db.Set<EmailSuppression>().OrderByDescending(s => s.CreatedAtUtc).ToListAsync(ct);
+    return Results.Json(rows.Select(s => new { id = s.Id.ToString("n"), address = s.Address, senderEmail = s.SenderEmail, createdAtUtc = s.CreatedAtUtc }));
+});
+
+// T-006-03 (FR-006-5, US-011-04): admin suppression remove — emits admin_action telemetry. F-TRF-011 owns the UI; this is the API surface.
+app.MapDelete("/api/v1/admin/suppressions/{id:guid}", async (Guid id, WaDbContext db, wa.application.Telemetry.WaTelemetryReporter telemetry, CancellationToken ct) =>
+{
+    var row = await db.Set<EmailSuppression>().FirstOrDefaultAsync(s => s.Id == id, ct);
+    if (row is null)
+        return Results.NotFound(ProblemWriter.Build(404, ProblemCodes.NotFound, "Not found."));
+
+    db.Set<EmailSuppression>().Remove(row);
+    await db.SaveChangesAsync(ct);
+    telemetry.LogEvent(TelemetryEvents.AdminAction); // F-TRF-011: admin removal is auditable via App Insights
+    return Results.Ok();
 });
 
 app.Run();
