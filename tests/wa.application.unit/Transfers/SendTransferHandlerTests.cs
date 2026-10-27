@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using wa.application.Limits;
 using wa.application.Ports;
+using wa.application.Telemetry;
 using wa.application.UseCases.Transfers;
 using wa.domain;
 
@@ -11,8 +12,11 @@ namespace wa.application.unit.Transfers;
 public class SendTransferHandlerTests
 {
     private readonly StubSendStore _store;
+    private readonly StubTransferStore _meterStore; // T-007-05: fake ITransferStore — the meter's single FR-007-4 read
     private readonly StubLimitsProvider _limits;
     private readonly StubEventPublisher _eventPublisher;
+    private readonly RecordingTelemetryLogger _telemetryLogger;
+    private readonly WaTelemetryReporter _telemetry;
     private readonly SendTransferHandler _handler;
 
     public SendTransferHandlerTests() : this(new StubLimitsProvider()) { }
@@ -20,9 +24,12 @@ public class SendTransferHandlerTests
     private SendTransferHandlerTests(StubLimitsProvider limits)
     {
         _store = new StubSendStore();
+        _meterStore = new StubTransferStore();
         _limits = limits;
         _eventPublisher = new StubEventPublisher();
-        _handler = new SendTransferHandler(_store, _limits, _eventPublisher, Microsoft.Extensions.Logging.Abstractions.NullLogger<SendTransferHandler>.Instance);
+        _telemetryLogger = new RecordingTelemetryLogger();
+        _telemetry = new WaTelemetryReporter(_telemetryLogger, System.Text.Encoding.UTF8.GetBytes("test-key"));
+        _handler = NewHandler(limits);
     }
 
     private Transfer NewDraftTransfer(Guid? id = null) => new()
@@ -227,7 +234,57 @@ public class SendTransferHandlerTests
     }
 
     private SendTransferHandler NewHandler(StubLimitsProvider limits) =>
-        new SendTransferHandler(_store, limits, _eventPublisher, Microsoft.Extensions.Logging.Abstractions.NullLogger<SendTransferHandler>.Instance);
+        new SendTransferHandler(_store, _meterStore, limits, _eventPublisher, _telemetry, Microsoft.Extensions.Logging.Abstractions.NullLogger<SendTransferHandler>.Instance);
+
+    // ---- T-007-05 / AC-007-2 (meter): storage_bytes_active on send ----
+
+    [Fact]
+    public async Task StorageBytesActive_EmitsRequeriedPostSaveValue_ForAccountOwner()
+    {
+        // Status 0→1 puts this row into the FR-007-4 SUM expression at send time — the meter is the re-run read after SaveSendAsync.
+        var transferId = Guid.NewGuid();
+        var owner = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+        _store.Transfer.OwnerAppUserId = owner;
+
+        // The fake returns the post-activation sum (prior 2 GB + this transfer's 100 bytes).
+        const long PostActivationSum = 2_000_000_100;
+        _meterStore.ActiveStorageBytes = PostActivationSum;
+
+        await _handler.Handle(new SendTransferCommand(transferId, null, null, null, []), CancellationToken.None);
+
+        // Exactly one read, for this owner — the EF expression lives in TransferStore.cs, not duplicated here.
+        var calls = _meterStore.Calls;
+        Assert.Single(calls);
+        Assert.Equal(owner, calls[0]);
+        var entry = Assert.Single(_telemetryLogger.Entries, e => e.RenderedText.StartsWith("storage_bytes_active"));
+        Assert.Contains(PostActivationSum.ToString(), entry.RenderedText);
+    }
+
+    [Fact]
+    public async Task StorageBytesActive_NotEmitted_WhenOwnerAppUserIdNull()
+    {
+        // Guest: no owner → no meter (mirrors the finalize-side EC-007-3 guard).
+        var transferId = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+
+        await _handler.Handle(new SendTransferCommand(transferId, null, null, null, []), CancellationToken.None);
+
+        Assert.Empty(_telemetryLogger.Entries.Where(e => e.RenderedText.StartsWith("storage_bytes_active")));
+        Assert.Empty(_meterStore.Calls);
+    }
+
+    [Fact]
+    public async Task StorageBytesActive_NotEmitted_WhenTransferNotFound()
+    {
+        // Null early-return path — no save, no meter.
+        _store.Transfer = null;
+
+        var result = await _handler.Handle(new SendTransferCommand(Guid.NewGuid(), null, null, null, []), CancellationToken.None);
+
+        Assert.Null(result);
+        Assert.Empty(_telemetryLogger.Entries.Where(e => e.RenderedText.StartsWith("storage_bytes_active")));
+    }
 
     [Fact]
     public async Task Handle_DuplicateEmails_Deduplicated()
@@ -461,5 +518,46 @@ public class SendTransferHandlerTests
             Published.Add(envelope);
             return Task.FromResult(new DomainEventRecord { EventId = envelope.EventId, IsPublished = true });
         }
+    }
+
+    // ---- T-007-05 stubs: fake ITransferStore + telemetry capture (the new ctor dependency) ----
+
+    private sealed class StubTransferStore : ITransferStore
+    {
+        public List<Guid> Calls { get; } = []; // owner ids in call order — tests pin exactly one call with the right owner
+        /// <summary>What the FR-007-4 SUM expression returns — set per scenario; the handler must emit exactly this.</summary>
+        public long ActiveStorageBytes { get; set; } = 0;
+
+        public Task<IdempotencyKey?> FindByIdempotencyKeyAsync(string key, CancellationToken ct) =>
+            Task.FromResult<IdempotencyKey?>(null);
+
+        public Task<bool> TransferExistsByLinkIdAsync(string linkId, CancellationToken ct) =>
+            Task.FromResult(false);
+
+        public Task SaveFinalizeAsync(Transfer transfer, IReadOnlyList<BlobRef> blobRefs, IReadOnlyList<FileItem> fileItems, IdempotencyKey idempotencyKey, CancellationToken ct) =>
+            Task.CompletedTask;
+
+        public Task<long> GetActiveStorageBytesAsync(Guid ownerId, CancellationToken ct)
+        {
+            Calls.Add(ownerId); // the meter's single read — tests pin exactly one call with the right owner
+            return Task.FromResult(ActiveStorageBytes);
+        }
+
+        public Task<int> GetActiveTransferCountAsync(Guid ownerId, CancellationToken ct) =>
+            Task.FromResult(0);
+    }
+
+    private sealed class RecordingTelemetryLogger : ILogger<WaTelemetryReporter>
+    {
+        public record Entry(string RenderedText);
+
+        public List<Entry> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+            => Entries.Add(new Entry(formatter(state, exception)));
+        public void Log(LogLevel logLevel, EventId eventId, string? message, Exception? exception, params object?[] args)
+            => Entries.Add(new Entry(message ?? string.Empty));
     }
 }

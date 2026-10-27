@@ -96,13 +96,15 @@ public sealed class FinalizeTransferHandler : IRequestHandler<FinalizeTransferCo
         var totalRetries = request.Files.Sum(f => f.Retries);
 
         // T-007-03: account-level checks (guests skip — EC-007-3).
+        // T-007-05: activeBytes is the quota law's read and the meter's source — same value, no second query.
+        long? activeBytes = null;
         if (request.OwnerAppUserId is not null)
         {
             var limits = await _limits.Resolve(ILimitsProvider.GuestPlanCode, cancellationToken);
 
-            long activeBytes = await _store.GetActiveStorageBytesAsync(request.OwnerAppUserId.Value, cancellationToken);
-            if (activeBytes + totalBytes > limits.StorageQuota)
-                throw new StorageQuotaExceededException(activeBytes, totalBytes, limits.StorageQuota);
+            activeBytes = await _store.GetActiveStorageBytesAsync(request.OwnerAppUserId.Value, cancellationToken);
+            if (activeBytes.Value + totalBytes > limits.StorageQuota)
+                throw new StorageQuotaExceededException(activeBytes.Value, totalBytes, limits.StorageQuota);
 
             int activeCount = await _store.GetActiveTransferCountAsync(request.OwnerAppUserId.Value, cancellationToken);
             if (!limits.IsActiveTransfersMaxInfinite() && activeCount >= limits.ActiveTransfersMax)
@@ -198,6 +200,11 @@ public sealed class FinalizeTransferHandler : IRequestHandler<FinalizeTransferCo
 
         // 6. Telemetry: upload_completed with bytes, durationMs (blob copy only), total retries.
         _telemetry.UploadCompleted(totalBytes, stopwatch.ElapsedMilliseconds, totalRetries);
+
+        // T-007-05 / AC-007-2 (meter): storage_bytes_active — the law's exact comparison value.
+        // The new row is Draft (Status=0), not yet inside the SUM expression, so prior + this transfer is FR-007-4's read.
+        if (request.OwnerAppUserId is not null)
+            _telemetry.StorageBytesActive(activeBytes!.Value + totalBytes);
 
         return result;
     }

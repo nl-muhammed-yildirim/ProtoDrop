@@ -96,6 +96,25 @@ public class WaTelemetryReporterTests
         Assert.Equal("18b7cb099a9ea3f50ba899b5ba81e0d377a5f3b16f8f6eeb8b3e58cd4692b993", new WaTelemetryReporter(new RecordingLogger(), Key).FileNameSlot("a.txt")); // raw "a.txt" never enters a property
 
     [Fact]
+    public void StorageBytesActive_TemplateIsNamePlusBytesProperty()
+    {
+        // T-007-05 / TA-10.2: storage_bytes_active — App Insights queries by the exact template text (AC-007-2's meter half).
+        var logger = new RecordingLogger();
+        var reporter = new WaTelemetryReporter(logger, Key);
+
+        reporter.StorageBytesActive(5_368_709_120L); // exactly STORAGE_QUOTA Free — an account at 5 GB of 5 GB reads a full meter
+
+        var entry = Assert.Single(logger.Entries);
+        Assert.StartsWith("storage_bytes_active", entry.RenderedText); // the closed name leads the message text — App Insights queries by it (TA-10.2)
+        Assert.Equal("storage_bytes_active 5368709120", entry.RenderedText); // exact template text: the name + the byte count rendered, no other properties (like expiry_job_lag_seconds's {seconds})
+        Assert.Equal(new object[] { 5_368_709_120L }, entry.Args); // the byte count is the only property — long-typed, no decimals
+
+        // Closed-set gate: storage_bytes_active stays a metric (same pipeline), not an event.
+        Assert.False(TelemetryEvents.IsEvent(TelemetryEvents.StorageBytesActive));
+        Assert.Equal(30, TelemetryEvents.AllNames().Count); // closed-set count unchanged — matches wa.domain.unit's ConstMembers pin (23 events + 7 metrics)
+    }
+
+    [Fact]
     public void IpSlot_ReturnsTheKeyedHmacTransform_NotTheRawIp() =>
         Assert.Equal("0ee7d12715e0fe81319cd148d4b43302ac231095c09642949a3660c8c664faea", new WaTelemetryReporter(new RecordingLogger(), Key).IpSlot("10.0.0.1")); // keyed by the ctor key — same vector as wa.domain.unit's PiiTransforms tests
 }

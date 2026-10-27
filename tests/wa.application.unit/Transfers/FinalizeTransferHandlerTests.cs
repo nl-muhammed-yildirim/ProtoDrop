@@ -278,6 +278,83 @@ public class FinalizeTransferHandlerTests
         Assert.Equal(0, result!.Status); // Draft
     }
 
+    [Fact]
+    public async Task StorageBytesActive_EmittedWithPriorPlusNewBytes_ForAccountUser()
+    {
+        var ownerId = Guid.NewGuid();
+        var draftId = Guid.NewGuid();
+        var file1 = new FinalizeFile { FileId = Guid.NewGuid(), Name = "a.txt", SizeBytes = 100, Retries = 0 };
+
+        _blobStore.Blobs[BlobPaths.StagingFile(draftId, file1.FileId)] = new byte[100];
+
+        // T-007-05: meter value = the law's exact comparison value (prior active + this transfer).
+        _store.ActiveStorageBytes = 2_500_000_000;
+
+        await _handler.Handle(new FinalizeTransferCommand(draftId, "key-meter", [file1], ownerId), CancellationToken.None);
+
+        var entry = _logger.Entries.Single(e => e.RenderedText.StartsWith("storage_bytes_active"));
+        Assert.Contains("2500000100", entry.RenderedText); // 2_500_000_000 + 100 — no second query, law and meter share one read
+    }
+
+    [Fact]
+    public async Task StorageMeter_ValueEqualsQuotaLawExpression_AtFullQuota()
+    {
+        // AC-007-2 (meter half): an account at 5 GB of 5 GB reads a full meter — storage_bytes_active == STORAGE_QUOTA.
+        // The plan referenced T-007-03's gherkin pair (4.9 GB + 200 MB rejected; 4 GB + 900 MB succeeds) as reusable, but only the
+        // rejection test (Handle_StorageQuotaExceeded_Throws_WithNumbers, 5.2 GB > 5 GB quota) exists in this file; the pair was
+        // never committed. This test implements TESTS #1 from scratch with the same pin: one GetActiveStorageBytesAsync value
+        // drives both the law (quota check) and the meter — a zero-byte finalize keeps the law green so both reads are observable.
+        var ownerId = Guid.NewGuid();
+        var draftId = Guid.NewGuid();
+        var file1 = new FinalizeFile { FileId = Guid.NewGuid(), Name = "empty.txt", SizeBytes = 0, Retries = 0 };
+
+        _blobStore.Blobs[BlobPaths.StagingFile(draftId, file1.FileId)] = []; // 0-byte blob; declared == actual (blob size truth)
+
+        // Account at exactly the Free STORAGE_QUOTA (T-007-01's LimitsProviderTests pins 5_368_709_120 for the same plan).
+        _store.ActiveStorageBytes = 5_368_709_120;
+
+        var result = await _handler.Handle(new FinalizeTransferCommand(draftId, "key-full-quota", [file1], ownerId), CancellationToken.None);
+
+        Assert.NotNull(result); // law: 5 GB + 0 <= 5 GB — at-full-quota does not reject (strict >)
+        var entry = _logger.Entries.Single(e => e.RenderedText.StartsWith("storage_bytes_active"));
+        Assert.Equal("storage_bytes_active 5368709120", entry.RenderedText); // meter == quota law's read == STORAGE_QUOTA → 100 percent
+    }
+
+    [Fact]
+    public async Task StorageBytesActive_NotEmitted_ForGuest()
+    {
+        // EC-007-3 guard mirror: no owner → no account-level read at all → no meter.
+        var draftId = Guid.NewGuid();
+        var file1 = new FinalizeFile { FileId = Guid.NewGuid(), Name = "a.txt", SizeBytes = 100, Retries = 0 };
+
+        _blobStore.Blobs[BlobPaths.StagingFile(draftId, file1.FileId)] = new byte[100];
+
+        var result = await _handler.Handle(new FinalizeTransferCommand(draftId, "key-guest-meter", [file1]), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Empty(_logger.Entries.Where(e => e.RenderedText.StartsWith("storage_bytes_active")));
+    }
+
+    [Fact]
+    public async Task StorageBytesActive_NotEmitted_OnIdempotentReplay()
+    {
+        // EC-002-1: replay returns the cached result before any mutation — so no emission on the second call.
+        var ownerId = Guid.NewGuid();
+        var draftId = Guid.NewGuid();
+        var file1 = new FinalizeFile { FileId = Guid.NewGuid(), Name = "a.txt", SizeBytes = 100, Retries = 0 };
+
+        _blobStore.Blobs[BlobPaths.StagingFile(draftId, file1.FileId)] = new byte[100];
+        _store.ActiveStorageBytes = 2_500_000_000;
+
+        var cmd = new FinalizeTransferCommand(draftId, "key-replay-meter", [file1], ownerId);
+        await _handler.Handle(cmd, CancellationToken.None); // first call — emits once
+        Assert.Single(_logger.Entries, e => e.RenderedText.StartsWith("storage_bytes_active"));
+
+        await _handler.Handle(cmd, CancellationToken.None); // replay — cached result, no mutation, no re-emission
+        Assert.Single(_logger.Entries, e => e.RenderedText.StartsWith("storage_bytes_active"));
+        Assert.Single(_store.SavedTransfers);
+    }
+
     // ---- Stubs ----
 
     private sealed class StubTransferStore : ITransferStore
