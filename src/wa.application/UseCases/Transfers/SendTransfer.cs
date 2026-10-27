@@ -76,6 +76,11 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
         // 3. Resolve plan limits — never a literal (TA-3.4).
         var limits = await _limits.Resolve(ILimitsProvider.GuestPlanCode, cancellationToken);
 
+        // 3b. T-007-04 / AC-007-1: send-time re-check — a flag may have changed since finalize; checks precede mutation.
+        //     Strict > : exactly-at-limit passes (inclusive cap, boundary pinned in unit tests).
+        if (transfer.TotalBytes > limits.MaxTransferSize)
+            throw new TransferSizeExceededException(transfer.TotalBytes, limits.MaxTransferSize, 0, limits.MaxSingleFile);
+
         // 4. Parse recipients: split on [\r\n,;\s]+, trim, drop empties, validate per-address, lowercase, dedupe, cap.
         var addresses = new List<string>();
         var seen = new HashSet<string>(StringComparer.Ordinal);

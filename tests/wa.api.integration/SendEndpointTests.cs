@@ -191,6 +191,61 @@ public class SendEndpointTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    // ---- T-007-04 / AC-007-1: send-time size re-check rejects oversize finalized transfers ----
+
+    [Fact]
+    public async Task Send_Endpoint_FinalizedOversize_TransferFailsWithTransferSizeExceeded()
+    {
+        // AC-007-1: finalize does NOT check MAX_TRANSFER_SIZE (only quota/active-transfers/blob-truth).
+        // A transfer with TotalBytes > 5GB can be finalized, but send must reject it with 422 TRANSFER_SIZE_EXCEEDED.
+        
+        // Step 1: Directly seed a Transfer in DB with TotalBytes exceeding MAX_TRANSFER_SIZE.
+        const long OversizeBytes = 5_658_836_480L; // 5.2 GB > 5 GB Free MaxTransferSize (5_368_709_120)
+        var transferId = Guid.NewGuid();
+        
+        _db.Set<Transfer>().Add(new Transfer
+        {
+            Id = transferId,
+            LinkId = "OVSZ1234", // Valid 8-char alphanumeric (TA-7.1)
+            Status = 0, // Draft — ready to send
+            TotalBytes = OversizeBytes,
+            FileCount = 1,
+            SenderName = "Guest",
+            MaxDownloads = 1,
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(30),
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        await _db.SaveChangesAsync();
+
+        // Step 2: Attempt to send — should fail with 422 TRANSFER_SIZE_EXCEEDED.
+        using var response = await PostSendAsync(transferId, new { emails = Array.Empty<string>() }, "key-send-oversize");
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        
+        // Step 3: Verify the error code and that both numbers appear in details.
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsByteArrayAsync());
+        var root = doc.RootElement;
+        
+        // TA-4.1.3 closed list: TRANSFER_SIZE_EXCEEDED pinned at 422.
+        Assert.Equal("TRANSFER_SIZE_EXCEEDED", root.GetProperty("code").GetString());
+        Assert.Equal(422, root.GetProperty("status").GetInt32());
+
+        // AC-007-1: details must contain both numbers — actual size (5.2 GB) and limit (5.0 GB).
+        var details = root.GetProperty("details").GetString();
+        Assert.NotNull(details);
+        
+        const long FreeMaxTransferSize = 5_368_709_120L; // 5 GB
+        double actualGib = OversizeBytes / 1073741824.0; // 5.2 GB
+        double limitGib = FreeMaxTransferSize / 1073741824.0; // 5.0 GB
+        
+        Assert.Contains(actualGib.ToString("F1") + " GB", details);
+        Assert.Contains(limitGib.ToString("F1") + " GB", details);
+
+        // Checks precede mutation — the transfer stayed Draft (Status=0).
+        var updatedTransfer = await _db.Set<Transfer>().FirstAsync(t => t.Id == transferId);
+        Assert.Equal(0, updatedTransfer.Status);
+    }
+
     // ---- Helpers ----
 
     /// <summary>Create a draft transfer via the existing endpoints (draft → finalize). Returns the transfer ID.</summary>

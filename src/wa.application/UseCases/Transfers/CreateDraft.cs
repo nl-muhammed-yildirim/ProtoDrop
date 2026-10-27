@@ -92,30 +92,3 @@ public sealed class CreateDraftHandler : IRequestHandler<CreateDraftCommand, Cre
     }
 }
 
-/// <summary>
-/// Thrown by CreateDraftHandler when the selection exceeds MAX_TRANSFER_SIZE or a single file exceeds MAX_SINGLE_FILE.
-/// The endpoint catches this and throws BusinessException(ProblemCodes.TransferSizeExceeded, ex.Message).
-/// </summary>
-public sealed class TransferSizeExceededException : Exception
-{
-    public long TotalBytes { get; }
-    public long MaxTransferSize { get; }
-    public long SingleFileBytes { get; }   // 0 when the total (not a single file) is the violation.
-    public long MaxSingleFile { get; }
-
-    internal TransferSizeExceededException(long totalBytes, long maxTransferSize, long singleFileBytes, long maxSingleFile)
-        : base(BuildMessage(totalBytes, maxTransferSize, singleFileBytes, maxSingleFile))
-    {
-        TotalBytes = totalBytes;
-        MaxTransferSize = maxTransferSize;
-        SingleFileBytes = singleFileBytes;
-        MaxSingleFile = maxSingleFile;
-    }
-
-    private static string BuildMessage(long totalBytes, long maxTransferSize, long singleFileBytes, long maxSingleFile) =>
-        singleFileBytes > 0
-            ? $"File size {FormatGib(singleFileBytes)} exceeds the {FormatGib(maxSingleFile)} limit."
-            : $"Transfer size {FormatGib(totalBytes)} exceeds the {FormatGib(maxTransferSize)} limit.";
-
-    internal static string FormatGib(long bytes) => (bytes / 1073741824.0).ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + " GB";
-}

@@ -15,13 +15,26 @@ public class SendTransferHandlerTests
     private readonly StubEventPublisher _eventPublisher;
     private readonly SendTransferHandler _handler;
 
-    public SendTransferHandlerTests()
+    public SendTransferHandlerTests() : this(new StubLimitsProvider()) { }
+
+    private SendTransferHandlerTests(StubLimitsProvider limits)
     {
         _store = new StubSendStore();
-        _limits = new StubLimitsProvider();
+        _limits = limits;
         _eventPublisher = new StubEventPublisher();
         _handler = new SendTransferHandler(_store, _limits, _eventPublisher, Microsoft.Extensions.Logging.Abstractions.NullLogger<SendTransferHandler>.Instance);
     }
+
+    private Transfer NewDraftTransfer(Guid? id = null) => new()
+    {
+        Id = id ?? Guid.NewGuid(),
+        LinkId = "ABCD1234",
+        Status = 0,
+        TotalBytes = 100,
+        FileCount = 1,
+        SenderName = "Guest",
+        CreatedAtUtc = DateTime.UtcNow
+    };
 
     [Fact]
     public async Task Handle_HappyPath_WithEmails_NormalizesAndStoresRecipients()
@@ -149,6 +162,72 @@ public class SendTransferHandlerTests
 
         Assert.Contains("Maximum", ex.Message);
     }
+
+    // ---- T-007-04 / AC-007-1: send-time size re-check ----
+
+    [Fact]
+    public async Task Handle_TotalBytesExceedsMaxTransferSize_ThrowsWithBothNumbers()
+    {
+        var transferId = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+        _store.Transfer.TotalBytes = 5_368_709_121; // 1 byte over Free's MAX_TRANSFER_SIZE
+
+        var ex = await Assert.ThrowsAsync<TransferSizeExceededException>(() =>
+            _handler.Handle(new SendTransferCommand(transferId, null, null, null, []), CancellationToken.None));
+
+        // Properties carry both numbers — the endpoint maps to 422 TRANSFER_SIZE_EXCEEDED from these.
+        Assert.Equal(5_368_709_121, ex.TotalBytes);
+        Assert.Equal(5_368_709_120, ex.MaxTransferSize);
+
+        // AC-007-1 exact wording (T-007-02 canonical form): both formatted GB numbers + 'exceeds'.
+        Assert.Contains("exceeds", ex.Message);
+        Assert.Contains((5_368_709_121 / 1073741824.0).ToString("F1") + " GB", ex.Message);
+        Assert.Contains((5_368_709_120 / 1073741824.0).ToString("F1") + " GB", ex.Message);
+
+        // Checks precede mutation — the transfer must NOT be activated.
+        Assert.Equal(0, _store.Transfer!.Status);
+        Assert.Empty(_eventPublisher.Published);
+    }
+
+    [Fact]
+    public async Task Handle_TotalAtExactMaxTransferSize_SendsSuccessfully()
+    {
+        // Inclusive boundary: exactly-at-limit passes the re-check (> is strict).
+        var limits = new StubLimitsProvider { Record = new LimitsRecord
+        {
+            MaxEmails = 20,
+            RetentionDays = 30,
+            MaxTransferSize = 1000,
+            MaxSingleFile = 1000
+        } };
+        var handler = NewHandler(limits);
+
+        var transferId = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+        _store.Transfer.TotalBytes = 1000; // exactly MAX_TRANSFER_SIZE
+
+        var result = await handler.Handle(new SendTransferCommand(transferId, null, null, null, []), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(1, result!.Status); // Active — the re-check did not trip.
+    }
+
+    [Fact]
+    public async Task Handle_Exactly20Recipients_SendsSuccessfully()
+    {
+        // Instruction 2 boundary pin: the MAX_EMAILS cap is inclusive — exactly 20 passes on Free (MaxEmails=20 from the stub record).
+        var transferId = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+
+        var emails = Enumerable.Range(0, 20).Select(i => $"user{i}@example.com").ToList();
+        var result = await _handler.Handle(new SendTransferCommand(transferId, null, null, null, emails), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(20, result!.Recipients.Count); // all 20 recipients stored — the cap did not trip
+    }
+
+    private SendTransferHandler NewHandler(StubLimitsProvider limits) =>
+        new SendTransferHandler(_store, limits, _eventPublisher, Microsoft.Extensions.Logging.Abstractions.NullLogger<SendTransferHandler>.Instance);
 
     [Fact]
     public async Task Handle_DuplicateEmails_Deduplicated()
@@ -359,8 +438,18 @@ public class SendTransferHandlerTests
 
     private sealed class StubLimitsProvider : ILimitsProvider
     {
+        // T-007-04: Free values from the Part 2 frozen table — MaxTransferSize/MaxSingleFile must be set
+        // (the new send-time re-check trips on 0 in every happy-path test). Tests may override per-scenario.
+        public LimitsRecord Record { get; set; } = new()
+        {
+            MaxEmails = 20,
+            RetentionDays = 30,
+            MaxTransferSize = 5_368_709_120, // 5 GB (Free) — same literal FinalizeTransferHandlerTests pins for the same reason.
+            MaxSingleFile = 5_368_709_120     // same as transfer size for all plans
+        };
+
         public Task<LimitsRecord> Resolve(string planCode, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new LimitsRecord { MaxEmails = 20, RetentionDays = 30 });
+            Task.FromResult(Record);
     }
 
     private sealed class StubEventPublisher : IEventPublisher

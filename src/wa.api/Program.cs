@@ -207,6 +207,11 @@ app.MapPost("/api/v1/transfers/{id}/send", async (Guid id, HttpRequest request, 
             throw new BusinessException(ProblemCodes.NotFound, "Transfer not found.");
         return Results.Json(new { id = result.TransferId.ToString("n"), linkId = result.LinkId, status = "Active", expiresAt = result.ExpiresAtUtc, totalBytes = result.TotalBytes, fileCount = result.FileCount, recipients = result.Recipients }, statusCode: 201);
     }
+    catch (TransferSizeExceededException ex)
+    {
+        // T-007-04 / AC-007-1: send-time size re-check violation — same closed-code mapping as the draft endpoint (TA-4.2a).
+        throw new BusinessException(ProblemCodes.TransferSizeExceeded, ex.Message);
+    }
     catch (wa.application.UseCases.Transfers.TransferValidationException vex)
     {
         throw new BusinessException(ProblemCodes.Validation, vex.Message);
