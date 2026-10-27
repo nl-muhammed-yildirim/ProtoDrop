@@ -95,10 +95,10 @@ AC-007-3: An account with 20 active transfers sends a 21st
 
 | Story | Task | File | Status |
 |---|---|---|---|
-| US-007-01 | T-007-01 Limits Registry: LimitsRecord, ILimitsProvider, caches (T-005) | `US-007-01-free-limits/T-007-01-limits-registry.md` | ☐ |
-| US-007-03 | T-007-02 Draft-time enforcement: transfer size + single file (FR-007-2) | `US-007-03-server-enforcement/T-007-02-draft-size-enforcement.md` | ☐ |
-| US-007-02 | T-007-03 Finalize-time enforcement: storage quota, active transfers, blob size truth (FR-007-4) | `US-007-02-storage-quota/T-007-03-finalize-enforcement.md` | ☐ |
-| US-007-03 | T-007-04 Send-time enforcement: re-check + MAX_EMAILS cap + retention (AC-007-1) | `US-007-03-server-enforcement/T-007-04-send-enforcement.md` | ☐ |
+| US-007-01 | T-007-01 Limits Registry: LimitsRecord, ILimitsProvider, caches (T-005) | `US-007-01-free-limits/T-007-01-limits-registry.md` | ☑ 2026-10-27 (7aa3244; feature review pending) |
+| US-007-03 | T-007-02 Draft-time enforcement: transfer size + single file (FR-007-2) | `US-007-03-server-enforcement/T-007-02-draft-size-enforcement.md` | ☑ 2026-10-27 (f7a2e61; feature review pending) |
+| US-007-02 | T-007-03 Finalize-time enforcement: storage quota, active transfers, blob size truth (FR-007-4) | `US-007-02-storage-quota/T-007-03-finalize-enforcement.md` | ☑ 2026-10-27 (b788f21; feature review pending) |
+| US-007-03 | T-007-04 Send-time enforcement: re-check + MAX_EMAILS cap + retention (AC-007-1) | `US-007-03-server-enforcement/T-007-04-send-enforcement.md` | ☑ 2026-10-27 (41a910f; AC-007-1 verified end-to-end, feature review pending) |
 | US-007-02 | T-007-05 Storage meter: per-user active bytes + storage_bytes_active metric (AC-007-2) | `US-007-02-storage-quota/T-007-05-storage-meter.md` | ☐ |
 | US-007-04 | T-007-06 Integration test: flag override changes a limit without deploy (FR-007-5) | `US-007-04-flag-limits/T-007-06-flag-override-integration-test.md` | ☐ |
 
