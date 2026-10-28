@@ -17,3 +17,8 @@
 /.goosehints
 /api.err.log
 /api.log
+/_asar_extracted
+/Cscratch_full.txt
+/Cscratch_integration.log
+/tmp-full-diff.txt
+/tmp-integration-run.log
