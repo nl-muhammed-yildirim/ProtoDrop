@@ -435,7 +435,8 @@ app.MapPost("/api/v1/auth/signup", async (SignupCommand cmd, ISender sender, Can
     catch (SignupValidationException ex)
     {
         // T-056 pipeline maps BusinessException → Problem+JSON; no new code — reuse VALIDATION (TA-4.1.3).
-        throw new BusinessException(ProblemCodes.Validation, ex.Message);
+        // Preserve the exception chain: the inner keeps its stack trace (Serilog), wire shape still comes from Code + the pipeline.
+        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
     }
 });
 

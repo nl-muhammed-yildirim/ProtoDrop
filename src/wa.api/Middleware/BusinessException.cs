@@ -11,6 +11,10 @@ public sealed class BusinessException : Exception
     public BusinessException(string code, string details)
         : base(details) => Code = code;
 
+    /// <summary>Preserves the inner exception so its stack trace survives — the wire shape still comes from <see cref="Code"/> + the pipeline.</summary>
+    public BusinessException(string code, string details, Exception innerException)
+        : base(details, innerException) => Code = code;
+
     /// <summary>A closed TA-4.1.3 code (validated against the list).</summary>
     public string Code { get; }
 

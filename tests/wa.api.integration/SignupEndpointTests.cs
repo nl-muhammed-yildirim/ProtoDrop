@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Testcontainers.Azurite;
 using Testcontainers.MsSql;
 using wa.domain;
 using wa.infrastructure.Persistence;
@@ -16,21 +17,31 @@ namespace wa.api.integration;
 /// </summary>
 public class SignupEndpointTests : IAsyncLifetime
 {
+    private AzuriteContainer _azurite = null!;
     private MsSqlContainer _sql = null!;
     private WaDbContext _db = null!;
     private HttpClient _client = null!;
 
     public async Task InitializeAsync()
     {
+        // Program.cs builds eagerly from top-level statements — ConfigureAppConfiguration in the factory lands too late; env vars are always visible (HealthFailureTests' comment).
+        _azurite = new AzuriteBuilder("mcr.microsoft.com/azure-storage/azurite:3.37.0").Build();
+        await _azurite.StartAsync();
+        var port = _azurite.GetMappedPublicPort(AzuriteBuilder.BlobPort);
+        // Account name as first path segment — the form Azurite with an IP host expects (same shape as the §5.2 local profile URL).
+        var accountUrl = new Uri($"http://127.0.0.1:{port}/{AzuriteBuilder.AccountName}");
+
         // Program.cs builds eagerly from top-level statements — env vars are the only way to inject config (DraftEndpointTests' comment).
+        Environment.SetEnvironmentVariable("Wa__Blob__AccountUrl", accountUrl.ToString());
+        Environment.SetEnvironmentVariable("Wa__Blob__AccountKey", AzuriteBuilder.AccountKey);
         Environment.SetEnvironmentVariable("Wa__Jwt__Secret", "test-jwt-secret");
 
+        // Fresh SQL + migrations: seeds the free plan row (TA-3.4) and creates dbo.AppUser (T-052).
         _sql = new MsSqlBuilder().WithImage("mcr.microsoft.com/mssql/server:2022-latest").Build();
         await _sql.StartAsync();
         var connString = _sql.GetConnectionString();
         Environment.SetEnvironmentVariable("ConnectionStrings__WaDb", connString);
 
-        // Fresh SQL + migrations: seeds the free plan row (TA-3.4) and creates dbo.AppUser (T-052).
         _db = new WaDbContext(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(connString).Options);
         await _db.Database.MigrateAsync();
 
@@ -41,6 +52,7 @@ public class SignupEndpointTests : IAsyncLifetime
     {
         await _db.DisposeAsync();
         await _sql.DisposeAsync();
+        await _azurite.DisposeAsync();
     }
 
     // ---- AC-008-1: new email → 200 with profile DTO + session token; DB row exists ----
