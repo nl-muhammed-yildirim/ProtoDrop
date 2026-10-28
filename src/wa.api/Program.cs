@@ -148,6 +148,10 @@ app.MapPost("/api/v1/transfers/draft", async (CreateDraftCommand cmd, ISender se
     return Results.Json(new { draftId = result.DraftId.ToString("n"), expiresInSec = result.ExpiresInSec, files = result.Files.Select(f => new { fileId = f.FileId.ToString("n"), uploadUrl = f.UploadUrl.ToString() }) }, statusCode: 201); // TA-4.2#1 exact wire shape — property names pinned at the single construction site (no global JSON policy in this app).
 });
 
+// T-055-02 (TA-9.1) provisional session reader — T-021 (F-TRF-008) lands real auth; until then,
+// finalize resolves the owner from wa.session cookie using the same HMAC scheme as TA-9.1.
+var sessionSecretBytes = System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Wa:Jwt:Secret"]!);
+
 // T-001-10 (TA-4.2#2): idempotent finalize — server-side blob copy staging→transfers, create Transfer(Draft)+FileItems+BlobRefs, EC-002-1 replay.
 app.MapPost("/api/v1/transfers/draft/{draftId}/finalize", async (Guid draftId, HttpRequest request, ISender sender, CancellationToken ct) =>
 {
@@ -165,9 +169,41 @@ app.MapPost("/api/v1/transfers/draft/{draftId}/finalize", async (Guid draftId, H
         Retries = e.TryGetProperty("retries", out var r) ? r.GetInt32() : 0
     }).ToList();
 
+    // TA-9.1: read wa.session cookie → resolve owner AppUserId (null if missing/invalid/expired).
+    Guid? ownerAppUserId = null;
+    var sessionCookie = request.Cookies["wa.session"];
+    if (!string.IsNullOrEmpty(sessionCookie))
+    {
+        try
+        {
+            var decoded = System.Convert.FromBase64String(sessionCookie);
+            var str = System.Text.Encoding.UTF8.GetString(decoded);
+            var parts = str.Split('|');
+            if (parts.Length == 3)
+            {
+                var userIdPart = parts[0];
+                var expPart = parts[1];
+                var sig = parts[2];
+                using var hmac = new System.Security.Cryptography.HMACSHA256(sessionSecretBytes);
+                var expectedSig = Convert.ToBase64String(
+                    hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes($"{userIdPart}|{expPart}")));
+                if (System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                    System.Text.Encoding.UTF8.GetBytes(sig),
+                    System.Text.Encoding.UTF8.GetBytes(expectedSig)))
+                {
+                    if (Guid.TryParse(userIdPart, out var uid) &&
+                        long.TryParse(expPart, out var expUnix) &&
+                        DateTime.UtcNow <= new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(expUnix))
+                        ownerAppUserId = uid;
+                }
+            }
+        }
+        catch { /* invalid cookie format → guest path */ }
+    }
+
     try
     {
-        var result = await sender.Send(new FinalizeTransferCommand(draftId, idempotencyKey, files), ct);
+        var result = await sender.Send(new FinalizeTransferCommand(draftId, idempotencyKey, files, ownerAppUserId), ct);
         if (result is null)
             throw new BusinessException(ProblemCodes.TransferNotFinalized, "Draft has no completed files.");
         return Results.Json(new { id = result.TransferId.ToString("n"), linkId = result.LinkId, publicUrl = result.PublicUrl, status = "Draft", expiresAt = result.ExpiresAtUtc, totalBytes = result.TotalBytes, files = result.Files.Select(f => new { id = f.FileId.ToString("n"), name = f.Name, sizeBytes = f.SizeBytes, contentType = f.ContentType }) }, statusCode: 201);

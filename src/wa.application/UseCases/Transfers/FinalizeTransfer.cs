@@ -142,6 +142,7 @@ public sealed class FinalizeTransferHandler : IRequestHandler<FinalizeTransferCo
             FileCount = request.Files.Count,
             SenderName = "Guest",
             MaxDownloads = 1,
+            OwnerAppUserId = request.OwnerAppUserId, // T-055-02 (TA-9.1) / FR-008-7: owned rows must carry their owner from finalize — SendTransferHandler (SendTransfer.cs L164-L165) reads transfer.OwnerAppUserId for the storage meter; lands ahead of T-008-08 which assumes rows already have it.
             CreatedAtUtc = now
         };
 
