@@ -50,6 +50,10 @@ public sealed class WaTelemetryReporter
     public void EmailFailures1h() =>
         _logger.LogInformation("email_failures_1h {count}", 1);
 
+    /// <summary>Emit storage_bytes_active metric (TA-10.2): the account's active-bytes read as FR-007-4 counts them, feeding the admin storage meter (F-TRF-011-2).</summary>
+    public void StorageBytesActive(long bytes) =>
+        _logger.LogInformation("storage_bytes_active {bytes}", bytes);
+
     /// <summary>Emit transfer_page_viewed with its one property — the linkId hash (TA-9.4 style: never the raw 8-char id in telemetry; T-003-01). Template text keeps the exact TA-10.2 name first — App Insights queries by it.</summary>
     public void TransferPageViewed(string linkIdHash) =>
         _logger.LogInformation("transfer_page_viewed {linkId}", linkIdHash);

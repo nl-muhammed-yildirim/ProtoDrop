@@ -8,7 +8,7 @@ using wa.domain.Telemetry;
 
 namespace wa.application.unit.Transfers;
 
-// T-001-05: the handler is the only business logic behind POST /api/v1/transfers/draft (TA-4.2a). Free guest limits are resolved via ILimitsProvider — never literals — and the whole selection is checked against MAX_TRANSFER_SIZE + per-file MAX_SINGLE_FILE before minting one staging SAS per file. Null result = oversized; upload_started emits exactly once on success.
+// T-001-05: the handler is the only business logic behind POST /api/v1/transfers/draft (TA-4.2a). Free guest limits are resolved via ILimitsProvider — never literals — and the whole selection is checked against MAX_TRANSFER_SIZE + per-file MAX_SINGLE_FILE before minting one staging SAS per file. Throws TransferSizeExceededException when oversized; upload_started emits exactly once on success.
 public class CreateDraftHandlerTests
 {
     private const long FreeMax = 5_368_709_120L; // Part-2 free-plan limit (T-052-04), mirrored so the test is self-contained.
@@ -32,8 +32,7 @@ public class CreateDraftHandlerTests
 
         var result = await f.Handler.Handle(new CreateDraftCommand(files), CancellationToken.None);
 
-        Assert.NotNull(result);
-        Assert.Equal(7200, result!.ExpiresInSec); // TA-3.6's 2 h draft-upload TTL — constant, not a plan limit.
+        Assert.Equal(7200, result.ExpiresInSec); // TA-3.6's 2 h draft-upload TTL — constant, not a plan limit.
         Assert.Equal(files.Length, result.Files.Count);
         Assert.Equal(result.Files.Count, result.Files.Select(x => x.FileId).Distinct().Count()); // one mint per file, all distinct (FR: fresh fileId per staged file).
         Assert.Equal(files.Length, f.Minter.Mints.Count);
@@ -42,28 +41,48 @@ public class CreateDraftHandlerTests
     }
 
     [Fact]
-    public async Task Handle_TotalExceedsMaxTransferSize_ReturnsNull() // TA-4.1.3 TRANSFER_SIZE_EXCEEDED path — endpoint maps null → 422.
+    public async Task Handle_TotalExceedsMaxTransferSize_ThrowsWithBothNumbers() // TA-4.1.3 TRANSFER_SIZE_EXCEEDED path — endpoint maps exception → 422.
     {
         var f = CreateFixture(FreeLimits());
 
-        var result = await f.Handler.Handle(new CreateDraftCommand([
-            new CreateDraftFile { Name = "big.mp4", SizeBytes = FreeMax },
-            new CreateDraftFile { Name = "one-byte.bin", SizeBytes = 1 }]), // total = MaxTransferSize + 1.
-            CancellationToken.None);
+        var ex = await Assert.ThrowsAsync<TransferSizeExceededException>(async () =>
+            await f.Handler.Handle(new CreateDraftCommand([
+                new CreateDraftFile { Name = "big.mp4", SizeBytes = FreeMax },
+                new CreateDraftFile { Name = "one-byte.bin", SizeBytes = 1 }]), CancellationToken.None)); // total = MaxTransferSize + 1.
 
-        Assert.Null(result);
+        Assert.Equal(FreeMax + 1, ex.TotalBytes);
+        Assert.Equal(FreeMax, ex.MaxTransferSize);
+        Assert.Equal(0, ex.SingleFileBytes); // total violation — no single-file bytes carried.
+        Assert.Contains("5.0 GB", ex.Message); // both numbers present in the details (AC-007-1).
     }
 
     [Fact]
-    public async Task Handle_SingleFileExceedsMaxSingleFile_ReturnsNull()
+    public async Task Handle_SingleFileExceedsMaxSingleFile_Throws()
     {
         var f = CreateFixture(FreeLimits());
 
-        var result = await f.Handler.Handle(new CreateDraftCommand([
-            new CreateDraftFile { Name = "huge.bin", SizeBytes = FreeMax + 1 }]), // total also exceeds, but the per-file check is what this pins.
-            CancellationToken.None);
+        var ex = await Assert.ThrowsAsync<TransferSizeExceededException>(async () =>
+            await f.Handler.Handle(new CreateDraftCommand([
+                new CreateDraftFile { Name = "huge.bin", SizeBytes = FreeMax + 1 }]), CancellationToken.None)); // total also exceeds, but the per-file check is what this pins.
 
-        Assert.Null(result);
+        Assert.Equal(FreeMax + 1, ex.SingleFileBytes);
+        Assert.Equal(FreeMax, ex.MaxSingleFile);
+        Assert.Contains("File size", ex.Message); // single-file violation wording.
+    }
+
+    [Fact]
+    public async Task Handle_SingleFileOver_TotalFits_ThrowsSingleFileViolation() // true per-file violation: MaxSingleFile < MaxTransferSize.
+    {
+        var f = CreateFixture(new LimitsRecord { MaxTransferSize = 5000, MaxSingleFile = 1000 });
+
+        var ex = await Assert.ThrowsAsync<TransferSizeExceededException>(async () =>
+            await f.Handler.Handle(new CreateDraftCommand([
+                new CreateDraftFile { Name = "a.bin", SizeBytes = 600 },
+                new CreateDraftFile { Name = "b.bin", SizeBytes = 1001 }]), CancellationToken.None)); // total = 1601 < 5000, but b.bin > 1000.
+
+        Assert.Equal(1001, ex.SingleFileBytes);
+        Assert.Equal(1000, ex.MaxSingleFile);
+        Assert.Equal(1601, ex.TotalBytes); // total is carried for context even when the single-file check fires.
     }
 
     [Fact]
@@ -94,7 +113,8 @@ public class CreateDraftHandlerTests
     {
         var f = CreateFixture(FreeLimits());
 
-        await f.Handler.Handle(new CreateDraftCommand([new CreateDraftFile { Name = "big.bin", SizeBytes = FreeMax + 1 }]), CancellationToken.None);
+        await Assert.ThrowsAsync<TransferSizeExceededException>(async () =>
+            await f.Handler.Handle(new CreateDraftCommand([new CreateDraftFile { Name = "big.bin", SizeBytes = FreeMax + 1 }]), CancellationToken.None));
 
         Assert.DoesNotContain(f.Logger.Entries, e => e.RenderedText == TelemetryEvents.UploadStarted);
     }

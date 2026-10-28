@@ -151,6 +151,11 @@ public class DraftEndpointTests : IAsyncLifetime
         Assert.Equal("TRANSFER_SIZE_EXCEEDED", root.GetProperty("code").GetString());
         Assert.Equal(422, root.GetProperty("status").GetInt32());
 
+        // AC-007-1: details must contain both numbers — actual size and limit.
+        var details = root.GetProperty("details").GetString();
+        Assert.NotNull(details);
+        Assert.Contains("GB", details); // human-readable unit present
+
         // The handler returns null before minting — nothing uploaded; the fresh staging container must still be empty.
         var names = new List<string>();
         await foreach (var item in _svc.GetBlobContainerClient(BlobPaths.StagingContainer).GetBlobsAsync())

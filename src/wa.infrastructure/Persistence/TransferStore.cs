@@ -20,6 +20,16 @@ public sealed class TransferStore : ITransferStore
     public Task<bool> TransferExistsByLinkIdAsync(string linkId, CancellationToken ct) =>
         _db.Set<Transfer>().AnyAsync(t => t.LinkId == linkId, ct);
 
+    public async Task<long> GetActiveStorageBytesAsync(Guid ownerId, CancellationToken ct) =>
+        await _db.Set<Transfer>()
+            .Where(t => t.OwnerAppUserId == ownerId && (t.Status == 1 || t.Status == 3))
+            .SumAsync(t => t.TotalBytes, ct);
+
+    public async Task<int> GetActiveTransferCountAsync(Guid ownerId, CancellationToken ct) =>
+        await _db.Set<Transfer>()
+            .Where(t => t.OwnerAppUserId == ownerId && (t.Status == 1 || t.Status == 3))
+            .CountAsync(ct);
+
     public async Task SaveFinalizeAsync(Transfer transfer, IReadOnlyList<BlobRef> blobRefs, IReadOnlyList<FileItem> fileItems, IdempotencyKey idempotencyKey, CancellationToken ct)
     {
         await using var tx = await _db.Database.BeginTransactionAsync(ct);

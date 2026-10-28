@@ -15,20 +15,22 @@ public class GetPublicTransferHandlerTests
     private readonly StubPublicTransferStore _store;
     private readonly TelemetryRecorder _telemetryLogger;
     private readonly StubUnlockTokenMinter _minter;
-    private readonly GetPublicTransferHandler _handler;
+    private GetPublicTransferHandler _handler;
 
     public GetPublicTransferHandlerTests()
     {
         _store = new StubPublicTransferStore();
         _telemetryLogger = new TelemetryRecorder();
         _minter = new StubUnlockTokenMinter();
-        _handler = new GetPublicTransferHandler(
-            _store,
-            NewLimits(maxZipSize: 4294967296), // free-plan seeded values (TA-3.4: no literals in handler code — the stub is test data)
-            new WaTelemetryReporter(_telemetryLogger, System.Text.Encoding.UTF8.GetBytes("unit-test-key")),
-            _minter,
-            NullLogger<GetPublicTransferHandler>.Instance);
+        _handler = CreateHandler(maxZipSize: 4294967296, maxDownloads: 100); // free-plan seeded values (TA-3.4: no literals in handler code — the stub is test data)
     }
+
+    private GetPublicTransferHandler CreateHandler(long maxZipSize, int maxDownloads) => new(
+        _store,
+        NewLimits(maxZipSize, maxDownloads),
+        new WaTelemetryReporter(_telemetryLogger, System.Text.Encoding.UTF8.GetBytes("unit-test-key")),
+        _minter,
+        NullLogger<GetPublicTransferHandler>.Instance);
 
     // ---- Active: full metadata payload (exit check 3 / FR-003-5) ----
 
@@ -54,12 +56,16 @@ public class GetPublicTransferHandlerTests
     [Fact]
     public async Task Handle_Active_UnlimitedCap_DownloadsLeftNull()
     {
+        // T-007-01: The handler now uses limits.IsMaxDownloadsInfinite() instead of transfer.MaxDownloads == -1.
+        // We need to set up the limits provider with MaxDownloads = -1 (infinite) for this test.
+        _handler = CreateHandler(maxZipSize: 4294967296, maxDownloads: -1); // Business plan (∞) — MaxDownloads=-1 → IsMaxDownloadsInfinite() true
+
         _store.SetupActive(files: [], maxDownloads: -1, downloadsCount: 0, passwordHash: null); // MaxDownloads=-1 → Business (∞)
 
         var result = await _handler.Handle(new GetPublicTransferQuery("abcdefgh"), CancellationToken.None);
 
         Assert.Equal(PublicTransferState.Active, result.State);
-        Assert.Null(result.DownloadsLeft); // FR-003-5: "Downloads left" hidden for infinite caps — JSON null on the wire
+        Assert.Null(result.DownloadsLeft); // FR-003-5: "Downloads left" hidden for infinite caps — JSON null on the wire (T-007-01 helper)
         Assert.False(result.PasswordRequired);
     }
 
@@ -344,16 +350,21 @@ public class GetPublicTransferHandlerTests
         }
     }
 
-    private static ILimitsProvider NewLimits(long maxZipSize) => new StubLimitsProvider(maxZipSize);
+    private static ILimitsProvider NewLimits(long maxZipSize, int maxDownloads = 100) => new StubLimitsProvider(maxZipSize, maxDownloads);
 
     private sealed class StubLimitsProvider : ILimitsProvider
     {
         public long MaxZipSize { get; }
+        public int MaxDownloads { get; }
 
-        public StubLimitsProvider(long maxZipSize) => MaxZipSize = maxZipSize;
+        public StubLimitsProvider(long maxZipSize, int maxDownloads)
+        {
+            MaxZipSize = maxZipSize;
+            MaxDownloads = maxDownloads;
+        }
 
         public Task<LimitsRecord> Resolve(string planCode, CancellationToken cancellationToken) =>
-            Task.FromResult(new LimitsRecord { MaxZipSize = MaxZipSize });
+            Task.FromResult(new LimitsRecord { MaxZipSize = MaxZipSize, MaxDownloads = MaxDownloads });
     }
 
     /// <summary>T-003-04: stub for IUnlockTokenMinter — returns a configurable verify result so tests can exercise the token branch.</summary>

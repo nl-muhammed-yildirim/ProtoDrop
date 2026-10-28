@@ -4,6 +4,7 @@ using MediatR;
 using Microsoft.Extensions.Logging;
 using wa.application.Limits;
 using wa.application.Ports;
+using wa.application.Telemetry;
 using wa.domain;
 using wa.domain.Correlation;
 
@@ -46,19 +47,25 @@ public interface ISendStore
 public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, SendTransferResult?>
 {
     private readonly ISendStore _store;
+    private readonly ITransferStore _transferStore;
     private readonly ILimitsProvider _limits;
     private readonly IEventPublisher _eventPublisher;
+    private readonly WaTelemetryReporter _telemetry;
     private readonly ILogger<SendTransferHandler> _logger;
 
     public SendTransferHandler(
         ISendStore store,
+        ITransferStore transferStore,
         ILimitsProvider limits,
         IEventPublisher eventPublisher,
+        WaTelemetryReporter telemetry,
         ILogger<SendTransferHandler> logger)
     {
         _store = store;
+        _transferStore = transferStore;
         _limits = limits;
         _eventPublisher = eventPublisher;
+        _telemetry = telemetry;
         _logger = logger;
     }
 
@@ -75,6 +82,11 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
 
         // 3. Resolve plan limits — never a literal (TA-3.4).
         var limits = await _limits.Resolve(ILimitsProvider.GuestPlanCode, cancellationToken);
+
+        // 3b. T-007-04 / AC-007-1: send-time re-check — a flag may have changed since finalize; checks precede mutation.
+        //     Strict > : exactly-at-limit passes (inclusive cap, boundary pinned in unit tests).
+        if (transfer.TotalBytes > limits.MaxTransferSize)
+            throw new TransferSizeExceededException(transfer.TotalBytes, limits.MaxTransferSize, 0, limits.MaxSingleFile);
 
         // 4. Parse recipients: split on [\r\n,;\s]+, trim, drop empties, validate per-address, lowercase, dedupe, cap.
         var addresses = new List<string>();
@@ -146,6 +158,11 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
 
         // 9. Emit transfer.created via the outbox (separate operation — TA-4.1.7 at-most-once accepted at M0).
         await _eventPublisher.PublishAsync(envelope, cancellationToken);
+
+        // T-007-05 / AC-007-2 (meter): storage_bytes_active — re-run the FR-007-4 SUM expression after commit;
+        // Status 0→1 puts this row into the expression at send time, so the recomputed value IS FR-007-4's read.
+        if (transfer.OwnerAppUserId is not null)
+            _telemetry.StorageBytesActive(await _transferStore.GetActiveStorageBytesAsync(transfer.OwnerAppUserId.Value, cancellationToken));
 
         return new SendTransferResult(
             transfer.Id,
