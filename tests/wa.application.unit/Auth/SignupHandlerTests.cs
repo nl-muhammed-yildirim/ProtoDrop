@@ -148,6 +148,10 @@ public class SignupHandlerTests
 
         public Task<Plan> GetAsync(string planCode, CancellationToken cancellationToken) =>
             planCode == "free" ? Task.FromResult(Plan) : throw new PlanUnknownException(planCode);
+
+        // T-008-02: by-Id read (returns null or the row; never throws) — new IPlansStore member from the plan.
+        public Task<Plan?> GetByIdAsync(Guid planId, CancellationToken cancellationToken) =>
+            Task.FromResult(Plan.Id == planId ? Plan : null);
     }
 
     /// <summary>T-014 style: records exactly what M.E.L hands to the logger (same as WaTelemetryReporterTests).</summary>

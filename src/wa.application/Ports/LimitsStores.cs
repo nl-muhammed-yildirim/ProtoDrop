@@ -17,6 +17,9 @@ public interface IPlansStore
 {
     /// <summary>Returns the seeded row for <paramref name="planCode"/>, or throws <see cref="PlanUnknownException"/> when no such plan exists (AC-053-4).</summary>
     Task<Plan> GetAsync(string planCode, CancellationToken cancellationToken);
+
+    /// <summary>T-008-02: resolve a plan by its Id for LoginResult.PlanCode. Returns the row or null — never throws.</summary>
+    Task<Plan?> GetByIdAsync(Guid planId, CancellationToken cancellationToken);
 }
 
 /// <summary>Reads flag rows. Limit resolution consumes the raw rows — key filtering and override layering live in T-053-04.</summary>

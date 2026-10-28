@@ -118,8 +118,9 @@ app.UseMiddleware<CorsAllowListMiddleware>();
 app.UseMiddleware<CorrelationMiddleware>(); // FR-056-1: runs before everything else — correlationId present in every log line incl. UseSerilogRequestLogging's per-request INF line
 // Rate limiting sits after correlation so the 429 body gets a correlationId, and BEFORE GlobalError so its empty-body 404 rewrite can't touch the 429 (the limiter short-circuits before routing).
 app.UseIpRateLimiting();
-// T-002-02 (TA-4.1.5): generic idempotency — before GlobalError so replays bypass error handling; on miss the full pipeline runs and the response is buffered.
+// T-008-02 (TA-4.1.5): session middleware — after idempotency, before GlobalError so refreshed cookies + error bodies keep correlationId.
 app.UseMiddleware<IdempotencyMiddleware>();
+app.UseMiddleware<SessionMiddleware>(); // TA-9.1: reads wa.session cookie → sets HttpContext.Items['wa.session.userId']; refreshes < 15 d remaining (FR-008-2)
 app.UseMiddleware<GlobalErrorMiddleware>(); // FR-056-3: every failure → TA-4.1.3 Problem+JSON (business codes keep their status, others 500 INTERNAL)
 app.UseSerilogRequestLogging(); // per-request INF line (Microsoft.* request logging is suppressed to Warning)
 app.MapGet("/", () => "Hello World!");
@@ -153,12 +154,8 @@ app.MapPost("/api/v1/transfers/draft", async (CreateDraftCommand cmd, ISender se
     return Results.Json(new { draftId = result.DraftId.ToString("n"), expiresInSec = result.ExpiresInSec, files = result.Files.Select(f => new { fileId = f.FileId.ToString("n"), uploadUrl = f.UploadUrl.ToString() }) }, statusCode: 201); // TA-4.2#1 exact wire shape — property names pinned at the single construction site (no global JSON policy in this app).
 });
 
-// T-055-02 (TA-9.1) provisional session reader — T-021 (F-TRF-008) lands real auth; until then,
-// finalize resolves the owner from wa.session cookie using the same HMAC scheme as TA-9.1.
-var sessionSecretBytes = System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Wa:Jwt:Secret"]!);
-
 // T-001-10 (TA-4.2#2): idempotent finalize — server-side blob copy staging→transfers, create Transfer(Draft)+FileItems+BlobRefs, EC-002-1 replay.
-app.MapPost("/api/v1/transfers/draft/{draftId}/finalize", async (Guid draftId, HttpRequest request, ISender sender, CancellationToken ct) =>
+app.MapPost("/api/v1/transfers/draft/{draftId}/finalize", async (Guid draftId, HttpContext httpContext, HttpRequest request, ISender sender, CancellationToken ct) =>
 {
     var idempotencyKey = request.Headers["Idempotency-Key"].FirstOrDefault() ?? string.Empty;
     using var ms = new MemoryStream();
@@ -174,37 +171,9 @@ app.MapPost("/api/v1/transfers/draft/{draftId}/finalize", async (Guid draftId, H
         Retries = e.TryGetProperty("retries", out var r) ? r.GetInt32() : 0
     }).ToList();
 
-    // TA-9.1: read wa.session cookie → resolve owner AppUserId (null if missing/invalid/expired).
-    Guid? ownerAppUserId = null;
-    var sessionCookie = request.Cookies["wa.session"];
-    if (!string.IsNullOrEmpty(sessionCookie))
-    {
-        try
-        {
-            var decoded = System.Convert.FromBase64String(sessionCookie);
-            var str = System.Text.Encoding.UTF8.GetString(decoded);
-            var parts = str.Split('|');
-            if (parts.Length == 3)
-            {
-                var userIdPart = parts[0];
-                var expPart = parts[1];
-                var sig = parts[2];
-                using var hmac = new System.Security.Cryptography.HMACSHA256(sessionSecretBytes);
-                var expectedSig = Convert.ToBase64String(
-                    hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes($"{userIdPart}|{expPart}")));
-                if (System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
-                    System.Text.Encoding.UTF8.GetBytes(sig),
-                    System.Text.Encoding.UTF8.GetBytes(expectedSig)))
-                {
-                    if (Guid.TryParse(userIdPart, out var uid) &&
-                        long.TryParse(expPart, out var expUnix) &&
-                        DateTime.UtcNow <= new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(expUnix))
-                        ownerAppUserId = uid;
-                }
-            }
-        }
-        catch { /* invalid cookie format → guest path */ }
-    }
+    // T-008-02 (TA-9.1): read owner AppUserId from the session middleware's Items (single parsing site — SessionMiddleware).
+    // Missing/invalid/expired → guest (item null); same wire behavior as before, no inline HMAC decode.
+    Guid? ownerAppUserId = httpContext.Items[SessionMiddleware.SessionUserIdKey] as Guid?;
 
     try
     {
@@ -436,6 +405,45 @@ app.MapPost("/api/v1/auth/signup", async (SignupCommand cmd, ISender sender, Can
     {
         // T-056 pipeline maps BusinessException → Problem+JSON; no new code — reuse VALIDATION (TA-4.1.3).
         // Preserve the exception chain: the inner keeps its stack trace (Serilog), wire shape still comes from Code + the pipeline.
+        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+    }
+});
+
+// T-008-02 (TA-4.2#9 / FR-008-1): login — signs in an existing user. Same wire shape as signup + sets wa.session cookie (TA-9.1).
+app.MapPost("/api/v1/auth/login", async (LoginCommand cmd, ISender sender, HttpContext httpContext, CancellationToken ct) =>
+{
+    try
+    {
+        var result = await sender.Send(cmd, ct);
+
+        // TA-9.1: set wa.session cookie from the minted token (cookie value == body's sessionToken; httpOnly, SameSite=Lax).
+        httpContext.Response.Cookies.Append("wa.session", result.SessionToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true, // TA-9.1 + FR-008-2 (not asserted in local plain-HTTP tests — no prior test does)
+            SameSite = SameSiteMode.Lax,
+            MaxAge = TimeSpan.FromDays(SessionTokenService.LifetimeDays) // frozen 30 d — no magic number
+        });
+
+        // TA-4.2a: exact wire shape as signup (userId 'n' form, email, displayName, theme, planCode, sessionToken).
+        return Results.Json(new
+        {
+            userId = result.UserId.ToString("n"),
+            email = result.Email,
+            displayName = result.DisplayName,
+            theme = result.Theme,
+            planCode = result.PlanCode,
+            sessionToken = result.SessionToken
+        }, statusCode: 200);
+    }
+    catch (LoginWrongPasswordException ex)
+    {
+        // T-056 pipeline maps BusinessException → Problem+JSON; 401 WRONG_PASSWORD via the closed list (no new code).
+        throw new BusinessException(ProblemCodes.WrongPassword, ex.Message, ex);
+    }
+    catch (LoginValidationException ex)
+    {
+        // T-056 pipeline maps BusinessException → Problem+JSON; no new code — reuse VALIDATION (TA-4.1.3).
         throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
     }
 });

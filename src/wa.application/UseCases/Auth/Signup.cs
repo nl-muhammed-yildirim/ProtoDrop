@@ -138,20 +138,38 @@ public sealed class SignupValidationException : Exception
 }
 
 /// <summary>
-/// TA-9.1 session-token minter: Base64(userId|exp|sig) where sig = HMAC-SHA256 over the first two segments.
+/// TA-9.1 session-token minter + reader: Base64(userId|exp|sig) where sig = HMAC-SHA256 over the first two segments.
 /// Frozen 30-day rolling TTL (Open-Decisions-and-Constants.md Part 2 FROZEN — not a plan limit, TA-3.4).
-/// The shared Wa:Jwt:Secret bytes arrive as a parameter (T-008-02 lands the cookie middleware reading this same value).
+/// Minter + reader live in one class so the cookie format can't drift (T-008-02's SessionMiddleware is the read site).
 /// </summary>
 public interface ISessionTokenMinter
 {
     /// <summary>Mint a 30-day session token for the given user id (TA-9.1).</summary>
     string Mint(Guid userId);
+
+    /// <summary>
+    /// TA-9.1 PARSE side: decode + verify the signed session token — returns the resolved user id + expiry, or null on
+    /// missing/malformed/tampered/expired (TA-9.1: guest path). The SessionMiddleware is the single read site (T-008-02).
+    /// </summary>
+    (Guid UserId, DateTime ExpUtc)? Parse(string? token);
+
+    /// <summary>
+    /// FR-008-2 / TA-9.1 30-day rolling: true when the token has less than RenewRemainingDays remaining — the middleware
+    /// re-mints + re-signs at that threshold (the "refreshed on use" rule). Pure helper over frozen values — no I/O.
+    /// </summary>
+    bool NeedsRenewal(DateTime expUtc, DateTime nowUtc);
 }
 
 public sealed class SessionTokenService : ISessionTokenMinter
 {
     /// <summary>Frozen Session TTL — 30 days rolling (Open-Decisions-and-Constants.md Part 2, TA-9.1). Not a plan limit (TA-3.4).</summary>
     public const int LifetimeDays = 30;
+
+    /// <summary>
+    /// FR-008-2 / TA-9.1 rolling threshold: re-mint when remaining lifetime is under 15 days. Task instructions §2 cites TA-9.1's
+    /// 30-day rolling rule; not a Part 2 FROZEN row → pinned as a named constant (no magic number).
+    /// </summary>
+    public const int RenewRemainingDays = 15;
 
     private readonly byte[] _key;
     private readonly Func<DateTimeOffset> _clock;
@@ -166,6 +184,52 @@ public sealed class SessionTokenService : ISessionTokenMinter
     {
         var now = _clock();
         var expSeconds = (now + TimeSpan.FromDays(LifetimeDays)).ToUnixTimeSeconds();
+        return Sign(userId, expSeconds);
+    }
+
+    /// <summary>TA-9.1 PARSE: Base64 decode → 3-segment split → HMAC-SHA256 over userId|exp with FixedTimeEquals; expired/null on tampered.</summary>
+    public (Guid UserId, DateTime ExpUtc)? Parse(string? token)
+    {
+        if (string.IsNullOrEmpty(token))
+            return null;
+
+        try
+        {
+            var str = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(token));
+            var parts = str.Split('|');
+            if (parts.Length != 3)
+                return null;
+            var userIdPart = parts[0];
+            var expPart = parts[1];
+            var sig = parts[2];
+
+            // TA-9.1: HMAC-SHA256 over the first two segments, fixed-time compare (the exact logic T-008-02 lifts out of Program.cs).
+            using var hmac = new HMACSHA256(_key);
+            var expectedSig = Convert.ToBase64String(hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes($"{userIdPart}|{expPart}")));
+            if (!CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(sig), System.Text.Encoding.UTF8.GetBytes(expectedSig)))
+                return null; // tampered signature → guest (AC-008-1 cookie round-trip)
+
+            // Expiry is a Unix second (the wire form Program.cs' provisional reader used); no Guid/long parse errors leak.
+            if (!Guid.TryParse(userIdPart, out var uid) || !long.TryParse(expPart, out var expUnix))
+                return null;
+            var expUtc = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(expUnix);
+            if (_clock().UtcDateTime > expUtc)
+                return null; // expired → guest (AC-008-1 cookie round-trip)
+
+            return (uid, expUtc);
+        }
+        catch
+        {
+            return null; // malformed base64 / decode failure → guest path (TA-9.1 — never throws from the middleware)
+        }
+    }
+
+    /// <summary>FR-008-2 rolling refresh: re-mint when remaining lifetime is under RenewRemainingDays (the frozen threshold).</summary>
+    public bool NeedsRenewal(DateTime expUtc, DateTime nowUtc) =>
+        expUtc - nowUtc <= TimeSpan.FromDays(RenewRemainingDays);
+
+    private string Sign(Guid userId, long expSeconds)
+    {
         var unsigned = $"{userId:N}|{expSeconds}";
         using var hmac = new HMACSHA256(_key);
         var sig = Convert.ToBase64String(hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(unsigned)));
