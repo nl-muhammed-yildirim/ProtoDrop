@@ -89,7 +89,7 @@ AC-008-3: Signed-in user creates a transfer
 |---|---|---|---|
 | US-008-01 | T-008-01 SignupCommand + endpoint 8: sign-up is sign-in (FR-008-3) | `US-008-01-signup-password/T-008-01-signup-endpoint.md` | ☑ 2026-10-28 |
 | US-008-01 | T-008-02 LoginCommand + endpoint 9 + session middleware (FR-008-1/2) | `US-008-01-signup-password/T-008-02-login-endpoint-session.md` | ☑ 2026-10-28 |
-| US-008-01 + US-008-02/03 | T-008-03 Auth screen: sign-in/sign-up tabs + magic-link ghost (UI-Reference §5.5) | `US-008-01-signup-password/T-008-03-auth-screen-ui.md` | ☐ |
+| US-008-01 + US-008-02/03 | T-008-03 Auth screen: sign-in/sign-up tabs + magic-link ghost (UI-Reference §5.5) | `US-008-01-signup-password/T-008-03-auth-screen-ui.md` | ☑ 2026-10-28 |
 | US-008-02 | T-008-04 Magic link: request + redeem, single-use token (FR-008-1) | `US-008-02-magic-link/T-008-04-magic-link-endpoint.md` | ☐ |
 | US-008-03 | T-008-05 ForgotPasswordCommand + endpoint 11: anti-enumeration link (FR-008-6) | `US-008-03-forgot-password/T-008-05-forgot-password-endpoint.md` | ☐ |
 | US-008-04 + US-008-06 | T-008-06 GET/PATCH/DELETE /auth/me + logout (endpoint 12–13) | `US-008-04-profile/T-008-06-me-endpoints.md` | ☐ |
