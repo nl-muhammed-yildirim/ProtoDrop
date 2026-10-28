@@ -19,6 +19,7 @@ Resolved via the approved production fix: `AsNoTracking` on `PlansStore.GetAsync
 
 | Task | Done | Notes |
 |---|---|---|
+| T-008-01 (F-TRF-008) — done 2026-10-28 | SignupCommand + endpoint 8 POST /api/v1/auth/signup: sign-up is sign-in (FR-008-3), email lowercased/trimmed, wrong-password-not-leaked deferred to T-008-02; IAppUserStore port (use-case-local convention) + AppUserStore adapter over WaDbContext; ISessionTokenMinter TA-9.1 mint in response body (cookie lands T-008-02); no new error codes (Validation reused), no migration (AppUser + UQ_AppUser_Email pre-exist). Code commits 52eac71 + fix 281c80c (SignupEndpointTests Azurite env setup — round-1 FAIL blocker; BusinessException inner ctor). Reviewer PASS round 2: domain.unit 41/41, application.unit 187/187, SignupEndpointTests filter run 3/3. Known pre-existing failure at base b788f21 (PublicTransferEndpointTests.Active_UnlimitedCap_ReturnsNullDownloadsLeft) still out of scope |
 | T-049…T-056 (F-FND-001…008) | 2026-10-13 | M0 foundation: domain/limits/events/blob/pipeline — details in git history + feature spec exit boxes |
 | T-001…T-008 (Milestone rows) | 2026-10-13/15 | M0 marked complete via F-FND-close sweep (44bea81) |
 | T-009 (T-001-05) | 2026-10-14 | CreateDraftCommand + POST /api/v1/transfers/draft — AC-001-2 limit pre-check at API |
