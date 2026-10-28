@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using wa.application.Limits;
 using wa.application.Ports;
+using wa.application.UseCases.Auth;
 using wa.application.UseCases.Health;
 using wa.application.UseCases.Sample;
 using wa.application.UseCases.Transfers;
@@ -101,6 +102,10 @@ builder.Services.AddSingleton<wa.application.Telemetry.WaTelemetryReporter>(sp =
 // T-003-04 (TA-4.2#5): unlock-JWT minter — BCL-only HS256, the SAME Wa:Jwt:Secret bytes (TA-9.1: "same key T-008's session cookie signs with").
 // Injectable clock arg is () => DateTimeOffset.UtcNow in production; unit tests pin exp via their own instance (D3).
 builder.Services.AddSingleton<IUnlockTokenMinter>(sp => new UnlockTokenService(
+    System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Wa:Jwt:Secret"]!), () => DateTimeOffset.UtcNow));
+// T-008-01 (TA-4.2#8): signup's DB surface — thin adapter over the adapter-owned WaDbContext, and its TA-9.1 session-token minter (30-day rolling).
+builder.Services.AddSingleton<IAppUserStore>(sp => new wa.infrastructure.Persistence.AppUserStore(sp.GetRequiredService<WaDbContext>()));
+builder.Services.AddSingleton<ISessionTokenMinter>(sp => new SessionTokenService(
     System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Wa:Jwt:Secret"]!), () => DateTimeOffset.UtcNow));
 // T-006-03 (TA-6.7): unsubscribe token verification + suppression insert — BCL-only HMAC, same Wa:Jwt:Secret key bytes.
 builder.Services.AddSingleton<wa.infrastructure.Persistence.UnsubscribeService>(sp => new wa.infrastructure.Persistence.UnsubscribeService(
@@ -409,6 +414,29 @@ app.MapDelete("/api/v1/admin/suppressions/{id:guid}", async (Guid id, WaDbContex
     await db.SaveChangesAsync(ct);
     telemetry.LogEvent(TelemetryEvents.AdminAction); // F-TRF-011: admin removal is auditable via App Insights
     return Results.Ok();
+});
+
+// T-008-01 (TA-4.2#8 / FR-008-3): sign-up is sign-in — unknown email → create; known email (any case) → existing row.
+app.MapPost("/api/v1/auth/signup", async (SignupCommand cmd, ISender sender, CancellationToken ct) =>
+{
+    try
+    {
+        var result = await sender.Send(cmd, ct);
+        return Results.Json(new
+        {
+            userId = result.UserId.ToString("n"),
+            email = result.Email,
+            displayName = result.DisplayName,
+            theme = result.Theme,
+            planCode = result.PlanCode,
+            sessionToken = result.SessionToken
+        }, statusCode: 200);
+    }
+    catch (SignupValidationException ex)
+    {
+        // T-056 pipeline maps BusinessException → Problem+JSON; no new code — reuse VALIDATION (TA-4.1.3).
+        throw new BusinessException(ProblemCodes.Validation, ex.Message);
+    }
 });
 
 app.Run();
