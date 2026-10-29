@@ -8,6 +8,8 @@ import DropZone from './features/landing/DropZone'
 import StagingList from './features/landing/StagingList'
 import AuthPage from './features/auth/AuthPage'
 import { matchAccountPath } from './features/auth/authRoute'
+import ProfilePage from './features/profile/ProfilePage'
+import { matchProfilePath, PROFILE_PATH } from './features/profile/profileRoute'
 import RecipientPage from './features/recipient/RecipientPage'
 import UnsubscribePage from './features/unsubscribe/UnsubscribePage'
 import { matchLinkPath } from './features/recipient/recipientRoute'
@@ -40,24 +42,42 @@ export default function App() {
     window.dispatchEvent(new PopStateEvent('popstate')) // existing popstate listener updates pathname.
   }
 
+  const handleSignOut = () => {
+    // T-008-07: POST /auth/logout clears the server-side wa.session cookie (T-008-06, TA-4.2#13).
+    // Fire-and-forget with a local fallback — even if the network fails we still clear the client session
+    // so the TopBar returns to "Sign in" (exit check c); the stale server-side cookie will 401 on next GET /auth/me.
+    fetch('http://localhost:8080/api/v1/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {})
+    clearSession()
+    setSession(null)
+    goHome()
+  }
+
+  const handleThemeChange = (theme: 'system' | 'light' | 'dark') => {
+    // Single source of truth for theme across TopBar + ProfilePage. The PATCH itself is owned by the
+    // component that initiated it (ProfilePage.changeTheme or — in this task's scope — nothing else,
+    // because TopBar's select is wired to the same onThemeChange but its own PATCH lives in D-4).
+    setSession((s) => (s ? { ...s, theme } : s))
+  }
+
   return (
     <>
       <TopBar
         profile={session}
         onNavigateAccount={() => {
-          window.history.pushState('', '', '/account')
+          window.history.pushState('', '', session ? PROFILE_PATH : '/account')
           window.dispatchEvent(new PopStateEvent('popstate'))
         }}
-        onSignOut={() => {
-          clearSession()
-          setSession(null)
-        }}
+        onThemeChange={handleThemeChange}
+        onSignOut={handleSignOut}
       />
       <main>
         {unsubscribeToken !== null ? (
           <UnsubscribePage token={unsubscribeToken} />
+        ) : session && matchProfilePath(pathname) ? (
+          <ProfilePage profile={session} onSignedIn={setSession} onThemeChange={handleThemeChange} />
         ) : matchAccountPath(pathname) ? (
-          // Catch-all until T-008-07 takes over the section; keep matchAccountPath a pure predicate.
+          // Signed-out guest keeps the sign-in card; /account/profile with no session falls
+          // through here too (it still matches ACCOUNT_PATH_RE — order above is what wins).
           <AuthPage onSignedIn={(p) => { setSession(p); goHome() }} />
         ) : linkId !== null ? (
           <RecipientPage linkId={linkId} />
