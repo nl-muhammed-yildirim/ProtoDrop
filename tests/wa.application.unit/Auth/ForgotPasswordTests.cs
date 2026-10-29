@@ -135,6 +135,11 @@ public class ForgotPasswordTests
         }
 
         public Task CreateAsync(AppUser user, CancellationToken ct) => Task.CompletedTask; // signup-only — unused here
+
+        // T-008-06 (D-1): compile fix only — the ForgotPassword handler doesn't call these new members.
+        public Task<AppUser?> GetByIdAsync(Guid userId, CancellationToken ct) => Task.FromResult(FoundUser);
+        public Task UpdateProfileAsync(Guid userId, string? displayName, string? theme, CancellationToken ct) => Task.CompletedTask;
+        public Task<bool> SoftDeleteWithReHomeAsync(Guid userId, DateTime deletedAtUtc, CancellationToken ct) => Task.FromResult(true);
     }
 
     private sealed class StubAuthTokenStore : IAuthTokenStore

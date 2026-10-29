@@ -157,6 +157,11 @@ public class LoginHandlerTests
             Created.Add(user);
             return Task.CompletedTask;
         }
+
+        // T-008-06 (D-1): compile fix only — the Login handler doesn't call these new members.
+        public Task<AppUser?> GetByIdAsync(Guid userId, CancellationToken ct) => Task.FromResult(ExistingUser?.Id == userId ? ExistingUser : null);
+        public Task UpdateProfileAsync(Guid userId, string? displayName, string? theme, CancellationToken ct) => Task.CompletedTask;
+        public Task<bool> SoftDeleteWithReHomeAsync(Guid userId, DateTime deletedAtUtc, CancellationToken ct) => Task.FromResult(true);
     }
 
     private sealed class StubPlansStore : IPlansStore

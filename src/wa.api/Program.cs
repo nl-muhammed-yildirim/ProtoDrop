@@ -521,6 +521,95 @@ app.MapPost("/api/v1/auth/login", async (LoginCommand cmd, ISender sender, HttpC
     }
 });
 
+// T-008-06 (FR-008-4 / TA-4.2#13): GET /api/v1/auth/me — the session user's profile DTO.
+// Wire shape = login's minus sessionToken (the cookie already carries the session; no re-mint).
+app.MapGet("/api/v1/auth/me", async (HttpContext ctx, ISender sender, CancellationToken ct) =>
+{
+    // Shared session-read idiom (T-008-02): SessionMiddleware.SessionUserIdKey as Guid? — null for guests.
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+
+    try
+    {
+        var result = await sender.Send(new GetProfileCommand(userId), ct);
+        // TA-4.2a single-construction-site rule (signup/login lines ~392–401 verbatim): 'n'-form userId, exact key set.
+        return Results.Json(new
+        {
+            userId = result.UserId.ToString("n"),
+            email = result.Email,
+            displayName = result.DisplayName,
+            theme = result.Theme,
+            planCode = result.PlanCode
+        }, statusCode: 200);
+    }
+    catch (MeProfileException ex) when (ex.Message == ProblemCodes.TitleOf(ProblemCodes.NotFound))
+    {
+        // Valid cookie but no AppUser row (unknown OR soft-deleted) → 404 NOT_FOUND (spec's literal pin).
+        return Results.Json(ProblemWriter.Build(404, ProblemCodes.NotFound, ProblemCodes.TitleOf(ProblemCodes.NotFound)), statusCode: 404);
+    }
+});
+
+// T-008-06 (FR-008-4 / TA-4.2#13): PATCH /api/v1/auth/me — partial update (only provided fields change).
+app.MapPatch("/api/v1/auth/me", async (UpdateProfileRequest req, HttpContext ctx, ISender sender, CancellationToken ct) =>
+{
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+
+    try
+    {
+        // Single construction site (TA-4.2a): UserId from the session cookie — NOT in the JSON body.
+        var result = await sender.Send(new UpdateProfileCommand(userId, req.DisplayName, req.Theme), ct);
+        return Results.Json(new
+        {
+            userId = result.UserId.ToString("n"),
+            email = result.Email,
+            displayName = result.DisplayName,
+            theme = result.Theme,
+            planCode = result.PlanCode
+        }, statusCode: 200);
+    }
+    catch (MeProfileException ex) when (ex.Message == ProblemCodes.TitleOf(ProblemCodes.NotFound))
+    {
+        // Same as GET — valid cookie, no row → 404 NOT_FOUND.
+        return Results.Json(ProblemWriter.Build(404, ProblemCodes.NotFound, ProblemCodes.TitleOf(ProblemCodes.NotFound)), statusCode: 404);
+    }
+    catch (MeProfileException ex)
+    {
+        // Validation family (invalid theme / too-long name / empty PATCH) → BusinessException(Validation, ...) —
+        // inner-exception-preservation pattern from T-008-01 fix round.
+        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+    }
+});
+
+// T-008-06 (TA-4.2#12): POST /api/v1/auth/logout — clear the session cookie. No use case: cookie clearing is
+// endpoint-level (the middleware owns parsing — same as T-008-02). No telemetry beyond metrics (task spec §3).
+app.MapPost("/api/v1/auth/logout", (HttpContext ctx) =>
+{
+    ctx.Response.Cookies.Delete("wa.session"); // the middleware only refreshes when a token is present; deleting leaves the next request as guest
+    return Results.Ok(); // 200 no body — top bar returns to "Sign in" via the SPA's redirect
+});
+
+// T-008-06 (FR-008-8 / TA-4.2#13): DELETE /api/v1/auth/me — soft-delete + re-home transfers + account_deleted once.
+app.MapDelete("/api/v1/auth/me", async (HttpContext ctx, ISender sender, CancellationToken ct) =>
+{
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+
+    try
+    {
+        var result = await sender.Send(new DeleteAccountCommand(userId), ct);
+
+        // account_deleted already went out via the outbox (EC-008-2: exactly one event for one deletion — dedup on EventId).
+        ctx.Response.Cookies.Delete("wa.session"); // clear cookie exactly like logout
+        return Results.Json(new { userId = userId.ToString("n") }, statusCode: 200); // body mirrors GET's shape minus profile fields
+    }
+    catch (MeProfileException ex) when (ex.Message == ProblemCodes.TitleOf(ProblemCodes.NotFound))
+    {
+        // Same as GET — valid cookie, no row → 404 NOT_FOUND.
+        return Results.Json(ProblemWriter.Build(404, ProblemCodes.NotFound, ProblemCodes.TitleOf(ProblemCodes.NotFound)), statusCode: 404);
+    }
+});
+
 app.Run();
 
 // Empty partial class so WebApplicationFactory<Program> can resolve the entry point.
