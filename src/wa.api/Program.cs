@@ -105,6 +105,8 @@ builder.Services.AddSingleton<IUnlockTokenMinter>(sp => new UnlockTokenService(
     System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Wa:Jwt:Secret"]!), () => DateTimeOffset.UtcNow));
 // T-008-01 (TA-4.2#8): signup's DB surface — thin adapter over the adapter-owned WaDbContext, and its TA-9.1 session-token minter (30-day rolling).
 builder.Services.AddSingleton<IAppUserStore>(sp => new wa.infrastructure.Persistence.AppUserStore(sp.GetRequiredService<WaDbContext>()));
+// T-008-04 (TA-9.1): magic-link token store — thin adapter over the adapter-owned WaDbContext (single-use, hashed token).
+builder.Services.AddSingleton<IAuthTokenStore>(sp => new wa.infrastructure.Persistence.AuthTokenStore(sp.GetRequiredService<WaDbContext>()));
 builder.Services.AddSingleton<ISessionTokenMinter>(sp => new SessionTokenService(
     System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Wa:Jwt:Secret"]!), () => DateTimeOffset.UtcNow));
 // T-006-03 (TA-6.7): unsubscribe token verification + suppression insert — BCL-only HMAC, same Wa:Jwt:Secret key bytes.
@@ -406,6 +408,61 @@ app.MapPost("/api/v1/auth/signup", async (SignupCommand cmd, ISender sender, Can
         // T-056 pipeline maps BusinessException → Problem+JSON; no new code — reuse VALIDATION (TA-4.1.3).
         // Preserve the exception chain: the inner keeps its stack trace (Serilog), wire shape still comes from Code + the pipeline.
         throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+    }
+});
+
+// T-008-04 (FR-008-1 / TA-9.1): POST /api/v1/auth/magic-link — request a sign-in link. 202 Accepted with no body.
+app.MapPost("/api/v1/auth/magic-link", async (RequestMagicLinkCommand cmd, ISender sender, CancellationToken ct) =>
+{
+    try
+    {
+        await sender.Send(cmd, ct);
+        return Results.Accepted(); // 202 — link is in-flight; body carries nothing (TA-4.2#10)
+    }
+    catch (RequestMagicLinkValidationException ex)
+    {
+        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+    }
+});
+
+// T-008-04 (FR-008-1 / FR-008-3 / AC-008-2 / EC-008-3): POST /api/v1/auth/magic-link/redeem — sign in via magic link.
+// Body: { token }. Success → 200 + same wire shape as login + wa.session cookie (TA-9.1).
+// LinkExpiredException (expired OR already redeemed) → 410 LINK_EXPIRED (identical state, don't leak which — EC-008-3).
+// Invalid token → also 410 LINK_EXPIRED (AC-008-2: second click invalid; don't leak "token not found" vs "expired").
+app.MapPost("/api/v1/auth/magic-link/redeem", async (RedeemMagicLinkCommand cmd, ISender sender, HttpContext httpContext, CancellationToken ct) =>
+{
+    try
+    {
+        var result = await sender.Send(cmd, ct);
+
+        // TA-9.1: set wa.session cookie from the minted token (cookie value == body's sessionToken; httpOnly, SameSite=Lax).
+        httpContext.Response.Cookies.Append("wa.session", result.SessionToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Lax,
+            MaxAge = TimeSpan.FromDays(SessionTokenService.LifetimeDays) // frozen 30 d — no magic number
+        });
+
+        return Results.Json(new
+        {
+            userId = result.UserId.ToString("n"),
+            email = result.Email,
+            displayName = result.DisplayName,
+            theme = result.Theme,
+            planCode = result.PlanCode,
+            sessionToken = result.SessionToken
+        }, statusCode: 200);
+    }
+    catch (RedeemValidationException ex)
+    {
+        // TA-4.1.3: malformed/missing token → VALIDATION (400), NOT LINK_EXPIRED (plan §ERROR CASES).
+        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+    }
+    catch (LinkExpiredException)
+    {
+        // EC-008-3 + AC-008-2: expired ≡ redeemed ≡ unknown token — all 410 LINK_EXPIRED. No leakage.
+        return Results.Json(ProblemWriter.Build(410, ProblemCodes.LinkExpired, ProblemCodes.TitleOf(ProblemCodes.LinkExpired)), statusCode: 410);
     }
 });
 

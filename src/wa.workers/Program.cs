@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using wa.application.Events;
 using wa.application.Limits;
 using wa.application.Ports;
+using wa.application.UseCases.Auth;
 using wa.application.UseCases.Transfers;
 using wa.infrastructure.Blob;
 using wa.infrastructure.Email;
@@ -110,6 +111,14 @@ var host = new HostBuilder()
             sp.GetRequiredService<wa.application.Telemetry.WaTelemetryReporter>(),
             sp.GetRequiredService<IConfiguration>(),
             sp.GetRequiredService<ILogger<SendNotificationEmailsHandler>>()));
+
+        // T-008-04 (D-6): magic-link f-email handler — self-contained, loads template from Emails/templates/magic-link/.
+        services.AddSingleton<SendMagicLinkEmailHandler>(sp => new SendMagicLinkEmailHandler(
+            sp.GetRequiredService<IEmailSender>(),
+            sp.GetRequiredService<IEventPublisher>(),
+            sp.GetRequiredService<IConfiguration>(),
+            sp.GetRequiredService<wa.application.Telemetry.WaTelemetryReporter>(),
+            sp.GetRequiredService<ILogger<SendMagicLinkEmailHandler>>()));
     })
     .Build();
 

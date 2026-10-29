@@ -65,6 +65,7 @@ These are the *current* values of the Limits Registry (TA-3.4 / Feature Plan App
 | SAS version token | `2024-08-04` | TA-3.6 "Version 2024" — see ADR in Part 3 |
 | Unlock JWT TTL | 7 d | TA-9.1 |
 | Magic link TTL | 600 s, single-use | TA-9.1 |
+| Magic link AuthToken Purpose values | 0=signup, 1=magic-link-login, 2=forgot-password | TA-3.2 / F-TRF-008 (D-6 architecture extension) |
 | Session TTL | 30 d rolling | TA-9.1 |
 | Block size (browser upload) | 8 MiB | TA-8.3 |
 | Block parallelism | 4 per file, files serialized | TA-8.3 |
