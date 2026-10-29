@@ -119,6 +119,14 @@ var host = new HostBuilder()
             sp.GetRequiredService<IConfiguration>(),
             sp.GetRequiredService<wa.application.Telemetry.WaTelemetryReporter>(),
             sp.GetRequiredService<ILogger<SendMagicLinkEmailHandler>>()));
+
+        // T-008-05 (D-3): forgot-password f-email handler — same shape as magic-link, template from Emails/templates/forgot-password/.
+        services.AddSingleton<SendForgotPasswordEmailHandler>(sp => new SendForgotPasswordEmailHandler(
+            sp.GetRequiredService<IEmailSender>(),
+            sp.GetRequiredService<IEventPublisher>(),
+            sp.GetRequiredService<IConfiguration>(),
+            sp.GetRequiredService<wa.application.Telemetry.WaTelemetryReporter>(),
+            sp.GetRequiredService<ILogger<SendForgotPasswordEmailHandler>>()));
     })
     .Build();
 

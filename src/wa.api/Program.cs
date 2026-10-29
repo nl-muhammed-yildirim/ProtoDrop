@@ -425,6 +425,22 @@ app.MapPost("/api/v1/auth/magic-link", async (RequestMagicLinkCommand cmd, ISend
     }
 });
 
+// T-008-05 (FR-008-6 / TA-4.2#11): POST /api/v1/auth/forgot-password — request a sign-in link with the forgot-password email.
+// Anti-enumeration: 202 Accepted, NO body, byte-identical for registered AND unregistered (D-5). Body: { email }.
+app.MapPost("/api/v1/auth/forgot-password", async (ForgotPasswordCommand cmd, ISender sender, wa.application.Telemetry.WaTelemetryReporter telemetry, CancellationToken ct) =>
+{
+    try
+    {
+        await sender.Send(cmd, ct);
+        telemetry.ForgotPasswordRequested(); // D-4: request-volume metric — only on the 202 path (a 400 isn't an abuse signal)
+        return Results.Accepted(); // 202 — identical for registered/unregistered (anti-enumeration; TA-4.2#11)
+    }
+    catch (ForgotPasswordValidationException ex)
+    {
+        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+    }
+});
+
 // T-008-04 (FR-008-1 / FR-008-3 / AC-008-2 / EC-008-3): POST /api/v1/auth/magic-link/redeem — sign in via magic link.
 // Body: { token }. Success → 200 + same wire shape as login + wa.session cookie (TA-9.1).
 // LinkExpiredException (expired OR already redeemed) → 410 LINK_EXPIRED (identical state, don't leak which — EC-008-3).

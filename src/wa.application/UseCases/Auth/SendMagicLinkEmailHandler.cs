@@ -13,7 +13,7 @@ namespace wa.application.UseCases.Auth;
 /// Loads the magic-link template from Emails/templates/magic-link/ and renders it with manual variable substitution.
 /// Self-contained: no DB context needed — payload carries email + token + expiry.
 /// </summary>
-public sealed class SendMagicLinkEmailHandler
+public sealed class SendMagicLinkEmailHandler : IEmailEventHandler
 {
     private const string Subject = "Your ProtoDrop sign-in link";
 
