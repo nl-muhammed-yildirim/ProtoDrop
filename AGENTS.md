@@ -2,7 +2,7 @@
 
 ## Agent pipeline (Orchestrator → Architect → Coder → Reviewer)
 
-The four roles are defined in `.pi/agents/*.md`, each pinned to its local Ollama model (`ollama/Qwen3.8:*`):
+The four roles are defined in `.agents/agents/*.md` (repo-local copy; live Pi home `C:\Users\myild\Desktop\.pi\agents\`), each pinned to its local Ollama model (`ollama/Qwen3.8:*`):
 
 | Role | Mode | Model | Job |
 |---|---|---|---|
