@@ -199,8 +199,11 @@ app.MapPost("/api/v1/transfers/draft/{draftId}/finalize", async (Guid draftId, H
 });
 
 // T-002-04 (TA-4.2#3): activate a Draft transfer — store recipients, emit transfer.created via outbox.
-app.MapPost("/api/v1/transfers/{id}/send", async (Guid id, HttpRequest request, ISender sender, CancellationToken ct) =>
+app.MapPost("/api/v1/transfers/{id}/send", async (Guid id, HttpContext httpContext, HttpRequest request, ISender sender, CancellationToken ct) =>
 {
+    // T-008-08 (FR-008-7): owner AppUserId from the session middleware's Items — single parsing site (T-008-02). Missing/invalid/expired → guest (null).
+    var ownerAppUserId = httpContext.Items[SessionMiddleware.SessionUserIdKey] as Guid?;
+
     using var ms = new MemoryStream();
     await request.Body.CopyToAsync(ms);
     ms.Position = 0;
@@ -214,7 +217,7 @@ app.MapPost("/api/v1/transfers/{id}/send", async (Guid id, HttpRequest request, 
 
     try
     {
-        var result = await sender.Send(new SendTransferCommand(id, senderName, senderEmail, note, emails, password), ct);
+        var result = await sender.Send(new SendTransferCommand(id, senderName, senderEmail, note, emails, password, ownerAppUserId), ct);
         if (result is null)
             throw new BusinessException(ProblemCodes.NotFound, "Transfer not found.");
         return Results.Json(new { id = result.TransferId.ToString("n"), linkId = result.LinkId, status = "Active", expiresAt = result.ExpiresAtUtc, totalBytes = result.TotalBytes, fileCount = result.FileCount, recipients = result.Recipients }, statusCode: 201);

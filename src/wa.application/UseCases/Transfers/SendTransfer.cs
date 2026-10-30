@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using wa.application.Limits;
 using wa.application.Ports;
 using wa.application.Telemetry;
+using wa.application.UseCases.Auth;
 using wa.domain;
 using wa.domain.Correlation;
 
@@ -17,7 +18,8 @@ public sealed record SendTransferCommand(
     string? SenderEmail,
     string? Note,
     IReadOnlyList<string> Emails,
-    string? Password = null) : IRequest<SendTransferResult?>;
+    string? Password = null,
+    Guid? OwnerAppUserId = null) : IRequest<SendTransferResult?>;   // T-008-08 (FR-008-7): session owner at send time — guest → null
 
 /// <summary>POST /api/v1/transfers/{id}/send result (TA-4.2#3 response shape).</summary>
 public sealed record SendTransferResult(
@@ -52,6 +54,7 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
     private readonly IEventPublisher _eventPublisher;
     private readonly WaTelemetryReporter _telemetry;
     private readonly ILogger<SendTransferHandler> _logger;
+    private readonly IAppUserStore _users;   // T-008-08 (FR-008-7): resolve the display-name "From" default
 
     public SendTransferHandler(
         ISendStore store,
@@ -59,7 +62,8 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
         ILimitsProvider limits,
         IEventPublisher eventPublisher,
         WaTelemetryReporter telemetry,
-        ILogger<SendTransferHandler> logger)
+        ILogger<SendTransferHandler> logger,
+        IAppUserStore users)   // T-008-08 (FR-008-7): session-owner display-name resolution — registered singleton at Program.cs L107
     {
         _store = store;
         _transferStore = transferStore;
@@ -67,6 +71,7 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
         _eventPublisher = eventPublisher;
         _telemetry = telemetry;
         _logger = logger;
+        _users = users ?? throw new ArgumentNullException(nameof(users));
     }
 
     public async Task<SendTransferResult?> Handle(SendTransferCommand request, CancellationToken cancellationToken)
@@ -111,7 +116,17 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
         var now = DateTime.UtcNow;
         transfer.Status = 1;
         transfer.ExpiresAtUtc = now.AddDays(limits.RetentionDays);
-        transfer.SenderName = request.SenderName ?? "Anonymous";
+
+        // T-008-08 (FR-008-7): send-time attribution — the session user id IS the owner (guest → null).
+        // Unconditional overwrite is deliberate: a guest-created draft sent while signed in becomes attributed,
+        // and a guest send stays NULL no matter how the draft was created. Lands ahead of T-022's My Files list.
+        transfer.OwnerAppUserId = request.OwnerAppUserId;
+
+        // T-008-08 (US-008-04 happy path step 2): "From" defaults to the display name. The per-transfer override
+        // (request.SenderName) still wins (exit check d); else the signed-in user's display name with the T-008-06
+        // email-local-part fallback for an empty/blank name; guests stay "Anonymous". SenderName is a SNAPSHOT at
+        // send time — later profile edits never rewrite it (FR-002-4).
+        transfer.SenderName = request.SenderName ?? await ResolveSenderName(request.OwnerAppUserId, cancellationToken);
         transfer.SenderEmail = request.SenderEmail;
         transfer.Note = request.Note;
 
@@ -185,6 +200,19 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
                 return new Guid(hex);
         }
         return Guid.NewGuid();
+    }
+
+    /// <summary>T-008-08 (FR-008-7 / US-008-04 step 2): default "From" for a signed-in send. Resolves the session owner's
+    /// display name; an empty/blank name falls back to the email local part (T-008-06 rule — never "From: (blank)").
+    /// Unknown or soft-deleted owner (e.g. account deleted mid-draft, T-008-09) → "Anonymous". Guest (null) → "Anonymous".</summary>
+    private async Task<string> ResolveSenderName(Guid? ownerAppUserId, CancellationToken ct)
+    {
+        if (ownerAppUserId is not null && await _users.GetByIdAsync(ownerAppUserId.Value, ct) is { } user)
+        {
+            var name = user.DisplayName.Trim();
+            return string.IsNullOrEmpty(name) ? user.Email.Split('@')[0] : name;   // local-part fallback — mirrors AppUserStore.UpdateProfileAsync / Signup.DeriveDisplayName verbatim
+        }
+        return "Anonymous";
     }
 
     /// <summary>Validates an email address using .NET's MailAddress (TA-4.2#3: per-address validation).</summary>
