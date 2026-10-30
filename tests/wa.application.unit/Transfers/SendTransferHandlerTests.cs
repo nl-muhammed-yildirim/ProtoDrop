@@ -642,6 +642,9 @@ public class SendTransferHandlerTests
 
         public Task<int> GetActiveTransferCountAsync(Guid ownerId, CancellationToken ct) =>
             Task.FromResult(0);
+
+        public Task<(List<MyTransferRow> Items, string? NextCursor)> ListByOwnerAsync(Guid ownerId, DateTime? afterUtc, Guid? afterIdExcluded, int limit, CancellationToken ct) =>
+            Task.FromResult<(List<MyTransferRow>, string?)>(([], null)); // T-009-01: not exercised by send tests — empty page.
     }
 
     private sealed class RecordingTelemetryLogger : ILogger<WaTelemetryReporter>

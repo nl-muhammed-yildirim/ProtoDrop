@@ -17,4 +17,11 @@ public interface ITransferStore
 
     /// <summary>COUNT(*) WHERE OwnerAppUserId=@ownerId AND Status IN (1,3).</summary>
     Task<int> GetActiveTransferCountAsync(Guid ownerId, CancellationToken ct);
+
+    /// <summary>
+    /// T-009-01 (TA-4.1.4): owner-scoped My Files page — non-deleted transfers where OwnerAppUserId=@ownerId, ordered by
+    /// CreatedAtUtc DESC, resumed after the given cursor row ((CreatedAtUtc &lt; @afterUtc) OR (= and Id &lt; @afterIdExcluded)),
+    /// taking @limit+1 to detect a further page; NextCursor is encoded from the last returned row (null when no next page).
+    /// </summary>
+    Task<(List<MyTransferRow> Items, string? NextCursor)> ListByOwnerAsync(Guid ownerId, DateTime? afterUtc, Guid? afterIdExcluded, int limit, CancellationToken ct);
 }

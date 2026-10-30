@@ -592,6 +592,53 @@ app.MapPost("/api/v1/auth/logout", (HttpContext ctx) =>
     return Results.Ok(); // 200 no body — top bar returns to "Sign in" via the SPA's redirect
 });
 
+// T-009-01 (TA-4.2#14): GET /api/v1/transfers — the session user's My Files history list, cursor-paged at 25 rows (TA-4.1.4).
+app.MapGet("/api/v1/transfers", async (HttpContext ctx, HttpRequest request, ISender sender, CancellationToken ct) =>
+{
+    // Shared session-read idiom (T-008-02): SessionMiddleware.SessionUserIdKey as Guid? — null for guests.
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+
+    var limitParam = request.Query["limit"].FirstOrDefault();
+    // TA-4.1.4 pin: default page size 25; reject limit <= 0 or > 25 with 400 VALIDATION (existing closed-list member).
+    if (limitParam is null)
+        limitParam = "25";
+    if (!int.TryParse(limitParam, out var parsedLimit) || parsedLimit is <= 0 or > 25)
+        throw new BusinessException(ProblemCodes.Validation, "limit must be a positive integer at most 25.");
+
+    string? cursor = request.Query["cursor"].FirstOrDefault();
+    // TA-4.1.4: decode base64("{createdAtUtc:O}:{id:N}") early so a malformed cursor → 400 VALIDATION (existing closed-list member).
+    if (!string.IsNullOrEmpty(cursor))
+        try
+        {
+            _ = wa.domain.Transfers.CursorCodec.Decode(cursor);
+        }
+        catch (wa.domain.Transfers.CursorFormatException ex)
+        {
+            throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+        }
+
+    var result = await sender.Send(new ListMyTransfersQuery(userId, cursor, parsedLimit), ct);
+    // TA-4.2a single-construction-site rule: 'n'-form id (signup/login style); opaque nextCursor as returned (null = last page).
+    return Results.Json(new
+    {
+        items = result.Items.Select(r => new
+        {
+            id = r.Id.ToString("n"),
+            name = r.Name,
+            fileCount = r.FileCount,
+            totalBytes = r.TotalBytes,
+            status = r.Status,
+            expiresAtUtc = r.ExpiresAtUtc,
+            downloadsCount = r.DownloadsCount,
+            maxDownloads = r.MaxDownloads,
+            recipientCount = r.RecipientCount
+        }),
+        nextCursor = result.NextCursor
+    }, statusCode: 200);
+});
+
+
 // T-008-06 (FR-008-8 / TA-4.2#13): DELETE /api/v1/auth/me — soft-delete + re-home transfers + account_deleted once.
 app.MapDelete("/api/v1/auth/me", async (HttpContext ctx, ISender sender, CancellationToken ct) =>
 {
