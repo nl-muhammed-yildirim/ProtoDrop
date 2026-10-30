@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using wa.application.Limits;
 using wa.application.Ports;
 using wa.application.Telemetry;
+using wa.application.UseCases.Auth;
 using wa.application.UseCases.Transfers;
 using wa.domain;
 
@@ -18,6 +19,7 @@ public class SendTransferHandlerTests
     private readonly RecordingTelemetryLogger _telemetryLogger;
     private readonly WaTelemetryReporter _telemetry;
     private readonly SendTransferHandler _handler;
+    private readonly StubAppUserStore _users; // T-008-08: fake IAppUserStore — session-owner display-name resolution
 
     public SendTransferHandlerTests() : this(new StubLimitsProvider()) { }
 
@@ -29,6 +31,7 @@ public class SendTransferHandlerTests
         _eventPublisher = new StubEventPublisher();
         _telemetryLogger = new RecordingTelemetryLogger();
         _telemetry = new WaTelemetryReporter(_telemetryLogger, System.Text.Encoding.UTF8.GetBytes("test-key"));
+        _users = new StubAppUserStore();
         _handler = NewHandler(limits);
     }
 
@@ -234,7 +237,7 @@ public class SendTransferHandlerTests
     }
 
     private SendTransferHandler NewHandler(StubLimitsProvider limits) =>
-        new SendTransferHandler(_store, _meterStore, limits, _eventPublisher, _telemetry, Microsoft.Extensions.Logging.Abstractions.NullLogger<SendTransferHandler>.Instance);
+        new SendTransferHandler(_store, _meterStore, limits, _eventPublisher, _telemetry, Microsoft.Extensions.Logging.Abstractions.NullLogger<SendTransferHandler>.Instance, _users);
 
     // ---- T-007-05 / AC-007-2 (meter): storage_bytes_active on send ----
 
@@ -251,7 +254,7 @@ public class SendTransferHandlerTests
         const long PostActivationSum = 2_000_000_100;
         _meterStore.ActiveStorageBytes = PostActivationSum;
 
-        await _handler.Handle(new SendTransferCommand(transferId, null, null, null, []), CancellationToken.None);
+        await _handler.Handle(new SendTransferCommand(transferId, null, null, null, [], null, owner), CancellationToken.None);
 
         // Exactly one read, for this owner — the EF expression lives in TransferStore.cs, not duplicated here.
         var calls = _meterStore.Calls;
@@ -476,6 +479,100 @@ public class SendTransferHandlerTests
         Assert.Null(_store.Transfer!.PasswordHash);
     }
 
+    // ---- T-008-08 / FR-008-7: send-time attribution — owner + "From" default ----
+
+    private AppUser NewUser(Guid id, string displayName, string email) => new()
+    { Id = id, Email = email, DisplayName = displayName, Theme = "system", PlanId = Guid.NewGuid(), CreatedAtUtc = DateTime.UtcNow };
+
+    [Fact]
+    public async Task Handle_SignedIn_OwnerSetFromSession_AndFromDefaultsToDisplayName()
+    {
+        // Exit (a): signed-in send → OwnerAppUserId = session user id; From = display name.
+        var transferId = Guid.NewGuid();
+        var owner = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+        _users.UserById[owner] = NewUser(owner, "Ada Lovelace", "ada@example.com");
+
+        await _handler.Handle(new SendTransferCommand(transferId, null, null, null, [], null, owner), CancellationToken.None);
+
+        Assert.Equal(owner, _store.Transfer!.OwnerAppUserId);
+        Assert.Equal("Ada Lovelace", _store.Transfer.SenderName);
+    }
+
+    [Fact]
+    public async Task Handle_Guest_OwnerNull_Anonymous()
+    {
+        // Exit (b): guest send → OwnerAppUserId = NULL; From = "Anonymous".
+        var transferId = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+
+        await _handler.Handle(new SendTransferCommand(transferId, null, null, null, []), CancellationToken.None);
+
+        Assert.Null(_store.Transfer!.OwnerAppUserId);
+        Assert.Equal("Anonymous", _store.Transfer.SenderName);
+    }
+
+    [Fact]
+    public async Task Handle_DraftGuest_SentSignedIn_AttributesToSessionUser()
+    {
+        // Exit (c): draft created as a guest, sent while signed in → attributed at send time (not draft time).
+        var transferId = Guid.NewGuid();
+        var owner = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+        _store.Transfer.OwnerAppUserId = null; // draft was finalized as a guest
+        _users.UserById[owner] = NewUser(owner, "Ada Lovelace", "ada@example.com");
+
+        await _handler.Handle(new SendTransferCommand(transferId, null, null, null, [], null, owner), CancellationToken.None);
+
+        Assert.Equal(owner, _store.Transfer!.OwnerAppUserId); // overwritten from null — send-time resolution
+        Assert.Equal("Ada Lovelace", _store.Transfer.SenderName);
+    }
+
+    [Fact]
+    public async Task Handle_OverrideWins_SenderNameBeatsDisplayName()
+    {
+        // Exit (d): the per-transfer From override still wins over the display-name default.
+        var transferId = Guid.NewGuid();
+        var owner = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+        _users.UserById[owner] = NewUser(owner, "Ada Lovelace", "ada@example.com");
+
+        await _handler.Handle(new SendTransferCommand(transferId, "My Custom Name", null, null, [], null, owner), CancellationToken.None);
+
+        Assert.Equal("My Custom Name", _store.Transfer!.SenderName);
+        Assert.Equal(owner, _store.Transfer.OwnerAppUserId); // attribution still set
+    }
+
+    [Fact]
+    public async Task Handle_EmptyDisplayName_FallsBackToLocalPart()
+    {
+        // T-008-06 rule: empty/blank display name → email local part (never "From: (blank)").
+        var transferId = Guid.NewGuid();
+        var owner = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+        _users.UserById[owner] = NewUser(owner, "  ", "ada@example.com");
+
+        await _handler.Handle(new SendTransferCommand(transferId, null, null, null, [], null, owner), CancellationToken.None);
+
+        Assert.Equal("ada", _store.Transfer!.SenderName);
+    }
+
+    [Fact]
+    public async Task Handle_OwnerDeletedMidDraft_SignedInFromFallsBackToAnonymous()
+    {
+        // Edge: soft-deleted/unknown owner (GetByIdAsync → null) → "From" degrades to Anonymous;
+        // attribution preserved even though the display name is gone (endpoint 13's not-found semantics).
+        var transferId = Guid.NewGuid();
+        var owner = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+        _users.UserById[owner] = null; // row soft-deleted or unknown
+
+        await _handler.Handle(new SendTransferCommand(transferId, null, null, null, [], null, owner), CancellationToken.None);
+
+        Assert.Equal("Anonymous", _store.Transfer!.SenderName);
+        Assert.Equal(owner, _store.Transfer.OwnerAppUserId);
+    }
+
     // ---- Stubs ----
 
     private sealed class StubSendStore : ISendStore
@@ -559,5 +656,22 @@ public class SendTransferHandlerTests
             => Entries.Add(new Entry(formatter(state, exception)));
         public void Log(LogLevel logLevel, EventId eventId, string? message, Exception? exception, params object?[] args)
             => Entries.Add(new Entry(message ?? string.Empty));
+    }
+
+    // ---- T-008-08 stubs: fake IAppUserStore (hand-stub, NO Moq — mirrors MeProfileTests.StubAppUserStore) ----
+
+    private sealed class StubAppUserStore : IAppUserStore
+    {
+        public Dictionary<Guid, AppUser?> UserById { get; } = new();
+
+        // T-008-08 (D-3): the only member the send handler touches — null on miss OR soft-delete.
+        public Task<AppUser?> GetByIdAsync(Guid userId, CancellationToken ct) =>
+            Task.FromResult(UserById.TryGetValue(userId, out var user) ? user : null);
+
+        // Members below are unused by these tests — no-op implementations keep the stub lean (IAppUserStore shape, T-008-01).
+        public Task<AppUser?> FindByEmailAsync(string lowercasedEmail, CancellationToken ct) => Task.FromResult<AppUser?>(null);
+        public Task CreateAsync(AppUser user, CancellationToken ct) => Task.CompletedTask;
+        public Task UpdateProfileAsync(Guid userId, string? displayName, string? theme, CancellationToken ct) => Task.CompletedTask;
+        public Task<bool> SoftDeleteWithReHomeAsync(Guid userId, DateTime deletedAtUtc, CancellationToken ct) => Task.FromResult(false);
     }
 }

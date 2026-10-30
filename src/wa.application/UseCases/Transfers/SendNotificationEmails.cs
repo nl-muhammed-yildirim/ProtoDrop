@@ -13,7 +13,7 @@ namespace wa.application.UseCases.Transfers;
 /// T-006-01: f-email consumer handler — sends notification emails for transfer.created events.
 /// Two-layer dedup: EventDeduplicator (eventId, 15-min window) + NotifiedAtUtc null check per recipient row.
 /// </summary>
-public sealed class SendNotificationEmailsHandler
+public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth.IEmailEventHandler
 {
     private readonly IEmailStore _store;
     private readonly IEmailSender _emailSender;

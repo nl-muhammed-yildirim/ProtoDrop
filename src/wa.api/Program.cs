@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using wa.application.Limits;
 using wa.application.Ports;
+using wa.application.UseCases.Auth;
 using wa.application.UseCases.Health;
 using wa.application.UseCases.Sample;
 using wa.application.UseCases.Transfers;
@@ -102,6 +103,12 @@ builder.Services.AddSingleton<wa.application.Telemetry.WaTelemetryReporter>(sp =
 // Injectable clock arg is () => DateTimeOffset.UtcNow in production; unit tests pin exp via their own instance (D3).
 builder.Services.AddSingleton<IUnlockTokenMinter>(sp => new UnlockTokenService(
     System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Wa:Jwt:Secret"]!), () => DateTimeOffset.UtcNow));
+// T-008-01 (TA-4.2#8): signup's DB surface — thin adapter over the adapter-owned WaDbContext, and its TA-9.1 session-token minter (30-day rolling).
+builder.Services.AddSingleton<IAppUserStore>(sp => new wa.infrastructure.Persistence.AppUserStore(sp.GetRequiredService<WaDbContext>()));
+// T-008-04 (TA-9.1): magic-link token store — thin adapter over the adapter-owned WaDbContext (single-use, hashed token).
+builder.Services.AddSingleton<IAuthTokenStore>(sp => new wa.infrastructure.Persistence.AuthTokenStore(sp.GetRequiredService<WaDbContext>()));
+builder.Services.AddSingleton<ISessionTokenMinter>(sp => new SessionTokenService(
+    System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Wa:Jwt:Secret"]!), () => DateTimeOffset.UtcNow));
 // T-006-03 (TA-6.7): unsubscribe token verification + suppression insert — BCL-only HMAC, same Wa:Jwt:Secret key bytes.
 builder.Services.AddSingleton<wa.infrastructure.Persistence.UnsubscribeService>(sp => new wa.infrastructure.Persistence.UnsubscribeService(
     sp.GetRequiredService<WaDbContext>(),
@@ -113,8 +120,9 @@ app.UseMiddleware<CorsAllowListMiddleware>();
 app.UseMiddleware<CorrelationMiddleware>(); // FR-056-1: runs before everything else — correlationId present in every log line incl. UseSerilogRequestLogging's per-request INF line
 // Rate limiting sits after correlation so the 429 body gets a correlationId, and BEFORE GlobalError so its empty-body 404 rewrite can't touch the 429 (the limiter short-circuits before routing).
 app.UseIpRateLimiting();
-// T-002-02 (TA-4.1.5): generic idempotency — before GlobalError so replays bypass error handling; on miss the full pipeline runs and the response is buffered.
+// T-008-02 (TA-4.1.5): session middleware — after idempotency, before GlobalError so refreshed cookies + error bodies keep correlationId.
 app.UseMiddleware<IdempotencyMiddleware>();
+app.UseMiddleware<SessionMiddleware>(); // TA-9.1: reads wa.session cookie → sets HttpContext.Items['wa.session.userId']; refreshes < 15 d remaining (FR-008-2)
 app.UseMiddleware<GlobalErrorMiddleware>(); // FR-056-3: every failure → TA-4.1.3 Problem+JSON (business codes keep their status, others 500 INTERNAL)
 app.UseSerilogRequestLogging(); // per-request INF line (Microsoft.* request logging is suppressed to Warning)
 app.MapGet("/", () => "Hello World!");
@@ -148,12 +156,8 @@ app.MapPost("/api/v1/transfers/draft", async (CreateDraftCommand cmd, ISender se
     return Results.Json(new { draftId = result.DraftId.ToString("n"), expiresInSec = result.ExpiresInSec, files = result.Files.Select(f => new { fileId = f.FileId.ToString("n"), uploadUrl = f.UploadUrl.ToString() }) }, statusCode: 201); // TA-4.2#1 exact wire shape — property names pinned at the single construction site (no global JSON policy in this app).
 });
 
-// T-055-02 (TA-9.1) provisional session reader — T-021 (F-TRF-008) lands real auth; until then,
-// finalize resolves the owner from wa.session cookie using the same HMAC scheme as TA-9.1.
-var sessionSecretBytes = System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Wa:Jwt:Secret"]!);
-
 // T-001-10 (TA-4.2#2): idempotent finalize — server-side blob copy staging→transfers, create Transfer(Draft)+FileItems+BlobRefs, EC-002-1 replay.
-app.MapPost("/api/v1/transfers/draft/{draftId}/finalize", async (Guid draftId, HttpRequest request, ISender sender, CancellationToken ct) =>
+app.MapPost("/api/v1/transfers/draft/{draftId}/finalize", async (Guid draftId, HttpContext httpContext, HttpRequest request, ISender sender, CancellationToken ct) =>
 {
     var idempotencyKey = request.Headers["Idempotency-Key"].FirstOrDefault() ?? string.Empty;
     using var ms = new MemoryStream();
@@ -169,37 +173,9 @@ app.MapPost("/api/v1/transfers/draft/{draftId}/finalize", async (Guid draftId, H
         Retries = e.TryGetProperty("retries", out var r) ? r.GetInt32() : 0
     }).ToList();
 
-    // TA-9.1: read wa.session cookie → resolve owner AppUserId (null if missing/invalid/expired).
-    Guid? ownerAppUserId = null;
-    var sessionCookie = request.Cookies["wa.session"];
-    if (!string.IsNullOrEmpty(sessionCookie))
-    {
-        try
-        {
-            var decoded = System.Convert.FromBase64String(sessionCookie);
-            var str = System.Text.Encoding.UTF8.GetString(decoded);
-            var parts = str.Split('|');
-            if (parts.Length == 3)
-            {
-                var userIdPart = parts[0];
-                var expPart = parts[1];
-                var sig = parts[2];
-                using var hmac = new System.Security.Cryptography.HMACSHA256(sessionSecretBytes);
-                var expectedSig = Convert.ToBase64String(
-                    hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes($"{userIdPart}|{expPart}")));
-                if (System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
-                    System.Text.Encoding.UTF8.GetBytes(sig),
-                    System.Text.Encoding.UTF8.GetBytes(expectedSig)))
-                {
-                    if (Guid.TryParse(userIdPart, out var uid) &&
-                        long.TryParse(expPart, out var expUnix) &&
-                        DateTime.UtcNow <= new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(expUnix))
-                        ownerAppUserId = uid;
-                }
-            }
-        }
-        catch { /* invalid cookie format → guest path */ }
-    }
+    // T-008-02 (TA-9.1): read owner AppUserId from the session middleware's Items (single parsing site — SessionMiddleware).
+    // Missing/invalid/expired → guest (item null); same wire behavior as before, no inline HMAC decode.
+    Guid? ownerAppUserId = httpContext.Items[SessionMiddleware.SessionUserIdKey] as Guid?;
 
     try
     {
@@ -223,8 +199,11 @@ app.MapPost("/api/v1/transfers/draft/{draftId}/finalize", async (Guid draftId, H
 });
 
 // T-002-04 (TA-4.2#3): activate a Draft transfer — store recipients, emit transfer.created via outbox.
-app.MapPost("/api/v1/transfers/{id}/send", async (Guid id, HttpRequest request, ISender sender, CancellationToken ct) =>
+app.MapPost("/api/v1/transfers/{id}/send", async (Guid id, HttpContext httpContext, HttpRequest request, ISender sender, CancellationToken ct) =>
 {
+    // T-008-08 (FR-008-7): owner AppUserId from the session middleware's Items — single parsing site (T-008-02). Missing/invalid/expired → guest (null).
+    var ownerAppUserId = httpContext.Items[SessionMiddleware.SessionUserIdKey] as Guid?;
+
     using var ms = new MemoryStream();
     await request.Body.CopyToAsync(ms);
     ms.Position = 0;
@@ -238,7 +217,7 @@ app.MapPost("/api/v1/transfers/{id}/send", async (Guid id, HttpRequest request, 
 
     try
     {
-        var result = await sender.Send(new SendTransferCommand(id, senderName, senderEmail, note, emails, password), ct);
+        var result = await sender.Send(new SendTransferCommand(id, senderName, senderEmail, note, emails, password, ownerAppUserId), ct);
         if (result is null)
             throw new BusinessException(ProblemCodes.NotFound, "Transfer not found.");
         return Results.Json(new { id = result.TransferId.ToString("n"), linkId = result.LinkId, status = "Active", expiresAt = result.ExpiresAtUtc, totalBytes = result.TotalBytes, fileCount = result.FileCount, recipients = result.Recipients }, statusCode: 201);
@@ -409,6 +388,229 @@ app.MapDelete("/api/v1/admin/suppressions/{id:guid}", async (Guid id, WaDbContex
     await db.SaveChangesAsync(ct);
     telemetry.LogEvent(TelemetryEvents.AdminAction); // F-TRF-011: admin removal is auditable via App Insights
     return Results.Ok();
+});
+
+// T-008-01 (TA-4.2#8 / FR-008-3): sign-up is sign-in — unknown email → create; known email (any case) → existing row.
+app.MapPost("/api/v1/auth/signup", async (SignupCommand cmd, ISender sender, CancellationToken ct) =>
+{
+    try
+    {
+        var result = await sender.Send(cmd, ct);
+        return Results.Json(new
+        {
+            userId = result.UserId.ToString("n"),
+            email = result.Email,
+            displayName = result.DisplayName,
+            theme = result.Theme,
+            planCode = result.PlanCode,
+            sessionToken = result.SessionToken
+        }, statusCode: 200);
+    }
+    catch (SignupValidationException ex)
+    {
+        // T-056 pipeline maps BusinessException → Problem+JSON; no new code — reuse VALIDATION (TA-4.1.3).
+        // Preserve the exception chain: the inner keeps its stack trace (Serilog), wire shape still comes from Code + the pipeline.
+        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+    }
+});
+
+// T-008-04 (FR-008-1 / TA-9.1): POST /api/v1/auth/magic-link — request a sign-in link. 202 Accepted with no body.
+app.MapPost("/api/v1/auth/magic-link", async (RequestMagicLinkCommand cmd, ISender sender, CancellationToken ct) =>
+{
+    try
+    {
+        await sender.Send(cmd, ct);
+        return Results.Accepted(); // 202 — link is in-flight; body carries nothing (TA-4.2#10)
+    }
+    catch (RequestMagicLinkValidationException ex)
+    {
+        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+    }
+});
+
+// T-008-05 (FR-008-6 / TA-4.2#11): POST /api/v1/auth/forgot-password — request a sign-in link with the forgot-password email.
+// Anti-enumeration: 202 Accepted, NO body, byte-identical for registered AND unregistered (D-5). Body: { email }.
+app.MapPost("/api/v1/auth/forgot-password", async (ForgotPasswordCommand cmd, ISender sender, wa.application.Telemetry.WaTelemetryReporter telemetry, CancellationToken ct) =>
+{
+    try
+    {
+        await sender.Send(cmd, ct);
+        telemetry.ForgotPasswordRequested(); // D-4: request-volume metric — only on the 202 path (a 400 isn't an abuse signal)
+        return Results.Accepted(); // 202 — identical for registered/unregistered (anti-enumeration; TA-4.2#11)
+    }
+    catch (ForgotPasswordValidationException ex)
+    {
+        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+    }
+});
+
+// T-008-04 (FR-008-1 / FR-008-3 / AC-008-2 / EC-008-3): POST /api/v1/auth/magic-link/redeem — sign in via magic link.
+// Body: { token }. Success → 200 + same wire shape as login + wa.session cookie (TA-9.1).
+// LinkExpiredException (expired OR already redeemed) → 410 LINK_EXPIRED (identical state, don't leak which — EC-008-3).
+// Invalid token → also 410 LINK_EXPIRED (AC-008-2: second click invalid; don't leak "token not found" vs "expired").
+app.MapPost("/api/v1/auth/magic-link/redeem", async (RedeemMagicLinkCommand cmd, ISender sender, HttpContext httpContext, CancellationToken ct) =>
+{
+    try
+    {
+        var result = await sender.Send(cmd, ct);
+
+        // TA-9.1: set wa.session cookie from the minted token (cookie value == body's sessionToken; httpOnly, SameSite=Lax).
+        httpContext.Response.Cookies.Append("wa.session", result.SessionToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Lax,
+            MaxAge = TimeSpan.FromDays(SessionTokenService.LifetimeDays) // frozen 30 d — no magic number
+        });
+
+        return Results.Json(new
+        {
+            userId = result.UserId.ToString("n"),
+            email = result.Email,
+            displayName = result.DisplayName,
+            theme = result.Theme,
+            planCode = result.PlanCode,
+            sessionToken = result.SessionToken
+        }, statusCode: 200);
+    }
+    catch (RedeemValidationException ex)
+    {
+        // TA-4.1.3: malformed/missing token → VALIDATION (400), NOT LINK_EXPIRED (plan §ERROR CASES).
+        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+    }
+    catch (LinkExpiredException)
+    {
+        // EC-008-3 + AC-008-2: expired ≡ redeemed ≡ unknown token — all 410 LINK_EXPIRED. No leakage.
+        return Results.Json(ProblemWriter.Build(410, ProblemCodes.LinkExpired, ProblemCodes.TitleOf(ProblemCodes.LinkExpired)), statusCode: 410);
+    }
+});
+
+// T-008-02 (TA-4.2#9 / FR-008-1): login — signs in an existing user. Same wire shape as signup + sets wa.session cookie (TA-9.1).
+app.MapPost("/api/v1/auth/login", async (LoginCommand cmd, ISender sender, HttpContext httpContext, CancellationToken ct) =>
+{
+    try
+    {
+        var result = await sender.Send(cmd, ct);
+
+        // TA-9.1: set wa.session cookie from the minted token (cookie value == body's sessionToken; httpOnly, SameSite=Lax).
+        httpContext.Response.Cookies.Append("wa.session", result.SessionToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true, // TA-9.1 + FR-008-2 (not asserted in local plain-HTTP tests — no prior test does)
+            SameSite = SameSiteMode.Lax,
+            MaxAge = TimeSpan.FromDays(SessionTokenService.LifetimeDays) // frozen 30 d — no magic number
+        });
+
+        // TA-4.2a: exact wire shape as signup (userId 'n' form, email, displayName, theme, planCode, sessionToken).
+        return Results.Json(new
+        {
+            userId = result.UserId.ToString("n"),
+            email = result.Email,
+            displayName = result.DisplayName,
+            theme = result.Theme,
+            planCode = result.PlanCode,
+            sessionToken = result.SessionToken
+        }, statusCode: 200);
+    }
+    catch (LoginWrongPasswordException ex)
+    {
+        // T-056 pipeline maps BusinessException → Problem+JSON; 401 WRONG_PASSWORD via the closed list (no new code).
+        throw new BusinessException(ProblemCodes.WrongPassword, ex.Message, ex);
+    }
+    catch (LoginValidationException ex)
+    {
+        // T-056 pipeline maps BusinessException → Problem+JSON; no new code — reuse VALIDATION (TA-4.1.3).
+        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+    }
+});
+
+// T-008-06 (FR-008-4 / TA-4.2#13): GET /api/v1/auth/me — the session user's profile DTO.
+// Wire shape = login's minus sessionToken (the cookie already carries the session; no re-mint).
+app.MapGet("/api/v1/auth/me", async (HttpContext ctx, ISender sender, CancellationToken ct) =>
+{
+    // Shared session-read idiom (T-008-02): SessionMiddleware.SessionUserIdKey as Guid? — null for guests.
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+
+    try
+    {
+        var result = await sender.Send(new GetProfileCommand(userId), ct);
+        // TA-4.2a single-construction-site rule (signup/login lines ~392–401 verbatim): 'n'-form userId, exact key set.
+        return Results.Json(new
+        {
+            userId = result.UserId.ToString("n"),
+            email = result.Email,
+            displayName = result.DisplayName,
+            theme = result.Theme,
+            planCode = result.PlanCode
+        }, statusCode: 200);
+    }
+    catch (MeProfileException ex) when (ex.Message == ProblemCodes.TitleOf(ProblemCodes.NotFound))
+    {
+        // Valid cookie but no AppUser row (unknown OR soft-deleted) → 404 NOT_FOUND (spec's literal pin).
+        return Results.Json(ProblemWriter.Build(404, ProblemCodes.NotFound, ProblemCodes.TitleOf(ProblemCodes.NotFound)), statusCode: 404);
+    }
+});
+
+// T-008-06 (FR-008-4 / TA-4.2#13): PATCH /api/v1/auth/me — partial update (only provided fields change).
+app.MapPatch("/api/v1/auth/me", async (UpdateProfileRequest req, HttpContext ctx, ISender sender, CancellationToken ct) =>
+{
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+
+    try
+    {
+        // Single construction site (TA-4.2a): UserId from the session cookie — NOT in the JSON body.
+        var result = await sender.Send(new UpdateProfileCommand(userId, req.DisplayName, req.Theme), ct);
+        return Results.Json(new
+        {
+            userId = result.UserId.ToString("n"),
+            email = result.Email,
+            displayName = result.DisplayName,
+            theme = result.Theme,
+            planCode = result.PlanCode
+        }, statusCode: 200);
+    }
+    catch (MeProfileException ex) when (ex.Message == ProblemCodes.TitleOf(ProblemCodes.NotFound))
+    {
+        // Same as GET — valid cookie, no row → 404 NOT_FOUND.
+        return Results.Json(ProblemWriter.Build(404, ProblemCodes.NotFound, ProblemCodes.TitleOf(ProblemCodes.NotFound)), statusCode: 404);
+    }
+    catch (MeProfileException ex)
+    {
+        // Validation family (invalid theme / too-long name / empty PATCH) → BusinessException(Validation, ...) —
+        // inner-exception-preservation pattern from T-008-01 fix round.
+        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+    }
+});
+
+// T-008-06 (TA-4.2#12): POST /api/v1/auth/logout — clear the session cookie. No use case: cookie clearing is
+// endpoint-level (the middleware owns parsing — same as T-008-02). No telemetry beyond metrics (task spec §3).
+app.MapPost("/api/v1/auth/logout", (HttpContext ctx) =>
+{
+    ctx.Response.Cookies.Delete("wa.session"); // the middleware only refreshes when a token is present; deleting leaves the next request as guest
+    return Results.Ok(); // 200 no body — top bar returns to "Sign in" via the SPA's redirect
+});
+
+// T-008-06 (FR-008-8 / TA-4.2#13): DELETE /api/v1/auth/me — soft-delete + re-home transfers + account_deleted once.
+app.MapDelete("/api/v1/auth/me", async (HttpContext ctx, ISender sender, CancellationToken ct) =>
+{
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+
+    try
+    {
+        var result = await sender.Send(new DeleteAccountCommand(userId), ct);
+
+        // account_deleted already went out via the outbox (EC-008-2: exactly one event for one deletion — dedup on EventId).
+        ctx.Response.Cookies.Delete("wa.session"); // clear cookie exactly like logout
+        return Results.Json(new { userId = userId.ToString("n") }, statusCode: 200); // body mirrors GET's shape minus profile fields
+    }
+    catch (MeProfileException ex) when (ex.Message == ProblemCodes.TitleOf(ProblemCodes.NotFound))
+    {
+        // Same as GET — valid cookie, no row → 404 NOT_FOUND.
+        return Results.Json(ProblemWriter.Build(404, ProblemCodes.NotFound, ProblemCodes.TitleOf(ProblemCodes.NotFound)), statusCode: 404);
+    }
 });
 
 app.Run();

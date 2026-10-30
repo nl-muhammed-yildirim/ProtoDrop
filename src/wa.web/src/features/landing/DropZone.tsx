@@ -55,9 +55,9 @@ const SKIP_TOAST = 'Some files were skipped'
 const PASTE_TOAST = 'Image added'
 const EMPTY_ITEMS: unknown[] = []
 
-export function DropZone() {
+export function DropZone({ toast }: { toast?: string | null }) {   // T-008-09: app-level post-delete toast (App state survives the unmount)
   const [dragOver, setDragOver] = useState(false)
-  const [toast, setToast] = useState<Toast>(null)
+  const [localToast, setLocalToast] = useState<Toast>(null)
   const timerRef = useRef<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -68,19 +68,19 @@ export function DropZone() {
       if (!pe.ctrlKey && !pe.metaKey) return
       const staged = pastedImages(pe.clipboardData?.items ?? EMPTY_ITEMS)
       stageFiles(staged)
-      if (staged.length) setToast(PASTE_TOAST) // a non-image paste must not clear another visible toast
+      if (staged.length) setLocalToast(PASTE_TOAST) // a non-image paste must not clear another visible toast
     }
     window.addEventListener('paste', onPaste)
     return () => { window.removeEventListener('paste', onPaste) }
   }, [])
 
   useEffect(() => {
-    if (!toast) return
-    timerRef.current = window.setTimeout(() => setToast(null), 5000)
+    if (!localToast) return
+    timerRef.current = window.setTimeout(() => setLocalToast(null), 5000)
     return () => {
       if (timerRef.current !== null) window.clearTimeout(timerRef.current)
     }
-  }, [toast])
+  }, [localToast])
 
   function drop(e: ReactDragEvent<HTMLElement>): void {
     e.preventDefault()
@@ -89,7 +89,7 @@ export function DropZone() {
     if (!dt) return
     const result = collectFiles(dt) // DataTransfer is structurally a DropSource (no cast).
     stageFiles(result.entries)
-    if (result.skipped > 0) setToast(SKIP_TOAST)
+    if (result.skipped > 0) setLocalToast(SKIP_TOAST)
   }
 
   function browse(e: FormEvent<HTMLInputElement>): void {
@@ -131,6 +131,12 @@ export function DropZone() {
         onChange={browse}
         onClick={(e) => e.stopPropagation()} // programmatic .click() bubbles; stop it from re-entering the zone handler
       />
+      {localToast && (
+        <div className="dz-toast" role="status">
+          {localToast}
+        </div>
+      )}
+      {/* T-008-09 (D-5): app-level post-delete toast — sibling line beside the internal paste/skip toast. */}
       {toast && (
         <div className="dz-toast" role="status">
           {toast}

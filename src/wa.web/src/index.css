@@ -4,11 +4,13 @@
   --bg-elevated: #FFFFFF;
   --fg: #101418;
   --fg-muted: #5F6B7A;
+  --fg-faint: #93A0AF; /* T-008-03: missing UI-Reference §1 token */
   --accent: #4185F4;
   --accent-hover: #2F6FD8;
   --accent-soft: #EAF1FD;
   --border: #DDE2E8;
   --danger: #D6453D;
+  --danger-soft: #FBEBEA; /* T-008-03: missing UI-Reference §1 token */
   --success: #2E9E5B;
   --warning: #C77C11;
 
@@ -18,6 +20,7 @@
   --fs-small: 14px;
   --fs-tiny: 12px;
   --radius-sm: 6px;
+  --radius-md: 10px; /* T-008-03: missing UI-Reference §1 token */
   --radius-lg: 16px;
 }
 
@@ -28,14 +31,49 @@
     --bg-elevated: #1C2028;
     --fg: #E8EAED;
     --fg-muted: #8A94A3;
+    --fg-faint: #667080; /* T-008-03: missing UI-Reference §1 token */
     --accent: #5A9BF7;
     --accent-hover: #74ACF9;
     --accent-soft: #1B2A44;
     --border: #2A2F3A;
     --danger: #E3645C;
+    --danger-soft: #2B1817; /* T-008-03: missing UI-Reference §1 token */
     --success: #43B978;
     --warning: #E0A43C;
   }
+}
+
+/* T-008-07 (F-TRF-015): explicit stored theme wins over OS prefers-color-scheme in both directions.
+   The pre-paint script in index.html sets [data-theme] from the signed-in profile; guests have no
+   attribute → they stay on the @media (prefers-color-scheme: dark) fallback above. */
+html[data-theme='dark'] :root, html[data-theme='dark'] {
+  --bg: #0F1115;
+  --bg-subtle: #171A21;
+  --bg-elevated: #1C2028;
+  --fg: #E8EAED;
+  --fg-muted: #8A94A3;
+  --fg-faint: #667080; /* T-008-03: missing UI-Reference §1 token */
+  --accent: #5A9BF7;
+  --accent-hover: #74ACF9;
+  --accent-soft: #1B2A44;
+  --border: #2A2F3A;
+  --danger: #E3645C;
+  --danger-soft: #2B1817; /* T-008-03: missing UI-Reference §1 token */
+}
+
+html[data-theme='light'] :root, html[data-theme='light'] {
+  --bg: #FFFFFF;
+  --bg-subtle: #F5F6F8;
+  --bg-elevated: #FFFFFF;
+  --fg: #101418;
+  --fg-muted: #5F6B7A;
+  --fg-faint: #93A0AF; /* T-008-03: missing UI-Reference §1 token */
+  --accent: #4185F4;
+  --accent-hover: #2F6FD8;
+  --accent-soft: #EAF1FD;
+  --border: #DDE2E8;
+  --danger: #D6453D;
+  --danger-soft: #FBEBEA; /* T-008-03: missing UI-Reference §1 token */
 }
 
 body {
@@ -514,4 +552,417 @@ main:has(.sl) .dz {
 .ls-send-error {
   color: var(--danger);
   font-size: var(--fs-small);
+}
+
+/* T-008-03 (UI-Reference §5.5): app-wide top bar — flex row, wordmark left, sign-in/avatar right */
+.tb {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tb-wordmark {
+  font-size: var(--fs-small);
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.tb-avatar-wrap {
+  position: relative;
+}
+
+.tb-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--fg);
+  border: none;
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+
+.tb-signin {
+  min-height: 32px;
+  padding: 4px 16px;
+  background: transparent;
+  color: var(--fg-muted);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+
+.tb-signin:hover {
+  color: var(--fg);
+}
+
+.tb-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 200px;
+  padding: 8px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .06);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 10;
+}
+
+.tb-dropdown-row {
+  padding: 8px 12px;
+  background: transparent;
+  color: var(--fg);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  text-align: left;
+  cursor: pointer;
+}
+
+.tb-dropdown-row:hover {
+  background: var(--bg-subtle);
+}
+
+.tb-theme-select {
+  padding: 6px 8px;
+  background: var(--bg-subtle);
+  color: var(--fg-muted);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+}
+
+/* T-008-03 (UI-Reference §5.5): auth screen — mirrors .ls-card */
+.au {
+  width: 100%;
+  max-width: 560px;
+}
+
+.au-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.au-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.au-tab {
+  flex: 1;
+  min-height: 44px; /* F-TRF-017-4 touch targets */
+  padding: 12px 24px;
+  background: transparent;
+  color: var(--fg-muted);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-body);
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .au-tab {
+    transition: background-color 120ms ease-out;
+  }
+}
+
+.au-tab--active {
+  background: var(--accent-soft);
+  color: var(--fg);
+}
+
+.au-heading {
+  margin: 0;
+  font-size: var(--fs-h1);
+  line-height: 1.25;
+  text-align: center;
+}
+
+.au-label {
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+  text-align: left;
+}
+
+.au-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  background: var(--bg-subtle);
+  color: var(--fg);
+}
+
+.au-helper {
+  margin: 4px 0 0;
+  font-size: var(--fs-tiny);
+  color: var(--fg-muted);
+  text-align: left;
+}
+
+.au-error {
+  margin: 0;
+  padding: 8px 12px;
+  background: var(--danger-soft);
+  border-radius: var(--radius-sm);
+  color: var(--danger);
+  font-size: var(--fs-small);
+  text-align: left;
+}
+
+.au-continue-btn {
+  min-height: 44px; /* F-TRF-017-4 touch targets */
+  padding: 12px 24px;
+  background: var(--accent);
+  color: #FFFFFF;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-body);
+  cursor: pointer;
+}
+
+.au-continue-btn:hover {
+  background: var(--accent-hover);
+}
+
+/* Ghost button — reuses the existing ghost visual (ls-copyonly), no third variant */
+.au-ghost-btn {
+  min-height: 44px; /* F-TRF-017-4 touch targets */
+  padding: 12px 24px;
+  background: transparent;
+  color: var(--fg-muted);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+
+.au-ghost-btn:hover:not(:disabled) {
+  color: var(--fg);
+}
+
+.au-ghost-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* Focus-visible on every focusable au-/tb-/pf- element */
+.tb button:focus-visible,
+.tb select:focus-visible,
+.au button:focus-visible,
+.au input:focus-visible,
+.pf button:focus-visible,
+.pf select:focus-visible,
+.pf input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* T-008-07 (UI-Reference §5.5): profile screen — mirrors .au-card */
+.pf {
+  width: 100%;
+  max-width: 560px;
+}
+
+.pf-heading {
+  margin: 0 0 16px;
+  font-size: var(--fs-h1); /* mirrors .au-heading — there is no --fs-h2 token in index.css */
+  line-height: 1.3;
+  color: var(--fg);
+  text-align: left;
+}
+
+.pf-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+  text-align: left;
+}
+
+.pf-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  background: var(--bg-subtle);
+  color: var(--fg);
+}
+
+.pf-save-btn {
+  min-height: 44px; /* F-TRF-017-4 touch targets */
+  margin-top: 8px;
+  padding: 12px 24px;
+  background: var(--accent);
+  color: #FFFFFF;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+
+.pf-save-btn:hover {
+  background: var(--accent-hover);
+}
+
+.pf-save-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.pf-theme-select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  background: var(--bg-subtle);
+  color: var(--fg);
+}
+
+.pf-plan {
+  margin: 0;
+  padding: 8px 0;
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+}
+
+/* Danger-zone divider + slot — US-008-06's delete button ships in T-008-09 (UI-Reference §5.5). */
+.pf-divider {
+  border: none;
+  height: 1px;
+  background: var(--border);
+  margin: 16px 0;
+}
+
+.pf-danger-zone {
+  padding: 8px 0;
+  min-height: 24px; /* reserved slot — empty in T-008-07, button lands in T-008-09 */
+}
+
+.pf-error {
+  margin: 0;
+  padding: 8px 12px;
+  background: var(--danger-soft);
+  border-radius: var(--radius-sm);
+  color: var(--danger);
+  font-size: var(--fs-small);
+  text-align: left;
+}
+
+/* T-008-09 (FR-008-8, UI-Reference §5.5 danger zone): ghost-danger button + confirm modal */
+.pf-delete-btn {
+  min-height: 44px; /* F-TRF-017-4 touch targets — mirrors .au-ghost-btn */
+  padding: 12px 24px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+
+.pf-delete-btn:hover {
+  color: #FFFFFF;
+  background: var(--danger);   /* red-tinted → solid on hover (ghost-danger) */
+}
+
+.pf-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(16, 20, 24, 0.5);
+}
+
+.pf-modal {
+  width: 100%;
+  max-width: 480px;
+  padding: 24px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+}
+
+.pf-modal-title {
+  margin: 0 0 8px;
+  font-size: var(--fs-h1); /* mirrors .pf-heading — no --fs-h2 token in index.css */
+  line-height: 1.3;
+  color: var(--fg);
+  text-align: left;
+}
+
+.pf-modal-copy {
+  margin: 0 0 16px;
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+  text-align: left;
+}
+
+.pf-modal-error {
+  margin: 0 0 16px;
+  padding: 8px 12px;
+  background: var(--danger-soft);
+  border-radius: var(--radius-sm);
+  color: var(--danger);
+  font-size: var(--fs-small);
+  text-align: left;
+}
+
+.pf-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Cancel = ghost (au-ghost-btn pattern); Confirm = danger solid. */
+.pf-modal-cancel {
+  min-height: 44px; /* F-TRF-017-4 touch targets — mirrors .au-ghost-btn */
+  padding: 12px 24px;
+  background: transparent;
+  color: var(--fg-muted);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+
+.pf-modal-cancel:hover:not(:disabled) {
+  color: var(--fg);
+}
+
+.pf-modal-confirm {
+  min-height: 44px; /* F-TRF-017-4 touch targets */
+  padding: 12px 24px;
+  background: var(--danger);
+  color: #FFFFFF;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+
+.pf-modal-confirm:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.pf-modal-cancel:disabled,
+.pf-modal-confirm:disabled {
+  opacity: 0.55;
+  cursor: default;
 }

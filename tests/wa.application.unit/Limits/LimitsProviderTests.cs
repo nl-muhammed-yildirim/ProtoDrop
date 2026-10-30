@@ -236,6 +236,9 @@ public class LimitsProviderTests
             };
             return Task.FromResult(plan);
         }
+
+        // T-008-02: by-Id read (returns null or the row; never throws) — new IPlansStore member from the plan.
+        public Task<Plan?> GetByIdAsync(Guid planId, CancellationToken cancellationToken) => Task.FromResult<Plan?>(null);
     }
 
     private sealed class StubFlagsStore(IReadOnlyList<FeatureFlag> rows) : IFlagsStore

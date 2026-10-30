@@ -1,0 +1,9 @@
+Hi,
+
+Sign in to your ProtoDrop account.
+
+Sign in: {{CtaUrl}}
+
+This link expires in about {{MinutesRemaining}} minutes.
+
+If you did not request this link, you can safely ignore this email — no access was granted.

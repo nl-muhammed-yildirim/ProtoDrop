@@ -5,6 +5,20 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>wa.web</title>
+    <!-- T-008-07 (F-TRF-015): apply the signed-in user's stored theme before React paints, so dark
+         survives sign-out/sign-in with no flash of wrong theme. Guests (no profile) get no attribute →
+         CSS falls back to @media (prefers-color-scheme: dark). Server value wins — this reads the
+         session mirror written by App on sign-in, which mirrors GET /auth/me exactly. -->
+    <script>
+      try {
+        var p = JSON.parse(localStorage.getItem('protoDrop.session') || 'null'); // SESSION_KEY from core/auth/session.ts — NOT the cookie name (wa.session is HttpOnly)
+        if (p && typeof p.theme === 'string' && p.theme !== 'system') {
+          document.documentElement.setAttribute('data-theme', p.theme);
+        } else {
+          document.documentElement.removeAttribute('data-theme');
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
