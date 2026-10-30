@@ -78,6 +78,43 @@ public sealed class TransferStore : ITransferStore
         return (items, nextCursor);
     }
 
+    /// <summary>
+    /// T-009-03 (TA-4.2#15): owner-scoped My Files detail — three bounded queries total (AC-009-1: no per-row round-trips).
+    /// Row predicate Id=@id AND OwnerAppUserId=@ownerId AND DeletedAtUtc==null in ONE query → foreign owner / guest-created
+    /// / deleted / unknown id are all indistinguishable nulls (no FORBIDDEN path; enumeration-safe). Separate projections for
+    /// files + recipients (PublicTransferStore.GetByLinkIdAsync idiom — no navigation from Transfer; golden rule 8: no EF
+    /// entities in use cases), AsNoTracking throughout.
+    /// </summary>
+    public async Task<GetMyTransferResult?> GetByOwnerAsync(Guid ownerId, Guid id, CancellationToken ct)
+    {
+        var t = await _db.Set<Transfer>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Id == id && t.OwnerAppUserId == ownerId && t.DeletedAtUtc == null, ct);
+        if (t is null) return null;
+
+        var files = await _db.Set<FileItem>()
+            .AsNoTracking()
+            .Where(f => f.TransferId == id)
+            .OrderBy(f => f.SortOrder)
+            .ThenBy(f => f.Id)
+            .Select(f => new GetMyTransferFile(f.OriginalName, f.SizeBytes))
+            .ToListAsync(ct);
+
+        // Row Name = first file's OriginalName by SortOrder/Id or "Transfer" — mirrors ListByOwnerAsync's row shape (FR-009-1).
+        var name = files.FirstOrDefault()?.Name ?? "Transfer";
+
+        var recipients = await _db.Set<EmailRecipient>()
+            .AsNoTracking()
+            .Where(r => r.TransferId == id)
+            .OrderBy(r => r.Id)
+            .Select(r => r.Address)
+            .ToListAsync(ct);
+
+        return new GetMyTransferResult(
+            new MyTransferRow(t.Id, name, t.FileCount, t.TotalBytes, t.Status, t.ExpiresAtUtc, t.DownloadsCount, t.MaxDownloads, recipients.Count),
+            files, recipients);
+    }
+
     public async Task SaveFinalizeAsync(Transfer transfer, IReadOnlyList<BlobRef> blobRefs, IReadOnlyList<FileItem> fileItems, IdempotencyKey idempotencyKey, CancellationToken ct)
     {
         await using var tx = await _db.Database.BeginTransactionAsync(ct);

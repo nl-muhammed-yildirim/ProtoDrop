@@ -25,4 +25,11 @@ public interface ITransferStore
     /// T-009-02 (US-009-02): optional statuses byte set — rows where Status IN the set (null = no status predicate / all).
     /// </summary>
     Task<(List<MyTransferRow> Items, string? NextCursor)> ListByOwnerAsync(Guid ownerId, DateTime? afterUtc, Guid? afterIdExcluded, int limit, IReadOnlyCollection<byte>? statuses, CancellationToken ct);
+
+    /// <summary>
+    /// T-009-03 (TA-4.2#15): owner-scoped My Files detail — non-deleted row where Id=@id AND OwnerAppUserId=@ownerId
+    /// (both predicates in ONE query → foreign owner / guest / deleted are indistinguishable nulls), plus the files +
+    /// recipients projections; null when no match. Three bounded queries total (AC-009-1: no extra round-trips per row).
+    /// </summary>
+    Task<GetMyTransferResult?> GetByOwnerAsync(Guid ownerId, Guid id, CancellationToken ct);
 }

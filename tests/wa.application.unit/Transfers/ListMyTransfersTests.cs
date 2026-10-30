@@ -233,5 +233,9 @@ public class ListMyTransfersTests
 
             return Task.FromResult((items, nextCursor));
         }
+
+        // T-009-03: signature-only — not exercised by ListMyTransfers facts; null = the endpoint's NOT_FOUND path.
+        public Task<GetMyTransferResult?> GetByOwnerAsync(Guid ownerId, Guid id, CancellationToken ct) =>
+            Task.FromResult<GetMyTransferResult?>(null);
     }
 }

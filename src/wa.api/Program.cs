@@ -653,6 +653,35 @@ app.MapGet("/api/v1/transfers", async (HttpContext ctx, HttpRequest request, ISe
     }, statusCode: 200);
 });
 
+// T-009-03 (TA-4.2#15): GET /api/v1/transfers/{id} — the session user's transfer detail: row + per-file rows + recipients.
+app.MapGet("/api/v1/transfers/{id}", async (Guid id, HttpContext ctx, ISender sender, CancellationToken ct) =>
+{
+    // Shared session-read idiom (T-008-02): SessionMiddleware.SessionUserIdKey as Guid? — null for guests.
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+
+    // T-009-03: null result = foreign owner / guest-created / deleted / unknown — ONE indistinguishable case (no FORBIDDEN).
+    var result = await sender.Send(new GetMyTransferQuery(id, userId), ct);
+    if (result is null)
+        throw new BusinessException(ProblemCodes.NotFound, "Transfer not found.");
+
+    // TA-4.2a single-construction-site rule: T-009-01's exact row wire names (UI treats list rows and detail identically)
+    // PLUS the per-file rows + recipient addresses (FR-009-3 row actions copy-link / view / re-send / delete).
+    return Results.Json(new
+    {
+        id = result.Row.Id.ToString("n"),
+        name = result.Row.Name,
+        fileCount = result.Row.FileCount,
+        totalBytes = result.Row.TotalBytes,
+        status = result.Row.Status,
+        expiresAtUtc = result.Row.ExpiresAtUtc,
+        downloadsCount = result.Row.DownloadsCount,
+        maxDownloads = result.Row.MaxDownloads,
+        recipientCount = result.Row.RecipientCount,
+        files = result.Files.Select(f => new { name = f.Name, sizeBytes = f.SizeBytes }),
+        recipients = result.Recipients
+    }, statusCode: 200);
+});
 
 // T-008-06 (FR-008-8 / TA-4.2#13): DELETE /api/v1/auth/me — soft-delete + re-home transfers + account_deleted once.
 app.MapDelete("/api/v1/auth/me", async (HttpContext ctx, ISender sender, CancellationToken ct) =>

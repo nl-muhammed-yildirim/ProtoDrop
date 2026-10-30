@@ -645,6 +645,9 @@ public class SendTransferHandlerTests
 
         public Task<(List<MyTransferRow> Items, string? NextCursor)> ListByOwnerAsync(Guid ownerId, DateTime? afterUtc, Guid? afterIdExcluded, int limit, IReadOnlyCollection<byte>? statuses, CancellationToken ct) =>
             Task.FromResult<(List<MyTransferRow>, string?)>(([], null)); // T-009-01: not exercised by send tests — empty page (T-009-02: signature-only).
+
+        public Task<GetMyTransferResult?> GetByOwnerAsync(Guid ownerId, Guid id, CancellationToken ct) =>
+            Task.FromResult<GetMyTransferResult?>(null); // T-009-03: not exercised by send tests — signature-only.
     }
 
     private sealed class RecordingTelemetryLogger : ILogger<WaTelemetryReporter>
