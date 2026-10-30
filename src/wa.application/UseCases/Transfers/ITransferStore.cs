@@ -22,6 +22,7 @@ public interface ITransferStore
     /// T-009-01 (TA-4.1.4): owner-scoped My Files page — non-deleted transfers where OwnerAppUserId=@ownerId, ordered by
     /// CreatedAtUtc DESC, resumed after the given cursor row ((CreatedAtUtc &lt; @afterUtc) OR (= and Id &lt; @afterIdExcluded)),
     /// taking @limit+1 to detect a further page; NextCursor is encoded from the last returned row (null when no next page).
+    /// T-009-02 (US-009-02): optional statuses byte set — rows where Status IN the set (null = no status predicate / all).
     /// </summary>
-    Task<(List<MyTransferRow> Items, string? NextCursor)> ListByOwnerAsync(Guid ownerId, DateTime? afterUtc, Guid? afterIdExcluded, int limit, CancellationToken ct);
+    Task<(List<MyTransferRow> Items, string? NextCursor)> ListByOwnerAsync(Guid ownerId, DateTime? afterUtc, Guid? afterIdExcluded, int limit, IReadOnlyCollection<byte>? statuses, CancellationToken ct);
 }

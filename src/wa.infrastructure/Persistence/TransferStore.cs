@@ -37,10 +37,12 @@ public sealed class TransferStore : ITransferStore
     /// via scalar subquery over EmailRecipient (EF translates to a scalar subselect — no N+1); Name = first FileItem.OriginalName
     /// ordered by SortOrder then Id, or literal "Transfer" when the transfer has no files (no SelectMany per row).
     /// </summary>
-    public async Task<(List<MyTransferRow> Items, string? NextCursor)> ListByOwnerAsync(Guid ownerId, DateTime? afterUtc, Guid? afterIdExcluded, int limit, CancellationToken ct)
+    public async Task<(List<MyTransferRow> Items, string? NextCursor)> ListByOwnerAsync(Guid ownerId, DateTime? afterUtc, Guid? afterIdExcluded, int limit, IReadOnlyCollection<byte>? statuses, CancellationToken ct)
     {
         var rows = await _db.Set<Transfer>()
             .Where(t => t.OwnerAppUserId == ownerId && t.DeletedAtUtc == null)
+            // T-009-02 (US-009-02): status predicate only when a byte set is given — null = all.
+            .Where(t => statuses == null || statuses.Contains(t.Status))
             .Where(t => afterUtc == null || t.CreatedAtUtc < afterUtc.Value || (t.CreatedAtUtc == afterUtc.Value && t.Id < afterIdExcluded!.Value))
             .OrderByDescending(t => t.CreatedAtUtc)
             .ThenByDescending(t => t.Id)

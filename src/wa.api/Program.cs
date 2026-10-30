@@ -618,7 +618,22 @@ app.MapGet("/api/v1/transfers", async (HttpContext ctx, HttpRequest request, ISe
             throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
         }
 
-    var result = await sender.Send(new ListMyTransfersQuery(userId, cursor, parsedLimit), ct);
+    // T-009-02 (US-009-02): optional ?status=all|active|expired (case-insensitive; absent → all).
+    // Resolved byte set threaded into the query — null = no status predicate (all), {1} = active, {2,3} = expired.
+    static IReadOnlyCollection<byte>? ResolveStatusFilter(HttpRequest request)
+    {
+        var raw = request.Query["status"].FirstOrDefault();
+        if (raw is null) return null;
+        return raw.Trim().ToLowerInvariant() switch
+        {
+            "all" => null,
+            "active" => new byte[] { 1 },
+            "expired" => new byte[] { 2, 3 }, // US-009-02: Status IN (2,3) — download-limit included
+            _ => throw new BusinessException(ProblemCodes.Validation, "status must be one of all / active / expired.")
+        };
+    }
+
+    var result = await sender.Send(new ListMyTransfersQuery(userId, cursor, parsedLimit, ResolveStatusFilter(request)), ct);
     // TA-4.2a single-construction-site rule: 'n'-form id (signup/login style); opaque nextCursor as returned (null = last page).
     return Results.Json(new
     {

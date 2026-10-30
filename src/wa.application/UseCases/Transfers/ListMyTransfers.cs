@@ -4,7 +4,7 @@ using wa.domain.Transfers;
 namespace wa.application.UseCases.Transfers;
 
 /// <summary>T-009-01 (TA-4.2#14): GET /api/v1/transfers — the session user's transfers, cursor-paged, most recent first.</summary>
-public sealed record ListMyTransfersQuery(Guid OwnerId, string? Cursor, int Limit) : IRequest<ListMyTransfersResult>;
+public sealed record ListMyTransfersQuery(Guid OwnerId, string? Cursor, int Limit, IReadOnlyCollection<byte>? Statuses = null) : IRequest<ListMyTransfersResult>;
 
 /// <summary>One row of the My Files history list (US-009-01 happy-path payload — no extra round-trips per row).</summary>
 public sealed record MyTransferRow(
@@ -44,7 +44,7 @@ public sealed class ListMyTransfersHandler : IRequestHandler<ListMyTransfersQuer
             (afterUtc, afterIdExcluded) = CursorCodec.Decode(request.Cursor);
         }
 
-        var (items, nextCursor) = await _transfers.ListByOwnerAsync(request.OwnerId, afterUtc, afterIdExcluded, request.Limit, cancellationToken);
+        var (items, nextCursor) = await _transfers.ListByOwnerAsync(request.OwnerId, afterUtc, afterIdExcluded, request.Limit, request.Statuses, cancellationToken);
         return new ListMyTransfersResult(items, nextCursor);
     }
 }

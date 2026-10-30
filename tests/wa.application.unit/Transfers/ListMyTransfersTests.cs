@@ -90,6 +90,112 @@ public class ListMyTransfersTests
     private static DateTime CreatedOf(StubTransferStore store, Guid id) =>
         store.Transfers.First(t => t.Id == id).CreatedAtUtc;
 
+    // ---- US-009-02 (AC): 5 active + 4 expired → ?status=active lists exactly the 5 active ----
+    [Fact]
+    public async Task Filter_Active_ReturnsOnlyStatus1()
+    {
+        var store = new StubTransferStore();
+        // 5 active rows (Status=1) interleaved with 2 expired (Status=2) and 2 download-limit (Status=3).
+        for (int i = 0; i < 9; i++)
+            store.Transfers.Add(new Transfer
+            {
+                Id = Guid.NewGuid(), OwnerAppUserId = OwnerId,
+                Status = (byte)(i < 5 ? 1 : (i % 2 == 0 ? 2 : 3)),
+                CreatedAtUtc = BaseUtc.AddSeconds(i * 60)
+            });
+        var activeIds = store.Transfers.Where(t => t.Status == 1).Select(t => t.Id).ToHashSet();
+        Assert.Equal(5, activeIds.Count);
+
+        var handler = new ListMyTransfersHandler(store);
+        var result = await handler.Handle(new ListMyTransfersQuery(OwnerId, null, 25, new byte[] { 1 }), CancellationToken.None);
+
+        // Exactly the 5 Status=1 rows — no expired/download-limit rows leak in.
+        Assert.Equal(activeIds, result.Items.Select(r => r.Id).ToHashSet());
+        Assert.All(result.Items, r => Assert.Equal(1, r.Status));
+    }
+
+    // ---- US-009-02 (AC): ?status=expired lists exactly the 4 Status IN (2,3) rows — download-limit included ----
+    [Fact]
+    public async Task Filter_Expired_ReturnsStatus2And3()
+    {
+        var store = new StubTransferStore();
+        for (int i = 0; i < 9; i++)
+            store.Transfers.Add(new Transfer
+            {
+                Id = Guid.NewGuid(), OwnerAppUserId = OwnerId,
+                Status = (byte)(i < 5 ? 1 : (i % 2 == 0 ? 2 : 3)),
+                CreatedAtUtc = BaseUtc.AddSeconds(i * 60)
+            });
+        var expiredIds = store.Transfers.Where(t => t.Status is 2 or 3).Select(t => t.Id).ToHashSet();
+        Assert.Equal(4, expiredIds.Count); // 2 Status=2 + 2 Status=3
+
+        var handler = new ListMyTransfersHandler(store);
+        var result = await handler.Handle(new ListMyTransfersQuery(OwnerId, null, 25, new byte[] { 2, 3 }), CancellationToken.None);
+
+        // FR-009-4 chip mapping: expired = Status IN (2,3) — download-limit rows are included.
+        Assert.Equal(expiredIds, result.Items.Select(r => r.Id).ToHashSet());
+        Assert.All(result.Items, r => Assert.True(r.Status is 2 or 3));
+    }
+
+    // ---- US-009-02 (AC): ?status=all or omitted → all 9 rows, most recent first ----
+    [Fact]
+    public async Task Filter_AllOrOmitted_ReturnsAllMostRecentFirst()
+    {
+        var store = new StubTransferStore();
+        for (int i = 0; i < 9; i++)
+            store.Transfers.Add(new Transfer
+            {
+                Id = Guid.NewGuid(), OwnerAppUserId = OwnerId,
+                Status = (byte)(i < 5 ? 1 : (i % 2 == 0 ? 2 : 3)),
+                CreatedAtUtc = BaseUtc.AddSeconds(i * 60)
+            });
+
+        var handler = new ListMyTransfersHandler(store);
+        // Explicit all (the endpoint resolves ?status=all to a null byte set).
+        var result = await handler.Handle(new ListMyTransfersQuery(OwnerId, null, 25, null), CancellationToken.None);
+
+        Assert.Equal(9, result.Items.Count);
+        // Most recent first: CreatedAtUtc strictly descending.
+        for (int i = 1; i < result.Items.Count; i++)
+            Assert.True(CreatedOf(store, result.Items[i - 1].Id) > CreatedOf(store, result.Items[i].Id),
+                "Items must be ordered by CreatedAtUtc DESC");
+    }
+
+    // ---- US-009-02 edge case: filter + cursor compose — page 2 of active stays inside the active set only ----
+    [Fact]
+    public async Task Filter_And_Cursor_Page2_StaysWithinActiveSet()
+    {
+        var store = new StubTransferStore();
+        // 30 active rows with 15 expired rows interleaved (every third row is Status=2).
+        for (int i = 0; i < 45; i++)
+            store.Transfers.Add(new Transfer
+            {
+                Id = Guid.NewGuid(), OwnerAppUserId = OwnerId,
+                Status = (byte)(i % 3 == 0 ? 2 : 1),
+                CreatedAtUtc = BaseUtc.AddSeconds(i * 60)
+            });
+
+        var handler = new ListMyTransfersHandler(store);
+        byte[] active = [1];
+        var page1 = await handler.Handle(new ListMyTransfersQuery(OwnerId, null, 25, active), CancellationToken.None);
+        Assert.Equal(25, page1.Items.Count);
+        Assert.NotEmpty(page1.NextCursor!); // 30 active > 25 — a next page must exist
+
+        var page2 = await handler.Handle(new ListMyTransfersQuery(OwnerId, page1.NextCursor!, 25, active), CancellationToken.None);
+
+        // Page 2: the remaining 5 active rows — still only Status=1, no dupes/gaps vs page 1.
+        Assert.Equal(5, page2.Items.Count);
+        Assert.Null(page2.NextCursor);
+        Assert.All(page2.Items, r => Assert.Equal(1, r.Status));
+        var page1Ids = page1.Items.Select(r => r.Id).ToHashSet();
+        foreach (var row in page2.Items)
+            Assert.DoesNotContain(row.Id, page1Ids);
+
+        // Union of both pages is the complete active set (no gaps).
+        var allActiveIds = store.Transfers.Where(t => t.Status == 1).Select(t => t.Id).ToHashSet();
+        Assert.Equal(allActiveIds, page1Ids.Union(page2.Items.Select(r => r.Id)).ToHashSet());
+    }
+
     // ---- Stubs (T-008-06 style — hand-written, no Moq) ----
     private sealed class StubTransferStore : ITransferStore
     {
@@ -103,13 +209,15 @@ public class ListMyTransfersTests
         public Task<int> GetActiveTransferCountAsync(Guid ownerId, CancellationToken ct) => Task.FromResult(0);
 
         /// <summary>
-        /// Simulates the EF store contract (TA-4.1.4): filter OwnerAppUserId == ownerId + cursor predicate,
+        /// Simulates the EF store contract (TA-4.1.4): filter OwnerAppUserId == ownerId + status set + cursor predicate,
         /// order CreatedAtUtc desc then Id desc, Take(limit+1), encode nextCursor from the last returned row.
+        /// T-009-02 (US-009-02): honors the statuses byte set — null = no status predicate (all).
         /// </summary>
-        public Task<(List<MyTransferRow> Items, string? NextCursor)> ListByOwnerAsync(Guid ownerId, DateTime? afterUtc, Guid? afterIdExcluded, int limit, CancellationToken ct)
+        public Task<(List<MyTransferRow> Items, string? NextCursor)> ListByOwnerAsync(Guid ownerId, DateTime? afterUtc, Guid? afterIdExcluded, int limit, IReadOnlyCollection<byte>? statuses, CancellationToken ct)
         {
             var filtered = Transfers
                 .Where(t => t.OwnerAppUserId == ownerId && t.DeletedAtUtc == null)
+                .Where(t => statuses is null || statuses.Contains(t.Status))
                 .Where(t => afterUtc is null || t.CreatedAtUtc < afterUtc.Value || (t.CreatedAtUtc == afterUtc.Value && t.Id < afterIdExcluded!.Value))
                 .OrderByDescending(t => t.CreatedAtUtc)
                 .ThenByDescending(t => t.Id)
