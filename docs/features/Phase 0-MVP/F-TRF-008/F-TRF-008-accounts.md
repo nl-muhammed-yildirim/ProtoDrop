@@ -94,7 +94,7 @@ AC-008-3: Signed-in user creates a transfer
 | US-008-03 | T-008-05 ForgotPasswordCommand + endpoint 11: anti-enumeration link (FR-008-6) | `US-008-03-forgot-password/T-008-05-forgot-password-endpoint.md` | ☑ 2026-10-29 |
 | US-008-04 + US-008-06 | T-008-06 GET/PATCH/DELETE /auth/me + logout (endpoint 12–13) | `US-008-04-profile/T-008-06-me-endpoints.md` | ☑ 2026-10-29 |
 | US-008-04 | T-008-07 Profile screen: name, theme, plan + avatar menu (UI-Reference §5.5) | `US-008-04-profile/T-008-07-profile-screen-ui.md` | ☑ 2026-10-30 |
-| US-008-05 | T-008-08 Send-time attribution: owner + "From" default (FR-008-7) | `US-008-05-attribution/T-008-08-send-time-attribution.md` | ☐ |
+| US-008-05 | T-008-08 Send-time attribution: owner + "From" default (FR-008-7) | `US-008-05-attribution/T-008-08-send-time-attribution.md` | ☑ 2026-10-30 |
 | US-008-06 | T-008-09 Danger zone: delete account confirm modal + post-delete redirect (FR-008-8) | `US-008-06-delete-account/T-008-09-delete-account-ui.md` | ☐ |
 
 **Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-021 can be marked `done` in `Milestone-Backlog.md`. (T-022 My Files attribution depends on this feature.)
