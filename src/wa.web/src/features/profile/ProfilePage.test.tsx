@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ProfilePage from './ProfilePage'
 import App from '../../App'
 import type { StoredProfile } from '../../core/auth/session'
-import { clearSession, writeSession } from '../../core/auth/session'
+import { clearSession, readSession, writeSession } from '../../core/auth/session'
 
 ;(globalThis as unknown as Record<string, boolean>).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -31,6 +31,7 @@ function renderProfilePage(
   profile: StoredProfile,
   onSignedIn?: (p: StoredProfile) => void,
   onThemeChange?: (t: 'system' | 'light' | 'dark') => void,
+  onDeleteAccount?: () => void,
 ): { host: HTMLElement; cleanup: () => void } {
   const host = document.createElement('div')
   document.body.appendChild(host)
@@ -41,6 +42,7 @@ function renderProfilePage(
         profile,
         onSignedIn: onSignedIn ?? (() => {}),
         onThemeChange: onThemeChange ?? (() => {}),
+        onDeleteAccount: onDeleteAccount ?? (() => {}),   // T-008-09: no-op default — the D-6 full-App tests cover the real handler.
       }),
     )
   })
@@ -206,6 +208,139 @@ describe('ProfilePage (T-008-07)', () => {
     expect(captured.init?.credentials).toBe('include')
     // Session cleared → TopBar flips back to the guest "Sign in" button.
     expect(host.innerHTML).toContain('<button type="button" class="tb-signin"')
+    root.unmount()
+    host.remove()
+  })
+
+  function navigateToProfile(): void {
+    window.history.pushState('', '', '/account/profile')
+    window.dispatchEvent(new PopStateEvent('popstate'))   // App's popstate listener updates pathname.
+  }
+
+  it('cancel: no request sent, modal closes, session unchanged (exit check d)', async () => {
+    const captured: { url?: string; init?: RequestInit } = {}
+    stubFetch(captured, () => { throw new Error('no requests allowed on the cancel path') })
+
+    writeSession(BASE_PROFILE)
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    act(() => {
+      void root.render(createElement(App))
+    })
+    await act(async () => { navigateToProfile() })
+
+    // Open the confirm modal via the danger-zone button.
+    const deleteBtn = host.querySelector('.pf-delete-btn') as HTMLButtonElement
+    act(() => { deleteBtn.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    expect(host.innerHTML).toContain('pf-modal-copy')   // modal is open
+
+    const cancelBtn = Array.from(host.querySelectorAll('.pf-modal-cancel'))[0] as HTMLButtonElement
+    act(() => { cancelBtn.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+
+    // Exit check d: no request, modal unmounted, delete button still visible, session intact.
+    expect(captured.url).toBeUndefined()   // fetch never called (stub throws if it were)
+    expect(host.innerHTML).not.toContain('pf-modal')
+    expect(host.querySelector('.pf-delete-btn')).toBeTruthy()
+    expect(readSession()).toEqual(BASE_PROFILE)
+    root.unmount()
+    host.remove()
+  })
+
+  it('confirm happy path: DELETE /auth/me with credentials → guest landing + toast + session cleared (exit checks a + c)', async () => {
+    const captured: { url?: string; init?: RequestInit } = {}
+    let calls = 0
+    stubFetch(captured, () => {
+      calls++
+      return Promise.resolve(new Response(JSON.stringify({ userId: '1' }), { status: 200 }))
+    })
+
+    writeSession(BASE_PROFILE)
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    act(() => {
+      void root.render(createElement(App))
+    })
+    await act(async () => { navigateToProfile() })
+
+    const deleteBtn = host.querySelector('.pf-delete-btn') as HTMLButtonElement
+    act(() => { deleteBtn.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+
+    const confirmBtn = Array.from(host.querySelectorAll('.pf-modal-confirm'))[0] as HTMLButtonElement
+    await act(async () => {
+      confirmBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await Promise.resolve()   // DangerZone awaits the fetch…
+      await Promise.resolve()   // …then App's synchronous clear + redirect block flushes.
+    })
+
+    // Exit check a (client half): exactly one DELETE /auth/me with credentials, no more.
+    expect(calls).toBe(1)
+    expect(captured.url).toContain('/auth/me')
+    expect(captured.init?.method).toBe('DELETE')
+    expect(captured.init?.credentials).toBe('include')
+    // Exit check c: guest TopBar + landing toast + session gone.
+    expect(host.innerHTML).toContain('<button type="button" class="tb-signin"')
+    const statusDivs = Array.from(host.querySelectorAll('[role="status"]'))
+    expect(statusDivs.some((d) => d.textContent === 'Your account was deleted.')).toBe(true)
+    expect(readSession()).toBeNull()
+    root.unmount()
+    host.remove()
+  })
+
+  it('confirm → non-2xx: modal stays open with inline alert, session unchanged, no redirect (D-1 error path)', async () => {
+    const captured: { url?: string; init?: RequestInit } = {}
+    stubFetch(captured, () => {
+      // T-008-06 problem shape (401 UNAUTHENTICATED — expired cookie; 404 covers the double-delete).
+      return Promise.resolve(new Response(JSON.stringify({ title: 'UNAUTHENTICATED' }), { status: 401 }))
+    })
+
+    writeSession(BASE_PROFILE)
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    act(() => {
+      void root.render(createElement(App))
+    })
+    await act(async () => { navigateToProfile() })
+
+    const deleteBtn = host.querySelector('.pf-delete-btn') as HTMLButtonElement
+    act(() => { deleteBtn.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+
+    const confirmBtn = Array.from(host.querySelectorAll('.pf-modal-confirm'))[0] as HTMLButtonElement
+    await act(async () => {
+      confirmBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    // Modal still open with the inline role="alert" error; account untouched; no redirect.
+    expect(host.innerHTML).toContain('pf-modal-copy')
+    const alertLines = Array.from(host.querySelectorAll('[role="alert"]'))
+    expect(alertLines.some((p) => p.textContent === 'Could not delete your account. Please try again.')).toBe(true)
+    expect(readSession()).toEqual(BASE_PROFILE)
+    expect(window.location.pathname).toBe('/account/profile')
+    root.unmount()
+    host.remove()
+  })
+
+  it('GDPR copy pinned: the exact task-spec string with {display name} interpolated (exit check b)', async () => {
+    const ada: StoredProfile = { ...BASE_PROFILE, displayName: 'Ada Lovelace' }
+    writeSession(ada)
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    act(() => {
+      void root.render(createElement(App))
+    })
+    await act(async () => { navigateToProfile() })
+
+    const deleteBtn = host.querySelector('.pf-delete-btn') as HTMLButtonElement
+    act(() => { deleteBtn.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+
+    // The pinned copy — verbatim, display name interpolated at render time (D-3).
+    expect(host.querySelector('.pf-modal-copy')!.textContent)
+      .toBe("Your account and profile are deleted. Your active transfers keep working and show 'From: Ada Lovelace' without your email.")
     root.unmount()
     host.remove()
   })

@@ -37,6 +37,15 @@ export default function App() {
   const unsubscribeToken = matchUnsubscribePath(pathname)
   const hasFiles = useUploadEngine((s) => s.files.length > 0)
 
+  // T-008-09 (D-5): post-delete toast — App state survives the ProfilePage unmount on redirect; DropZone renders it.
+  const [deleteToast, setDeleteToast] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!deleteToast) return
+    const t = window.setTimeout(() => setDeleteToast(null), 5000)   // DropZone toast precedent: 5 s auto-dismiss
+    return () => window.clearTimeout(t)
+  }, [deleteToast])
+
   const goHome = () => {
     window.history.pushState('', '', '/')
     window.dispatchEvent(new PopStateEvent('popstate')) // existing popstate listener updates pathname.
@@ -50,6 +59,16 @@ export default function App() {
     clearSession()
     setSession(null)
     goHome()
+  }
+
+  const handleDeleteAccount = () => {
+    // T-008-09 (FR-008-8): DELETE already returned 2xx — account is gone server-side, cookie cleared by the API.
+    // Order matters (unlike sign-out's fire-and-forget D-3 of T-008-07): the toast claims success, so it only
+    // fires on a confirmed 2xx; local state then clears unconditionally — a failed server outcome is impossible here.
+    clearSession()
+    setSession(null)
+    setDeleteToast('Your account was deleted.')
+    goHome()   // pushState / + popstate dispatch (existing App helper) → ProfilePage unmounts, landing renders.
   }
 
   const handleThemeChange = (theme: 'system' | 'light' | 'dark') => {
@@ -74,7 +93,7 @@ export default function App() {
         {unsubscribeToken !== null ? (
           <UnsubscribePage token={unsubscribeToken} />
         ) : session && matchProfilePath(pathname) ? (
-          <ProfilePage profile={session} onSignedIn={setSession} onThemeChange={handleThemeChange} />
+          <ProfilePage profile={session} onSignedIn={setSession} onThemeChange={handleThemeChange} onDeleteAccount={handleDeleteAccount} />
         ) : matchAccountPath(pathname) ? (
           // Signed-out guest keeps the sign-in card; /account/profile with no session falls
           // through here too (it still matches ACCOUNT_PATH_RE — order above is what wins).
@@ -83,7 +102,7 @@ export default function App() {
           <RecipientPage linkId={linkId} />
         ) : (
           <>
-            <DropZone />
+            <DropZone toast={deleteToast} />
             {hasFiles && <StagingList />}
           </>
         )}

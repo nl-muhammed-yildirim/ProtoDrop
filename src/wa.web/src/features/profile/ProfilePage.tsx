@@ -1,24 +1,26 @@
 import { useState } from 'react'
 
 import type { StoredProfile } from '../../core/auth/session'
+import DangerZone from './DangerZone'
 
 // T-008-06 wire (TA-4.2#12–13), verified against src/wa.api/Program.cs — GET/PATCH /auth/me + logout:
-const ME_BASE = 'http://localhost:8080/api/v1/auth/me'   // fixed-port absolute, AuthPage API_BASE precedent
+export const ME_BASE = 'http://localhost:8080/api/v1/auth/me'   // fixed-port absolute, AuthPage API_BASE precedent; shared with DangerZone (T-008-09 D-1)
 
 interface ProfilePageProps {
   profile: StoredProfile                     // App owns the session; this is a prop (UnsubscribePage pattern)
   onSignedIn: (p: StoredProfile) => void      // App re-sets session state after a successful PATCH
   onThemeChange: (theme: 'system' | 'light' | 'dark') => void   // shared with TopBar — single source of truth in App
+  onDeleteAccount: () => void                // T-008-09: App.handleDeleteAccount — fires after the 2xx DELETE (D-2).
 }
 
 /**
  * T-008-07 (UI-Reference §5.5): profile screen at /account/profile (signed-in only).
  * Display name input + Save (PATCH { displayName }), theme select (PATCH { theme } — server-wins, F-TRF-015),
- * read-only plan line, divider, reserved danger-zone slot (T-008-09). First signed-in client fetch:
- * credentials: 'include' carries the HttpOnly wa.session cookie cross-origin. Sign out is via TopBar only
- * (D-4), so no button here and no onSignOut prop (App wires it at App level, D-3/D-6).
+ * read-only plan line, divider, danger-zone slot with the Delete account button + GDPR confirm modal (T-008-09).
+ * First signed-in client fetch: credentials: 'include' carries the HttpOnly wa.session cookie cross-origin.
+ * Sign out is via TopBar only (D-4), so no button here and no onSignOut prop (App wires it at App level, D-3/D-6).
  */
-export function ProfilePage({ profile, onSignedIn, onThemeChange }: ProfilePageProps) {
+export function ProfilePage({ profile, onSignedIn, onThemeChange, onDeleteAccount }: ProfilePageProps) {
   const [name, setName] = useState(profile.displayName)
   const [theme, setThemeLocal] = useState<'system' | 'light' | 'dark'>(profile.theme)
   const [savingName, setSavingName] = useState(false)
@@ -93,10 +95,10 @@ export function ProfilePage({ profile, onSignedIn, onThemeChange }: ProfilePageP
       </select>
       {/* Plan line — read-only in MVP (FR-008-4: "Free by default"). planCode comes from the session DTO; no extra fetch. */}
       <p className="pf-plan">{profile.planCode === 'free' ? 'Free' : profile.planCode}</p>
-      {/* Danger zone divider + slot — US-008-06's Delete account button ships in T-008-09; reserve the slot, NOT the confirm modal. */}
+      {/* Danger zone divider + slot — US-008-06's Delete account button + GDPR confirm modal (T-008-09 D-1/D-4). */}
       <hr className="pf-divider" />
       <div className="pf-danger-zone" aria-label="Danger zone">
-        {/* T-008-09: delete-account button + GDPR confirm modal land here */}
+        <DangerZone profile={profile} onDeleteAccount={onDeleteAccount} />
       </div>
       {error && <p role="alert" className="pf-error">{error}</p>}
     </div>
