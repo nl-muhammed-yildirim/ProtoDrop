@@ -86,6 +86,6 @@ AC-009-3: Expired row
 | US-009-01 | T-009-03 GetMyTransferQuery + endpoint 15: owner detail incl. recipient list (TA-4.2#15) | `US-009-01-history-list/T-009-03-transfer-detail-endpoint.md` | ☑ |
 | US-009-04 | T-009-04 DeleteTransferCommand + endpoint 17: owner delete, refcount path (FR-009-3) | `US-009-04-delete/T-009-04-delete-transfer-endpoint.md` | ☑ |
 | US-009-01 + US-009-02 | T-009-05 My Files screen: list, filter pills, row actions (UI-Reference §5.4) | `US-009-01-history-list/T-009-05-my-files-ui.md` | ☑ |
-| US-009-04 + US-009-01 | T-009-06 Delete confirm modal + row actions (copy / view / re-send) (FR-009-3) | `US-009-04-delete/T-009-06-delete-confirm-ui.md` | ☐ |
+| US-009-04 + US-009-01 | T-009-06 Delete confirm modal + row actions (copy / view / re-send) (FR-009-3) | `US-009-04-delete/T-009-06-delete-confirm-ui.md` | ☑ |
 
 **Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-022 can be marked `done` in `Milestone-Backlog.md`. (US-009-03 needs no new code here — its endpoint 16 + shared-blob mechanics live in F-TRF-010 / T-023.)
