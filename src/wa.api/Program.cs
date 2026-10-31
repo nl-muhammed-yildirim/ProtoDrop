@@ -647,7 +647,9 @@ app.MapGet("/api/v1/transfers", async (HttpContext ctx, HttpRequest request, ISe
             expiresAtUtc = r.ExpiresAtUtc,
             downloadsCount = r.DownloadsCount,
             maxDownloads = r.MaxDownloads,
-            recipientCount = r.RecipientCount
+            recipientCount = r.RecipientCount,
+            // T-009-06 (FR-009-3): linkId — Copy/View build {origin}/t/{linkId} client-side (no per-row round-trip).
+            linkId = r.LinkId
         }),
         nextCursor = result.NextCursor
     }, statusCode: 200);
@@ -678,6 +680,8 @@ app.MapGet("/api/v1/transfers/{id}", async (Guid id, HttpContext ctx, ISender se
         downloadsCount = result.Row.DownloadsCount,
         maxDownloads = result.Row.MaxDownloads,
         recipientCount = result.Row.RecipientCount,
+        // T-009-06 (FR-009-3): linkId — Copy/View build {origin}/t/{linkId} client-side (no per-row round-trip).
+        linkId = result.Row.LinkId,
         files = result.Files.Select(f => new { name = f.Name, sizeBytes = f.SizeBytes }),
         recipients = result.Recipients
     }, statusCode: 200);

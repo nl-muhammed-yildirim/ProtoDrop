@@ -63,12 +63,14 @@ public sealed class TransferStore : ITransferStore
                 ExpiresAtUtc = t.ExpiresAtUtc,
                 DownloadsCount = t.DownloadsCount,
                 MaxDownloads = t.MaxDownloads,
-                RecipientCount = _db.Set<EmailRecipient>().Count(r => r.TransferId == t.Id)
+                RecipientCount = _db.Set<EmailRecipient>().Count(r => r.TransferId == t.Id),
+                // T-009-06: linkId — Copy/View build {origin}/t/{linkId} client-side (no per-row round-trip).
+                LinkId = t.LinkId
             })
             .ToListAsync(ct);
 
         var items = rows.Take(limit)
-            .Select(r => new MyTransferRow(r.Id, r.Name, r.FileCount, r.TotalBytes, r.Status, r.ExpiresAtUtc, r.DownloadsCount, r.MaxDownloads, r.RecipientCount))
+            .Select(r => new MyTransferRow(r.Id, r.Name, r.FileCount, r.TotalBytes, r.Status, r.ExpiresAtUtc, r.DownloadsCount, r.MaxDownloads, r.RecipientCount, r.LinkId))
             .ToList();
         // TA-4.1.4: cursor = base64("{createdAtUtc:O}:{id:N}") of the last returned row — null when no next page.
         var nextCursor = rows.Count > limit
@@ -111,7 +113,7 @@ public sealed class TransferStore : ITransferStore
             .ToListAsync(ct);
 
         return new GetMyTransferResult(
-            new MyTransferRow(t.Id, name, t.FileCount, t.TotalBytes, t.Status, t.ExpiresAtUtc, t.DownloadsCount, t.MaxDownloads, recipients.Count),
+            new MyTransferRow(t.Id, name, t.FileCount, t.TotalBytes, t.Status, t.ExpiresAtUtc, t.DownloadsCount, t.MaxDownloads, recipients.Count, t.LinkId),
             files, recipients);
     }
 

@@ -212,7 +212,8 @@ public class GetMyTransferTests
             var name = files.Count > 0 ? files[0].Name : "Transfer";
 
             GetMyTransferResult? detail = new GetMyTransferResult(
-                new MyTransferRow(t.Id, name, t.FileCount, t.TotalBytes, t.Status, t.ExpiresAtUtc, t.DownloadsCount, t.MaxDownloads, recipients.Count),
+                // T-009-06: 10th positional field — fixture linkId (lowercase Crockford, LinkId charset).
+                new MyTransferRow(t.Id, name, t.FileCount, t.TotalBytes, t.Status, t.ExpiresAtUtc, t.DownloadsCount, t.MaxDownloads, recipients.Count, "ab3def5g"),
                 files, recipients);
             return Task.FromResult<GetMyTransferResult?>(detail);
         }

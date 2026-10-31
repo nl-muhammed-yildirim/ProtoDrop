@@ -346,4 +346,277 @@ describe('FilesPage (T-009-05)', () => {
       cleanup()
     }
   })
+
+  // ===== T-009-06 (FR-009-3, AC-009-2 client half, EC-009-2): row actions + delete confirm modal =====
+
+  // Plan D7 fixture: fileCount=3, totalBytes=1_288_490_188 → formatBytes → "1.20 GB" (value<10 → toFixed(2) —
+  // the REAL helper output is pinned here, NOT the spec's illustrative "1.2 GB").
+  const T6_BASE_ROW: Record<string, unknown> = {
+    ...makeRows(1, 1, 3600_000)[0] as object,
+    id: 't6id', name: 'T6 row', fileCount: 3, totalBytes: 1288490188, linkId: 'ab3def5g',
+  }
+
+  it('(i) CopyLink_WritesExactUrl — clicking Copy writes {origin}/t/{linkId} via the clipboard (FR-009-3)', async () => {
+    const captured: { calls: string[] } = { calls: [] }
+    stubFetch(captured, () => {
+      return new Response(JSON.stringify({ items: [T6_BASE_ROW], nextCursor: null }), { status: 200 })
+    })
+
+    // jsdom has no native clipboard API — the component must see a spy on navigator.clipboard.
+    const writeTextSpy = vi.fn(async () => {})
+    Object.defineProperty(window, 'navigator', {
+      value: { ...window.navigator, clipboard: { writeText: writeTextSpy } },
+      configurable: true,
+    })
+
+    const { host, cleanup } = renderAppAtFiles()
+    try {
+      await flush()
+
+      const copyBtn = Array.from(host.querySelectorAll('.mf-actions button')) as HTMLButtonElement[]
+      expect(copyBtn.find((b) => b.getAttribute('aria-label') === 'Copy link')).toBeDefined()
+      await act(async () => {
+        (copyBtn.find((b) => b.getAttribute('aria-label') === 'Copy link') as HTMLButtonElement).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+
+      // Client-side URL construction — NO round-trip for the recipient URL (T-009-06 D4).
+      expect(writeTextSpy).toHaveBeenCalledTimes(1)
+      expect(writeTextSpy).toHaveBeenCalledWith(`${window.location.origin}/t/ab3def5g`)
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('(j) ViewLink_OpensRecipientUrl — clicking View opens /t/{linkId} in a new context (FR-009-3)', async () => {
+    const captured: { calls: string[] } = { calls: [] }
+    stubFetch(captured, () => {
+      return new Response(JSON.stringify({ items: [T6_BASE_ROW], nextCursor: null }), { status: 200 })
+    })
+
+    // Capture the open() call args via a closure (jsdom's window.open is a no-op — we don't care about its return).
+    const openCalls: Array<[string | URL, string?, string?]> = []
+    vi.stubGlobal('open', (url: string | URL, target?: string, features?: string) => {
+      openCalls.push([url, target, features])
+      return null as unknown as Window
+    })
+
+    const { host, cleanup } = renderAppAtFiles()
+    try {
+      await flush()
+
+      const viewBtn = Array.from(host.querySelectorAll('.mf-actions button')) as HTMLButtonElement[]
+      expect(viewBtn.find((b) => b.getAttribute('aria-label') === 'View')).toBeDefined()
+      await act(async () => {
+        (viewBtn.find((b) => b.getAttribute('aria-label') === 'View') as HTMLButtonElement).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+
+      // window.open called with the client-built URL — RecipientPage is a guest route (App.tsx branch).
+      expect(openCalls.length).toBe(1)
+      expect(openCalls[0][0]).toBe(`${window.location.origin}/t/ab3def5g`)
+      expect(openCalls[0][1]).toBe('_blank')
+      expect(openCalls[0][2]).toBe('noopener')
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('(k) ResendStub_OnlyStatusToast_NoFetch — the Re-send button shows the T-023 status toast, NO fetch (T-023 route stub)', async () => {
+    const captured: { calls: string[] } = { calls: [] }
+    stubFetch(captured, () => {
+      return new Response(JSON.stringify({ items: [T6_BASE_ROW], nextCursor: null }), { status: 200 })
+    })
+
+    const { host, cleanup } = renderAppAtFiles()
+    try {
+      await flush()
+      const initialCalls = captured.calls.length   // exactly the initial list fetch
+
+      const resendBtn = Array.from(host.querySelectorAll('.mf-actions button')) as HTMLButtonElement[]
+      expect(resendBtn.find((b) => b.getAttribute('aria-label') === 'Re-send')).toBeDefined()
+      await act(async () => {
+        (resendBtn.find((b) => b.getAttribute('aria-label') === 'Re-send') as HTMLButtonElement).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+
+      // T-023 route stub: the endpoint ships in F-TRF-010 — nothing is sent today, only this status toast.
+      expect(host.textContent).toContain('Re-send lands in T-023 (F-TRF-010).')
+      expect(captured.calls.length).toBe(initialCalls)   // no fetch on the Re-send stub (the plan forbids one).
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('(l) DeleteModal_ExactCopy — opening the modal shows AC-009-2 copy built from ROW data + formatBytes', async () => {
+    const captured: { calls: string[] } = { calls: [] }
+    stubFetch(captured, () => {
+      return new Response(JSON.stringify({ items: [T6_BASE_ROW], nextCursor: null }), { status: 200 })
+    })
+
+    const { host, cleanup } = renderAppAtFiles()
+    try {
+      await flush()
+
+      const deleteBtn = Array.from(host.querySelectorAll('.mf-actions button')) as HTMLButtonElement[]
+      expect(deleteBtn.find((b) => b.getAttribute('aria-label') === 'Delete')).toBeDefined()
+      await act(async () => {
+        (deleteBtn.find((b) => b.getAttribute('aria-label') === 'Delete') as HTMLButtonElement).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+
+      // AC-009-2 exact copy: "{count} files, {formatBytes(totalBytes)}. This can't be undone."
+      const modalEl = host.querySelector('.pf-modal') as HTMLElement
+      expect(modalEl).not.toBeNull()
+      const titleEl = modalEl.querySelector('.pf-modal-title') as HTMLElement
+      const copyEl = modalEl.querySelector('.pf-modal-copy') as HTMLElement
+      expect(titleEl.textContent).toBe('Delete transfer?')
+      expect(copyEl.textContent).toBe(`3 files, ${formatBytes(1288490188)}. This can't be undone.`)
+      expect(copyEl.textContent).toContain('1.20 GB')   // REAL formatBytes output (toFixed 2), not the spec's '1.2 GB'.
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('(m) ConfirmDelete_204_RowRemoved_ToastStatus — confirm on 204 removes the row + role=status "Transfer deleted."', async () => {
+    const captured: { calls: string[] } = { calls: [] }
+    stubFetch(captured, (req) => {
+      if (req.method === 'DELETE') {
+        return new Response(null, { status: 204 })   // endpoint 17 returns NoContent with NO body on success.
+      }
+      return new Response(JSON.stringify({ items: [T6_BASE_ROW], nextCursor: null }), { status: 200 })
+    })
+
+    const { host, cleanup } = renderAppAtFiles()
+    try {
+      await flush()
+      expect(host.querySelectorAll('.mf-row').length).toBe(1)
+
+      const deleteBtn = Array.from(host.querySelectorAll('.mf-actions button')) as HTMLButtonElement[]
+      await act(async () => {
+        (deleteBtn.find((b) => b.getAttribute('aria-label') === 'Delete') as HTMLButtonElement).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+
+      const confirmBtn = host.querySelector('.pf-modal-confirm') as HTMLButtonElement
+      await act(async () => {
+        confirmBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        await Promise.resolve()   // flush the DELETE's promise chain (the stub is async).
+      })
+
+      expect(captured.calls.some((c) => c.includes('/transfers/t6id'))).toBe(true)   // the DELETE was sent.
+      expect(host.querySelectorAll('.mf-row').length).toBe(0)   // the row was removed locally on success.
+      const toastEl = host.querySelector('[role="status"]') as HTMLElement
+      expect(toastEl.textContent).toBe('Transfer deleted.')
+      expect(host.querySelector('.pf-modal')).toBeNull()   // the modal closed.
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('(n) ConfirmDelete_404NotFound_EcSuccess — 404 with code NOT_FOUND is EC-009-2 success (no error, row gone)', async () => {
+    const captured: { calls: string[] } = { calls: [] }
+    stubFetch(captured, (req) => {
+      if (req.method === 'DELETE') {
+        return new Response(JSON.stringify({ code: 'NOT_FOUND', type: 'https://tools.ietf.org/html/rfc7807' }), { status: 404 })
+      }
+      return new Response(JSON.stringify({ items: [T6_BASE_ROW], nextCursor: null }), { status: 200 })
+    })
+
+    const { host, cleanup } = renderAppAtFiles()
+    try {
+      await flush()
+      expect(host.querySelectorAll('.mf-row').length).toBe(1)
+
+      const deleteBtn = Array.from(host.querySelectorAll('.mf-actions button')) as HTMLButtonElement[]
+      await act(async () => {
+        (deleteBtn.find((b) => b.getAttribute('aria-label') === 'Delete') as HTMLButtonElement).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+
+      const confirmBtn = host.querySelector('.pf-modal-confirm') as HTMLButtonElement
+      await act(async () => {
+        confirmBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        await Promise.resolve()
+      })
+
+      // EC-009-2: a second tab already deleted the transfer — no error, the row quietly vanishes.
+      expect(host.querySelectorAll('.mf-row').length).toBe(0)   // removed locally (it's gone server-side).
+      const toastEl = host.querySelector('[role="status"]') as HTMLElement
+      expect(toastEl.textContent).toBe('Transfer deleted.')
+      expect(host.querySelector('[role="alert"]')).toBeNull()   // no error region for EC-009-2.
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('(o) ConfirmDelete_500_ErrorAlert — a real failure keeps the modal open with a role=alert error (AC-009-2)', async () => {
+    const captured: { calls: string[] } = { calls: [] }
+    stubFetch(captured, (req) => {
+      if (req.method === 'DELETE') {
+        return new Response(null, { status: 500 })   // a genuine failure (anything NOT the EC-009-2 success shape).
+      }
+      return new Response(JSON.stringify({ items: [T6_BASE_ROW], nextCursor: null }), { status: 200 })
+    })
+
+    const { host, cleanup } = renderAppAtFiles()
+    try {
+      await flush()
+      expect(host.querySelectorAll('.mf-row').length).toBe(1)
+
+      const deleteBtn = Array.from(host.querySelectorAll('.mf-actions button')) as HTMLButtonElement[]
+      await act(async () => {
+        (deleteBtn.find((b) => b.getAttribute('aria-label') === 'Delete') as HTMLButtonElement).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+
+      const confirmBtn = host.querySelector('.pf-modal-confirm') as HTMLButtonElement
+      await act(async () => {
+        confirmBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        await Promise.resolve()
+      })
+
+      // Failure (anything else): inline role=alert error in the modal, modal stays open.
+      const alertEl = host.querySelector('[role="alert"]') as HTMLElement
+      expect(alertEl.textContent).toBe("Could not delete the transfer. Please try again.")
+      expect(host.querySelector('.pf-modal')).not.toBeNull()   // the modal is still open.
+      expect(host.querySelectorAll('.mf-row').length).toBe(1)   // the row is NOT removed on failure.
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('(p) CancelOrEscape_NoDeleteSent — closing the modal sends nothing (Cancel button + Escape key)', async () => {
+    const captured: { calls: string[] } = { calls: [] }
+    stubFetch(captured, () => {
+      return new Response(JSON.stringify({ items: [T6_BASE_ROW], nextCursor: null }), { status: 200 })
+    })
+
+    const { host, cleanup } = renderAppAtFiles()
+    try {
+      await flush()
+      const initialCalls = captured.calls.length   // exactly the initial list fetch — nothing else is allowed.
+
+      const deleteBtn = Array.from(host.querySelectorAll('.mf-actions button')) as HTMLButtonElement[]
+      await act(async () => {
+        (deleteBtn.find((b) => b.getAttribute('aria-label') === 'Delete') as HTMLButtonElement).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+      expect(host.querySelector('.pf-modal')).not.toBeNull()   // the modal is open.
+
+      // Cancel button closes the modal — nothing is sent.
+      const cancelBtn = host.querySelector('.pf-modal-cancel') as HTMLButtonElement
+      await act(async () => {
+        cancelBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+      expect(host.querySelector('.pf-modal')).toBeNull()   // the modal closed.
+      expect(captured.calls.length).toBe(initialCalls)     // nothing sent on Cancel.
+
+      // Escape closes it too — still nothing sent.
+      await act(async () => {
+        (deleteBtn.find((b) => b.getAttribute('aria-label') === 'Delete') as HTMLButtonElement).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+      expect(host.querySelector('.pf-modal')).not.toBeNull()   // the modal is open again.
+
+      await act(async () => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      })
+      expect(host.querySelector('.pf-modal')).toBeNull()       // Escape closed it (closeDelete — nothing sent).
+      expect(captured.calls.length).toBe(initialCalls)         // still nothing sent on Escape.
+    } finally {
+      cleanup()
+    }
+  })
 })

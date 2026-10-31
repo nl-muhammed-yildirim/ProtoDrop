@@ -16,7 +16,9 @@ public sealed record MyTransferRow(
     DateTime ExpiresAtUtc,
     int DownloadsCount,
     int MaxDownloads,
-    int RecipientCount);
+    int RecipientCount,
+    // T-009-06 (FR-009-3 row actions): the 8-char Crockford linkId — Copy link / View build {origin}/t/{linkId} client-side (no extra round-trip).
+    string LinkId);
 
 /// <summary>Page result: the rows plus the opaque next cursor (null = last page).</summary>
 public sealed record ListMyTransfersResult(IReadOnlyList<MyTransferRow> Items, string? NextCursor);

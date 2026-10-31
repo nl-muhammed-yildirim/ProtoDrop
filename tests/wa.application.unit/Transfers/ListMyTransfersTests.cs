@@ -226,7 +226,8 @@ public class ListMyTransfersTests
 
             var items = filtered.Take(limit).Select(t => new MyTransferRow(
                 t.Id, "Transfer", t.FileCount, t.TotalBytes, t.Status, t.ExpiresAtUtc,
-                t.DownloadsCount, t.MaxDownloads, 0)).ToList();
+                // T-009-06: 10th positional field — fixture linkId (lowercase Crockford, LinkId charset).
+                t.DownloadsCount, t.MaxDownloads, 0, "ab3def5g")).ToList();
             var nextCursor = filtered.Count > limit
                 ? CursorCodec.Encode(filtered[limit - 1].CreatedAtUtc, filtered[limit - 1].Id)
                 : null;

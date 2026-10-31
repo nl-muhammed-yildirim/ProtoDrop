@@ -16,6 +16,7 @@ export interface MyTransferRowDto {
   downloadsCount: number  // int
   maxDownloads: number    // int
   recipientCount: number  // int; 0 = link-only transfer (EC-009-4)
+  linkId: string          // T-009-06 (FR-009-3): 8-char Crockford — Copy/View build {origin}/t/{linkId} client-side (no round-trip)
 }
 
 export interface ListTransfersResponse {

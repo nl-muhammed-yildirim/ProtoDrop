@@ -1100,6 +1100,14 @@ main:has(.sl) .dz {
   white-space: nowrap;
 }
 
+/* T-009-06 (FR-009-3): row actions — flex cell; the ghost buttons themselves reuse .au-ghost-btn (no new base style). */
+.mf-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .mf-paging {
   display: flex;
   justify-content: space-between;
