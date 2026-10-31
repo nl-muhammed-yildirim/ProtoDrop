@@ -10,6 +10,8 @@ import AuthPage from './features/auth/AuthPage'
 import { matchAccountPath } from './features/auth/authRoute'
 import ProfilePage from './features/profile/ProfilePage'
 import { matchProfilePath, PROFILE_PATH } from './features/profile/profileRoute'
+import FilesPage from './features/files/FilesPage'
+import { matchFilesPath } from './features/files/filesRoute'
 import RecipientPage from './features/recipient/RecipientPage'
 import UnsubscribePage from './features/unsubscribe/UnsubscribePage'
 import { matchLinkPath } from './features/recipient/recipientRoute'
@@ -94,6 +96,8 @@ export default function App() {
           <UnsubscribePage token={unsubscribeToken} />
         ) : session && matchProfilePath(pathname) ? (
           <ProfilePage profile={session} onSignedIn={setSession} onThemeChange={handleThemeChange} onDeleteAccount={handleDeleteAccount} />
+        ) : session && matchFilesPath(pathname) ? (
+          <FilesPage onNewTransfer={goHome} />
         ) : matchAccountPath(pathname) ? (
           // Signed-out guest keeps the sign-in card; /account/profile with no session falls
           // through here too (it still matches ACCOUNT_PATH_RE — order above is what wins).

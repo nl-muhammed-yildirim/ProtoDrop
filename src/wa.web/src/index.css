@@ -966,3 +966,185 @@ main:has(.sl) .dz {
   opacity: 0.55;
   cursor: default;
 }
+
+/* ===== T-009-05 (UI-Reference §5.4): My Files screen at /files — mf- prefix (collision-free) ===== */
+
+.mf {
+  padding: 32px 24px;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.mf-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.mf-h1 {
+  font-size: var(--fs-h1);
+  margin: 0;
+  color: var(--fg);
+}
+
+.mf-new-btn {
+  min-height: 44px; /* F-TRF-017-4 touch targets */
+  padding: 12px 24px;
+  background: var(--accent);
+  color: #FFFFFF;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+
+.mf-new-btn:hover {
+  background: var(--accent-hover);
+}
+
+.mf-pills {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.mf-pill {
+  min-height: 44px;
+  padding: 8px 18px;
+  background: transparent;
+  color: var(--fg-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+
+.mf-pill-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: transparent;
+}
+
+.mf-loading,
+.mf-error {
+  color: var(--fg-muted);
+  margin: 0 0 16px;
+  font-size: var(--fs-small);
+}
+
+.mf-retry {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: var(--fs-small);
+  padding: 0;
+}
+
+.mf-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mf-row {
+  min-height: 44px; /* UI-Reference §5.4 — 44 px rows */
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.mf-name {
+  flex: 1;
+  min-width: 0; /* allow ellipsis inside a flex item */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--fs-body);
+  color: var(--fg);
+}
+
+.mf-meta {
+  flex: none;
+  white-space: nowrap;
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+}
+
+.mf-chip {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  font-size: var(--fs-tiny);
+  white-space: nowrap;
+}
+
+/* Text + color (F-TRF-016): the text is the primary signal, bg stays neutral. */
+.mf-chip-green { color: var(--success); }
+.mf-chip-amber { color: var(--warning); }
+.mf-chip-gray  { color: var(--fg-faint); }
+
+.mf-countdown {
+  flex: none;
+  min-width: 120px;
+  text-align: right;
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+
+.mf-paging {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.mf-prev,
+.mf-next {
+  min-height: 44px; /* F-TRF-017-4 touch targets */
+  padding: 8px 20px;
+  background: transparent;
+  color: var(--fg-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+
+.mf-prev:hover:not(:disabled),
+.mf-next:hover:not(:disabled) {
+  color: var(--fg);
+}
+
+.mf-prev:disabled,
+.mf-next:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.mf-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.mf-empty-icon {
+  font-size: 36px;
+}
+
+.mf-empty-text {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: var(--fs-body);
+}
