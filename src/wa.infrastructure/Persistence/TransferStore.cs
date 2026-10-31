@@ -115,6 +115,53 @@ public sealed class TransferStore : ITransferStore
             files, recipients);
     }
 
+    /// <summary>
+    /// T-009-04 (TA-4.2#17 / FR-009-3): owner delete — soft-delete only + RefCount decrement (mirrors
+    /// ExpiryDeletionStore.DeleteTransfersAsync's idiom for a SINGLE transfer, three bounded queries total).
+    /// </summary>
+    public async Task<MarkDeleteResult?> MarkDeletedAsync(Guid id, Guid ownerId, DateTime deletedAtUtc, CancellationToken ct)
+    {
+        // 1. Load the row with owner-scoped predicate (Id=@id AND OwnerAppUserId=@ownerId AND Status != 4).
+        var t = await _db.Set<Transfer>()
+            .FirstOrDefaultAsync(t => t.Id == id && t.OwnerAppUserId == ownerId && t.Status != 4, ct);
+        if (t is null) return null; // foreign owner / guest / already-deleted / unknown → handler returns null → NOT_FOUND
+
+        // 2. Soft-delete the row (TA-3.1: NO hard delete).
+        t.Status = 4;
+        t.DeletedAtUtc = deletedAtUtc;
+
+        // 3. Decrement RefCount for each distinct BlobRefId referenced by this transfer's FileItems.
+        var blobIds = await _db.Set<FileItem>()
+            .AsNoTracking()
+            .Where(f => f.TransferId == id)
+            .Select(f => f.BlobRefId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        if (blobIds.Count > 0)
+        {
+            var blobRefs = await _db.Set<BlobRef>()
+                .Where(b => blobIds.Contains(b.Id))
+                .ToListAsync(ct);
+
+            var nowPlusBuffer = deletedAtUtc.AddHours(24); // FR-009-3: same 24h buffer as expiry idiom (TA-3.1)
+
+            foreach (var blob in blobRefs)
+            {
+                blob.RefCount -= 1;
+                if (blob.RefCount <= 0)
+                {
+                    blob.RefCount = 0; // clamp to zero
+                    blob.PhysicallyDeletedAtUtc = nowPlusBuffer;
+                }
+            }
+
+            await _db.SaveChangesAsync(ct);
+        }
+
+        return new MarkDeleteResult(deletedAtUtc, t.LinkId);
+    }
+
     public async Task SaveFinalizeAsync(Transfer transfer, IReadOnlyList<BlobRef> blobRefs, IReadOnlyList<FileItem> fileItems, IdempotencyKey idempotencyKey, CancellationToken ct)
     {
         await using var tx = await _db.Database.BeginTransactionAsync(ct);

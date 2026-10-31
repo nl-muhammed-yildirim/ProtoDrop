@@ -648,6 +648,9 @@ public class SendTransferHandlerTests
 
         public Task<GetMyTransferResult?> GetByOwnerAsync(Guid ownerId, Guid id, CancellationToken ct) =>
             Task.FromResult<GetMyTransferResult?>(null); // T-009-03: not exercised by send tests — signature-only.
+
+        public Task<MarkDeleteResult?> MarkDeletedAsync(Guid id, Guid ownerId, DateTime deletedAtUtc, CancellationToken ct) =>
+            Task.FromResult<MarkDeleteResult?>(null); // T-009-04: not exercised by send tests — signature-only.
     }
 
     private sealed class RecordingTelemetryLogger : ILogger<WaTelemetryReporter>

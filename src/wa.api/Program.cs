@@ -683,6 +683,22 @@ app.MapGet("/api/v1/transfers/{id}", async (Guid id, HttpContext ctx, ISender se
     }, statusCode: 200);
 });
 
+// T-009-04 (TA-4.2#17 / FR-009-3): DELETE /api/v1/transfers/{id} — owner delete, soft-delete + refcount path.
+app.MapDelete("/api/v1/transfers/{id}", async (Guid id, HttpContext ctx, ISender sender, CancellationToken ct) =>
+{
+    // Shared session-read idiom (T-008-02): SessionMiddleware.SessionUserIdKey as Guid? — null for guests.
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+
+    // T-009-04: null result = foreign owner / guest-created / already-deleted / unknown — ONE indistinguishable case (EC-009-2).
+    var result = await sender.Send(new DeleteTransferCommand(id, userId, "user"), ct);
+    if (result is null)
+        throw new BusinessException(ProblemCodes.NotFound, "Transfer not found.");
+
+    // FR-009-3: 204 No Content — no body (the client treats 404 on a second delete as success per EC-009-2).
+    return Results.NoContent();
+});
+
 // T-008-06 (FR-008-8 / TA-4.2#13): DELETE /api/v1/auth/me — soft-delete + re-home transfers + account_deleted once.
 app.MapDelete("/api/v1/auth/me", async (HttpContext ctx, ISender sender, CancellationToken ct) =>
 {

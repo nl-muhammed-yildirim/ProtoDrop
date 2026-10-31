@@ -180,6 +180,13 @@ public class GetMyTransferTests
             Task.FromResult<(List<MyTransferRow>, string?)>(([], null)); // T-009-03: not exercised by these facts — empty page (signature-only).
 
         /// <summary>
+        /// T-009-04 (TA-4.2#17): signature-only for these facts — returns null = the handler's NOT_FOUND path.
+        /// The full refcount behaviour is covered by DeleteTransferCommandTests' own richer stub.
+        /// </summary>
+        public Task<MarkDeleteResult?> MarkDeletedAsync(Guid id, Guid ownerId, DateTime deletedAtUtc, CancellationToken ct) =>
+            Task.FromResult<MarkDeleteResult?>(null);
+
+        /// <summary>
         /// Simulates the EF store contract (T-009-03): Id=@id AND OwnerAppUserId=@ownerId AND DeletedAtUtc==null in ONE
         /// predicate (each fact isolates its own branch); files ordered by SortOrder then Id; recipients ordered by Id.
         /// Null when no match — the handler's null = the endpoint's NOT_FOUND, never FORBIDDEN.
