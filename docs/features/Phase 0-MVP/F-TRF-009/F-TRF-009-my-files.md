@@ -84,7 +84,7 @@ AC-009-3: Expired row
 | US-009-01 | T-009-01 ListMyTransfersQuery + endpoint 14: owner-scoped list, cursor paging (FR-009-1/2) | `US-009-01-history-list/T-009-01-my-files-list-endpoint.md` | ☑ |
 | US-009-02 | T-009-02 Status filter on endpoint 14: All / Active / Expired (FR-009-4) | `US-009-02-filters/T-009-02-status-filter.md` | ☑ |
 | US-009-01 | T-009-03 GetMyTransferQuery + endpoint 15: owner detail incl. recipient list (TA-4.2#15) | `US-009-01-history-list/T-009-03-transfer-detail-endpoint.md` | ☑ |
-| US-009-04 | T-009-04 DeleteTransferCommand + endpoint 17: owner delete, refcount path (FR-009-3) | `US-009-04-delete/T-009-04-delete-transfer-endpoint.md` | ☐ |
+| US-009-04 | T-009-04 DeleteTransferCommand + endpoint 17: owner delete, refcount path (FR-009-3) | `US-009-04-delete/T-009-04-delete-transfer-endpoint.md` | ☑ |
 | US-009-01 + US-009-02 | T-009-05 My Files screen: list, filter pills, row actions (UI-Reference §5.4) | `US-009-01-history-list/T-009-05-my-files-ui.md` | ☐ |
 | US-009-04 + US-009-01 | T-009-06 Delete confirm modal + row actions (copy / view / re-send) (FR-009-3) | `US-009-04-delete/T-009-06-delete-confirm-ui.md` | ☐ |
 
