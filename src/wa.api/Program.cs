@@ -233,6 +233,41 @@ app.MapPost("/api/v1/transfers/{id}/send", async (Guid id, HttpContext httpConte
     }
 });
 
+// T-010-01 (endpoint 16): re-send — create a new Draft transfer sharing the original's blobs (no data copy, ADR-009).
+// Cookie required; no request body. Guest row → 403 FORBIDDEN (EC-010-4); foreign owner / unknown id / Status=4 → 404 NOT_FOUND.
+app.MapPost("/api/v1/transfers/{id}/resend", async (Guid id, HttpContext httpContext, ISender sender, CancellationToken ct) =>
+{
+    // T-008-08 (FR-008-7): owner AppUserId from the session middleware's Items — single parsing site (T-008-02). Missing/invalid/expired → guest (null).
+    var ownerAppUserId = httpContext.Items[SessionMiddleware.SessionUserIdKey] as Guid?;
+
+    try
+    {
+        var result = await sender.Send(new wa.application.UseCases.Transfers.ResendTransferCommand(id, ownerAppUserId), ct);
+        if (result is null)
+            throw new BusinessException(ProblemCodes.NotFound, "Transfer not found.");
+        return Results.Json(new
+        {
+            id = result.TransferId.ToString("n"),
+            linkId = result.LinkId,
+            status = "Draft",
+            expiresAt = result.ExpiresAtUtc,
+            totalBytes = result.TotalBytes,
+            fileCount = result.FileCount,
+            files = result.Files.Select(f => new { fileId = f.FileId.ToString("n"), name = f.Name }),
+            recipients = result.Recipients,
+            note = result.Note,
+            senderName = result.SenderName,
+            senderEmail = result.SenderEmail,
+            passwordRequired = result.PasswordRequired
+        }, statusCode: 201);
+    }
+    catch (wa.application.UseCases.Transfers.ResendForbiddenException ex)
+    {
+        // EC-010-4: a guest row (no owner) is re-send-ineligible → 403 FORBIDDEN — first usage of ProblemCodes.Forbidden.
+        throw new BusinessException(ProblemCodes.Forbidden, ex.Message);
+    }
+});
+
 // T-014 (TA-4.2#4): recipient metadata for GET /api/v1/public/transfers/{linkId} — no auth, no cookie; page views never mint SAS or consume a download.
 app.MapGet("/api/v1/public/transfers/{linkId}", async (string linkId, HttpRequest request, ISender sender, CancellationToken ct) =>
 {

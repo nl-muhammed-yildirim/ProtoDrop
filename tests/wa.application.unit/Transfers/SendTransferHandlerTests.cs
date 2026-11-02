@@ -579,6 +579,10 @@ public class SendTransferHandlerTests
     {
         public Transfer? Transfer { get; set; }
         public List<EmailRecipient> Recipients { get; } = [];
+        // T-010-01 (row 3): the three new ISendStore members — no-op fakes for the send-path tests.
+        public Dictionary<Guid, string[]> RecipientAddressesById { get; } = [];
+        public Dictionary<Guid, FileItemRow[]> FilesById { get; } = [];
+        public (Transfer Draft, IReadOnlyList<FileItem> FileItems, IReadOnlyList<BlobRef> SharedBlobRefs)? ResendCapture { get; private set; }
 
         public Task<Transfer?> FindByIdAsync(Guid id, CancellationToken ct) =>
             Task.FromResult(Transfer is not null && Transfer.Id == id ? Transfer : null);
@@ -586,6 +590,18 @@ public class SendTransferHandlerTests
         public Task SaveSendAsync(Transfer transfer, IReadOnlyList<EmailRecipient> recipients, CancellationToken ct)
         {
             Recipients.AddRange(recipients);
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<string>> GetRecipientAddressesAsync(Guid transferId, CancellationToken ct) =>
+            Task.FromResult(RecipientAddressesById.TryGetValue(transferId, out var a) ? (IReadOnlyList<string>)a : (IReadOnlyList<string>)[]);
+
+        public Task<IReadOnlyList<FileItemRow>> ListFileItemsByTransferAsync(Guid transferId, CancellationToken ct) =>
+            Task.FromResult(FilesById.TryGetValue(transferId, out var f) ? (IReadOnlyList<FileItemRow>)f : (IReadOnlyList<FileItemRow>)[]);
+
+        public Task SaveResendAsync(Transfer draft, IReadOnlyList<FileItem> fileItems, IReadOnlyList<BlobRef> sharedBlobRefs, CancellationToken ct)
+        {
+            ResendCapture = (draft, fileItems, sharedBlobRefs);
             return Task.CompletedTask;
         }
     }

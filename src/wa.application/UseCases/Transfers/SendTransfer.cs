@@ -39,7 +39,25 @@ public interface ISendStore
 {
     Task<Transfer?> FindByIdAsync(Guid id, CancellationToken ct);
     Task SaveSendAsync(Transfer transfer, IReadOnlyList<EmailRecipient> recipients, CancellationToken ct);
+
+    // T-010-01 (AC-010-1): three new members for the re-send use case — no changes to existing signatures.
+    /// <summary>T-010-01: read all recipient email addresses stored for a transfer.</summary>
+    Task<IReadOnlyList<string>> GetRecipientAddressesAsync(Guid transferId, CancellationToken ct);
+
+    /// <summary>T-010-01: list file item rows (metadata only, no EF entities) ordered by SortOrder.</summary>
+    Task<IReadOnlyList<FileItemRow>> ListFileItemsByTransferAsync(Guid transferId, CancellationToken ct);
+
+    /// <summary>
+    /// T-010-01 (AC-010-1): one transaction — insert the new draft Transfer + new FileItem rows, then
+    /// increment RefCount on each shared BlobRef via guarded ExecuteUpdate (same raw-SQL guard style as
+    /// PublicTransferStore.RecordSingleFileDownloadAsync; rowsAffected < expected → InvalidOperationException).
+    /// T-010-02 will insert its FILES_GONE gate inside this same transaction.
+    /// </summary>
+    Task SaveResendAsync(Transfer draft, IReadOnlyList<FileItem> fileItems, IReadOnlyList<BlobRef> sharedBlobRefs, CancellationToken ct);
 }
+
+/// <summary>T-010-01: file item row projection (plain POCO — no EF entity in use case layer).</summary>
+public sealed record FileItemRow(Guid Id, Guid BlobRefId, string OriginalName, long SizeBytes, string? ContentType, int SortOrder);
 
 /// <summary>
 /// T-002-04 (TA-4.2#3) — the only business logic behind POST /api/v1/transfers/{id}/send:
