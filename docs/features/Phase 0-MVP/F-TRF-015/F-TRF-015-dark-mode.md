@@ -68,9 +68,19 @@ AC-015-4: Every screen in the app
 - E2E (Playwright): `emulateMedia({ colorScheme: 'dark' })` + theme setting → `data-theme` correct before paint (screenshot assert on background color); OS-change listener (AC-015-3).
 - Manual matrix: all screens in both themes (T-027 exit: "No flash-of-wrong-theme").
 
-## User stories
+## User stories & implementation tasks
 
-| ID | Story | File |
+| ID | Story / Task | File |
 |---|---|---|
-| US-015-01 | Choose light, dark, or system theme | `US-015-01-theme-choice.md` |
-| US-015-02 | See a consistent theme on every screen | `US-015-02-theme-parity.md` |
+| US-015-01 | Choose light, dark, or system theme | `US-015-01-theme-choice/US-015-01-theme-choice.md` |
+| US-015-02 | See a consistent theme on every screen | `US-015-02-theme-parity/US-015-02-theme-parity.md` |
+
+**Implementation tasks:** one file per task — each story folder holds its story .md + its task files (context-friendly; execute top-to-bottom).
+
+| Story | Task | File | Status |
+|---|---|---|---|
+| US-015-02 | T-015-01 Theme tokens + pre-paint bootstrap: both palettes in `tokens.css`, `core/theme` resolution (account > preference > default) (FR-015-1/3, TA-8.2) | `US-015-02-theme-parity/T-015-01-tokens-and-bootstrap.md` | ☐ |
+| US-015-01 | T-015-02 Profile theme select + live `system` OS tracking via matchMedia (FR-015-4) | `US-015-01-theme-choice/T-015-02-profile-theme-select-live-system.md` | ☐ |
+| US-015-02 | T-015-03 Full-screen theme parity audit + token-diff CI check (FR-015-2) | `US-015-02-theme-parity/T-015-03-parity-audit-and-token-diff.md` | ☐ |
+
+**Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified (AC-015-1…AC-015-4, EC-015-1…EC-015-3). Then T-027 can be marked `done` in `Milestone-Backlog.md` — its exit is "No flash-of-wrong-theme" plus the screen-by-screen dark pass (the manual matrix of F-TRF-015's test plan, T-015-03).
