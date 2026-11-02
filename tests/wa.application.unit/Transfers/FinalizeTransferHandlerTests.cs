@@ -403,6 +403,15 @@ public class FinalizeTransferHandlerTests
 
         public Task<int> GetActiveTransferCountAsync(Guid ownerId, CancellationToken ct) =>
             Task.FromResult(ActiveTransferCount);
+
+        public Task<(List<MyTransferRow> Items, string? NextCursor)> ListByOwnerAsync(Guid ownerId, DateTime? afterUtc, Guid? afterIdExcluded, int limit, IReadOnlyCollection<byte>? statuses, CancellationToken ct) =>
+            Task.FromResult<(List<MyTransferRow>, string?)>(([], null)); // T-009-01: not exercised by finalize tests — empty page (T-009-02: signature-only).
+
+        public Task<GetMyTransferResult?> GetByOwnerAsync(Guid ownerId, Guid id, CancellationToken ct) =>
+            Task.FromResult<GetMyTransferResult?>(null); // T-009-03: not exercised by finalize tests — signature-only.
+
+        public Task<MarkDeleteResult?> MarkDeletedAsync(Guid id, Guid ownerId, DateTime deletedAtUtc, CancellationToken ct) =>
+            Task.FromResult<MarkDeleteResult?>(null); // T-009-04: not exercised by finalize tests — signature-only.
     }
 
     private sealed class StubLimitsProvider : ILimitsProvider
@@ -435,6 +444,15 @@ public class FinalizeTransferHandlerTests
 
         public Task<int> GetActiveTransferCountAsync(Guid ownerId, CancellationToken ct) =>
             throw new InvalidOperationException("GetActiveTransferCountAsync called for guest — should not be called.");
+
+        public Task<(List<MyTransferRow> Items, string? NextCursor)> ListByOwnerAsync(Guid ownerId, DateTime? afterUtc, Guid? afterIdExcluded, int limit, IReadOnlyCollection<byte>? statuses, CancellationToken ct) =>
+            throw new InvalidOperationException("ListByOwnerAsync called on ThrowingTransferStore — should not be called.");
+
+        public Task<GetMyTransferResult?> GetByOwnerAsync(Guid ownerId, Guid id, CancellationToken ct) =>
+            throw new InvalidOperationException("GetByOwnerAsync called on ThrowingTransferStore — should not be called.");
+
+        public Task<MarkDeleteResult?> MarkDeletedAsync(Guid id, Guid ownerId, DateTime deletedAtUtc, CancellationToken ct) =>
+            throw new InvalidOperationException("MarkDeletedAsync called on ThrowingTransferStore — should not be called.");
     }
 
     private sealed class StubBlobStore : IBlobStore
