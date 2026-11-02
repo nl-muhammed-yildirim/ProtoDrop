@@ -70,13 +70,15 @@ public sealed class SendStore : ISendStore
     /// PublicTransferStore.RecordSingleFileDownloadAsync; no data copy, ADR-009). rowsAffected &lt; 1 → InvalidOperationException.
     /// T-010-02 inserts its FILES_GONE gate at step 0 inside this same transaction (full rollback — AC-010-2).
     /// </summary>
-    public async Task SaveResendAsync(Transfer draft, IReadOnlyList<FileItem> fileItems, IReadOnlyList<BlobRef> sharedBlobRefs, CancellationToken ct)
+    public async Task SaveResendAsync(Transfer draft, IReadOnlyList<FileItem> fileItems, IReadOnlyList<EmailRecipient> recipients, IReadOnlyList<BlobRef> sharedBlobRefs, CancellationToken ct)
     {
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
 
         _db.Set<Transfer>().Add(draft);
         foreach (var f in fileItems)
             _db.Set<FileItem>().Add(f);
+        foreach (var r in recipients)
+            _db.Set<EmailRecipient>().Add(r); // T-010-01: materialized snapshot rows — the editable pending state US-010-02 reads
         await _db.SaveChangesAsync(ct);
 
         // The guard lives in the UPDATE's WHERE (Id must exist); a concurrent physical delete makes rowsAffected 0.

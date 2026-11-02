@@ -44,16 +44,16 @@ public interface ISendStore
     /// <summary>T-010-01: read all recipient email addresses stored for a transfer.</summary>
     Task<IReadOnlyList<string>> GetRecipientAddressesAsync(Guid transferId, CancellationToken ct);
 
-    /// <summary>T-010-01: list file item rows (metadata only, no EF entities) ordered by SortOrder.</summary>
+    /// <summary>T-010-01 (AC-010-1): list file item rows (metadata only, no EF entities) ordered by SortOrder.</summary>
     Task<IReadOnlyList<FileItemRow>> ListFileItemsByTransferAsync(Guid transferId, CancellationToken ct);
 
     /// <summary>
-    /// T-010-01 (AC-010-1): one transaction — insert the new draft Transfer + new FileItem rows, then
-    /// increment RefCount on each shared BlobRef via guarded ExecuteUpdate (same raw-SQL guard style as
-    /// PublicTransferStore.RecordSingleFileDownloadAsync; rowsAffected < expected → InvalidOperationException).
-    /// T-010-02 will insert its FILES_GONE gate inside this same transaction.
+    /// T-010-01 (AC-010-1): one transaction — insert the new draft Transfer + new FileItem rows + the materialized
+    /// snapshot EmailRecipient rows (the editable pending state US-010-02 reads), then increment RefCount on each shared
+    /// BlobRef via guarded ExecuteUpdate (same raw-SQL guard style as PublicTransferStore.RecordSingleFileDownloadAsync;
+    /// rowsAffected &lt; 1 → InvalidOperationException). T-010-02 will insert its FILES_GONE gate inside this same transaction.
     /// </summary>
-    Task SaveResendAsync(Transfer draft, IReadOnlyList<FileItem> fileItems, IReadOnlyList<BlobRef> sharedBlobRefs, CancellationToken ct);
+    Task SaveResendAsync(Transfer draft, IReadOnlyList<FileItem> fileItems, IReadOnlyList<EmailRecipient> recipients, IReadOnlyList<BlobRef> sharedBlobRefs, CancellationToken ct);
 }
 
 /// <summary>T-010-01: file item row projection (plain POCO — no EF entity in use case layer).</summary>

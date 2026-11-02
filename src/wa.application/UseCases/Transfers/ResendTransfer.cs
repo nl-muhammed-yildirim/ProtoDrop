@@ -118,6 +118,12 @@ public sealed class ResendTransferHandler : IRequestHandler<ResendTransferComman
 
         // 7. New EmailRecipient rows carrying the original's addresses (the editable pending state US-010-02 reads).
         var recipientAddresses = await _store.GetRecipientAddressesAsync(original.Id, cancellationToken);
+        var recipients = recipientAddresses.Select(a => new EmailRecipient
+        {
+            Id = Guid.NewGuid(),
+            TransferId = transferId,
+            Address = a
+        }).ToList();
 
         // 8. RefCount++ on each shared BlobRef — guarded ExecuteUpdate in SaveResendAsync (steps 5–8 in ONE transaction).
         var sharedBlobRefs = fileItems.Select(f => f.BlobRefId)
@@ -125,7 +131,7 @@ public sealed class ResendTransferHandler : IRequestHandler<ResendTransferComman
             .Select(id => new BlobRef { Id = id })
             .ToList();
 
-        await _store.SaveResendAsync(draft, fileItems, sharedBlobRefs, cancellationToken);
+        await _store.SaveResendAsync(draft, fileItems, recipients, sharedBlobRefs, cancellationToken);
 
         return new ResendTransferResult(
             transferId,

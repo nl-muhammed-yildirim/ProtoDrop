@@ -224,7 +224,7 @@ public class ResendTransferHandlerTests
         public Dictionary<Guid, FileItemRow[]> FileRowsByTransferId { get; } = [];
         public Dictionary<Guid, Guid?> SourcedFromByTransferId { get; } = [];
         public Dictionary<Guid, int> RefCountByBlobId { get; } = new();
-        public List<(Transfer Draft, IReadOnlyList<FileItem> FileItems, IReadOnlyList<BlobRef> SharedBlobRefs)> ResendCaptures { get; } = [];
+        public List<(Transfer Draft, IReadOnlyList<FileItem> FileItems, IReadOnlyList<EmailRecipient> Recipients, IReadOnlyList<BlobRef> SharedBlobRefs)> ResendCaptures { get; } = [];
         public Transfer? LastDraft => ResendCaptures.Count > 0 ? ResendCaptures[^1].Draft : null;
 
         public Task<Transfer?> FindByIdAsync(Guid id, CancellationToken ct) =>
@@ -242,9 +242,9 @@ public class ResendTransferHandlerTests
         public Task<IReadOnlyList<FileItemRow>> ListFileItemsByTransferAsync(Guid transferId, CancellationToken ct) =>
             Task.FromResult(FileRowsByTransferId.TryGetValue(transferId, out var f) ? (IReadOnlyList<FileItemRow>)f : (IReadOnlyList<FileItemRow>)[]);
 
-        public Task SaveResendAsync(Transfer draft, IReadOnlyList<FileItem> fileItems, IReadOnlyList<BlobRef> sharedBlobRefs, CancellationToken ct)
+        public Task SaveResendAsync(Transfer draft, IReadOnlyList<FileItem> fileItems, IReadOnlyList<EmailRecipient> recipients, IReadOnlyList<BlobRef> sharedBlobRefs, CancellationToken ct)
         {
-            ResendCaptures.Add((draft, fileItems, sharedBlobRefs));
+            ResendCaptures.Add((draft, fileItems, recipients, sharedBlobRefs));
             foreach (var blobRef in sharedBlobRefs)
                 RefCountByBlobId[blobRef.Id] = RefCountByBlobId.GetValueOrDefault(blobRef.Id) + 1; // RefCount++ per shared blob
             return Task.CompletedTask;
