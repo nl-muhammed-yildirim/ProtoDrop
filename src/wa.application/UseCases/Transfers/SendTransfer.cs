@@ -154,6 +154,12 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
             var hasher = new Microsoft.AspNetCore.Identity.PasswordHasher<string>();
             transfer.PasswordHash = hasher.HashPassword(transfer.Id.ToString("n"), request.Password);
         }
+        else if (transfer.SourcedFrom is not null)
+        {
+            // T-010-03 (US-010-02): re-send drafts clear their copied hash when no new password is provided — the original's
+            // PBKDF2 key (original transfer ID) doesn't match this draft's ID, so keeping it would break unlock.
+            transfer.PasswordHash = null;
+        }
 
         // 6. One EmailRecipient row per unique address.
         var recipients = addresses.Select(a => new EmailRecipient

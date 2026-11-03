@@ -8,6 +8,12 @@ interface LinkScreenProps {
   senderName?: string
   transferId: string
   onSendAgain?: (entries: Array<{ name: string; size: number }>) => void
+  // T-010-03 (FR-010-2/4): re-send pre-fill props — the screen is reused for the re-send flow.
+  initialRecipients?: string
+  initialNote?: string
+  passwordRequired?: boolean
+  sentHeading?: string
+  bannerFiles?: { firstFile: string; count: number } | null
 }
 
 type SendResponse = {
@@ -34,11 +40,12 @@ const SEND_ENDPOINT = 'http://localhost:8080/api/v1/transfers/{id}/send'
  * Idempotency-Key; whitespace-only recipients follow the same path; after any successful send the card swaps to
  * "Transfer sent." — link + Copy + Send again (M0 client-side pre-fill; F-TRF-010's endpoint 16 later).
  */
-export function LinkScreen({ linkId, senderName, transferId, onSendAgain }: LinkScreenProps) {
+export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initialRecipients, initialNote, passwordRequired, sentHeading, bannerFiles }: LinkScreenProps) {
   const [copied, setCopied] = useState(false)
   const timeoutRef = useRef<number | null>(null)
 
-  const [recipientsRaw, setRecipientsRaw] = useState('')
+  // T-010-03 (AC-010-2 client half): pre-fill from the original transfer's snapshot — editable; the send body carries the form values.
+  const [recipientsRaw, setRecipientsRaw] = useState(initialRecipients ?? '')
   const [invalidAddresses, setInvalidAddresses] = useState<string[]>([])
   const [capExceeded, setCapExceeded] = useState(false)
 
@@ -46,8 +53,12 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain }: Link
   const [fromName, setFromName] = useState(senderName ?? '')
   const [senderEmail, setSenderEmail] = useState('')
   const [emailError, setEmailError] = useState(false)
-  const [note, setNote] = useState('')
+  const [note, setNote] = useState(initialNote ?? '')
   const senderEmailRef = useRef(senderEmail)
+
+  // T-010-03 (FR-010-2): password field — starts empty in all cases (PBKDF2 is one-way; the plaintext can't be recovered).
+  const [passwordValue, setPasswordValue] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   // T-002-08: send + confirmation state (FR-002-6/7) — phase only; the SendResponse body is intentionally not stored.
   const [sendState, setSendState] = useState<SendPhase>('form')
@@ -164,6 +175,8 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain }: Link
             senderName: blankOr(fromName),
             senderEmail: blankOr(senderEmail),
             note: blankOr(note),
+            // T-010-03 (FR-010-2): password — only included when non-empty; the handler at Program.cs L217 reads it.
+            password: blankOr(passwordValue),
           }),
         })
       } catch {
@@ -204,7 +217,7 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain }: Link
         {sendState === 'sent' ? (
           // T-002-08 (FR-002-7): confirmation screen — in-place swap, no route navigation.
           <>
-            <h1 className="ls-heading">Transfer sent.</h1>
+            <h1 className="ls-heading">{sentHeading ?? 'Transfer sent.'}</h1>
             <p className="ls-sent-sub">Share the link or send it again later.</p>
             <div className="ls-field">
               <span className="ls-url">{url}</span>
@@ -227,6 +240,14 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain }: Link
         ) : (
           <>
             <h1 className="ls-heading">Your link is ready</h1>
+            {/* T-010-03 (EC-010-3): re-send banner — first file name + "and N more files" (all-or-nothing; no per-file selection). */}
+            {bannerFiles && (
+              <p className="ls-banner">
+                {bannerFiles.count === 1
+                  ? `Re-sending '${bannerFiles.firstFile}'. You can change the details before sending.`
+                  : `Re-sending '${bannerFiles.firstFile}' and ${bannerFiles.count - 1} more files. You can change the details before sending.`}
+              </p>
+            )}
             <div className="ls-field">
               <span className="ls-url">{url}</span>
               <button type="button" className="ls-copy-btn" onClick={() => void handleCopy()}>
@@ -299,6 +320,32 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain }: Link
               {noteTooLong && (
                 <p className="ls-sender-error">Note is too long</p>
               )}
+            </div>
+            {/* T-010-03 (FR-010-2, UI-Reference §5.2): password field — starts empty; the label notes a password was set on the original. */}
+            <div className="ls-password-field">
+              <label className="ls-sender-label" htmlFor="link-password">
+                Password{passwordRequired === true ? ' (was set on original)' : ''}
+              </label>
+              <div className="ls-password-row">
+                <input
+                  id="link-password"
+                  type={showPassword ? 'text' : 'password'}
+                  className="ls-password-input"
+                  value={passwordValue}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPasswordValue(e.target.value)}
+                  placeholder="Optional"
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  className="ls-password-toggle"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
+                  onClick={() => setShowPassword((s) => !s)}
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
             </div>
             {/* T-002-08: Send transfer + Copy link only — disabled while blocked or in flight; wrapper spans carry the title (§4.2). */}
             <div className="ls-actions">

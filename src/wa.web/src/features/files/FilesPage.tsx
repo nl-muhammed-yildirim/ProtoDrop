@@ -16,11 +16,6 @@ interface FilesPageProps {
 // T-009-05: fixed local port, no proxy, no env vars yet (AuthPage API_BASE line-14 precedent).
 const API_BASE = 'http://localhost:8080/api/v1'
 
-// T-023 (F-TRF-010): the re-send endpoint POST /api/v1/transfers/{id}/resend ships there — route stub only for now.
-function ReSendStubToast(): string {
-  return 'Re-send lands in T-023 (F-TRF-010).'
-}
-
 /**
  * T-009-05 (UI-Reference §5.4): My Files screen at /files (signed-in only — App guards the branch).
  * Cursor-paged transfer history from endpoint 14 (GET /api/v1/transfers?status=&cursor=, TA-4.2#14),
@@ -211,11 +206,15 @@ export function FilesPage({ onNewTransfer }: FilesPageProps) {
     window.open(url, '_blank', 'noopener')   // noopener: the recipient page must not reach back to this window.
   }
 
-  // T-023 (F-TRF-010): route stub — the endpoint lands there; nothing is sent today, only this status toast.
-  function resendStub(): void {
-    setToast(ReSendStubToast())
-    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current)
-    toastTimerRef.current = window.setTimeout(() => setToast(null), 5000)
+  // T-010-03 (FR-010-4): Re-send navigates to /resend/{originalTransferId} — App's route branch mounts ReSendScreen,
+  // which POSTs endpoint 16 to mint the new draft. Same pushState + popstate pattern as App.goHome.
+  // Endpoint 14 returns ids in 'n' form (no dashes); the route (resendRoute.ts) expects standard dashed GUIDs.
+  function resend(row: MyTransferRowDto): void {
+    const id = row.id.length === 32
+      ? `${row.id.slice(0, 8)}-${row.id.slice(8, 12)}-${row.id.slice(12, 16)}-${row.id.slice(16, 20)}-${row.id.slice(20)}`
+      : row.id
+    window.history.pushState('', '', `/resend/${id}`)
+    window.dispatchEvent(new PopStateEvent('popstate'))
   }
 
   const deleteTarget = rows.find((r) => r.id === deleteTargetId)
@@ -270,7 +269,7 @@ export function FilesPage({ onNewTransfer }: FilesPageProps) {
                   <div className="mf-actions">
                     <button type="button" className="au-ghost-btn" aria-label="Copy link" onClick={() => void copyLink(row)}>Copy</button>
                     <button type="button" className="au-ghost-btn" aria-label="View" onClick={() => viewLink(row)}>View</button>
-                    <button type="button" className="au-ghost-btn" aria-label="Re-send" onClick={resendStub}>Re-send</button>
+                    <button type="button" className="au-ghost-btn" aria-label="Re-send" onClick={() => resend(row)}>Re-send</button>
                     <button type="button" className="au-ghost-btn" aria-label="Delete" onClick={() => openDelete(row)}>Delete</button>
                   </div>
                 </li>

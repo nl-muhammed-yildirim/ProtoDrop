@@ -499,6 +499,105 @@ main:has(.sl) .dz {
   font-size: var(--fs-small);
 }
 
+/* T-010-03 (EC-010-3): re-send banner — --accent-soft, one line above the form (UI-Reference §5.2). */
+.ls-banner {
+  background: var(--accent-soft);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: var(--fs-small);
+  margin-bottom: 12px;
+}
+
+/* T-010-03 (FR-010-2): password field — same layout as .ls-sender, input styled like .ls-sender-input. */
+.ls-password-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ls-password-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ls-password-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  background: var(--bg-subtle);
+  color: var(--fg);
+}
+
+.ls-password-toggle {
+  font-size: var(--fs-small);
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+/* T-010-03 (EC-010-3): FILES_GONE single-screen state — centered heading + one primary CTA (§4.6 terminal states). */
+.rs-filesgone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 48px 24px;
+}
+
+.rs-filesgone-heading {
+  font-size: var(--fs-h2);
+  color: var(--fg);
+  text-align: center;
+}
+
+.rs-filesgone-upload {
+  min-height: 44px;
+  padding: 12px 24px;
+  background: var(--accent);
+  color: #FFFFFF;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-body);
+  cursor: pointer;
+}
+
+/* T-010-03: re-send screen loading + generic error states. */
+.rs-loading {
+  padding: 48px 24px;
+  color: var(--fg-muted);
+  text-align: center;
+}
+
+.rs-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 48px 24px;
+}
+
+.rs-error-message {
+  color: var(--danger);
+  font-size: var(--fs-small);
+  text-align: center;
+}
+
+.rs-error-retry {
+  min-height: 44px;
+  padding: 12px 24px;
+  background: var(--accent);
+  color: #FFFFFF;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-body);
+  cursor: pointer;
+}
+
 /* T-002-08: Send transfer + Copy link only row, and the in-place "Transfer sent." confirmation */
 .ls-actions {
   display: flex;

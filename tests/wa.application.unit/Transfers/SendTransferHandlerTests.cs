@@ -479,6 +479,93 @@ public class SendTransferHandlerTests
         Assert.Null(_store.Transfer!.PasswordHash);
     }
 
+    // ---- T-010-03 (US-010-02): re-send drafts clear their copied hash when no new password is provided ----
+
+    [Fact]
+    public async Task Send_ResendDraft_NoPassword_ClearsCopiedHash()
+    {
+        // Seed a SourcedFrom draft with PasswordHash set (copied from the original by T-010-01).
+        var transferId = Guid.NewGuid();
+        var originalTransferId = Guid.NewGuid();
+        _store.Transfer = new Transfer
+        {
+            Id = transferId,
+            LinkId = "ABCD1234",
+            Status = 0,
+            TotalBytes = 100,
+            FileCount = 1,
+            SenderName = "Guest",
+            CreatedAtUtc = DateTime.UtcNow,
+            SourcedFrom = originalTransferId,
+            PasswordHash = "copied-hash-from-original" // T-010-01 copies this byte-for-byte
+        };
+
+        await _handler.Handle(
+            new SendTransferCommand(transferId, null, null, null, []),
+            CancellationToken.None);
+
+        // The copied hash is cleared — the original's PBKDF2 key doesn't match this draft's ID.
+        Assert.Null(_store.Transfer!.PasswordHash);
+    }
+
+    [Fact]
+    public async Task Send_ResendDraft_NewPassword_ReKeysWithNewId()
+    {
+        // Seed a SourcedFrom draft with PasswordHash set (copied from the original by T-010-01).
+        var transferId = Guid.NewGuid();
+        var originalTransferId = Guid.NewGuid();
+        _store.Transfer = new Transfer
+        {
+            Id = transferId,
+            LinkId = "ABCD1234",
+            Status = 0,
+            TotalBytes = 100,
+            FileCount = 1,
+            SenderName = "Guest",
+            CreatedAtUtc = DateTime.UtcNow,
+            SourcedFrom = originalTransferId,
+            PasswordHash = "copied-hash-from-original"
+        };
+
+        await _handler.Handle(
+            new SendTransferCommand(transferId, null, null, null, [], "newpass"),
+            CancellationToken.None);
+
+        // The hash is re-keyed with the NEW transfer's ID.
+        var hash = _store.Transfer!.PasswordHash;
+        Assert.NotNull(hash);
+        Assert.NotEqual("copied-hash-from-original", hash);
+
+        // Verify the hash can be verified against the NEW transfer's ID.
+        var hasher = new Microsoft.AspNetCore.Identity.PasswordHasher<string>();
+        var verifyResult = hasher.VerifyHashedPassword(transferId.ToString("n"), hash, "newpass");
+        Assert.Equal(Microsoft.AspNetCore.Identity.PasswordVerificationResult.Success, verifyResult);
+    }
+
+    [Fact]
+    public async Task Normal_Draft_NoPassword_KeepsNull()
+    {
+        // SourcedFrom=null draft (normal draft) — no behavior change.
+        var transferId = Guid.NewGuid();
+        _store.Transfer = new Transfer
+        {
+            Id = transferId,
+            LinkId = "ABCD1234",
+            Status = 0,
+            TotalBytes = 100,
+            FileCount = 1,
+            SenderName = "Guest",
+            CreatedAtUtc = DateTime.UtcNow,
+            SourcedFrom = null // normal draft — not a re-send
+        };
+
+        await _handler.Handle(
+            new SendTransferCommand(transferId, null, null, null, []),
+            CancellationToken.None);
+
+        Assert.Null(_store.Transfer!.PasswordHash);
+    }
+
     // ---- T-008-08 / FR-008-7: send-time attribution — owner + "From" default ----
 
     private AppUser NewUser(Guid id, string displayName, string email) => new()
