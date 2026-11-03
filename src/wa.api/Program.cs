@@ -65,7 +65,8 @@ builder.Services.AddSingleton<IFlagsStore>(sp => new FlagsStore(sp.GetRequiredSe
 // T-001-10 (TA-4.2#2): finalize handler's DB surface — thin adapter over the adapter-owned WaDbContext.
 builder.Services.AddSingleton<wa.application.UseCases.Transfers.ITransferStore>(sp => new wa.infrastructure.Persistence.TransferStore(sp.GetRequiredService<WaDbContext>()));
 // T-002-04 (TA-4.2#3): send handler's DB surface — thin adapter over the adapter-owned WaDbContext.
-builder.Services.AddSingleton<wa.application.UseCases.Transfers.ISendStore>(sp => new wa.infrastructure.Persistence.SendStore(sp.GetRequiredService<WaDbContext>()));
+// T-010-02: IBlobStore (the gate primitive, registered as a singleton at L53) — SendStore's FILES_GONE gate checks physical presence via ExistsAsync.
+builder.Services.AddSingleton<wa.application.UseCases.Transfers.ISendStore>(sp => new wa.infrastructure.Persistence.SendStore(sp.GetRequiredService<WaDbContext>(), sp.GetRequiredService<wa.application.Ports.IBlobStore>()));
 // T-014 (TA-4.2#4): recipient-page handler's DB surface — thin adapter over the adapter-owned WaDbContext.
 builder.Services.AddSingleton<wa.application.UseCases.Transfers.IPublicTransferStore>(sp => new wa.infrastructure.Persistence.PublicTransferStore(sp.GetRequiredService<WaDbContext>()));
 // T-002-02 (TA-4.1.5): generic HTTP idempotency store — used by IdempotencyMiddleware for finalize + send endpoints.
@@ -231,6 +232,11 @@ app.MapPost("/api/v1/transfers/{id}/send", async (Guid id, HttpContext httpConte
     {
         throw new BusinessException(ProblemCodes.Validation, vex.Message);
     }
+    catch (wa.application.UseCases.Transfers.FilesGoneException ex)
+    {
+        // T-010-02 (EC-010-2): a re-send draft's blobs are physically gone → 410 FILES_GONE.
+        throw new BusinessException(ProblemCodes.FilesGone, ex.Message);
+    }
 });
 
 // T-010-01 (endpoint 16): re-send — create a new Draft transfer sharing the original's blobs (no data copy, ADR-009).
@@ -265,6 +271,11 @@ app.MapPost("/api/v1/transfers/{id}/resend", async (Guid id, HttpContext httpCon
     {
         // EC-010-4: a guest row (no owner) is re-send-ineligible → 403 FORBIDDEN — first usage of ProblemCodes.Forbidden.
         throw new BusinessException(ProblemCodes.Forbidden, ex.Message);
+    }
+    catch (wa.application.UseCases.Transfers.FilesGoneException ex)
+    {
+        // T-010-02 (AC-010-2): the original's blobs are physically gone → 410 FILES_GONE — zero new rows, no RefCount change.
+        throw new BusinessException(ProblemCodes.FilesGone, ex.Message);
     }
 });
 

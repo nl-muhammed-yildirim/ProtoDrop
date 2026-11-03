@@ -256,3 +256,13 @@ public sealed class TransferValidationException : Exception
 {
     public TransferValidationException(string message) : base(message) { }
 }
+
+/// <summary>
+/// T-010-02 (AC-010-2/EC-010-2): a re-send's shared blobs are physically gone — thrown by SendStore's gate at
+/// creation time (SaveResendAsync step 0) or send time (SaveSendAsync, SourcedFrom drafts only). The endpoints catch
+/// it and throw BusinessException(ProblemCodes.FilesGone), keeping the closed code list intact (410 FILES_GONE).
+/// </summary>
+public sealed class FilesGoneException : Exception
+{
+    public FilesGoneException() : base("The files for this transfer were deleted — upload again.") { }
+}

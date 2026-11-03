@@ -149,12 +149,33 @@ public class SendTransferSupersedeTests
         public Transfer? Transfer { get; set; }
         public Dictionary<Guid, Transfer> TransferById { get; } = [];
         public List<EmailRecipient> Recipients { get; } = [];
+        // T-010-02 (row 7): the gate's inputs — this transfer's seeded file items + the blob rows (T-005-03 output) + the physical-presence set.
+        public Dictionary<Guid, FileItem[]> FileItemsByTransferId { get; } = [];
+        public Dictionary<Guid, BlobRef> BlobRefRowsByBlobId { get; } = new();
+
+        private readonly StubBlobStore _blobStore = new(); // the physical-storage surface (ExistsAsync only)
 
         public Task<Transfer?> FindByIdAsync(Guid id, CancellationToken ct) =>
             Task.FromResult(Transfer is not null && Transfer.Id == id ? Transfer : null);
 
         public Task SaveSendAsync(Transfer transfer, IReadOnlyList<EmailRecipient> recipients, CancellationToken ct)
         {
+            // T-010-02 (row 7): mirror the real gate — re-send drafts only. Look up this transfer's seeded file items and
+            // throw FilesGoneException before recording if any blob is missing — exactly like row 5's stub. No existing
+            // fact seeds a missing blob for a SourcedFrom draft (they seed drafts with no file rows), so the empty
+            // collection early-return keeps them green (AC-010-2).
+            if (transfer.SourcedFrom is not null)
+            {
+                var fileItems = FileItemsByTransferId.TryGetValue(transfer.Id, out var fi) ? fi : Array.Empty<FileItem>();
+                foreach (var blobId in fileItems.Select(f => f.BlobRefId).Distinct())
+                {
+                    if (!BlobRefRowsByBlobId.TryGetValue(blobId, out var row))
+                        throw new FilesGoneException(); // missing row = gone (f-delete-blobs removed blob and row together)
+
+                    if (!_blobStore.ExistingPaths.Contains(row.BlobPath))
+                        throw new FilesGoneException(); // blob physically gone
+                }
+            }
             // T-010-01: when SourcedFrom is set, flip SupersededBy on the original row — only if the original still exists.
             if (transfer.SourcedFrom is not null && TransferById.TryGetValue(transfer.SourcedFrom.Value, out var original))
                 original.SupersededBy = transfer.Id;
@@ -170,6 +191,15 @@ public class SendTransferSupersedeTests
 
         public Task SaveResendAsync(Transfer draft, IReadOnlyList<FileItem> fileItems, IReadOnlyList<EmailRecipient> recipients, IReadOnlyList<BlobRef> sharedBlobRefs, CancellationToken ct) =>
             Task.CompletedTask;
+    }
+
+    // T-010-02 (row 7): the blob store stub — physical-presence set (the gate's only primitive, mirroring IBlobStore.ExistsAsync).
+    private sealed class StubBlobStore
+    {
+        public HashSet<string> ExistingPaths { get; } = new();
+
+        public Task<bool> ExistsAsync(string path, CancellationToken ct = default) =>
+            Task.FromResult(ExistingPaths.Contains(path));
     }
 
     private sealed class StubLimitsProvider : ILimitsProvider

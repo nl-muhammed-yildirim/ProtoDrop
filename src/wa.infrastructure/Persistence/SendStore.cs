@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using wa.application.Ports;
 using wa.application.UseCases.Transfers;
 using wa.domain;
 
@@ -11,8 +12,13 @@ namespace wa.infrastructure.Persistence;
 public sealed class SendStore : ISendStore
 {
     private readonly WaDbContext _db;
+    private readonly IBlobStore _blobs;   // T-010-02: the gate primitive — physical-presence checks via ExistsAsync.
 
-    public SendStore(WaDbContext db) => _db = db;
+    public SendStore(WaDbContext db, IBlobStore blobs)
+    {
+        _db = db;
+        _blobs = blobs;
+    }
 
     public Task<Transfer?> FindByIdAsync(Guid id, CancellationToken ct) =>
         _db.Set<Transfer>().FirstOrDefaultAsync(t => t.Id == id, ct);
@@ -20,6 +26,18 @@ public sealed class SendStore : ISendStore
     public async Task SaveSendAsync(Transfer transfer, IReadOnlyList<EmailRecipient> recipients, CancellationToken ct)
     {
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
+
+        // T-010-02 (EC-010-2): re-send drafts only — a normal draft's blobs cannot be "gone" via this lifecycle, so the
+        // gate is scoped to SourcedFrom rows. Runs BEFORE any write: a throw rolls the transaction back → no orphan rows.
+        if (transfer.SourcedFrom is not null)
+        {
+            var blobIds = await _db.Set<FileItem>()
+                .Where(f => f.TransferId == transfer.Id)
+                .Select(f => f.BlobRefId)
+                .Distinct()
+                .ToListAsync(ct);
+            await AssertBlobsPhysicallyPresentAsync(blobIds, ct); // T-010-02: the shared FILES_GONE gate
+        }
 
         // T-010-01 (AC-010-1): a re-send draft carries SourcedFrom = original.Id — set SupersededBy on the original row
         // inside this same transaction. rowsAffected 0 → the original was deleted while the draft sat open — no error here;
@@ -74,6 +92,12 @@ public sealed class SendStore : ISendStore
     {
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
 
+        // T-010-02 (AC-010-2): step 0 — the FILES_GONE gate inside this transaction, BEFORE any insert or RefCount bump.
+        // The handler passes Id-only BlobRef stubs, so the predicate reads its own rows from _db. A throw rolls this
+        // transaction back → zero new rows, no RefCount change (no half-created draft remains).
+        var distinctBlobIds = sharedBlobRefs.Select(b => b.Id).Distinct().ToList();
+        await AssertBlobsPhysicallyPresentAsync(distinctBlobIds, ct);
+
         _db.Set<Transfer>().Add(draft);
         foreach (var f in fileItems)
             _db.Set<FileItem>().Add(f);
@@ -93,5 +117,36 @@ public sealed class SendStore : ISendStore
         }
 
         await tx.CommitAsync(ct);
+    }
+
+    /// <summary>
+    /// T-010-02 gate — the single shared predicate for create-time (SaveResendAsync step 0) and send-time
+    /// (SaveSendAsync, SourcedFrom drafts). Checks PHYSICAL presence only: row presence + IBlobStore.ExistsAsync(row.BlobPath).
+    /// A missing BlobRef row means gone — T-005-03's f-delete-blobs job removes blob and row in one pass, so a missing
+    /// row has no path to check. PhysicallyDeletedAtUtc is NOT read: within T-005-03's 24 h buffer window the blob is
+    /// still physically present and the re-send is ALLOWED (exit check c). Must run inside the caller's transaction —
+    /// a FilesGoneException throw rolls it back → zero new rows, no RefCount change (AC-010-2). An empty id collection
+    /// returns early (a SourcedFrom draft with no file rows must not fire the gate).
+    /// </summary>
+    private async Task AssertBlobsPhysicallyPresentAsync(IReadOnlyCollection<Guid> blobRefIds, CancellationToken ct)
+    {
+        if (blobRefIds.Count == 0)
+            return;
+
+        var rows = await _db.Set<BlobRef>()
+            .AsNoTracking()
+            .Where(b => blobRefIds.Contains(b.Id))
+            .ToListAsync(ct);
+        var rowsById = rows.ToDictionary(r => r.Id);
+
+        foreach (var id in blobRefIds)
+        {
+            if (!rowsById.TryGetValue(id, out var row))
+                throw new FilesGoneException(); // missing row = gone (f-delete-blobs removed blob and row together)
+
+            var physicallyPresent = await _blobs.ExistsAsync(row.BlobPath, ct);
+            if (!physicallyPresent)
+                throw new FilesGoneException();
+        }
     }
 }
