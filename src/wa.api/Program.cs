@@ -77,6 +77,9 @@ builder.Services.AddSingleton<wa.application.UseCases.Admin.IAuditStore>(sp => n
 builder.Services.AddSingleton<wa.application.UseCases.Admin.IAuditWriter>(sp => new wa.application.UseCases.Admin.AuditWriter(sp.GetRequiredService<wa.application.UseCases.Admin.IAuditStore>(), sp.GetRequiredService<wa.application.Ports.IEventPublisher>()));
 builder.Services.AddSingleton(sp => new PlansCache(sp.GetRequiredService<IPlansStore>(), limitsTtl, () => DateTimeOffset.UtcNow));
 builder.Services.AddSingleton(sp => new FlagsCache(sp.GetRequiredService<IFlagsStore>(), limitsTtl, () => DateTimeOffset.UtcNow));
+// T-011-03 (TA-4.2#20 / FR-011-6): overview aggregates — store + 5-min snapshot cache (pinned by spec; not config-driven).
+builder.Services.AddSingleton<wa.application.UseCases.Admin.IOverviewStore>(sp => new wa.infrastructure.Persistence.OverviewStore(sp.GetRequiredService<WaDbContext>()));
+builder.Services.AddSingleton(sp => new wa.application.UseCases.Admin.OverviewSnapshotCache(sp.GetRequiredService<wa.application.UseCases.Admin.IOverviewStore>(), TimeSpan.FromMinutes(5), () => DateTimeOffset.UtcNow));
 builder.Services.AddSingleton<ILimitsProvider>(sp => new LimitsProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
 // TA-3.6 — minting is pure HMAC (no network at request time); §5.2 account values already read above (T-055-02).
 builder.Services.AddSingleton<IBlobSasMinter>(new DraftBlobSasMinter(new Uri(blobAccountUrl!), blobAccountKey!));
@@ -466,6 +469,24 @@ app.MapDelete("/api/v1/admin/suppressions/{id:guid}", async (Guid id, HttpContex
     await db.SaveChangesAsync(ct);
     telemetry.LogEvent(TelemetryEvents.AdminAction); // F-TRF-011: admin removal is auditable via App Insights
     return Results.Ok();
+});
+
+// T-011-03 (TA-4.2#20 / FR-011-6): admin overview — four aggregates + recent transfers list, cached 5 min in-memory.
+app.MapGet("/api/v1/admin/overview", async (HttpContext ctx, IAppUserStore users, ISender sender, CancellationToken ct) =>
+{
+    await RequireAdminAsync(ctx, users, superadminOnly: false, ct); // T-011-01: both roles read — same as the GET at L450.
+
+    var result = await sender.Send(new wa.application.UseCases.Admin.GetOverviewQuery(), ct);
+    return Results.Json(new
+    {
+        activeTransfers = result.ActiveTransfers,
+        storageBytesUsed = result.StorageBytesUsed,
+        newUsersToday = result.NewUsersToday,
+        emailsSent7d = result.EmailsSent7d,
+        emailsFailed7d = result.EmailsFailed7d,
+        snapshotAtUtc = result.SnapshotAtUtc,
+        recentTransfers = result.RecentTransfers.Select(r => new { linkId = r.LinkId, ownerEmail = r.OwnerEmail, status = r.Status, totalBytes = r.TotalBytes, createdAtUtc = r.CreatedAtUtc })
+    });
 });
 
 // T-008-01 (TA-4.2#8 / FR-008-3): sign-up is sign-in — unknown email → create; known email (any case) → existing row.
