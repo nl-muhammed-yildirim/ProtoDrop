@@ -80,6 +80,8 @@ builder.Services.AddSingleton(sp => new FlagsCache(sp.GetRequiredService<IFlagsS
 // T-011-03 (TA-4.2#20 / FR-011-6): overview aggregates — store + 5-min snapshot cache (pinned by spec; not config-driven).
 builder.Services.AddSingleton<wa.application.UseCases.Admin.IOverviewStore>(sp => new wa.infrastructure.Persistence.OverviewStore(sp.GetRequiredService<WaDbContext>()));
 builder.Services.AddSingleton(sp => new wa.application.UseCases.Admin.OverviewSnapshotCache(sp.GetRequiredService<wa.application.UseCases.Admin.IOverviewStore>(), TimeSpan.FromMinutes(5), () => DateTimeOffset.UtcNow));
+// T-011-04 (TA-4.2#21 / FR-011-3): admin transfer search — store over the adapter-owned WaDbContext.
+builder.Services.AddSingleton<wa.application.UseCases.Admin.ISearchTransfersStore>(sp => new wa.infrastructure.Persistence.SearchTransfersStore(sp.GetRequiredService<WaDbContext>()));
 builder.Services.AddSingleton<ILimitsProvider>(sp => new LimitsProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
 // TA-3.6 — minting is pure HMAC (no network at request time); §5.2 account values already read above (T-055-02).
 builder.Services.AddSingleton<IBlobSasMinter>(new DraftBlobSasMinter(new Uri(blobAccountUrl!), blobAccountKey!));
@@ -488,6 +490,80 @@ app.MapGet("/api/v1/admin/overview", async (HttpContext ctx, IAppUserStore users
         recentTransfers = result.RecentTransfers.Select(r => new { linkId = r.LinkId, ownerEmail = r.OwnerEmail, status = r.Status, totalBytes = r.TotalBytes, createdAtUtc = r.CreatedAtUtc })
     });
 });
+
+// T-011-04 (TA-4.2#21 / FR-011-3): admin transfer search — GET /api/v1/admin/transfers?q=&status=&cursor=&minBytes=&maxBytes=&from=&to=&limit=.
+// Cursor-paged at 25 rows (TA-4.1.4); thin endpoint gated by T-011-01's RequireAdminAsync (superadminOnly:false — both roles read).
+app.MapGet("/api/v1/admin/transfers", async (HttpContext ctx, HttpRequest request, IAppUserStore users, ISender sender, CancellationToken ct) =>
+{
+    await RequireAdminAsync(ctx, users, superadminOnly: false, ct); // T-011-01: both roles read — same as the GET at L475.
+
+    // TA-4.1.4 pin: default page size 25; reject limit <= 0 or > 25 with 400 VALIDATION (existing closed-list member).
+    var limitParam = request.Query["limit"].FirstOrDefault();
+    if (limitParam is null)
+        limitParam = "25";
+    if (!int.TryParse(limitParam, out var parsedLimit) || parsedLimit is <= 0 or > 25)
+        throw new BusinessException(ProblemCodes.Validation, "limit must be a positive integer at most 25.");
+
+    // T-011-04: optional filters — q/status/minBytes/maxBytes/from/to (all optional; absent → no predicate).
+    var q = request.Query["q"].FirstOrDefault();
+    var status = request.Query["status"].FirstOrDefault();
+    long? minBytes = ParseLongParam(request, "minBytes");
+    long? maxBytes = ParseLongParam(request, "maxBytes");
+    DateTime? fromUtc = ParseDateTimeParam(request, "from");
+    DateTime? toUtc = ParseDateTimeParam(request, "to");
+
+    string? cursor = request.Query["cursor"].FirstOrDefault();
+
+    try
+    {
+        var result = await sender.Send(new wa.application.UseCases.Admin.SearchTransfersQuery(
+            q, status, minBytes, maxBytes, fromUtc, toUtc, cursor, parsedLimit), ct);
+        return Results.Json(new
+        {
+            items = result.Items.Select(r => new
+            {
+                linkId = r.LinkId,
+                ownerEmail = r.OwnerEmail,
+                status = r.Status,
+                fileCount = r.FileCount,
+                totalBytes = r.TotalBytes,
+                createdAtUtc = r.CreatedAtUtc,
+                downloadsCount = r.DownloadsCount
+            }),
+            nextCursor = result.NextCursor
+        });
+    }
+    catch (wa.domain.Transfers.CursorFormatException ex)
+    {
+        // TA-4.1.4: malformed cursor → 400 VALIDATION (existing closed-list member) — same as Program.cs L715-723.
+        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+    }
+    catch (wa.application.UseCases.Admin.SearchTransfersValidationException ex)
+    {
+        // T-011-04: handler validation (status vocabulary / range pairing) → 400 VALIDATION (existing closed-list member).
+        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+    }
+});
+
+// T-011-04: helper — parse an optional long query param; bad int → 400 VALIDATION.
+static long? ParseLongParam(HttpRequest request, string name)
+{
+    var raw = request.Query[name].FirstOrDefault();
+    if (raw is null || raw.Length == 0) return null;
+    if (!long.TryParse(raw, out var value))
+        throw new BusinessException(ProblemCodes.Validation, $"{name} must be an integer.");
+    return value;
+}
+
+// T-011-04: helper — parse an optional DateTime query param (RoundtripKind); bad date → 400 VALIDATION.
+static DateTime? ParseDateTimeParam(HttpRequest request, string name)
+{
+    var raw = request.Query[name].FirstOrDefault();
+    if (raw is null || raw.Length == 0) return null;
+    if (!DateTime.TryParse(raw, null, System.Globalization.DateTimeStyles.RoundtripKind, out var value))
+        throw new BusinessException(ProblemCodes.Validation, $"{name} must be a valid date/time.");
+    return value;
+}
 
 // T-008-01 (TA-4.2#8 / FR-008-3): sign-up is sign-in — unknown email → create; known email (any case) → existing row.
 app.MapPost("/api/v1/auth/signup", async (SignupCommand cmd, ISender sender, CancellationToken ct) =>
