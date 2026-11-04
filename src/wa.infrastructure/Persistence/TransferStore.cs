@@ -21,10 +21,29 @@ public sealed class TransferStore : ITransferStore
     public Task<bool> TransferExistsByLinkIdAsync(string linkId, CancellationToken ct) =>
         _db.Set<Transfer>().AnyAsync(t => t.LinkId == linkId, ct);
 
-    public async Task<long> GetActiveStorageBytesAsync(Guid ownerId, CancellationToken ct) =>
-        await _db.Set<Transfer>()
+    /// <summary>
+    /// T-010-04 (US-010-03 / AC-010-1): count UNIQUE BlobRefs — a re-send adds FileItem rows pointing at the same
+    /// BlobRefId(s) without changing the original's Status, so summing Transfer.TotalBytes per row double-counts.
+    /// Sum BlobRef.SizeBytes over distinct blob ids instead (three bounded queries; EF folds them to one subquery).
+    /// </summary>
+    public async Task<long> GetActiveStorageBytesAsync(Guid ownerId, CancellationToken ct)
+    {
+        // (a) active transfer ids for this owner — Status IN (1,3), same predicate as before.
+        var activeIds = _db.Set<Transfer>()
             .Where(t => t.OwnerAppUserId == ownerId && (t.Status == 1 || t.Status == 3))
-            .SumAsync(t => t.TotalBytes, ct);
+            .Select(t => t.Id);
+
+        // (b) distinct blob ids those transfers' FileItems reference.
+        var blobIds = _db.Set<FileItem>()
+            .Where(f => activeIds.Contains(f.TransferId))
+            .Select(f => f.BlobRefId)
+            .Distinct();
+
+        // (c) sum each physical blob once.
+        return await _db.Set<BlobRef>()
+            .Where(b => blobIds.Contains(b.Id))
+            .SumAsync(b => b.SizeBytes, ct);
+    }
 
     public async Task<int> GetActiveTransferCountAsync(Guid ownerId, CancellationToken ct) =>
         await _db.Set<Transfer>()
