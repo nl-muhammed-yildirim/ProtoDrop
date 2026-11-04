@@ -82,6 +82,8 @@ builder.Services.AddSingleton<wa.application.UseCases.Admin.IOverviewStore>(sp =
 builder.Services.AddSingleton(sp => new wa.application.UseCases.Admin.OverviewSnapshotCache(sp.GetRequiredService<wa.application.UseCases.Admin.IOverviewStore>(), TimeSpan.FromMinutes(5), () => DateTimeOffset.UtcNow));
 // T-011-04 (TA-4.2#21 / FR-011-3): admin transfer search — store over the adapter-owned WaDbContext.
 builder.Services.AddSingleton<wa.application.UseCases.Admin.ISearchTransfersStore>(sp => new wa.infrastructure.Persistence.SearchTransfersStore(sp.GetRequiredService<WaDbContext>()));
+// T-011-05 (TA-4.2#21 / FR-011-4): admin force-delete — store over the adapter-owned WaDbContext (platform-scoped predicate).
+builder.Services.AddSingleton<wa.application.UseCases.Admin.IAdminTransferStore>(sp => new wa.infrastructure.Persistence.AdminTransferStore(sp.GetRequiredService<WaDbContext>()));
 builder.Services.AddSingleton<ILimitsProvider>(sp => new LimitsProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
 // TA-3.6 — minting is pure HMAC (no network at request time); §5.2 account values already read above (T-055-02).
 builder.Services.AddSingleton<IBlobSasMinter>(new DraftBlobSasMinter(new Uri(blobAccountUrl!), blobAccountKey!));
@@ -543,6 +545,32 @@ app.MapGet("/api/v1/admin/transfers", async (HttpContext ctx, HttpRequest reques
         // T-011-04: handler validation (status vocabulary / range pairing) → 400 VALIDATION (existing closed-list member).
         throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
     }
+});
+
+// T-011-05 (TA-4.2#21 / FR-011-4): admin force-delete — DELETE /api/v1/admin/transfers/{id} — SuperAdmin-only write.
+// Reuses T-009-04's delete semantics verbatim with reason "admin" — row marked Deleted (soft, Status=4), transfer.deleted
+// emitted once { transferId, reason:"admin" }, RefCount decremented per BlobRef, sole-ref blob gets PhysicallyDeletedAtUtc = now+24h.
+app.MapDelete("/api/v1/admin/transfers/{id:guid}", async (Guid id, HttpContext ctx, IAppUserStore users, ISender sender, IAuditWriter auditWriter, CancellationToken ct) =>
+{
+    // T-011-01 gate: SuperAdmin-only write (TA-4.2#21). The gate resolves the role internally and returns nothing —
+    // 401 UNAUTHENTICATED / 403 FORBIDDEN via BusinessException (GlobalErrorMiddleware maps them).
+    await RequireAdminAsync(ctx, users, superadminOnly: true, ct);
+
+    // T-011-05: null result = already-deleted / unknown — ONE indistinguishable case (EC-009-2 idempotency reused).
+    var result = await sender.Send(new AdminDeleteTransferCommand(id), ct);
+    if (result is null)
+        throw new BusinessException(ProblemCodes.NotFound, "Transfer not found.");
+
+    // FR-011-5: audit only on successful delete — re-read actor email via IAppUserStore (the gate returns void).
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is Guid userId)
+    {
+        var user = await users.GetByIdAsync(userId, ct);
+        if (user?.Email is not null)
+            await auditWriter.WriteAsync(user.Email, "transfer.force_delete", "transfer", id.ToString("n"), new { reason = "admin", transferId = id }, ct);
+    }
+
+    // FR-011-4: 204 No Content — no body (same as endpoint 17 at Program.cs L883).
+    return Results.NoContent();
 });
 
 // T-011-04: helper — parse an optional long query param; bad int → 400 VALIDATION.
