@@ -86,6 +86,8 @@ builder.Services.AddSingleton<wa.application.UseCases.Admin.ISearchTransfersStor
 builder.Services.AddSingleton<wa.application.UseCases.Admin.IAdminTransferStore>(sp => new wa.infrastructure.Persistence.AdminTransferStore(sp.GetRequiredService<WaDbContext>()));
 // T-011-06 (TA-4.2#22 / FR-011-2): admin users list — store over the adapter-owned WaDbContext (computed plan/storage/count).
 builder.Services.AddSingleton<wa.application.UseCases.Admin.IAdminUserStore>(sp => new wa.infrastructure.Persistence.AdminUserStore(sp.GetRequiredService<WaDbContext>()));
+// T-011-08 (TA-4.2#23 / FR-011-2): admin flag write surface — single-key PK upsert over the adapter-owned WaDbContext.
+builder.Services.AddSingleton<wa.application.UseCases.Admin.IAdminFlagStore>(sp => new wa.infrastructure.Persistence.AdminFlagStore(sp.GetRequiredService<WaDbContext>()));
 builder.Services.AddSingleton<ILimitsProvider>(sp => new LimitsProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
 // TA-3.6 — minting is pure HMAC (no network at request time); §5.2 account values already read above (T-055-02).
 builder.Services.AddSingleton<IBlobSasMinter>(new DraftBlobSasMinter(new Uri(blobAccountUrl!), blobAccountKey!));
@@ -675,6 +677,50 @@ app.MapDelete("/api/v1/admin/users/{id:guid}", async (Guid id, HttpContext ctx, 
 
     // FR-011-2: 204 No Content — no body (same as endpoint 21 at Program.cs L616).
     return Results.NoContent();
+});
+
+// T-011-08 (TA-4.2#23 / FR-011-2): admin flags list — GET /api/v1/admin/flags — both roles read.
+// 52 fixed seeded rows — no paging; bare JSON array of {key,value}, camelCase, ordered by key ascending.
+app.MapGet("/api/v1/admin/flags", async (HttpContext ctx, IAppUserStore users, ISender sender, CancellationToken ct) =>
+{
+    // T-011-01 gate: both roles read — same as the GET at L556.
+    await RequireAdminAsync(ctx, users, superadminOnly: false, ct);
+
+    var rows = await sender.Send(new GetFlagsQuery(), ct);
+    return Results.Json(rows.Select(f => new { key = f.Key, value = f.Value })); // reads write NO audit row
+});
+
+// T-011-08 (TA-4.2#23 / FR-011-2): set a flag's value — PUT /api/v1/admin/flags/{key} — SuperAdmin-only write.
+// The value takes effect within 30 s via the EXISTING FlagsCache TTL (TA-3.4) — no invalidation code here.
+app.MapPut("/api/v1/admin/flags/{key}", async (string key, HttpContext ctx, HttpRequest request, IAppUserStore users, ISender sender, IAuditWriter auditWriter, CancellationToken ct) =>
+{
+    // T-011-01 gate: SuperAdmin-only write (TA-4.2#23). The gate resolves the role internally and returns nothing —
+    // 401 UNAUTHENTICATED / 403 FORBIDDEN via BusinessException (GlobalErrorMiddleware maps them).
+    await RequireAdminAsync(ctx, users, superadminOnly: true, ct);
+
+    // T-011-08: the raw body string is the new value — passed through to the handler (TA-4.2a thin endpoint).
+    var body = await new StreamReader(request.Body).ReadToEndAsync(ct);
+
+    try
+    {
+        var result = await sender.Send(new SetFlagCommand(key, body), ct);
+
+        // FR-011-5: audit only on successful save — re-read actor email via IAppUserStore (the gate returns void).
+        if (ctx.Items[SessionMiddleware.SessionUserIdKey] is Guid userId)
+        {
+            var user = await users.GetByIdAsync(userId, ct);
+            if (user?.Email is not null)
+                await auditWriter.WriteAsync(user.Email, "flag.set", "flag", key, new { oldValue = result.OldValue, newValue = result.NewValue }, ct);
+        }
+
+        // FR-011-2: 204 No Content — no body (same as endpoint 22 at Program.cs L645).
+        return Results.NoContent();
+    }
+    catch (SetFlagException ex)
+    {
+        // T-011-08 (Decision): bad JSON → 400 VALIDATION "Invalid JSON"; unknown key → 404 NOT_FOUND.
+        throw new BusinessException(ex.Code, ex.Message, ex);
+    }
 });
 
 // T-011-04: helper — parse an optional long query param; bad int → 400 VALIDATION.
