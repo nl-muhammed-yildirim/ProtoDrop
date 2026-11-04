@@ -65,7 +65,8 @@ builder.Services.AddSingleton<IFlagsStore>(sp => new FlagsStore(sp.GetRequiredSe
 // T-001-10 (TA-4.2#2): finalize handler's DB surface — thin adapter over the adapter-owned WaDbContext.
 builder.Services.AddSingleton<wa.application.UseCases.Transfers.ITransferStore>(sp => new wa.infrastructure.Persistence.TransferStore(sp.GetRequiredService<WaDbContext>()));
 // T-002-04 (TA-4.2#3): send handler's DB surface — thin adapter over the adapter-owned WaDbContext.
-builder.Services.AddSingleton<wa.application.UseCases.Transfers.ISendStore>(sp => new wa.infrastructure.Persistence.SendStore(sp.GetRequiredService<WaDbContext>()));
+// T-010-02: IBlobStore (the gate primitive, registered as a singleton at L53) — SendStore's FILES_GONE gate checks physical presence via ExistsAsync.
+builder.Services.AddSingleton<wa.application.UseCases.Transfers.ISendStore>(sp => new wa.infrastructure.Persistence.SendStore(sp.GetRequiredService<WaDbContext>(), sp.GetRequiredService<wa.application.Ports.IBlobStore>()));
 // T-014 (TA-4.2#4): recipient-page handler's DB surface — thin adapter over the adapter-owned WaDbContext.
 builder.Services.AddSingleton<wa.application.UseCases.Transfers.IPublicTransferStore>(sp => new wa.infrastructure.Persistence.PublicTransferStore(sp.GetRequiredService<WaDbContext>()));
 // T-002-02 (TA-4.1.5): generic HTTP idempotency store — used by IdempotencyMiddleware for finalize + send endpoints.
@@ -230,6 +231,51 @@ app.MapPost("/api/v1/transfers/{id}/send", async (Guid id, HttpContext httpConte
     catch (wa.application.UseCases.Transfers.TransferValidationException vex)
     {
         throw new BusinessException(ProblemCodes.Validation, vex.Message);
+    }
+    catch (wa.application.UseCases.Transfers.FilesGoneException ex)
+    {
+        // T-010-02 (EC-010-2): a re-send draft's blobs are physically gone → 410 FILES_GONE.
+        throw new BusinessException(ProblemCodes.FilesGone, ex.Message);
+    }
+});
+
+// T-010-01 (endpoint 16): re-send — create a new Draft transfer sharing the original's blobs (no data copy, ADR-009).
+// Cookie required; no request body. Guest row → 403 FORBIDDEN (EC-010-4); foreign owner / unknown id / Status=4 → 404 NOT_FOUND.
+app.MapPost("/api/v1/transfers/{id}/resend", async (Guid id, HttpContext httpContext, ISender sender, CancellationToken ct) =>
+{
+    // T-008-08 (FR-008-7): owner AppUserId from the session middleware's Items — single parsing site (T-008-02). Missing/invalid/expired → guest (null).
+    var ownerAppUserId = httpContext.Items[SessionMiddleware.SessionUserIdKey] as Guid?;
+
+    try
+    {
+        var result = await sender.Send(new wa.application.UseCases.Transfers.ResendTransferCommand(id, ownerAppUserId), ct);
+        if (result is null)
+            throw new BusinessException(ProblemCodes.NotFound, "Transfer not found.");
+        return Results.Json(new
+        {
+            id = result.TransferId.ToString("n"),
+            linkId = result.LinkId,
+            status = "Draft",
+            expiresAt = result.ExpiresAtUtc,
+            totalBytes = result.TotalBytes,
+            fileCount = result.FileCount,
+            files = result.Files.Select(f => new { fileId = f.FileId.ToString("n"), name = f.Name }),
+            recipients = result.Recipients,
+            note = result.Note,
+            senderName = result.SenderName,
+            senderEmail = result.SenderEmail,
+            passwordRequired = result.PasswordRequired
+        }, statusCode: 201);
+    }
+    catch (wa.application.UseCases.Transfers.ResendForbiddenException ex)
+    {
+        // EC-010-4: a guest row (no owner) is re-send-ineligible → 403 FORBIDDEN — first usage of ProblemCodes.Forbidden.
+        throw new BusinessException(ProblemCodes.Forbidden, ex.Message);
+    }
+    catch (wa.application.UseCases.Transfers.FilesGoneException ex)
+    {
+        // T-010-02 (AC-010-2): the original's blobs are physically gone → 410 FILES_GONE — zero new rows, no RefCount change.
+        throw new BusinessException(ProblemCodes.FilesGone, ex.Message);
     }
 });
 

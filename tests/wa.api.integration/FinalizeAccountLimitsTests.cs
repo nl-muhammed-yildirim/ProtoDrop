@@ -175,24 +175,51 @@ public class FinalizeAccountLimitsTests : IAsyncLifetime
         return owner.Id;
     }
 
-    /// <summary>Seed Transfer rows directly in the DB (TA-3.4 seeded rows) — Status=1 active, no blobs needed:
-    /// both checks read only OwnerAppUserId/Status/TotalBytes and run before any blob copy.</summary>
+    /// <summary>Seed Transfer rows directly in the DB (TA-3.4 seeded rows) — Status=1 active. T-010-04: each row now
+    /// carries a matching BlobRef (SizeBytes == TotalBytes, RefCount 1) + one FileItem so GetActiveStorageBytesAsync's
+    /// unique-BlobRef expression reads real bytes (bare Transfer.TotalBytes rows would contribute 0 after the rewrite).</summary>
     private async Task SeedActiveTransferRowsAsync(Guid ownerId, long[] totalBytes)
     {
-        var transfers = totalBytes.Select(bytes => new Transfer
+        var now = DateTime.UtcNow;
+        foreach (var bytes in totalBytes)
         {
-            Id = Guid.NewGuid(),
-            LinkId = wa.domain.ValueObjects.LinkId.Mint().Value,
-            Status = 1, // Active — inside GetActiveStorageBytesAsync/GetActiveTransferCountAsync WHERE (Status IN (1,3))
-            OwnerAppUserId = ownerId,
-            TotalBytes = bytes,
-            FileCount = 1,
-            SenderName = "Guest",
-            MaxDownloads = 1,
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(30),
-            CreatedAtUtc = DateTime.UtcNow
-        }).ToList();
-        _db.Set<Transfer>().AddRange(transfers);
+            var transferId = Guid.NewGuid();
+            var blobRef = new BlobRef
+            {
+                Id = Guid.NewGuid(),
+                BlobPath = $"transfers/{transferId:N}/{Guid.NewGuid():N}",
+                SizeBytes = bytes,
+                RefCount = 1,
+                CreatedAtUtc = now
+            };
+            _db.Set<BlobRef>().Add(blobRef);
+
+            var transfer = new Transfer
+            {
+                Id = transferId,
+                LinkId = wa.domain.ValueObjects.LinkId.Mint().Value,
+                Status = 1, // Active — inside GetActiveStorageBytesAsync/GetActiveTransferCountAsync WHERE (Status IN (1,3))
+                OwnerAppUserId = ownerId,
+                TotalBytes = bytes,
+                FileCount = 1,
+                SenderName = "Guest",
+                MaxDownloads = 1,
+                ExpiresAtUtc = now.AddDays(30),
+                CreatedAtUtc = now
+            };
+            _db.Set<Transfer>().Add(transfer);
+
+            var fileItem = new FileItem
+            {
+                Id = Guid.NewGuid(),
+                TransferId = transferId,
+                BlobRefId = blobRef.Id,
+                OriginalName = "seeded.txt",
+                SizeBytes = bytes,
+                SortOrder = 0
+            };
+            _db.Set<FileItem>().Add(fileItem);
+        }
         await _db.SaveChangesAsync();
     }
 

@@ -14,6 +14,8 @@ import FilesPage from './features/files/FilesPage'
 import { matchFilesPath } from './features/files/filesRoute'
 import RecipientPage from './features/recipient/RecipientPage'
 import UnsubscribePage from './features/unsubscribe/UnsubscribePage'
+import ReSendScreen from './features/sender/ReSendScreen'
+import { matchResendPath } from './features/sender/resendRoute'
 import { matchLinkPath } from './features/recipient/recipientRoute'
 import { matchUnsubscribePath } from './features/unsubscribe/unsubscribeRoute'
 
@@ -37,6 +39,8 @@ export default function App() {
 
   const linkId = matchLinkPath(pathname)
   const unsubscribeToken = matchUnsubscribePath(pathname)
+  // T-010-03 (FR-010-4): re-send route — /resend/{originalTransferId}; requires a signed-in user (T-010-01 owner scope).
+  const resendTransferId = matchResendPath(pathname)
   const hasFiles = useUploadEngine((s) => s.files.length > 0)
 
   // T-008-09 (D-5): post-delete toast — App state survives the ProfilePage unmount on redirect; DropZone renders it.
@@ -98,6 +102,9 @@ export default function App() {
           <ProfilePage profile={session} onSignedIn={setSession} onThemeChange={handleThemeChange} onDeleteAccount={handleDeleteAccount} />
         ) : session && matchFilesPath(pathname) ? (
           <FilesPage onNewTransfer={goHome} />
+        ) : session && resendTransferId !== null ? (
+          // T-010-03 (FR-010-4): re-send screen — the ORIGINAL transfer's ID from My Files rows; endpoint 16 mints a new draft.
+          <ReSendScreen originalTransferId={resendTransferId} onUpload={goHome} />
         ) : matchAccountPath(pathname) ? (
           // Signed-out guest keeps the sign-in card; /account/profile with no session falls
           // through here too (it still matches ACCOUNT_PATH_RE — order above is what wins).

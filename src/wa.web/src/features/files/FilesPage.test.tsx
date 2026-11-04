@@ -353,7 +353,7 @@ describe('FilesPage (T-009-05)', () => {
   // the REAL helper output is pinned here, NOT the spec's illustrative "1.2 GB").
   const T6_BASE_ROW: Record<string, unknown> = {
     ...makeRows(1, 1, 3600_000)[0] as object,
-    id: 't6id', name: 'T6 row', fileCount: 3, totalBytes: 1288490188, linkId: 'ab3def5g',
+    id: 'a1b2c3d4e5f67890abcdef1234567890', name: 'T6 row', fileCount: 3, totalBytes: 1288490188, linkId: 'ab3def5g',
   }
 
   it('(i) CopyLink_WritesExactUrl — clicking Copy writes {origin}/t/{linkId} via the clipboard (FR-009-3)', async () => {
@@ -420,16 +420,24 @@ describe('FilesPage (T-009-05)', () => {
     }
   })
 
-  it('(k) ResendStub_OnlyStatusToast_NoFetch — the Re-send button shows the T-023 status toast, NO fetch (T-023 route stub)', async () => {
+  it('(k) Resend_NavigatesToResendRoute — clicking Re-send pushes /resend/{id} and mounts ReSendScreen (T-010-03)', async () => {
     const captured: { calls: string[] } = { calls: [] }
-    stubFetch(captured, () => {
+    stubFetch(captured, (req) => {
+      const url = new URL(req.url, 'http://localhost:8080')
+      if (url.pathname.endsWith('/resend')) {
+        // Endpoint 16 wire shape (Program.cs L254-268) — ReSendScreen's ready state renders LinkScreen.
+        return new Response(JSON.stringify({
+          id: 'newdraftid', linkId: 'NewLink123', status: 'Draft', expiresAt: '2026-12-01T00:00:00Z',
+          totalBytes: 100, fileCount: 1, files: [{ fileId: 'f1', name: 'a.txt' }],
+          recipients: ['a@x.com'], note: null, senderName: 'Ada', senderEmail: null, passwordRequired: false,
+        }), { status: 201 })
+      }
       return new Response(JSON.stringify({ items: [T6_BASE_ROW], nextCursor: null }), { status: 200 })
     })
 
     const { host, cleanup } = renderAppAtFiles()
     try {
       await flush()
-      const initialCalls = captured.calls.length   // exactly the initial list fetch
 
       const resendBtn = Array.from(host.querySelectorAll('.mf-actions button')) as HTMLButtonElement[]
       expect(resendBtn.find((b) => b.getAttribute('aria-label') === 'Re-send')).toBeDefined()
@@ -437,9 +445,16 @@ describe('FilesPage (T-009-05)', () => {
         (resendBtn.find((b) => b.getAttribute('aria-label') === 'Re-send') as HTMLButtonElement).dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
 
-      // T-023 route stub: the endpoint ships in F-TRF-010 — nothing is sent today, only this status toast.
-      expect(host.textContent).toContain('Re-send lands in T-023 (F-TRF-010).')
-      expect(captured.calls.length).toBe(initialCalls)   // no fetch on the Re-send stub (the plan forbids one).
+      // T-010-03 (FR-010-4): pushState to /resend/{originalTransferId} — dashed GUID form.
+      const expectedId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+      expect(window.location.pathname).toBe(`/resend/${expectedId}`)
+      // ReSendScreen POSTs endpoint 16 on mount (the new draft is minted server-side).
+      const resendCall = captured.calls.find((c) => c.endsWith('/resend'))
+      expect(resendCall).toBeDefined()
+      // The ready state renders LinkScreen with the pre-filled recipients.
+      const textarea = host.querySelector('.ls-recipients-textarea') as HTMLTextAreaElement
+      expect(textarea).not.toBeNull()
+      expect(textarea.value).toBe('a@x.com')
     } finally {
       cleanup()
     }
@@ -499,7 +514,7 @@ describe('FilesPage (T-009-05)', () => {
         await Promise.resolve()   // flush the DELETE's promise chain (the stub is async).
       })
 
-      expect(captured.calls.some((c) => c.includes('/transfers/t6id'))).toBe(true)   // the DELETE was sent.
+      expect(captured.calls.some((c) => c.includes(`/transfers/${T6_BASE_ROW.id}`))).toBe(true)   // the DELETE was sent.
       expect(host.querySelectorAll('.mf-row').length).toBe(0)   // the row was removed locally on success.
       const toastEl = host.querySelector('[role="status"]') as HTMLElement
       expect(toastEl.textContent).toBe('Transfer deleted.')

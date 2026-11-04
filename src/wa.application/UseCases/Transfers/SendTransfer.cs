@@ -39,7 +39,25 @@ public interface ISendStore
 {
     Task<Transfer?> FindByIdAsync(Guid id, CancellationToken ct);
     Task SaveSendAsync(Transfer transfer, IReadOnlyList<EmailRecipient> recipients, CancellationToken ct);
+
+    // T-010-01 (AC-010-1): three new members for the re-send use case — no changes to existing signatures.
+    /// <summary>T-010-01: read all recipient email addresses stored for a transfer.</summary>
+    Task<IReadOnlyList<string>> GetRecipientAddressesAsync(Guid transferId, CancellationToken ct);
+
+    /// <summary>T-010-01 (AC-010-1): list file item rows (metadata only, no EF entities) ordered by SortOrder.</summary>
+    Task<IReadOnlyList<FileItemRow>> ListFileItemsByTransferAsync(Guid transferId, CancellationToken ct);
+
+    /// <summary>
+    /// T-010-01 (AC-010-1): one transaction — insert the new draft Transfer + new FileItem rows + the materialized
+    /// snapshot EmailRecipient rows (the editable pending state US-010-02 reads), then increment RefCount on each shared
+    /// BlobRef via guarded ExecuteUpdate (same raw-SQL guard style as PublicTransferStore.RecordSingleFileDownloadAsync;
+    /// rowsAffected &lt; 1 → InvalidOperationException). T-010-02 will insert its FILES_GONE gate inside this same transaction.
+    /// </summary>
+    Task SaveResendAsync(Transfer draft, IReadOnlyList<FileItem> fileItems, IReadOnlyList<EmailRecipient> recipients, IReadOnlyList<BlobRef> sharedBlobRefs, CancellationToken ct);
 }
+
+/// <summary>T-010-01: file item row projection (plain POCO — no EF entity in use case layer).</summary>
+public sealed record FileItemRow(Guid Id, Guid BlobRefId, string OriginalName, long SizeBytes, string? ContentType, int SortOrder);
 
 /// <summary>
 /// T-002-04 (TA-4.2#3) — the only business logic behind POST /api/v1/transfers/{id}/send:
@@ -135,6 +153,12 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
         {
             var hasher = new Microsoft.AspNetCore.Identity.PasswordHasher<string>();
             transfer.PasswordHash = hasher.HashPassword(transfer.Id.ToString("n"), request.Password);
+        }
+        else if (transfer.SourcedFrom is not null)
+        {
+            // T-010-03 (US-010-02): re-send drafts clear their copied hash when no new password is provided — the original's
+            // PBKDF2 key (original transfer ID) doesn't match this draft's ID, so keeping it would break unlock.
+            transfer.PasswordHash = null;
         }
 
         // 6. One EmailRecipient row per unique address.
@@ -237,4 +261,14 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
 public sealed class TransferValidationException : Exception
 {
     public TransferValidationException(string message) : base(message) { }
+}
+
+/// <summary>
+/// T-010-02 (AC-010-2/EC-010-2): a re-send's shared blobs are physically gone — thrown by SendStore's gate at
+/// creation time (SaveResendAsync step 0) or send time (SaveSendAsync, SourcedFrom drafts only). The endpoints catch
+/// it and throw BusinessException(ProblemCodes.FilesGone), keeping the closed code list intact (410 FILES_GONE).
+/// </summary>
+public sealed class FilesGoneException : Exception
+{
+    public FilesGoneException() : base("The files for this transfer were deleted — upload again.") { }
 }

@@ -968,6 +968,9 @@ namespace wa.infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("NVARCHAR(100)");
 
+                    b.Property<Guid?>("SourcedFrom")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<byte>("Status")
                         .HasColumnType("TINYINT");
 

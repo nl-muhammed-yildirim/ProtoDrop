@@ -22,6 +22,8 @@ public class Transfer
     public int FileCount { get; set; }
     /// <summary>Self-reference: transfer that superseded this one (re-send).</summary>
     public Guid? SupersededBy { get; set; }
+    /// <summary>The original transfer this row was re-sent from (T-010-01); null for a fresh draft. Read by SendStore.SaveSendAsync to set SupersededBy on the original.</summary>
+    public Guid? SourcedFrom { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public DateTime? ExpiredAtUtc { get; set; }
     /// <summary>Soft-delete (TA-3.1).</summary>
