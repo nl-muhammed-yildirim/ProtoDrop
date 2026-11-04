@@ -17,6 +17,13 @@ public interface IAdminUserStore
         Guid? afterIdExcluded,
         int limit,
         CancellationToken ct);
+
+    /// <summary>
+    /// T-011-07 (TA-4.2#22 / FR-011-2): set AppUser.PlanId = newPlanId WHERE Id == userId — returns false when the row
+    /// vanished in a race (mirror SoftDeleteWithReHomeAsync's bool contract). Limits take effect at the NEXT finalize
+    /// (FR-BIL-001-4 "applies to new transfers") — no limit recompute here.
+    /// </summary>
+    Task<bool> SetPlanIdAsync(Guid userId, Guid newPlanId, CancellationToken ct);
 }
 
 /// <summary>T-011-06: one row in the admin users list (TA-4.2#22). Storage + count are computed, not stored.</summary>

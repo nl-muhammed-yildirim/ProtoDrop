@@ -616,6 +616,67 @@ app.MapDelete("/api/v1/admin/transfers/{id:guid}", async (Guid id, HttpContext c
     return Results.NoContent();
 });
 
+// T-011-07 (TA-4.2#22 / FR-011-2): set a user's plan — PATCH /api/v1/admin/users/{id}?planId= — SuperAdmin-only write.
+// Limits take effect at the NEXT finalize (FR-BIL-001-4 "applies to new transfers") — no limit recompute here.
+app.MapPatch("/api/v1/admin/users/{id:guid}", async (Guid id, HttpContext ctx, HttpRequest request, IAppUserStore users, ISender sender, IAuditWriter auditWriter, CancellationToken ct) =>
+{
+    // T-011-01 gate: SuperAdmin-only write (TA-4.2#22). The gate resolves the role internally and returns nothing —
+    // 401 UNAUTHENTICATED / 403 FORBIDDEN via BusinessException (GlobalErrorMiddleware maps them).
+    await RequireAdminAsync(ctx, users, superadminOnly: true, ct);
+
+    // T-011-07: planId from the query string — bad format → 400 VALIDATION (existing closed-list member).
+    var planIdParam = request.Query["planId"].FirstOrDefault();
+    if (!Guid.TryParse(planIdParam, out var planId))
+        throw new BusinessException(ProblemCodes.Validation, "planId must be a GUID.");
+
+    try
+    {
+        var result = await sender.Send(new SetUserPlanCommand(id, planId), ct);
+
+        // FR-011-5: audit only on successful write — re-read actor email via IAppUserStore (the gate returns void).
+        if (ctx.Items[SessionMiddleware.SessionUserIdKey] is Guid userId)
+        {
+            var user = await users.GetByIdAsync(userId, ct);
+            if (user?.Email is not null)
+                await auditWriter.WriteAsync(user.Email, "user.plan_changed", "user", id.ToString("n"), new { oldPlanId = result.OldPlanId, newPlanId = result.NewPlanId }, ct);
+        }
+
+        // FR-011-2: 204 No Content — no body (same as endpoint 21 at Program.cs L616).
+        return Results.NoContent();
+    }
+    catch (SetUserPlanException ex)
+    {
+        // T-011-07 (Decision 2): unknown user OR unknown planId → 404 NOT_FOUND (existing closed-list member).
+        throw new BusinessException(ProblemCodes.NotFound, ex.Message, ex);
+    }
+});
+
+// T-011-07 (TA-4.2#22 / FR-011-2): force-delete a user — DELETE /api/v1/admin/users/{id} — SuperAdmin-only write.
+// Reuses T-008's GDPR soft-delete + re-home verbatim (reason "admin" is the admin context, not a column).
+app.MapDelete("/api/v1/admin/users/{id:guid}", async (Guid id, HttpContext ctx, IAppUserStore users, ISender sender, IAuditWriter auditWriter, CancellationToken ct) =>
+{
+    // T-011-01 gate: SuperAdmin-only write (TA-4.2#22). The gate resolves the role internally and returns nothing —
+    // 401 UNAUTHENTICATED / 403 FORBIDDEN via BusinessException (GlobalErrorMiddleware maps them).
+    await RequireAdminAsync(ctx, users, superadminOnly: true, ct);
+
+    // T-011-07: null result = unknown user OR already soft-deleted — ONE indistinguishable case (EC-009-2 idempotency reused).
+    var result = await sender.Send(new AdminForceDeleteUserCommand(id), ct);
+    if (result is null)
+        throw new BusinessException(ProblemCodes.NotFound, "User not found.");
+
+    // FR-011-5: audit only on successful delete — re-read actor email via IAppUserStore (the gate returns void).
+    // The target user's email comes from the result (captured PRE-delete) — the row is soft-deleted and unreadable now.
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is Guid userId)
+    {
+        var user = await users.GetByIdAsync(userId, ct);
+        if (user?.Email is not null)
+            await auditWriter.WriteAsync(user.Email, "user.force_delete", "user", id.ToString("n"), new { email = result.Email }, ct);
+    }
+
+    // FR-011-2: 204 No Content — no body (same as endpoint 21 at Program.cs L616).
+    return Results.NoContent();
+});
+
 // T-011-04: helper — parse an optional long query param; bad int → 400 VALIDATION.
 static long? ParseLongParam(HttpRequest request, string name)
 {

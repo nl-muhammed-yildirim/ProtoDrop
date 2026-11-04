@@ -115,5 +115,9 @@ public class GetUsersQueryTests
             CapturedLimit = limit;
             return Task.FromResult(Data);
         }
+
+        // T-011-07 (additive break from Decision 1): the new IAdminUserStore member — return true, record args.
+        public Task<bool> SetPlanIdAsync(Guid userId, Guid newPlanId, CancellationToken ct) =>
+            Task.FromResult(true);
     }
 }

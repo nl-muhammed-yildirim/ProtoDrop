@@ -69,4 +69,17 @@ public sealed class AdminUserStore : IAdminUserStore
 
         return (items, nextCursor);
     }
+
+    /// <summary>
+    /// T-011-07 (TA-4.2#22 / FR-011-2): set AppUser.PlanId via ExecuteUpdateAsync — mirrors AppUserStore.SoftDeleteWithReHomeAsync's
+    /// idiom (L57-69). Single-row update, no transaction needed. Returns false when the row vanished in a race.
+    /// </summary>
+    public async Task<bool> SetPlanIdAsync(Guid userId, Guid newPlanId, CancellationToken ct)
+    {
+        var updatedUsers = await _db.Set<AppUser>()
+            .Where(u => u.Id == userId)
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.PlanId, newPlanId), ct);
+
+        return updatedUsers > 0; // false only in the race where a concurrent force-delete already committed — handler maps to the same not-found shape
+    }
 }
