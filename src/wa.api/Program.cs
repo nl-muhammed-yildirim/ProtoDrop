@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using wa.application.Limits;
 using wa.application.Ports;
+using wa.application.UseCases.Admin; // T-011-01: AdminRolePolicy (gate + role field)
 using wa.application.UseCases.Auth;
 using wa.application.UseCases.Health;
 using wa.application.UseCases.Sample;
@@ -116,6 +117,30 @@ builder.Services.AddSingleton<wa.infrastructure.Persistence.UnsubscribeService>(
     System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Wa:Jwt:Secret"]!),
     sp.GetRequiredService<ILogger<wa.infrastructure.Persistence.UnsubscribeService>>()));
 var app = builder.Build();
+
+// T-011-01 (TA-9.2 / FR-011-1): role is derived PER REQUEST from the two config lists — same cookie, role flips when a list changes (EC-011-3).
+// Wa:AdminEmails = frozen key (D-18 dev seed "dev@example.com"); Wa:OperatorEmails = NEW optional key — absent/empty → every admin is SuperAdmin.
+var adminEmails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+var operatorEmails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+foreach (var part in builder.Configuration["Wa:AdminEmails"]?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [])
+    adminEmails.Add(part);
+foreach (var part in builder.Configuration["Wa:OperatorEmails"]?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [])
+    operatorEmails.Add(part);
+
+// T-011-01 gate helper — the contract endpoints 20–23 call as their routes land (T-011-03…T-011-09). Session read → 401 UNAUTHENTICATED inline
+// (same idiom as /auth/me L578); unknown email OR not in Wa:AdminEmails → FORBIDDEN; SuperAdmin-only route with an Operator role → same FORBIDDEN.
+// No audit row for a rejected gate — the suppression DELETE emits TelemetryEvents.AdminAction AFTER the gate passes (T-006-03).
+async Task RequireAdminAsync(HttpContext ctx, IAppUserStore users, bool superadminOnly, CancellationToken ct)
+{
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        throw new BusinessException(ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated));
+
+    var user = await users.GetByIdAsync(userId, ct);
+    var role = user?.Email is { } email ? AdminRolePolicy.Resolve(email.ToLowerInvariant(), adminEmails, operatorEmails) : null;
+    if (role is null || (superadminOnly && role != AdminRole.SuperAdmin))
+        throw new BusinessException(ProblemCodes.Forbidden, ProblemCodes.TitleOf(ProblemCodes.Forbidden));
+}
+
 // TA-4.1.6 (T-056-03): allow-list CORS only — configured origins via Wa:Cors:AllowedOrigins, no wildcard, preflight cached 1 h.
 app.UseMiddleware<CorsAllowListMiddleware>();
 app.UseMiddleware<CorrelationMiddleware>(); // FR-056-1: runs before everything else — correlationId present in every log line incl. UseSerilogRequestLogging's per-request INF line
@@ -417,15 +442,19 @@ app.MapGet("/unsubscribe/{token}", async (string token, wa.infrastructure.Persis
 });
 
 // T-006-03 (FR-006-5, US-011-04): admin suppression list — F-TRF-011 owns the UI; this is the API surface.
-app.MapGet("/api/v1/admin/suppressions", async (WaDbContext db, CancellationToken ct) =>
+app.MapGet("/api/v1/admin/suppressions", async (HttpContext ctx, IAppUserStore users, WaDbContext db, CancellationToken ct) =>
 {
+    await RequireAdminAsync(ctx, users, superadminOnly: false, ct); // T-011-01: both roles — every GET of 20–23 passes Operator + SuperAdmin (AC-011-3 server half).
+
     var rows = await db.Set<EmailSuppression>().OrderByDescending(s => s.CreatedAtUtc).ToListAsync(ct);
     return Results.Json(rows.Select(s => new { id = s.Id.ToString("n"), address = s.Address, senderEmail = s.SenderEmail, createdAtUtc = s.CreatedAtUtc }));
 });
 
 // T-006-03 (FR-006-5, US-011-04): admin suppression remove — emits admin_action telemetry. F-TRF-011 owns the UI; this is the API surface.
-app.MapDelete("/api/v1/admin/suppressions/{id:guid}", async (Guid id, WaDbContext db, wa.application.Telemetry.WaTelemetryReporter telemetry, CancellationToken ct) =>
+app.MapDelete("/api/v1/admin/suppressions/{id:guid}", async (Guid id, HttpContext ctx, IAppUserStore users, WaDbContext db, wa.application.Telemetry.WaTelemetryReporter telemetry, CancellationToken ct) =>
 {
+    await RequireAdminAsync(ctx, users, superadminOnly: true, ct); // T-011-01: suppression remove is in the exact SuperAdmin-only write set (AC-011-3 server half).
+
     var row = await db.Set<EmailSuppression>().FirstOrDefaultAsync(s => s.Id == id, ct);
     if (row is null)
         return Results.NotFound(ProblemWriter.Build(404, ProblemCodes.NotFound, "Not found."));
@@ -581,15 +610,20 @@ app.MapGet("/api/v1/auth/me", async (HttpContext ctx, ISender sender, Cancellati
     try
     {
         var result = await sender.Send(new GetProfileCommand(userId), ct);
-        // TA-4.2a single-construction-site rule (signup/login lines ~392–401 verbatim): 'n'-form userId, exact key set.
-        return Results.Json(new
+        // T-011-01 (TA-9.2 / UI-Reference §5.6): additive role field — "superadmin" or "operator"; ABSENT for non-admin so the UI renders disabled buttons with tooltip, not hidden elements.
+        var roleField = AdminRolePolicy.RoleField(AdminRolePolicy.Resolve(result.Email.ToLowerInvariant(), adminEmails, operatorEmails));
+        // TA-4.2a exact key set (signup/login verbatim order). Dictionary preserves insertion order — the additive 'role' key is present ONLY when non-null, so a non-admin's body carries no role key at all (not "role":null).
+        var meBody = new Dictionary<string, object>
         {
-            userId = result.UserId.ToString("n"),
-            email = result.Email,
-            displayName = result.DisplayName,
-            theme = result.Theme,
-            planCode = result.PlanCode
-        }, statusCode: 200);
+            ["userId"] = result.UserId.ToString("n"),
+            ["email"] = result.Email,
+            ["displayName"] = result.DisplayName,
+            ["theme"] = result.Theme,
+            ["planCode"] = result.PlanCode
+        };
+        if (roleField is not null)
+            meBody["role"] = roleField;
+        return Results.Json(meBody, statusCode: 200);
     }
     catch (MeProfileException ex) when (ex.Message == ProblemCodes.TitleOf(ProblemCodes.NotFound))
     {
