@@ -84,7 +84,7 @@ AC-011-3: Operator (read) tries to edit a flag
 | Story | Task | File | Status |
 |---|---|---|---|
 | US-011-04 | T-011-01 Admin gate + role policy: `Wa:AdminEmails` config, SuperAdmin/Operator per-request (TA-9.2, FR-011-1) | `US-011-04-flags-audit/T-011-01-admin-gate-role-policy.md` | ☑ |
-| US-011-04 | T-011-02 Audit write helper: `AuditLog` row + `admin.action` event in the same request (FR-011-5, TA-5.3) | `US-011-04-flags-audit/T-011-02-audit-write-helper.md` | ☐ |
+| US-011-04 | T-011-02 Audit write helper: `AuditLog` row + `admin.action` event in the same request (FR-011-5, TA-5.3) | `US-011-04-flags-audit/T-011-02-audit-write-helper.md` | ☑ |
 | US-011-01 | T-011-03 GetOverviewQuery + endpoint 20: live counts, 5-min cache (FR-011-6, TA-4.2#20) | `US-011-01-overview/T-011-03-overview-endpoint.md` | ☐ |
 | US-011-02 | T-011-04 Transfers search + endpoint 21 GET: linkId / email / status / size / date, cursor paging (FR-011-3) | `US-011-02-transfers-admin/T-011-04-transfers-search-endpoint.md` | ☐ |
 | US-011-02 | T-011-05 Force-delete transfer + endpoint 21 DELETE: `transfer.deleted` reason `admin` (FR-011-4) | `US-011-02-transfers-admin/T-011-05-force-delete-endpoint.md` | ☐ |
