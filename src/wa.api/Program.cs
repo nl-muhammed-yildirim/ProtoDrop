@@ -72,6 +72,9 @@ builder.Services.AddSingleton<wa.application.UseCases.Transfers.ISendStore>(sp =
 builder.Services.AddSingleton<wa.application.UseCases.Transfers.IPublicTransferStore>(sp => new wa.infrastructure.Persistence.PublicTransferStore(sp.GetRequiredService<WaDbContext>()));
 // T-002-02 (TA-4.1.5): generic HTTP idempotency store — used by IdempotencyMiddleware for finalize + send endpoints.
 builder.Services.AddSingleton<IIdempotencyStore>(sp => new wa.infrastructure.Persistence.IdempotencyStore(sp.GetRequiredService<WaDbContext>()));
+// T-011-02 (FR-011-5 / TA-3.2): audit write helper — one AuditLog row + one admin.action domain event per mutation.
+builder.Services.AddSingleton<wa.application.UseCases.Admin.IAuditStore>(sp => new wa.infrastructure.Persistence.AuditStore(sp.GetRequiredService<WaDbContext>()));
+builder.Services.AddSingleton<wa.application.UseCases.Admin.IAuditWriter>(sp => new wa.application.UseCases.Admin.AuditWriter(sp.GetRequiredService<wa.application.UseCases.Admin.IAuditStore>(), sp.GetRequiredService<wa.application.Ports.IEventPublisher>()));
 builder.Services.AddSingleton(sp => new PlansCache(sp.GetRequiredService<IPlansStore>(), limitsTtl, () => DateTimeOffset.UtcNow));
 builder.Services.AddSingleton(sp => new FlagsCache(sp.GetRequiredService<IFlagsStore>(), limitsTtl, () => DateTimeOffset.UtcNow));
 builder.Services.AddSingleton<ILimitsProvider>(sp => new LimitsProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
