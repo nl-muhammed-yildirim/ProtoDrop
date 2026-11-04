@@ -84,6 +84,8 @@ builder.Services.AddSingleton(sp => new wa.application.UseCases.Admin.OverviewSn
 builder.Services.AddSingleton<wa.application.UseCases.Admin.ISearchTransfersStore>(sp => new wa.infrastructure.Persistence.SearchTransfersStore(sp.GetRequiredService<WaDbContext>()));
 // T-011-05 (TA-4.2#21 / FR-011-4): admin force-delete — store over the adapter-owned WaDbContext (platform-scoped predicate).
 builder.Services.AddSingleton<wa.application.UseCases.Admin.IAdminTransferStore>(sp => new wa.infrastructure.Persistence.AdminTransferStore(sp.GetRequiredService<WaDbContext>()));
+// T-011-06 (TA-4.2#22 / FR-011-2): admin users list — store over the adapter-owned WaDbContext (computed plan/storage/count).
+builder.Services.AddSingleton<wa.application.UseCases.Admin.IAdminUserStore>(sp => new wa.infrastructure.Persistence.AdminUserStore(sp.GetRequiredService<WaDbContext>()));
 builder.Services.AddSingleton<ILimitsProvider>(sp => new LimitsProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
 // TA-3.6 — minting is pure HMAC (no network at request time); §5.2 account values already read above (T-055-02).
 builder.Services.AddSingleton<IBlobSasMinter>(new DraftBlobSasMinter(new Uri(blobAccountUrl!), blobAccountKey!));
@@ -543,6 +545,47 @@ app.MapGet("/api/v1/admin/transfers", async (HttpContext ctx, HttpRequest reques
     catch (wa.application.UseCases.Admin.SearchTransfersValidationException ex)
     {
         // T-011-04: handler validation (status vocabulary / range pairing) → 400 VALIDATION (existing closed-list member).
+        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+    }
+});
+
+// T-011-06 (TA-4.2#22 / FR-011-2): admin users list — GET /api/v1/admin/users?q=&cursor=&limit=.
+// Cursor-paged at 25 rows (TA-4.1.4); thin endpoint gated by T-011-01's RequireAdminAsync (superadminOnly:false — both roles read).
+app.MapGet("/api/v1/admin/users", async (HttpContext ctx, HttpRequest request, IAppUserStore users, ISender sender, CancellationToken ct) =>
+{
+    await RequireAdminAsync(ctx, users, superadminOnly: false, ct); // T-011-01: both roles read — same as the GET at L498.
+
+    // TA-4.1.4 pin: default page size 25; reject limit <= 0 or > 25 with 400 VALIDATION (existing closed-list member).
+    var limitParam = request.Query["limit"].FirstOrDefault();
+    if (limitParam is null)
+        limitParam = "25";
+    if (!int.TryParse(limitParam, out var parsedLimit) || parsedLimit is <= 0 or > 25)
+        throw new BusinessException(ProblemCodes.Validation, "limit must be a positive integer at most 25.");
+
+    // T-011-06: optional filters — q (email substring) + cursor (all optional; absent → no predicate).
+    var q = request.Query["q"].FirstOrDefault();
+    string? cursor = request.Query["cursor"].FirstOrDefault();
+
+    try
+    {
+        var result = await sender.Send(new wa.application.UseCases.Admin.GetUsersQuery(q, cursor, parsedLimit), ct);
+        return Results.Json(new
+        {
+            items = result.Items.Select(r => new
+            {
+                id = r.Id,
+                email = r.Email,
+                planName = r.PlanName,
+                storageBytesUsed = r.StorageBytesUsed,
+                activeTransferCount = r.ActiveTransferCount,
+                createdAtUtc = r.CreatedAtUtc
+            }),
+            nextCursor = result.NextCursor
+        });
+    }
+    catch (wa.domain.Transfers.CursorFormatException ex)
+    {
+        // TA-4.1.4: malformed cursor → 400 VALIDATION (existing closed-list member) — same as Program.cs L538-542.
         throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
     }
 });
