@@ -89,7 +89,7 @@ AC-011-3: Operator (read) tries to edit a flag
 | US-011-02 | T-011-04 Transfers search + endpoint 21 GET: linkId / email / status / size / date, cursor paging (FR-011-3) | `US-011-02-transfers-admin/T-011-04-transfers-search-endpoint.md` | ☑ |
 | US-011-02 | T-011-05 Force-delete transfer + endpoint 21 DELETE: `transfer.deleted` reason `admin` (FR-011-4) | `US-011-02-transfers-admin/T-011-05-force-delete-endpoint.md` | ☑ |
 | US-011-03 | T-011-06 Users list + endpoint 22 GET: email/plan/storage/transfers, cursor paging (FR-011-2) | `US-011-03-users-admin/T-011-06-users-list-endpoint.md` | ☑ |
-| US-011-03 | T-011-07 Set plan + force-delete user, endpoint 22 PATCH/DELETE (FR-011-2; FR-BIL-001-4 semantics) | `US-011-03-users-admin/T-011-07-user-plan-and-delete-endpoint.md` | ☐ |
+| US-011-03 | T-011-07 Set plan + force-delete user, endpoint 22 PATCH/DELETE (FR-011-2; FR-BIL-001-4 semantics) | `US-011-03-users-admin/T-011-07-user-plan-and-delete-endpoint.md` | ☑ |
 | US-011-04 | T-011-08 GetFlagsQuery + SetFlagCommand, endpoint 23: unknown key → 404, validate before commit (TA-13.2, FR-011-5) | `US-011-04-flags-audit/T-011-08-set-flag-endpoint.md` | ☐ |
 | US-011-04 | T-011-09 Suppressions list/remove + recent-actions read: catalog rows 24–25 (FR-011-2, FR-011-5) | `US-011-04-flags-audit/T-011-09-suppressions-and-audit-read-endpoint.md` | ☐ |
 | US-011-01 | T-011-10 Admin shell + Overview screen: stat cards, recent transfers (UI-Reference §5.6) | `US-011-01-overview/T-011-10-overview-ui.md` | ☐ |
