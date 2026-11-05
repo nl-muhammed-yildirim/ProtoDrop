@@ -1423,3 +1423,49 @@ main:has(.sl) .dz {
   font-size: var(--fs-small);
   margin: 0 0 24px;
 }
+
+/* ===== T-011-11 (FR-011-3): Admin Transfers screen — filter bar, row actions, pagination ===== */
+
+.ad-filter-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.ad-filter-input {
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  color: var(--fg);
+}
+
+.ad-filter-select {
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  color: var(--fg);
+}
+
+.ad-row-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* UI-Reference L82: opacity + cursor default — NEVER pointer-events:none alone (tooltip must work). */
+.ad-row-action:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.ad-pagination {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+}

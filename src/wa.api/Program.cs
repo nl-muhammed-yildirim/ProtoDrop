@@ -551,6 +551,7 @@ app.MapGet("/api/v1/admin/transfers", async (HttpContext ctx, HttpRequest reques
         {
             items = result.Items.Select(r => new
             {
+                id = r.Id,
                 linkId = r.LinkId,
                 ownerEmail = r.OwnerEmail,
                 status = r.Status,

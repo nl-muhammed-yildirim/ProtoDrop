@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import AdminOverviewPage from './AdminOverviewPage'
+import AdminTransfersPage from './AdminTransfersPage'
 import { ADMIN_NAV_ITEMS } from './adminRoute'
 import type { AdminScreen } from './adminRoute'
 
@@ -105,6 +106,8 @@ export function AdminShell({ screen }: AdminShellProps) {
         </div>
         {screen === 'overview' ? (
           <AdminOverviewPage />
+        ) : screen === 'transfers' ? (
+          <AdminTransfersPage role={roleState.role} />
         ) : (
           <div className="ad-placeholder">
             <h1 className="mf-h1">{ADMIN_NAV_ITEMS.find((i) => i.label === screenLabel(screen))?.label ?? screen} — coming soon</h1>
