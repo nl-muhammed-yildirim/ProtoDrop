@@ -94,7 +94,7 @@ AC-011-3: Operator (read) tries to edit a flag
 | US-011-04 | T-011-09 Suppressions list/remove + recent-actions read: catalog rows 24–25 (FR-011-2, FR-011-5) | `US-011-04-flags-audit/T-011-09-suppressions-and-audit-read-endpoint.md` | ☑ |
 | US-011-01 | T-011-10 Admin shell + Overview screen: stat cards, recent transfers (UI-Reference §5.6) | `US-011-01-overview/T-011-10-overview-ui.md` | ☑ |
 | US-011-02 | T-011-11 Admin Transfers screen: search + force-delete (FR-011-3/4, UI-Reference §5.6) | `US-011-02-transfers-admin/T-011-11-transfers-ui.md` | ☑ |
-| US-011-03 | T-011-12 Admin Users screen: plan edit + force-delete (FR-011-2, UI-Reference §5.6) | `US-011-03-users-admin/T-011-12-users-ui.md` | ☐ |
+| US-011-03 | T-011-12 Admin Users screen: plan edit + force-delete (FR-011-2, UI-Reference §5.6) | `US-011-03-users-admin/T-011-12-users-ui.md` | ☑ |
 | US-011-04 | T-011-13 Admin Flags & Suppressions screens + Recent actions panel (FR-011-5, UI-Reference §5.6) | `US-011-04-flags-audit/T-011-13-flags-suppressions-ui.md` | ☐ |
 
 **Story done when:** all tasks checked + full AGENT.md §4 gate green + AC-011-1…AC-011-2 verified with every mutation audit-logged with the actor email (T-024 row scope + exit check). Then T-024 can be marked `done` in `Milestone-Backlog.md`.
