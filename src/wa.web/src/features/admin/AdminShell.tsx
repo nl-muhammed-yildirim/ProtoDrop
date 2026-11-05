@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 
+import AdminFlagsPage from './AdminFlagsPage'
 import AdminOverviewPage from './AdminOverviewPage'
+import AdminSuppressionsPage from './AdminSuppressionsPage'
 import AdminTransfersPage from './AdminTransfersPage'
 import AdminUsersPage from './AdminUsersPage'
 import { ADMIN_NAV_ITEMS } from './adminRoute'
@@ -111,6 +113,10 @@ export function AdminShell({ screen }: AdminShellProps) {
           <AdminTransfersPage role={roleState.role} />
         ) : screen === 'users' ? (
           <AdminUsersPage role={roleState.role} />
+        ) : screen === 'flags' ? (
+          <AdminFlagsPage role={roleState.role} />
+        ) : screen === 'suppressions' ? (
+          <AdminSuppressionsPage role={roleState.role} />
         ) : (
           <div className="ad-placeholder">
             <h1 className="mf-h1">{ADMIN_NAV_ITEMS.find((i) => i.label === screenLabel(screen))?.label ?? screen} — coming soon</h1>

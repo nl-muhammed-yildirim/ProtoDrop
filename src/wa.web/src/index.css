@@ -1469,3 +1469,17 @@ main:has(.sl) .dz {
   font-size: var(--fs-small);
   color: var(--fg-muted);
 }
+
+/* ===== T-011-13 (FR-011-2 / FR-011-5): Admin Flags screen — hint lines + JSON preview ===== */
+
+.ad-hint {
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+  margin: 0;
+}
+
+.ad-json-preview {
+  font-family: monospace;
+  font-size: var(--fs-small);
+  color: var(--fg);
+}
