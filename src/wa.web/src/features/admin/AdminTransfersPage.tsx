@@ -38,6 +38,7 @@ export function AdminTransfersPage({ role }: AdminTransfersPageProps) {
   // The committed search — the form's submit writes it; pagination reuses it via the ref.
   const paramsRef = useRef<SearchParams>({})
   const cursorsRef = useRef<(string | null)[]>([null])   // cursorsRef[i] loads page i+1; page 0 is null.
+  const pageIndexRef = useRef(0)                         // current page index — force-delete refetches THIS page, not page 0.
 
   const [rows, setRows] = useState<AdminTransferRowDto[]>([])
   const [loading, setLoading] = useState(true)
@@ -60,9 +61,10 @@ export function AdminTransfersPage({ role }: AdminTransfersPageProps) {
     return () => { window.removeEventListener('keydown', onKey) }
   }, [deleteTargetId])
 
-  // Initial load + refetch after a successful force-delete (refreshTick).
+  // Initial load + refetch after a successful force-delete (refreshTick). Targets the CURRENT page —
+  // a SuperAdmin on page 2+ must not be bounced back to page 1 when one row disappears.
   useEffect(() => {
-    void fetchPage(0)
+    void fetchPage(pageIndexRef.current)
   }, [refreshTick])
 
   async function fetchPage(index: number): Promise<void> {
@@ -78,6 +80,7 @@ export function AdminTransfersPage({ role }: AdminTransfersPageProps) {
       cursorsRef.current[index + 1] = data.nextCursor
       setRows(data.rows)
       setPageIndex(index)
+      pageIndexRef.current = index   // keep the ref in sync so force-delete's refetch hits THIS page.
       setHasNext(data.nextCursor !== null)   // Next enabled only when the current page still has a next.
     } catch {
       setError('Could not load transfers.')
