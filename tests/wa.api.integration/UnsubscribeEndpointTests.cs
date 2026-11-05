@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
@@ -27,12 +28,15 @@ namespace wa.api.integration;
 public class UnsubscribeEndpointTests : IAsyncLifetime
 {
     private const string TestSecret = "test-jwt-secret";
+    // T-011-01 gate: these three facts hit the gated admin routes — seed this user into Wa__AdminEmails (SuperAdmin) and sign requests with its TA-9.1 session cookie.
+    private const string AdminEmail = "gate-admin@x.com";
 
     private AzuriteContainer _azurite = null!;
     private MsSqlContainer _sql = null!;
     private WaDbContext _db = null!;
     private TestFactory _factory = null!;
     private HttpClient _client = null!;
+    private Guid _adminUserId = default;
 
     public async Task InitializeAsync()
     {
@@ -45,6 +49,8 @@ public class UnsubscribeEndpointTests : IAsyncLifetime
         Environment.SetEnvironmentVariable("Wa__Blob__AccountKey", AzuriteBuilder.AccountKey);
         Environment.SetEnvironmentVariable("Wa__Jwt__Secret", TestSecret);
         Environment.SetEnvironmentVariable("Wa__Url__Public", "http://localhost:5173");
+        // Program.cs reads Wa:AdminEmails at host build — must be set before the first CreateClient below (TA-9.2 gate).
+        Environment.SetEnvironmentVariable("Wa__AdminEmails", AdminEmail);
 
         _sql = new MsSqlBuilder().WithImage("mcr.microsoft.com/mssql/server:2022-latest").Build();
         await _sql.StartAsync();
@@ -53,6 +59,19 @@ public class UnsubscribeEndpointTests : IAsyncLifetime
 
         _db = new WaDbContext(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(connString).Options);
         await _db.Database.MigrateAsync();
+
+        // T-011-01: the gate resolves role from AppUser.Email against the admin set — seed a SuperAdmin row (no password needed; the gate only reads email).
+        var planId = await _db.Set<Plan>().Where(p => p.Code == "free").Select(p => p.Id).FirstAsync();
+        _adminUserId = Guid.NewGuid();
+        _db.Set<AppUser>().Add(new AppUser
+        {
+            Id = _adminUserId,
+            Email = AdminEmail.ToLowerInvariant(),
+            DisplayName = "Gate Test",
+            PlanId = planId,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        await _db.SaveChangesAsync();
 
         UnsubscribeTelemetryCapture.Lines.Clear(); // per-test isolation: assertions below cover only this test's requests (fresh host per instance)
 
@@ -142,7 +161,8 @@ public class UnsubscribeEndpointTests : IAsyncLifetime
         using (var unsub = await _client.GetAsync($"/unsubscribe/{token}"))
             Assert.Equal(HttpStatusCode.OK, unsub.StatusCode);
 
-        using var response = await _client.GetAsync("/api/v1/admin/suppressions");
+        // T-011-01 gate: GET /admin/suppressions requires a session (guest → 401) — sign in as the seeded SuperAdmin.
+        using var response = await WithSessionCookieAsync(HttpMethod.Get, "/api/v1/admin/suppressions");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         using var doc = JsonDocument.Parse(await response.Content.ReadAsByteArrayAsync());
@@ -176,7 +196,8 @@ public class UnsubscribeEndpointTests : IAsyncLifetime
 
         UnsubscribeTelemetryCapture.Lines.Clear(); // isolate this test's telemetry
 
-        using (var del = await _client.DeleteAsync($"/api/v1/admin/suppressions/{row.Id:N}"))
+        // T-011-01 gate: suppression remove is SuperAdmin-only — sign in as the seeded SuperAdmin (guest → 401 UNAUTHENTICATED).
+        using (var del = await WithSessionCookieAsync(HttpMethod.Delete, $"/api/v1/admin/suppressions/{row.Id:N}"))
             Assert.Equal(HttpStatusCode.OK, del.StatusCode);
 
         // Row is gone.
@@ -190,8 +211,25 @@ public class UnsubscribeEndpointTests : IAsyncLifetime
     [Fact]
     public async Task AdminDelete_UnknownId_Returns404()
     {
-        using var response = await _client.DeleteAsync($"/api/v1/admin/suppressions/{Guid.NewGuid():N}");
+        // T-011-01 gate: sign in as SuperAdmin so the request reaches the handler's NOT_FOUND path (a guest would 401 at the gate first).
+        using var response = await WithSessionCookieAsync(HttpMethod.Delete, $"/api/v1/admin/suppressions/{Guid.NewGuid():N}");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    // ---- T-011-01 gate: admin routes require a session — TA-9.1 cookie idiom (same as FinalizeAccountLimitsTests) ----
+
+    /// <summary>Send a request with the seeded SuperAdmin's forged session cookie (TA-9.1: Base64(userId|exp|sig), sig = HMAC-SHA256 over Wa:Jwt:Secret).</summary>
+    private async Task<HttpResponseMessage> WithSessionCookieAsync(HttpMethod method, string url)
+    {
+        var exp = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 300;
+        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(TestSecret));
+        var unsigned = $"{_adminUserId:N}|{exp}";
+        var sig = Convert.ToBase64String(hmac.ComputeHash(Encoding.UTF8.GetBytes(unsigned)));
+        var cookieValue = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{unsigned}|{sig}"));
+
+        var request = new HttpRequestMessage(method, url);
+        request.Headers.Add("Cookie", $"wa.session={cookieValue}");
+        return await _client.SendAsync(request);
     }
 
     // ---- Test factory: swap the telemetry logger so we can inspect rendered log lines ----

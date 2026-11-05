@@ -1255,3 +1255,231 @@ main:has(.sl) .dz {
   color: var(--fg-muted);
   font-size: var(--fs-body);
 }
+
+/* ===== T-011-10 (UI-Reference §5.6): Admin console at /admin/* — ad- prefix (collision-free) ===== */
+
+.ad-layout {
+  display: flex;
+  min-height: 100%;
+}
+
+.ad-nav {
+  flex: none;
+  width: 200px;
+  padding: 24px 16px;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ad-nav-item {
+  min-height: 44px; /* F-TRF-017-4 touch targets */
+  padding: 8px 16px;
+  background: transparent;
+  color: var(--fg-muted);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  cursor: pointer;
+  text-align: left;
+}
+
+.ad-nav-item:hover {
+  color: var(--fg);
+  background: var(--bg-subtle);
+}
+
+.ad-nav-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.ad-content {
+  flex: 1;
+  min-width: 0;
+  padding: 32px 24px;
+}
+
+.ad-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+
+.ad-badge {
+  padding: 4px 12px;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+}
+
+.ad-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 720px) {
+  .ad-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ad-card {
+  padding: 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.ad-card-value {
+  font-size: var(--fs-h1);
+  color: var(--fg);
+}
+
+.ad-card-label {
+  margin-top: 4px;
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+}
+
+.ad-updated {
+  margin: 0 0 16px;
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+}
+
+.ad-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.ad-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-elevated);
+  text-align: left;
+  padding: 8px 12px;
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.ad-table tbody td {
+  padding: 8px 12px;
+  font-size: var(--fs-small);
+  color: var(--fg);
+  border-bottom: 1px solid var(--border);
+}
+
+.ad-linkid {
+  font-family: monospace;
+}
+
+.ad-danger {
+  color: var(--danger);
+}
+
+/* Text + color (F-TRF-016): the text is the primary signal, bg stays neutral. */
+.ad-chip {
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  font-size: var(--fs-tiny);
+  white-space: nowrap;
+}
+
+.ad-chip-green { color: var(--success); }
+.ad-chip-amber { color: var(--warning); }
+.ad-chip-gray  { color: var(--fg-faint); }
+
+.ad-loading {
+  padding: 32px 24px;
+  color: var(--fg-muted);
+  font-size: var(--fs-small);
+}
+
+.ad-prompt {
+  max-width: 480px;
+  margin: 48px auto;
+  padding: 24px;
+  text-align: center;
+}
+
+.ad-prompt-h1 {
+  font-size: var(--fs-h1);
+  color: var(--fg);
+  margin: 0 0 16px;
+}
+
+.ad-prompt-text {
+  color: var(--fg-muted);
+  font-size: var(--fs-small);
+  margin: 0 0 24px;
+}
+
+/* ===== T-011-11 (FR-011-3): Admin Transfers screen — filter bar, row actions, pagination ===== */
+
+.ad-filter-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.ad-filter-input {
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  color: var(--fg);
+}
+
+.ad-filter-select {
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  color: var(--fg);
+}
+
+.ad-row-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* UI-Reference L82: opacity + cursor default — NEVER pointer-events:none alone (tooltip must work). */
+.ad-row-action:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.ad-pagination {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+}
+
+/* ===== T-011-13 (FR-011-2 / FR-011-5): Admin Flags screen — hint lines + JSON preview ===== */
+
+.ad-hint {
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+  margin: 0;
+}
+
+.ad-json-preview {
+  font-family: monospace;
+  font-size: var(--fs-small);
+  color: var(--fg);
+}

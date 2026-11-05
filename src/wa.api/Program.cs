@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using wa.application.Limits;
 using wa.application.Ports;
+using wa.application.UseCases.Admin; // T-011-01: AdminRolePolicy (gate + role field)
 using wa.application.UseCases.Auth;
 using wa.application.UseCases.Health;
 using wa.application.UseCases.Sample;
@@ -71,8 +72,26 @@ builder.Services.AddSingleton<wa.application.UseCases.Transfers.ISendStore>(sp =
 builder.Services.AddSingleton<wa.application.UseCases.Transfers.IPublicTransferStore>(sp => new wa.infrastructure.Persistence.PublicTransferStore(sp.GetRequiredService<WaDbContext>()));
 // T-002-02 (TA-4.1.5): generic HTTP idempotency store — used by IdempotencyMiddleware for finalize + send endpoints.
 builder.Services.AddSingleton<IIdempotencyStore>(sp => new wa.infrastructure.Persistence.IdempotencyStore(sp.GetRequiredService<WaDbContext>()));
+// T-011-02 (FR-011-5 / TA-3.2): audit write helper — one AuditLog row + one admin.action domain event per mutation.
+builder.Services.AddSingleton<wa.application.UseCases.Admin.IAuditStore>(sp => new wa.infrastructure.Persistence.AuditStore(sp.GetRequiredService<WaDbContext>()));
+builder.Services.AddSingleton<wa.application.UseCases.Admin.IAuditWriter>(sp => new wa.application.UseCases.Admin.AuditWriter(sp.GetRequiredService<wa.application.UseCases.Admin.IAuditStore>(), sp.GetRequiredService<wa.application.Ports.IEventPublisher>()));
 builder.Services.AddSingleton(sp => new PlansCache(sp.GetRequiredService<IPlansStore>(), limitsTtl, () => DateTimeOffset.UtcNow));
 builder.Services.AddSingleton(sp => new FlagsCache(sp.GetRequiredService<IFlagsStore>(), limitsTtl, () => DateTimeOffset.UtcNow));
+// T-011-03 (TA-4.2#20 / FR-011-6): overview aggregates — store + 5-min snapshot cache (pinned by spec; not config-driven).
+builder.Services.AddSingleton<wa.application.UseCases.Admin.IOverviewStore>(sp => new wa.infrastructure.Persistence.OverviewStore(sp.GetRequiredService<WaDbContext>()));
+builder.Services.AddSingleton(sp => new wa.application.UseCases.Admin.OverviewSnapshotCache(sp.GetRequiredService<wa.application.UseCases.Admin.IOverviewStore>(), TimeSpan.FromMinutes(5), () => DateTimeOffset.UtcNow));
+// T-011-04 (TA-4.2#21 / FR-011-3): admin transfer search — store over the adapter-owned WaDbContext.
+builder.Services.AddSingleton<wa.application.UseCases.Admin.ISearchTransfersStore>(sp => new wa.infrastructure.Persistence.SearchTransfersStore(sp.GetRequiredService<WaDbContext>()));
+// T-011-05 (TA-4.2#21 / FR-011-4): admin force-delete — store over the adapter-owned WaDbContext (platform-scoped predicate).
+builder.Services.AddSingleton<wa.application.UseCases.Admin.IAdminTransferStore>(sp => new wa.infrastructure.Persistence.AdminTransferStore(sp.GetRequiredService<WaDbContext>()));
+// T-011-06 (TA-4.2#22 / FR-011-2): admin users list — store over the adapter-owned WaDbContext (computed plan/storage/count).
+builder.Services.AddSingleton<wa.application.UseCases.Admin.IAdminUserStore>(sp => new wa.infrastructure.Persistence.AdminUserStore(sp.GetRequiredService<WaDbContext>()));
+// T-011-08 (TA-4.2#23 / FR-011-2): admin flag write surface — single-key PK upsert over the adapter-owned WaDbContext.
+builder.Services.AddSingleton<wa.application.UseCases.Admin.IAdminFlagStore>(sp => new wa.infrastructure.Persistence.AdminFlagStore(sp.GetRequiredService<WaDbContext>()));
+// T-011-09 (TA-4.2#24 / FR-011-2): admin suppressions surface — list + remove over the adapter-owned WaDbContext.
+builder.Services.AddSingleton<wa.application.UseCases.Admin.IAdminSuppressionStore>(sp => new wa.infrastructure.Persistence.AdminSuppressionStore(sp.GetRequiredService<WaDbContext>()));
+// T-011-09 (TA-4.2#25 / US-011-04 happy path 5): audit read surface — last count rows, newest first, over the adapter-owned WaDbContext.
+builder.Services.AddSingleton<wa.application.UseCases.Admin.IAuditReadStore>(sp => new wa.infrastructure.Persistence.AuditReadStore(sp.GetRequiredService<WaDbContext>()));
 builder.Services.AddSingleton<ILimitsProvider>(sp => new LimitsProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
 // TA-3.6 — minting is pure HMAC (no network at request time); §5.2 account values already read above (T-055-02).
 builder.Services.AddSingleton<IBlobSasMinter>(new DraftBlobSasMinter(new Uri(blobAccountUrl!), blobAccountKey!));
@@ -116,6 +135,30 @@ builder.Services.AddSingleton<wa.infrastructure.Persistence.UnsubscribeService>(
     System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Wa:Jwt:Secret"]!),
     sp.GetRequiredService<ILogger<wa.infrastructure.Persistence.UnsubscribeService>>()));
 var app = builder.Build();
+
+// T-011-01 (TA-9.2 / FR-011-1): role is derived PER REQUEST from the two config lists — same cookie, role flips when a list changes (EC-011-3).
+// Wa:AdminEmails = frozen key (D-18 dev seed "dev@example.com"); Wa:OperatorEmails = NEW optional key — absent/empty → every admin is SuperAdmin.
+var adminEmails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+var operatorEmails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+foreach (var part in builder.Configuration["Wa:AdminEmails"]?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [])
+    adminEmails.Add(part);
+foreach (var part in builder.Configuration["Wa:OperatorEmails"]?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [])
+    operatorEmails.Add(part);
+
+// T-011-01 gate helper — the contract endpoints 20–23 call as their routes land (T-011-03…T-011-09). Session read → 401 UNAUTHENTICATED inline
+// (same idiom as /auth/me L578); unknown email OR not in Wa:AdminEmails → FORBIDDEN; SuperAdmin-only route with an Operator role → same FORBIDDEN.
+// No audit row for a rejected gate — the suppression DELETE emits TelemetryEvents.AdminAction AFTER the gate passes (T-006-03).
+async Task RequireAdminAsync(HttpContext ctx, IAppUserStore users, bool superadminOnly, CancellationToken ct)
+{
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        throw new BusinessException(ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated));
+
+    var user = await users.GetByIdAsync(userId, ct);
+    var role = user?.Email is { } email ? AdminRolePolicy.Resolve(email.ToLowerInvariant(), adminEmails, operatorEmails) : null;
+    if (role is null || (superadminOnly && role != AdminRole.SuperAdmin))
+        throw new BusinessException(ProblemCodes.Forbidden, ProblemCodes.TitleOf(ProblemCodes.Forbidden));
+}
+
 // TA-4.1.6 (T-056-03): allow-list CORS only — configured origins via Wa:Cors:AllowedOrigins, no wildcard, preflight cached 1 h.
 app.UseMiddleware<CorsAllowListMiddleware>();
 app.UseMiddleware<CorrelationMiddleware>(); // FR-056-1: runs before everything else — correlationId present in every log line incl. UseSerilogRequestLogging's per-request INF line
@@ -416,25 +459,313 @@ app.MapGet("/unsubscribe/{token}", async (string token, wa.infrastructure.Persis
         : Results.NotFound(ProblemWriter.Build(404, ProblemCodes.NotFound, "Not found.")); // 404 — don't leak detail (TA-9.6)
 });
 
-// T-006-03 (FR-006-5, US-011-04): admin suppression list — F-TRF-011 owns the UI; this is the API surface.
-app.MapGet("/api/v1/admin/suppressions", async (WaDbContext db, CancellationToken ct) =>
+// T-011-09 (TA-4.2#24 / FR-011-2): admin suppression list — thin endpoint over MediatR (was inline EF from T-006-03).
+app.MapGet("/api/v1/admin/suppressions", async (HttpContext ctx, IAppUserStore users, ISender sender, CancellationToken ct) =>
 {
-    var rows = await db.Set<EmailSuppression>().OrderByDescending(s => s.CreatedAtUtc).ToListAsync(ct);
-    return Results.Json(rows.Select(s => new { id = s.Id.ToString("n"), address = s.Address, senderEmail = s.SenderEmail, createdAtUtc = s.CreatedAtUtc }));
+    await RequireAdminAsync(ctx, users, superadminOnly: false, ct); // T-011-01: both roles — every GET of 20–23 passes Operator + SuperAdmin (AC-011-3 server half).
+
+    var rows = await sender.Send(new GetSuppressionsQuery(), ct);
+    return Results.Json(rows.Select(s => new { id = s.Id.ToString("n"), address = s.Address, senderEmail = s.SenderEmail, createdAtUtc = s.CreatedAtUtc })); // bare array — UnsubscribeEndpointTests L145 pins the wire shape
 });
 
-// T-006-03 (FR-006-5, US-011-04): admin suppression remove — emits admin_action telemetry. F-TRF-011 owns the UI; this is the API surface.
-app.MapDelete("/api/v1/admin/suppressions/{id:guid}", async (Guid id, WaDbContext db, wa.application.Telemetry.WaTelemetryReporter telemetry, CancellationToken ct) =>
+// T-011-09 (TA-4.2#24 / FR-011-5): admin suppression remove — thin endpoint over MediatR; audits every removal + emits admin_action telemetry.
+app.MapDelete("/api/v1/admin/suppressions/{id:guid}", async (Guid id, HttpContext ctx, IAppUserStore users, ISender sender, IAuditWriter auditWriter, wa.application.Telemetry.WaTelemetryReporter telemetry, CancellationToken ct) =>
 {
-    var row = await db.Set<EmailSuppression>().FirstOrDefaultAsync(s => s.Id == id, ct);
-    if (row is null)
-        return Results.NotFound(ProblemWriter.Build(404, ProblemCodes.NotFound, "Not found."));
+    await RequireAdminAsync(ctx, users, superadminOnly: true, ct); // T-011-01: suppression remove is in the exact SuperAdmin-only write set (AC-011-3 server half).
 
-    db.Set<EmailSuppression>().Remove(row);
-    await db.SaveChangesAsync(ct);
-    telemetry.LogEvent(TelemetryEvents.AdminAction); // F-TRF-011: admin removal is auditable via App Insights
+    // T-011-09: null result = unknown id — ONE case (endpoint maps to 404 NOT_FOUND via BusinessException; mirrors T-011-05/07).
+    var result = await sender.Send(new RemoveSuppressionCommand(id), ct);
+    if (result is null)
+        throw new BusinessException(ProblemCodes.NotFound, "Not found.");
+
+    telemetry.LogEvent(TelemetryEvents.AdminAction); // F-TRF-011: admin removal is auditable via App Insights (T-006-03 FR-006-5 surface — kept)
+
+    // FR-011-5: audit only on successful removal — re-read actor email via IAppUserStore (the gate returns void).
+    // The removed row's address comes from the handler RESULT (captured PRE-delete) — the row is gone and unreadable now.
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is Guid userId)
+    {
+        var user = await users.GetByIdAsync(userId, ct);
+        if (user?.Email is not null)
+            await auditWriter.WriteAsync(user.Email, "suppression.removed", "emailSuppression", id.ToString("n"), new { email = result.Address }, ct);
+    }
+
+    // KEEP 200 OK — UnsubscribeEndpointTests L180 asserts OK (NOT NoContent like T-011-05/07).
     return Results.Ok();
 });
+
+// T-011-09 (TA-4.2#25 / US-011-04 happy path 5): admin recent actions — last 50 rows, newest first; both roles read.
+app.MapGet("/api/v1/admin/audit-recent", async (HttpContext ctx, IAppUserStore users, ISender sender, CancellationToken ct) =>
+{
+    await RequireAdminAsync(ctx, users, superadminOnly: false, ct); // T-011-01: both roles read — same as the GET at L459.
+
+    var rows = await sender.Send(new GetRecentAuditQuery(), ct);
+    return Results.Json(rows.Select(a => new { id = a.Id, actorEmail = a.ActorEmail, action = a.Action, entityType = a.EntityType, entityId = a.EntityId, detailsJson = a.DetailsJson, createdAtUtc = a.CreatedAtUtc })); // bare array, camelCase — new route (no existing wire shape)
+});
+
+// T-011-03 (TA-4.2#20 / FR-011-6): admin overview — four aggregates + recent transfers list, cached 5 min in-memory.
+app.MapGet("/api/v1/admin/overview", async (HttpContext ctx, IAppUserStore users, ISender sender, CancellationToken ct) =>
+{
+    await RequireAdminAsync(ctx, users, superadminOnly: false, ct); // T-011-01: both roles read — same as the GET at L450.
+
+    var result = await sender.Send(new wa.application.UseCases.Admin.GetOverviewQuery(), ct);
+    return Results.Json(new
+    {
+        activeTransfers = result.ActiveTransfers,
+        storageBytesUsed = result.StorageBytesUsed,
+        newUsersToday = result.NewUsersToday,
+        emailsSent7d = result.EmailsSent7d,
+        emailsFailed7d = result.EmailsFailed7d,
+        snapshotAtUtc = result.SnapshotAtUtc,
+        recentTransfers = result.RecentTransfers.Select(r => new { linkId = r.LinkId, ownerEmail = r.OwnerEmail, status = r.Status, totalBytes = r.TotalBytes, createdAtUtc = r.CreatedAtUtc })
+    });
+});
+
+// T-011-04 (TA-4.2#21 / FR-011-3): admin transfer search — GET /api/v1/admin/transfers?q=&status=&cursor=&minBytes=&maxBytes=&from=&to=&limit=.
+// Cursor-paged at 25 rows (TA-4.1.4); thin endpoint gated by T-011-01's RequireAdminAsync (superadminOnly:false — both roles read).
+app.MapGet("/api/v1/admin/transfers", async (HttpContext ctx, HttpRequest request, IAppUserStore users, ISender sender, CancellationToken ct) =>
+{
+    await RequireAdminAsync(ctx, users, superadminOnly: false, ct); // T-011-01: both roles read — same as the GET at L475.
+
+    // TA-4.1.4 pin: default page size 25; reject limit <= 0 or > 25 with 400 VALIDATION (existing closed-list member).
+    var limitParam = request.Query["limit"].FirstOrDefault();
+    if (limitParam is null)
+        limitParam = "25";
+    if (!int.TryParse(limitParam, out var parsedLimit) || parsedLimit is <= 0 or > 25)
+        throw new BusinessException(ProblemCodes.Validation, "limit must be a positive integer at most 25.");
+
+    // T-011-04: optional filters — q/status/minBytes/maxBytes/from/to (all optional; absent → no predicate).
+    var q = request.Query["q"].FirstOrDefault();
+    var status = request.Query["status"].FirstOrDefault();
+    long? minBytes = ParseLongParam(request, "minBytes");
+    long? maxBytes = ParseLongParam(request, "maxBytes");
+    DateTime? fromUtc = ParseDateTimeParam(request, "from");
+    DateTime? toUtc = ParseDateTimeParam(request, "to");
+
+    string? cursor = request.Query["cursor"].FirstOrDefault();
+
+    try
+    {
+        var result = await sender.Send(new wa.application.UseCases.Admin.SearchTransfersQuery(
+            q, status, minBytes, maxBytes, fromUtc, toUtc, cursor, parsedLimit), ct);
+        return Results.Json(new
+        {
+            items = result.Items.Select(r => new
+            {
+                id = r.Id,
+                linkId = r.LinkId,
+                ownerEmail = r.OwnerEmail,
+                status = r.Status,
+                fileCount = r.FileCount,
+                totalBytes = r.TotalBytes,
+                createdAtUtc = r.CreatedAtUtc,
+                downloadsCount = r.DownloadsCount
+            }),
+            nextCursor = result.NextCursor
+        });
+    }
+    catch (wa.domain.Transfers.CursorFormatException ex)
+    {
+        // TA-4.1.4: malformed cursor → 400 VALIDATION (existing closed-list member) — same as Program.cs L715-723.
+        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+    }
+    catch (wa.application.UseCases.Admin.SearchTransfersValidationException ex)
+    {
+        // T-011-04: handler validation (status vocabulary / range pairing) → 400 VALIDATION (existing closed-list member).
+        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+    }
+});
+
+// T-011-06 (TA-4.2#22 / FR-011-2): admin users list — GET /api/v1/admin/users?q=&cursor=&limit=.
+// Cursor-paged at 25 rows (TA-4.1.4); thin endpoint gated by T-011-01's RequireAdminAsync (superadminOnly:false — both roles read).
+app.MapGet("/api/v1/admin/users", async (HttpContext ctx, HttpRequest request, IAppUserStore users, ISender sender, CancellationToken ct) =>
+{
+    await RequireAdminAsync(ctx, users, superadminOnly: false, ct); // T-011-01: both roles read — same as the GET at L498.
+
+    // TA-4.1.4 pin: default page size 25; reject limit <= 0 or > 25 with 400 VALIDATION (existing closed-list member).
+    var limitParam = request.Query["limit"].FirstOrDefault();
+    if (limitParam is null)
+        limitParam = "25";
+    if (!int.TryParse(limitParam, out var parsedLimit) || parsedLimit is <= 0 or > 25)
+        throw new BusinessException(ProblemCodes.Validation, "limit must be a positive integer at most 25.");
+
+    // T-011-06: optional filters — q (email substring) + cursor (all optional; absent → no predicate).
+    var q = request.Query["q"].FirstOrDefault();
+    string? cursor = request.Query["cursor"].FirstOrDefault();
+
+    try
+    {
+        var result = await sender.Send(new wa.application.UseCases.Admin.GetUsersQuery(q, cursor, parsedLimit), ct);
+        return Results.Json(new
+        {
+            items = result.Items.Select(r => new
+            {
+                id = r.Id,
+                email = r.Email,
+                planName = r.PlanName,
+                storageBytesUsed = r.StorageBytesUsed,
+                activeTransferCount = r.ActiveTransferCount,
+                createdAtUtc = r.CreatedAtUtc
+            }),
+            nextCursor = result.NextCursor
+        });
+    }
+    catch (wa.domain.Transfers.CursorFormatException ex)
+    {
+        // TA-4.1.4: malformed cursor → 400 VALIDATION (existing closed-list member) — same as Program.cs L538-542.
+        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+    }
+});
+
+// T-011-05 (TA-4.2#21 / FR-011-4): admin force-delete — DELETE /api/v1/admin/transfers/{id} — SuperAdmin-only write.
+// Reuses T-009-04's delete semantics verbatim with reason "admin" — row marked Deleted (soft, Status=4), transfer.deleted
+// emitted once { transferId, reason:"admin" }, RefCount decremented per BlobRef, sole-ref blob gets PhysicallyDeletedAtUtc = now+24h.
+app.MapDelete("/api/v1/admin/transfers/{id:guid}", async (Guid id, HttpContext ctx, IAppUserStore users, ISender sender, IAuditWriter auditWriter, CancellationToken ct) =>
+{
+    // T-011-01 gate: SuperAdmin-only write (TA-4.2#21). The gate resolves the role internally and returns nothing —
+    // 401 UNAUTHENTICATED / 403 FORBIDDEN via BusinessException (GlobalErrorMiddleware maps them).
+    await RequireAdminAsync(ctx, users, superadminOnly: true, ct);
+
+    // T-011-05: null result = already-deleted / unknown — ONE indistinguishable case (EC-009-2 idempotency reused).
+    var result = await sender.Send(new AdminDeleteTransferCommand(id), ct);
+    if (result is null)
+        throw new BusinessException(ProblemCodes.NotFound, "Transfer not found.");
+
+    // FR-011-5: audit only on successful delete — re-read actor email via IAppUserStore (the gate returns void).
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is Guid userId)
+    {
+        var user = await users.GetByIdAsync(userId, ct);
+        if (user?.Email is not null)
+            await auditWriter.WriteAsync(user.Email, "transfer.force_delete", "transfer", id.ToString("n"), new { reason = "admin", transferId = id }, ct);
+    }
+
+    // FR-011-4: 204 No Content — no body (same as endpoint 17 at Program.cs L883).
+    return Results.NoContent();
+});
+
+// T-011-07 (TA-4.2#22 / FR-011-2): set a user's plan — PATCH /api/v1/admin/users/{id}?planId= — SuperAdmin-only write.
+// Limits take effect at the NEXT finalize (FR-BIL-001-4 "applies to new transfers") — no limit recompute here.
+app.MapPatch("/api/v1/admin/users/{id:guid}", async (Guid id, HttpContext ctx, HttpRequest request, IAppUserStore users, ISender sender, IAuditWriter auditWriter, CancellationToken ct) =>
+{
+    // T-011-01 gate: SuperAdmin-only write (TA-4.2#22). The gate resolves the role internally and returns nothing —
+    // 401 UNAUTHENTICATED / 403 FORBIDDEN via BusinessException (GlobalErrorMiddleware maps them).
+    await RequireAdminAsync(ctx, users, superadminOnly: true, ct);
+
+    // T-011-07: planId from the query string — bad format → 400 VALIDATION (existing closed-list member).
+    var planIdParam = request.Query["planId"].FirstOrDefault();
+    if (!Guid.TryParse(planIdParam, out var planId))
+        throw new BusinessException(ProblemCodes.Validation, "planId must be a GUID.");
+
+    try
+    {
+        var result = await sender.Send(new SetUserPlanCommand(id, planId), ct);
+
+        // FR-011-5: audit only on successful write — re-read actor email via IAppUserStore (the gate returns void).
+        if (ctx.Items[SessionMiddleware.SessionUserIdKey] is Guid userId)
+        {
+            var user = await users.GetByIdAsync(userId, ct);
+            if (user?.Email is not null)
+                await auditWriter.WriteAsync(user.Email, "user.plan_changed", "user", id.ToString("n"), new { oldPlanId = result.OldPlanId, newPlanId = result.NewPlanId }, ct);
+        }
+
+        // FR-011-2: 204 No Content — no body (same as endpoint 21 at Program.cs L616).
+        return Results.NoContent();
+    }
+    catch (SetUserPlanException ex)
+    {
+        // T-011-07 (Decision 2): unknown user OR unknown planId → 404 NOT_FOUND (existing closed-list member).
+        throw new BusinessException(ProblemCodes.NotFound, ex.Message, ex);
+    }
+});
+
+// T-011-07 (TA-4.2#22 / FR-011-2): force-delete a user — DELETE /api/v1/admin/users/{id} — SuperAdmin-only write.
+// Reuses T-008's GDPR soft-delete + re-home verbatim (reason "admin" is the admin context, not a column).
+app.MapDelete("/api/v1/admin/users/{id:guid}", async (Guid id, HttpContext ctx, IAppUserStore users, ISender sender, IAuditWriter auditWriter, CancellationToken ct) =>
+{
+    // T-011-01 gate: SuperAdmin-only write (TA-4.2#22). The gate resolves the role internally and returns nothing —
+    // 401 UNAUTHENTICATED / 403 FORBIDDEN via BusinessException (GlobalErrorMiddleware maps them).
+    await RequireAdminAsync(ctx, users, superadminOnly: true, ct);
+
+    // T-011-07: null result = unknown user OR already soft-deleted — ONE indistinguishable case (EC-009-2 idempotency reused).
+    var result = await sender.Send(new AdminForceDeleteUserCommand(id), ct);
+    if (result is null)
+        throw new BusinessException(ProblemCodes.NotFound, "User not found.");
+
+    // FR-011-5: audit only on successful delete — re-read actor email via IAppUserStore (the gate returns void).
+    // The target user's email comes from the result (captured PRE-delete) — the row is soft-deleted and unreadable now.
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is Guid userId)
+    {
+        var user = await users.GetByIdAsync(userId, ct);
+        if (user?.Email is not null)
+            await auditWriter.WriteAsync(user.Email, "user.force_delete", "user", id.ToString("n"), new { email = result.Email }, ct);
+    }
+
+    // FR-011-2: 204 No Content — no body (same as endpoint 21 at Program.cs L616).
+    return Results.NoContent();
+});
+
+// T-011-08 (TA-4.2#23 / FR-011-2): admin flags list — GET /api/v1/admin/flags — both roles read.
+// 52 fixed seeded rows — no paging; bare JSON array of {key,value}, camelCase, ordered by key ascending.
+app.MapGet("/api/v1/admin/flags", async (HttpContext ctx, IAppUserStore users, ISender sender, CancellationToken ct) =>
+{
+    // T-011-01 gate: both roles read — same as the GET at L556.
+    await RequireAdminAsync(ctx, users, superadminOnly: false, ct);
+
+    var rows = await sender.Send(new GetFlagsQuery(), ct);
+    return Results.Json(rows.Select(f => new { key = f.Key, value = f.Value })); // reads write NO audit row
+});
+
+// T-011-08 (TA-4.2#23 / FR-011-2): set a flag's value — PUT /api/v1/admin/flags/{key} — SuperAdmin-only write.
+// The value takes effect within 30 s via the EXISTING FlagsCache TTL (TA-3.4) — no invalidation code here.
+app.MapPut("/api/v1/admin/flags/{key}", async (string key, HttpContext ctx, HttpRequest request, IAppUserStore users, ISender sender, IAuditWriter auditWriter, CancellationToken ct) =>
+{
+    // T-011-01 gate: SuperAdmin-only write (TA-4.2#23). The gate resolves the role internally and returns nothing —
+    // 401 UNAUTHENTICATED / 403 FORBIDDEN via BusinessException (GlobalErrorMiddleware maps them).
+    await RequireAdminAsync(ctx, users, superadminOnly: true, ct);
+
+    // T-011-08: the raw body string is the new value — passed through to the handler (TA-4.2a thin endpoint).
+    var body = await new StreamReader(request.Body).ReadToEndAsync(ct);
+
+    try
+    {
+        var result = await sender.Send(new SetFlagCommand(key, body), ct);
+
+        // FR-011-5: audit only on successful save — re-read actor email via IAppUserStore (the gate returns void).
+        if (ctx.Items[SessionMiddleware.SessionUserIdKey] is Guid userId)
+        {
+            var user = await users.GetByIdAsync(userId, ct);
+            if (user?.Email is not null)
+                await auditWriter.WriteAsync(user.Email, "flag.set", "flag", key, new { oldValue = result.OldValue, newValue = result.NewValue }, ct);
+        }
+
+        // FR-011-2: 204 No Content — no body (same as endpoint 22 at Program.cs L645).
+        return Results.NoContent();
+    }
+    catch (SetFlagException ex)
+    {
+        // T-011-08 (Decision): bad JSON → 400 VALIDATION "Invalid JSON"; unknown key → 404 NOT_FOUND.
+        throw new BusinessException(ex.Code, ex.Message, ex);
+    }
+});
+
+// T-011-04: helper — parse an optional long query param; bad int → 400 VALIDATION.
+static long? ParseLongParam(HttpRequest request, string name)
+{
+    var raw = request.Query[name].FirstOrDefault();
+    if (raw is null || raw.Length == 0) return null;
+    if (!long.TryParse(raw, out var value))
+        throw new BusinessException(ProblemCodes.Validation, $"{name} must be an integer.");
+    return value;
+}
+
+// T-011-04: helper — parse an optional DateTime query param (RoundtripKind); bad date → 400 VALIDATION.
+static DateTime? ParseDateTimeParam(HttpRequest request, string name)
+{
+    var raw = request.Query[name].FirstOrDefault();
+    if (raw is null || raw.Length == 0) return null;
+    if (!DateTime.TryParse(raw, null, System.Globalization.DateTimeStyles.RoundtripKind, out var value))
+        throw new BusinessException(ProblemCodes.Validation, $"{name} must be a valid date/time.");
+    return value;
+}
 
 // T-008-01 (TA-4.2#8 / FR-008-3): sign-up is sign-in — unknown email → create; known email (any case) → existing row.
 app.MapPost("/api/v1/auth/signup", async (SignupCommand cmd, ISender sender, CancellationToken ct) =>
@@ -581,15 +912,20 @@ app.MapGet("/api/v1/auth/me", async (HttpContext ctx, ISender sender, Cancellati
     try
     {
         var result = await sender.Send(new GetProfileCommand(userId), ct);
-        // TA-4.2a single-construction-site rule (signup/login lines ~392–401 verbatim): 'n'-form userId, exact key set.
-        return Results.Json(new
+        // T-011-01 (TA-9.2 / UI-Reference §5.6): additive role field — "superadmin" or "operator"; ABSENT for non-admin so the UI renders disabled buttons with tooltip, not hidden elements.
+        var roleField = AdminRolePolicy.RoleField(AdminRolePolicy.Resolve(result.Email.ToLowerInvariant(), adminEmails, operatorEmails));
+        // TA-4.2a exact key set (signup/login verbatim order). Dictionary preserves insertion order — the additive 'role' key is present ONLY when non-null, so a non-admin's body carries no role key at all (not "role":null).
+        var meBody = new Dictionary<string, object>
         {
-            userId = result.UserId.ToString("n"),
-            email = result.Email,
-            displayName = result.DisplayName,
-            theme = result.Theme,
-            planCode = result.PlanCode
-        }, statusCode: 200);
+            ["userId"] = result.UserId.ToString("n"),
+            ["email"] = result.Email,
+            ["displayName"] = result.DisplayName,
+            ["theme"] = result.Theme,
+            ["planCode"] = result.PlanCode
+        };
+        if (roleField is not null)
+            meBody["role"] = roleField;
+        return Results.Json(meBody, statusCode: 200);
     }
     catch (MeProfileException ex) when (ex.Message == ProblemCodes.TitleOf(ProblemCodes.NotFound))
     {
