@@ -88,6 +88,10 @@ builder.Services.AddSingleton<wa.application.UseCases.Admin.IAdminTransferStore>
 builder.Services.AddSingleton<wa.application.UseCases.Admin.IAdminUserStore>(sp => new wa.infrastructure.Persistence.AdminUserStore(sp.GetRequiredService<WaDbContext>()));
 // T-011-08 (TA-4.2#23 / FR-011-2): admin flag write surface — single-key PK upsert over the adapter-owned WaDbContext.
 builder.Services.AddSingleton<wa.application.UseCases.Admin.IAdminFlagStore>(sp => new wa.infrastructure.Persistence.AdminFlagStore(sp.GetRequiredService<WaDbContext>()));
+// T-011-09 (TA-4.2#24 / FR-011-2): admin suppressions surface — list + remove over the adapter-owned WaDbContext.
+builder.Services.AddSingleton<wa.application.UseCases.Admin.IAdminSuppressionStore>(sp => new wa.infrastructure.Persistence.AdminSuppressionStore(sp.GetRequiredService<WaDbContext>()));
+// T-011-09 (TA-4.2#25 / US-011-04 happy path 5): audit read surface — last count rows, newest first, over the adapter-owned WaDbContext.
+builder.Services.AddSingleton<wa.application.UseCases.Admin.IAuditReadStore>(sp => new wa.infrastructure.Persistence.AuditReadStore(sp.GetRequiredService<WaDbContext>()));
 builder.Services.AddSingleton<ILimitsProvider>(sp => new LimitsProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
 // TA-3.6 — minting is pure HMAC (no network at request time); §5.2 account values already read above (T-055-02).
 builder.Services.AddSingleton<IBlobSasMinter>(new DraftBlobSasMinter(new Uri(blobAccountUrl!), blobAccountKey!));
@@ -455,28 +459,47 @@ app.MapGet("/unsubscribe/{token}", async (string token, wa.infrastructure.Persis
         : Results.NotFound(ProblemWriter.Build(404, ProblemCodes.NotFound, "Not found.")); // 404 — don't leak detail (TA-9.6)
 });
 
-// T-006-03 (FR-006-5, US-011-04): admin suppression list — F-TRF-011 owns the UI; this is the API surface.
-app.MapGet("/api/v1/admin/suppressions", async (HttpContext ctx, IAppUserStore users, WaDbContext db, CancellationToken ct) =>
+// T-011-09 (TA-4.2#24 / FR-011-2): admin suppression list — thin endpoint over MediatR (was inline EF from T-006-03).
+app.MapGet("/api/v1/admin/suppressions", async (HttpContext ctx, IAppUserStore users, ISender sender, CancellationToken ct) =>
 {
     await RequireAdminAsync(ctx, users, superadminOnly: false, ct); // T-011-01: both roles — every GET of 20–23 passes Operator + SuperAdmin (AC-011-3 server half).
 
-    var rows = await db.Set<EmailSuppression>().OrderByDescending(s => s.CreatedAtUtc).ToListAsync(ct);
-    return Results.Json(rows.Select(s => new { id = s.Id.ToString("n"), address = s.Address, senderEmail = s.SenderEmail, createdAtUtc = s.CreatedAtUtc }));
+    var rows = await sender.Send(new GetSuppressionsQuery(), ct);
+    return Results.Json(rows.Select(s => new { id = s.Id.ToString("n"), address = s.Address, senderEmail = s.SenderEmail, createdAtUtc = s.CreatedAtUtc })); // bare array — UnsubscribeEndpointTests L145 pins the wire shape
 });
 
-// T-006-03 (FR-006-5, US-011-04): admin suppression remove — emits admin_action telemetry. F-TRF-011 owns the UI; this is the API surface.
-app.MapDelete("/api/v1/admin/suppressions/{id:guid}", async (Guid id, HttpContext ctx, IAppUserStore users, WaDbContext db, wa.application.Telemetry.WaTelemetryReporter telemetry, CancellationToken ct) =>
+// T-011-09 (TA-4.2#24 / FR-011-5): admin suppression remove — thin endpoint over MediatR; audits every removal + emits admin_action telemetry.
+app.MapDelete("/api/v1/admin/suppressions/{id:guid}", async (Guid id, HttpContext ctx, IAppUserStore users, ISender sender, IAuditWriter auditWriter, wa.application.Telemetry.WaTelemetryReporter telemetry, CancellationToken ct) =>
 {
     await RequireAdminAsync(ctx, users, superadminOnly: true, ct); // T-011-01: suppression remove is in the exact SuperAdmin-only write set (AC-011-3 server half).
 
-    var row = await db.Set<EmailSuppression>().FirstOrDefaultAsync(s => s.Id == id, ct);
-    if (row is null)
-        return Results.NotFound(ProblemWriter.Build(404, ProblemCodes.NotFound, "Not found."));
+    // T-011-09: null result = unknown id — ONE case (endpoint maps to 404 NOT_FOUND via BusinessException; mirrors T-011-05/07).
+    var result = await sender.Send(new RemoveSuppressionCommand(id), ct);
+    if (result is null)
+        throw new BusinessException(ProblemCodes.NotFound, "Not found.");
 
-    db.Set<EmailSuppression>().Remove(row);
-    await db.SaveChangesAsync(ct);
-    telemetry.LogEvent(TelemetryEvents.AdminAction); // F-TRF-011: admin removal is auditable via App Insights
+    telemetry.LogEvent(TelemetryEvents.AdminAction); // F-TRF-011: admin removal is auditable via App Insights (T-006-03 FR-006-5 surface — kept)
+
+    // FR-011-5: audit only on successful removal — re-read actor email via IAppUserStore (the gate returns void).
+    // The removed row's address comes from the handler RESULT (captured PRE-delete) — the row is gone and unreadable now.
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is Guid userId)
+    {
+        var user = await users.GetByIdAsync(userId, ct);
+        if (user?.Email is not null)
+            await auditWriter.WriteAsync(user.Email, "suppression.removed", "emailSuppression", id.ToString("n"), new { email = result.Address }, ct);
+    }
+
+    // KEEP 200 OK — UnsubscribeEndpointTests L180 asserts OK (NOT NoContent like T-011-05/07).
     return Results.Ok();
+});
+
+// T-011-09 (TA-4.2#25 / US-011-04 happy path 5): admin recent actions — last 50 rows, newest first; both roles read.
+app.MapGet("/api/v1/admin/audit-recent", async (HttpContext ctx, IAppUserStore users, ISender sender, CancellationToken ct) =>
+{
+    await RequireAdminAsync(ctx, users, superadminOnly: false, ct); // T-011-01: both roles read — same as the GET at L459.
+
+    var rows = await sender.Send(new GetRecentAuditQuery(), ct);
+    return Results.Json(rows.Select(a => new { id = a.Id, actorEmail = a.ActorEmail, action = a.Action, entityType = a.EntityType, entityId = a.EntityId, detailsJson = a.DetailsJson, createdAtUtc = a.CreatedAtUtc })); // bare array, camelCase — new route (no existing wire shape)
 });
 
 // T-011-03 (TA-4.2#20 / FR-011-6): admin overview — four aggregates + recent transfers list, cached 5 min in-memory.
