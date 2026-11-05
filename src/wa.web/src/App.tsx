@@ -16,6 +16,8 @@ import RecipientPage from './features/recipient/RecipientPage'
 import UnsubscribePage from './features/unsubscribe/UnsubscribePage'
 import ReSendScreen from './features/sender/ReSendScreen'
 import { matchResendPath } from './features/sender/resendRoute'
+import AdminShell from './features/admin/AdminShell'
+import { matchAdminPath } from './features/admin/adminRoute'
 import { matchLinkPath } from './features/recipient/recipientRoute'
 import { matchUnsubscribePath } from './features/unsubscribe/unsubscribeRoute'
 
@@ -41,6 +43,8 @@ export default function App() {
   const unsubscribeToken = matchUnsubscribePath(pathname)
   // T-010-03 (FR-010-4): re-send route — /resend/{originalTransferId}; requires a signed-in user (T-010-01 owner scope).
   const resendTransferId = matchResendPath(pathname)
+  // T-011-10 (FR-011-2): admin console — /admin/{screen}; role gating happens inside AdminShell via /auth/me.
+  const adminScreen = matchAdminPath(pathname)
   const hasFiles = useUploadEngine((s) => s.files.length > 0)
 
   // T-008-09 (D-5): post-delete toast — App state survives the ProfilePage unmount on redirect; DropZone renders it.
@@ -105,6 +109,9 @@ export default function App() {
         ) : session && resendTransferId !== null ? (
           // T-010-03 (FR-010-4): re-send screen — the ORIGINAL transfer's ID from My Files rows; endpoint 16 mints a new draft.
           <ReSendScreen originalTransferId={resendTransferId} onUpload={goHome} />
+        ) : session && adminScreen !== null ? (
+          // T-011-10 (FR-011-2): admin console — gated on session like files/profile; role gating inside AdminShell via /auth/me.
+          <AdminShell screen={adminScreen} />
         ) : matchAccountPath(pathname) ? (
           // Signed-out guest keeps the sign-in card; /account/profile with no session falls
           // through here too (it still matches ACCOUNT_PATH_RE — order above is what wins).
