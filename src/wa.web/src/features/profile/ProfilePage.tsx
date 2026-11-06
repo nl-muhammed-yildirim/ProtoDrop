@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import type { StoredProfile } from '../../core/auth/session'
+import { getTraceParent } from '../../core/traceparent'
 import DangerZone from './DangerZone'
 
 // T-008-06 wire (TA-4.2#12–13), verified against src/wa.api/Program.cs — GET/PATCH /auth/me + logout:
@@ -34,7 +35,7 @@ export function ProfilePage({ profile, onSignedIn, onThemeChange, onDeleteAccoun
     try {
       const res = await fetch(ME_BASE, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', traceparent: getTraceParent() },
         // First signed-in client call — HttpOnly wa.session cookie must be sent cross-origin.
         credentials: 'include',
         body: JSON.stringify({ displayName: name.trim() })   // server trims + falls back to email local part on empty (T-008-06)
@@ -64,7 +65,7 @@ export function ProfilePage({ profile, onSignedIn, onThemeChange, onDeleteAccoun
     setError(null)
     fetch(ME_BASE, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', traceparent: getTraceParent() },
       credentials: 'include',
       body: JSON.stringify({ theme: next })   // partial update — displayName untouched (T-008-06)
     })

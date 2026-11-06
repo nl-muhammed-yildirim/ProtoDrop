@@ -6,6 +6,7 @@ using System.Text;
 using wa.application.Blob;
 using wa.application.Ports;
 using wa.application.Telemetry;
+using wa.domain.Correlation;
 using wa.domain.Telemetry;
 using wa.domain.ValueObjects;
 
@@ -136,6 +137,8 @@ public sealed class GetDownloadAllUrlHandler : IRequestHandler<GetDownloadAllUrl
             using var httpClient = new HttpClient();
             using var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl.TrimEnd('/')}/zip/{transferId.ToString("n")}");
             request.Headers.Add("x-zip-sign", signKey);
+            // T-012-01: forward the ambient W3C traceparent so f-zip's logs share this request's correlationId (TA-10.1).
+            request.Headers.Add("traceparent", CorrelationContext.CurrentRequest?.ToHeader() ?? W3CTraceParser.New().ToHeader());
 
             await httpClient.SendAsync(request, cancellationToken);
         }

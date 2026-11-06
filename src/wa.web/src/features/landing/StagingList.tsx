@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { useUploadEngine, stagedHandles, type Draft } from '../../core/upload/UploadEngine'
+import { getTraceParent } from '../../core/traceparent'
 import { formatBytes } from '../../core/upload/formatBytes'
 import { checkLimits, getPlanLimits, limitMessage } from '../../core/upload/planLimits'
 import LinkScreen from '../sender/LinkScreen'
@@ -116,7 +117,7 @@ export function StagingList() {
       }))
       const res = await fetch(DRAFT_ENDPOINT, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', traceparent: getTraceParent() },
         body: JSON.stringify({ files: rows }),
       })
       if (!res.ok) return // 422 Problem+JSON (TRANSFER_SIZE_EXCEEDED): the limit message already explains it; keep minimal.
@@ -135,7 +136,7 @@ export function StagingList() {
       if (!allDone) return
       const finRes = await fetch(FINALIZE_ENDPOINT.replace('{draftId}', draft.draftId), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': finalizeKey(draft.draftId) },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': finalizeKey(draft.draftId), traceparent: getTraceParent() },
         body: JSON.stringify(buildFinalizePayload(minted)),
       })
       if (!finRes.ok) { setFinalizeError(true); return } // inline error below — the blobs are staged; retry re-finalizes (EC-002-1).

@@ -84,6 +84,45 @@ public class W3CTraceParserTests
     public void CorrelationId_IsExactlyFirstEightHexChars() =>
         Assert.Equal("a1b2c3d4", W3CTraceParser.Parse(Valid)!.CorrelationId);
 
+    // ---- New() + IsValid() (T-012-01 — worker/browser generation surfaces) ----
+
+    [Fact]
+    public void New_ReturnsValidTraceParent()
+    {
+        var tp = W3CTraceParser.New();
+
+        Assert.Equal("00", tp.Version);
+        Assert.Equal(32, tp.TraceId.Length);
+        Assert.All(tp.TraceId, c => Assert.True(char.IsDigit(c) || (c is >= 'a' and <= 'f')));
+        Assert.Equal(16, tp.ParentId.Length);
+        Assert.All(tp.ParentId, c => Assert.True(char.IsDigit(c) || (c is >= 'a' and <= 'f')));
+        Assert.Equal("07", tp.Flags);
+
+        // Round-trips through Parse.
+        var parsed = W3CTraceParser.Parse(tp.ToHeader());
+        Assert.NotNull(parsed);
+        Assert.Equal(tp, parsed!);
+    }
+
+    [Fact]
+    public void New_IsRandomAcrossCalls() =>
+        Assert.NotEqual(W3CTraceParser.New().TraceId, W3CTraceParser.New().TraceId);
+
+    [Theory]
+    [InlineData("00-a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6-0af1bc2d3e4f5a6b-07")] // valid
+    public void IsValid_ValidValue_ReturnsTrue(string value) => Assert.True(W3CTraceParser.IsValid(value));
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("01-a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6-0af1bc2d3e4f5a6b-07")] // wrong version
+    [InlineData("zz-a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6-0af1bc2d3e4f5a6b-07")] // non-hex version
+    [InlineData("00-a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d-0af1bc2d3e4f5a6b-07")] // trace-id 31 chars
+    [InlineData("00-a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6-0af1bc2d3e4f5a6b")] // only three parts
+    [InlineData("00-00000000000000000000000000000000-0af1bc2d3e4f5a6b-07")] // all-zero trace-id
+    public void IsValid_MalformedOrAbsent_ReturnsFalse(string? value) => Assert.False(W3CTraceParser.IsValid(value));
+
     // ---- ambient context (middleware sets it once per request; tests exercise Set directly — internal via InternalsVisibleTo? no: domain has no test visibility yet, so cover the public surface only) ----
 
     [Fact]

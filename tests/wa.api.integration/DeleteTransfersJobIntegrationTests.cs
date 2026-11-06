@@ -311,6 +311,8 @@ public class DeleteTransfersJobIntegrationTests : IAsyncLifetime
     {
         public Task UploadAsync(string path, Stream content, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<Stream> DownloadAsync(string path, CancellationToken cancellationToken = default) => Task.FromResult(Stream.Null);
+        public Task CopyAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<long> GetSizeAsync(string path, CancellationToken cancellationToken = default) => Task.FromResult(0L);
         public Task<bool> ExistsAsync(string path, CancellationToken cancellationToken = default) => Task.FromResult(false);
         public Task DeleteAsync(string path, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }

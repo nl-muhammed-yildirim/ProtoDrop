@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { formatBytes } from '../../core/upload/formatBytes'
 import type { ListTransfersResponse, MyTransferRowDto } from './formatting'
+import { getTraceParent } from '../../core/traceparent'
 import {
   downloadsLabel,
   formatRemaining,
@@ -83,7 +84,7 @@ export function FilesPage({ onNewTransfer }: FilesPageProps) {
     setError(null)
 
     // limit 25 is the endpoint's default (TA-4.1.4) — do NOT send it; keep the query minimal like the rest of the client.
-    fetch(`${API_BASE}/transfers?status=${statusFilter}`, { credentials: 'include' })
+    fetch(`${API_BASE}/transfers?status=${statusFilter}`, { credentials: 'include', headers: { traceparent: getTraceParent() } })
       .then(async (res) => {
         if (!res.ok) throw new Error('Could not load your files.')
         return (await res.json()) as ListTransfersResponse
@@ -113,7 +114,7 @@ export function FilesPage({ onNewTransfer }: FilesPageProps) {
     if (cursor !== null) url += `&cursor=${encodeURIComponent(cursor)}`
 
     try {
-      const res = await fetch(url, { credentials: 'include' })
+      const res = await fetch(url, { credentials: 'include', headers: { traceparent: getTraceParent() } })
       if (!res.ok) throw new Error('Could not load your files.')
       const data = (await res.json()) as ListTransfersResponse
       // TA-4.1.4: the returned nextCursor becomes the cursor for the NEXT page past this one.
@@ -152,7 +153,7 @@ export function FilesPage({ onNewTransfer }: FilesPageProps) {
     setDeleting(true)
     setDeleteError(null)
     try {
-      const res = await fetch(`${API_BASE}/transfers/${id}`, { method: 'DELETE', credentials: 'include' })
+      const res = await fetch(`${API_BASE}/transfers/${id}`, { method: 'DELETE', credentials: 'include', headers: { traceparent: getTraceParent() } })
       const parsedBody = (await res.json().catch(() => null)) as { code?: string } | null
       const ok = res.status === 204 || (res.status === 404 && parsedBody?.code === 'NOT_FOUND')
       if (!ok) throw new Error('Could not delete the transfer. Please try again.')

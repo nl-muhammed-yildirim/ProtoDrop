@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using wa.application.UseCases.Auth;
 using wa.application.UseCases.Transfers;
 using wa.domain;
+using wa.domain.Correlation;
 
 namespace wa.workers;
 
@@ -48,6 +49,13 @@ public class EmailFunction
         var envelope = JsonSerializer.Deserialize<EventEnvelope>(body);
         if (envelope is null)
             return;
+
+        // T-012-01: derive the W3C traceparent from the envelope's CorrelationId — it is a W3C trace-id (32-hex) when the event was published from a request; generate fresh otherwise.
+        var traceId = envelope.CorrelationId.ToString("n");
+        var tp = (traceId.Length == 32 && !traceId.All(c => c == '0'))
+            ? new TraceParent(W3CTraceParser.SupportedVersion, traceId, Guid.NewGuid().ToString("n")[..16], "07")
+            : W3CTraceParser.New();
+        using var scope = _logger.BeginScope(new Dictionary<string, object?> { ["CorrelationId"] = tp.CorrelationId, ["TraceParent"] = tp.ToHeader() });
 
         // T-008-04 (D-6) + T-008-05 (D-3): route on event type — only these two types reach this subscription.
         // Annotated IEmailEventHandler? so all arms (including null) share one type — fixes the pre-existing CS8506.

@@ -4,6 +4,7 @@ import { formatBytes } from '../../core/upload/formatBytes'
 import { statusLabel, statusTone } from './overviewData'
 import type { AdminTransferRowDto, SearchParams } from './transfersData'
 import { buildSearchQuery, formatCreatedAt, parseSearchResponse } from './transfersData'
+import { getTraceParent } from '../../core/traceparent'
 
 interface AdminTransfersPageProps {
   role: 'SuperAdmin' | 'Operator'   // T-011-10 precedent — AdminShell narrows /auth/me's role and passes it down.
@@ -73,7 +74,7 @@ export function AdminTransfersPage({ role }: AdminTransfersPageProps) {
     setError(null)
     try {
       const qs = buildSearchQuery({ ...paramsRef.current, cursor: cursor ?? undefined })
-      const res = await fetch(`${API_BASE}/admin/transfers?${qs}`, { credentials: 'include' })
+      const res = await fetch(`${API_BASE}/admin/transfers?${qs}`, { credentials: 'include', headers: { traceparent: getTraceParent() } })
       if (!res.ok) throw new Error('Could not load transfers.')
       const data = parseSearchResponse((await res.json()) as { items?: unknown[]; nextCursor?: string | null })
       // TA-4.1.4: the returned nextCursor becomes the cursor for the NEXT page past this one.
@@ -122,7 +123,7 @@ export function AdminTransfersPage({ role }: AdminTransfersPageProps) {
     setDeleting(true)
     setDeleteError(null)
     try {
-      const res = await fetch(`${API_BASE}/admin/transfers/${id}`, { method: 'DELETE', credentials: 'include' })
+      const res = await fetch(`${API_BASE}/admin/transfers/${id}`, { method: 'DELETE', credentials: 'include', headers: { traceparent: getTraceParent() } })
       const parsedBody = (await res.json().catch(() => null)) as { code?: string } | null
       const ok = res.status === 204 || (res.status === 404 && parsedBody?.code === 'NOT_FOUND')
       if (!ok) throw new Error('Could not force-delete the transfer. Please try again.')

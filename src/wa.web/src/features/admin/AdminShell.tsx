@@ -7,6 +7,7 @@ import AdminTransfersPage from './AdminTransfersPage'
 import AdminUsersPage from './AdminUsersPage'
 import { ADMIN_NAV_ITEMS } from './adminRoute'
 import type { AdminScreen } from './adminRoute'
+import { getTraceParent } from '../../core/traceparent'
 
 interface AdminShellProps {
   screen: AdminScreen
@@ -32,7 +33,7 @@ export function AdminShell({ screen }: AdminShellProps) {
   useEffect(() => {
     const loadRole = async () => {
       try {
-        const res = await fetch(`${API_BASE}/auth/me`, { credentials: 'include' })
+        const res = await fetch(`${API_BASE}/auth/me`, { credentials: 'include', headers: { traceparent: getTraceParent() } })
         if (res.ok) {
           const body = (await res.json()) as { role?: string }
           if (body.role === 'superadmin') setRoleState({ kind: 'signed-in', role: 'SuperAdmin' })

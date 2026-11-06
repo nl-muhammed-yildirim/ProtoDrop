@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { getTraceParent } from '../../core/traceparent'
 
 /**
  * T-003-02 (TA-4.2#4): Zustand store for the recipient page at /t/{linkId} — holds endpoint 4's payload
@@ -194,7 +195,7 @@ export const useRecipientStore = create<RecipientState & RecipientActions>((set,
         const token = readUnlockToken(linkId)
         const url = PUBLIC_TRANSFER_ENDPOINT.replace('{linkId}', linkId)
           + (token !== null ? `?t=${encodeURIComponent(token)}` : '')
-        const res = await fetch(url, { signal: controller.signal })
+        const res = await fetch(url, { signal: controller.signal, headers: { traceparent: getTraceParent() } })
         if (!res.ok) {
           // T-003-03 (FR-003-8/9): classify by the Problem+JSON code, not the HTTP status — 410 and 404 both map to
           // 'expired' when the code is TRANSFER_EXPIRED; a non-Problem body (or parse failure) keeps the generic error.
@@ -251,7 +252,7 @@ export const useRecipientStore = create<RecipientState & RecipientActions>((set,
       try {
         const res = await fetch(UNLOCK_ENDPOINT.replace('{linkId}', linkId), {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', traceparent: getTraceParent() },
           body: JSON.stringify({ password }), // TA-4.2#5 exact wire shape — { password } only.
           signal: controller.signal,
         })
@@ -314,7 +315,7 @@ export const useRecipientStore = create<RecipientState & RecipientActions>((set,
           .replace('{linkId}', linkId)
           .replace('{fileId}', fileId)
           + (token !== null ? `?t=${encodeURIComponent(token)}` : '')
-        const res = await fetch(url, { signal: controller.signal })
+        const res = await fetch(url, { signal: controller.signal, headers: { traceparent: getTraceParent() } })
         if (!res.ok) {
           const problem = (await res.json()) as { code?: string; details?: string } | null
           const terminal = classifyProblem(problem)

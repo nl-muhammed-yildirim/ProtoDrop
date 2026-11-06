@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { getTraceParent } from '../../core/traceparent'
 
 interface UnsubscribePageProps {
   token: string
@@ -15,7 +16,7 @@ export function UnsubscribePage({ token }: UnsubscribePageProps) {
 
   useEffect(() => {
     let cancelled = false
-    fetch(`/unsubscribe/${token}`)
+    fetch(`/unsubscribe/${token}`, { headers: { traceparent: getTraceParent() } })
       .then(() => { if (!cancelled) setDone(true) })
       .catch(() => { if (!cancelled) setDone(true) }) // 404 or network error → still show the card (no leak)
     return () => { cancelled = true }

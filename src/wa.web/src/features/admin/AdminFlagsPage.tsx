@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import type { AuditRecentRowDto, FlagRowDto } from './adminData'
 import { formatCreatedAt } from './adminData'
+import { getTraceParent } from '../../core/traceparent'
 
 interface AdminFlagsPageProps {
   role: 'SuperAdmin' | 'Operator'   // T-011-10 precedent — AdminShell narrows /auth/me's role and passes it down.
@@ -39,8 +40,8 @@ export function AdminFlagsPage({ role }: AdminFlagsPageProps) {
     setError(null)
     try {
       const [flagsRes, auditRes] = await Promise.all([
-        fetch(`${API_BASE}/admin/flags`, { credentials: 'include' }),
-        fetch(`${API_BASE}/admin/audit-recent`, { credentials: 'include' }),
+        fetch(`${API_BASE}/admin/flags`, { credentials: 'include', headers: { traceparent: getTraceParent() } }),
+        fetch(`${API_BASE}/admin/audit-recent`, { credentials: 'include', headers: { traceparent: getTraceParent() } }),
       ])
       if (!flagsRes.ok || !auditRes.ok) throw new Error('Could not load flags.')
       const flags = (await flagsRes.json()) as FlagRowDto[]
@@ -67,6 +68,7 @@ export function AdminFlagsPage({ role }: AdminFlagsPageProps) {
       const res = await fetch(`${API_BASE}/admin/flags/${key}`, {
         method: 'PUT',
         credentials: 'include',
+        headers: { traceparent: getTraceParent() },
         body: drafts[key] ?? '',   // the raw string, verbatim — the server reads it as the value.
       })
       if (res.status === 400) {

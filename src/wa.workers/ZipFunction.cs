@@ -10,6 +10,7 @@ using wa.application.Limits;
 using wa.application.Ports;
 using wa.application.Telemetry;
 using wa.application.UseCases.Transfers;
+using wa.domain.Correlation;
 using wa.domain.Errors;
 using wa.domain.Telemetry;
 
@@ -51,9 +52,16 @@ public class ZipFunction
         FunctionContext context,
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "zip/{transferId}")] HttpRequestData req, string transferIdParam)
     {
+        // T-012-01: read-or-generate W3C traceparent for log correlation (TA-10.1, FR-012-1).
+        // MEL BeginScope stores the scope in an AsyncLocal — subsequent _logger.* calls carry it.
+        // HttpHeadersCollection inherits BCL HttpHeaders: GetValues throws on absent headers, so use TryGetValues.
+        var tp = W3CTraceParser.Parse(req.Headers.TryGetValues("traceparent", out var tpValues) ? tpValues.FirstOrDefault() : null)
+            ?? W3CTraceParser.New();
+        using var scope = _logger.BeginScope(new Dictionary<string, object?> { ["CorrelationId"] = tp.CorrelationId, ["TraceParent"] = tp.ToHeader() });
+
         // Auth: check x-zip-sign header against config using timing-safe comparison
         var expectedSign = _config["Wa:Zip:SignKey"];
-        var signValues = req.Headers.GetValues("x-zip-sign");
+        req.Headers.TryGetValues("x-zip-sign", out var signValues);
         if (expectedSign is null || signValues is null || !VerifySignature(true, string.Join(",", signValues), expectedSign))
             return CreateProblemResponse(req, 401, ProblemCodes.Unauthenticated, "Invalid or missing signature.");
 
