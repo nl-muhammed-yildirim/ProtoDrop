@@ -17,6 +17,12 @@ public interface IBlobStore
     /// <returns>A stream with the blob content. The caller must dispose it.</returns>
     Task<Stream> DownloadAsync(string path, CancellationToken cancellationToken = default);
 
+    /// <summary>Server-side copy of one blob to another within the same account (finalize's staging→transfers move). Returns only once the destination holds exactly the source bytes — callers may write DB rows referencing the destination afterwards.</summary>
+    Task CopyAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken = default);
+
+    /// <summary>The size in bytes of a blob at its canonical path — metadata read only, no content download (finalize's ±0 size check must not buffer multi-GB blobs).</summary>
+    Task<long> GetSizeAsync(string path, CancellationToken cancellationToken = default);
+
     /// <summary>Check if a blob exists at its canonical path.</summary>
     Task<bool> ExistsAsync(string path, CancellationToken cancellationToken = default);
 

@@ -1,3 +1,8 @@
+/* Universal box-sizing reset — width: 100% elements with padding/borders must not overflow (e.g. .tb top bar) */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 :root {
   --bg: #FFFFFF;
   --bg-subtle: #F5F6F8;
@@ -84,13 +89,29 @@ body {
   font-size: var(--fs-body);
 }
 
+/* Fixed-viewport shell — no document-level scrollbars; tall routes (admin) scroll inside main */
+#root {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
 main {
-  min-height: 100vh;
+  /* flex:1 + min-height:0 => fills the space below the TopBar and scrolls internally when content is taller */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 24px;
+}
+
+/* Auto margins vertically center short routes (landing/auth) and collapse to 0 when content is taller,
+   so tall routes scroll inside main instead of growing the document. */
+main > * {
+  margin-top: auto;
+  margin-bottom: auto;
 }
 
 /* §4.1 Drop zone */

@@ -118,16 +118,15 @@ public sealed class FinalizeTransferHandler : IRequestHandler<FinalizeTransferCo
             var stagingPath = BlobPaths.StagingFile(request.DraftId, file.FileId);
             var transferPath = BlobPaths.TransferFile(transferId, file.FileId);
 
-            await using var stream = await _blobStore.DownloadAsync(stagingPath, cancellationToken);
-            var ms = new MemoryStream();
-            await stream.CopyToAsync(ms, cancellationToken);
-            ms.Position = 0;
+            // Server-side copy — no bytes pass through this process. The old download→MemoryStream→upload path
+            // buffered the whole blob in RAM: a 2.5 GB file blew past Int32.MaxValue (MemoryStream's limit) with
+            // "Stream was too long" and timed out on smaller-but-slow copies. Copy + metadata size read scale to any size.
+            await _blobStore.CopyAsync(stagingPath, transferPath, cancellationToken);
 
-            // T-007-03: blob size truth — declared SizeBytes must match actual (±0 tolerance).
-            if (ms.Length != file.SizeBytes)
-                throw new BlobSizeMismatchException(file.Name, file.SizeBytes, ms.Length);
-
-            await _blobStore.UploadAsync(transferPath, ms, cancellationToken);
+            // T-007-03: blob size truth — declared SizeBytes must match actual (±0 tolerance). Metadata read only.
+            var actualSize = await _blobStore.GetSizeAsync(transferPath, cancellationToken);
+            if (actualSize != file.SizeBytes)
+                throw new BlobSizeMismatchException(file.Name, file.SizeBytes, actualSize);
         }
         stopwatch.Stop();
 

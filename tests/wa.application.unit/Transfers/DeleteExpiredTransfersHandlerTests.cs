@@ -169,6 +169,11 @@ public class DeleteExpiredTransfersHandlerTests
         public bool ShouldThrow { get; set; }
 
         public Task UploadAsync(string path, Stream content, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        // Finalize no longer buffers blobs: these mirror the server-side copy + metadata size read.
+        public Task CopyAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<long> GetSizeAsync(string path, CancellationToken cancellationToken = default) => Task.FromResult(0L);
+
         public Task<Stream> DownloadAsync(string path, CancellationToken cancellationToken = default) => Task.FromResult(Stream.Null);
         public Task<bool> ExistsAsync(string path, CancellationToken cancellationToken = default) => Task.FromResult(true);
 

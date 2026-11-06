@@ -1,0 +1,27 @@
+# syntax=docker/dockerfile:1
+
+# One-shot migration runner — applies EF migrations + seeds from wa.infrastructure against the
+# SQL server named by ConnectionStrings__WaDb (env). Reuses wa.api's config, so it reads the same
+# connection string as the running app. Idempotent; exits 0 when already up to date.
+
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS migrate
+WORKDIR /src
+
+# Pin dotnet-ef to match the EF Core runtime (10.0.x) so migrations apply deterministically.
+RUN dotnet tool install --global dotnet-ef --version 10.0.12 && \
+    ln -s /root/.dotnet/tools/dotnet-ef /usr/local/bin/dotnet-ef
+
+# Restore first (needs sibling projects for ProjectReferences) so package layers stay cached.
+COPY src/wa.api/wa.api.csproj wa.api/
+COPY src/wa.application/wa.application.csproj wa.application/
+COPY src/wa.domain/wa.domain.csproj wa.domain/
+COPY src/wa.infrastructure/wa.infrastructure.csproj wa.infrastructure/
+RUN dotnet restore wa.api/wa.api.csproj
+
+COPY src ./
+
+# --project points at the migrations assembly (wa.infrastructure); --startup-project boots wa.api's
+# DI/config so it reads ConnectionStrings__WaDb from env. WaDbContext lives in infrastructure.
+CMD ["dotnet", "ef", "database", "update", \
+     "--project", "wa.infrastructure/wa.infrastructure.csproj", \
+     "--startup-project", "wa.api/wa.api.csproj"]

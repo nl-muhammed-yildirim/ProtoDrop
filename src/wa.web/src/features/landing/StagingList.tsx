@@ -3,6 +3,9 @@ import { useState } from 'react'
 import { useUploadEngine, stagedHandles, type Draft } from '../../core/upload/UploadEngine'
 import { formatBytes } from '../../core/upload/formatBytes'
 import { checkLimits, getPlanLimits, limitMessage } from '../../core/upload/planLimits'
+import LinkScreen from '../sender/LinkScreen'
+import { buildFinalizePayload, finalizeKey, type MintedFile } from './finalize'
+import { useFinalize } from './finalizeState'
 
 /**
  * Staging list (T-001-03): one row per staged file — icon, name (truncated, `title`),
@@ -21,8 +24,23 @@ import { checkLimits, getPlanLimits, limitMessage } from '../../core/upload/plan
 
  // T-001-09 (Send wiring): the API is cross-origin at a fixed local port — no proxy, no env vars yet (ADR row).
  const DRAFT_ENDPOINT = 'http://localhost:8080/api/v1/transfers/draft'
+ // T-001-10 (TA-4.2#2): finalize — server-side blob copy staging→transfers + mint linkId; {draftId} filled per send().
+ const FINALIZE_ENDPOINT = 'http://localhost:8080/api/v1/transfers/draft/{draftId}/finalize'
  const AZURITE_ACCOUNT_KEY_B64 = 'Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=='
  const AZURITE_ACCOUNT_NAME = 'devstoreaccount1'
+
+ /**
+  * T-001-10 (TA-4.2#2): finalize response wire shape — mirrors Program.cs L229 exactly (id in 'n'-form, status "Draft").
+  * linkId + id are what LinkScreen needs to render the public URL and activate endpoint 3 on send.
+  */
+ type FinalizeResult = {
+   id: string
+   linkId: string
+   status: string
+   expiresAt: string
+   totalBytes: number
+   files: Array<{ id: string; name: string }>
+ }
 
  /**
   * Re-signs each minted uploadUrl for a plain-HTTP browser leg. Azurite (and the C# integration fixture) rejects a PUT on a
@@ -66,15 +84,30 @@ export function StagingList() {
   const removeFile = useUploadEngine((s) => s.remove)
   const retryFile = useUploadEngine((s) => s.retry)
   const [sending, setSending] = useState(false) // double-click guard — start() itself serializes files (TA-8.3).
+  // T-001-10 handoff: shared store so App can hide the DropZone once LinkScreen is showing (see finalizeState.ts).
+  const finalized = useFinalize((s) => s.finalized)
+  const setFinalized = useFinalize((s) => s.setFinalized)
+  const finalizeError = useFinalize((s) => s.finalizeError)
+  const setFinalizeError = useFinalize((s) => s.setFinalizeError)
+  const clearFinalize = useFinalize((s) => s.clear)
+
+  // "Send again" (LinkScreen sent-phase): reset finalize + staged files so staging reappears for the next transfer.
+  const handleSendAgain = (): void => {
+    clearFinalize()
+    useUploadEngine.getState().reset() // clears staged files + FR-001-6 records so staging reappears.
+  }
 
   // Pure arithmetic on staged sizes; re-read every render (TA-8.3).
   const limits = getPlanLimits()
   const check = checkLimits(files, limits)
   const message = limitMessage(files, check, limits)
   // T-001-09 (Send wiring): post the whole staged selection in row order — start() mints uploadUrls by position.
+  // T-001-10: capture each file's minted fileId as it uploads so finalize can build its payload; after all files are
+  // done, POST /finalize with an Idempotency-Key (EC-002-1) and swap the staging list for LinkScreen.
   const send = async () => {
-    if (sending) return
+    if (sending || finalized !== null) return
     setSending(true)
+    setFinalizeError(false)
     try {
       const rows = files.map((f) => ({
         name: f.name,
@@ -88,10 +121,47 @@ export function StagingList() {
       })
       if (!res.ok) return // 422 Problem+JSON (TRANSFER_SIZE_EXCEEDED): the limit message already explains it; keep minimal.
       const draft = (await res.json()) as Draft
+      // Minted fileIds by staged-row position — Program.cs L213 Guid.Parse's each one against this list.
+      const minted: MintedFile[] = files.map((f, i) => ({
+        stagedId: f.id,
+        name: f.name,
+        sizeBytes: f.size,
+        fileId: draft.files[i]?.fileId ?? '',
+      }))
       await useUploadEngine.getState().start(await reSignForHttp(draft))
+      // start() never rejects — per-file failures surface as 'failed' status. Finalize only when every file is done;
+      // a failed row means the user retries it (T-001-08) before finalize, so don't mint a partial transfer.
+      const allDone = files.length > 0 && useUploadEngine.getState().files.every((f) => f.status === 'done')
+      if (!allDone) return
+      const finRes = await fetch(FINALIZE_ENDPOINT.replace('{draftId}', draft.draftId), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': finalizeKey(draft.draftId) },
+        body: JSON.stringify(buildFinalizePayload(minted)),
+      })
+      if (!finRes.ok) { setFinalizeError(true); return } // inline error below — the blobs are staged; retry re-finalizes (EC-002-1).
+      const result = (await finRes.json()) as FinalizeResult
+      setFinalized(result)
     } finally {
       setSending(false)
     }
+  }
+
+  if (finalized !== null) {
+    // T-001-10 handoff: the hero card — full public URL + Copy + recipients/sender fields; endpoint 3 activates on send.
+    // "Send again" clears finalize + staged files → App re-renders the drop zone for the next transfer (same as ReSendScreen's Upload path).
+    return <LinkScreen linkId={finalized.linkId} transferId={finalized.id} onSendAgain={() => handleSendAgain()} />
+  }
+
+  if (finalizeError) {
+    // EC-002-1: finalize failed — blobs are staged, so retrying re-finalizes with the same key; no half-filled form.
+    return (
+      <section className="sl" aria-label="Finalize failed">
+        <p role="alert" className="sl-limit-msg">Upload finished but the link could not be prepared. Please try again.</p>
+        <div className="sl-footer">
+          <button type="button" className="btn-primary sl-send" onClick={() => void send()}>Try again</button>
+        </div>
+      </section>
+    )
   }
 
   return (
