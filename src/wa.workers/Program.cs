@@ -16,6 +16,7 @@ using wa.infrastructure.Events;
 using wa.infrastructure.Persistence;
 
 var host = new HostBuilder()
+    .ConfigureFunctionsWorkerDefaults()
     .ConfigureAppConfiguration(config => config.AddEnvironmentVariables())
     .ConfigureServices(services =>
     {

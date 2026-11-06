@@ -10,3 +10,74 @@ services:
     image: mcr.microsoft.com/azure-storage/azurite:latest
     command: ["azurite-blob", "--blobHost", "0.0.0.0"]
     ports: ["10000:10000"]
+
+  # One-shot: apply EF migrations (6 + seeds) before the API starts, using wa.api's config so it
+  # reads the same connection string as the running app. Idempotent — safe to re-run on every start.
+  migrate:
+    build:
+      context: .
+      dockerfile: src/wa.api/Dockerfile.migrate
+    environment:
+      ConnectionStrings__WaDb: "Server=host.docker.internal,1433;Database=wa;User Id=sa;Password=YourStrong!Passw0rd;Trust Server Certificate=True"
+    depends_on: [sql]
+    restart: "no"
+
+  # One-shot: apply the Azurite CORS rule (browser -> staging blob direct upload). Ephemeral in
+  # Azurite, so re-applied on every stack start. Runs the committed script with @azure/storage-blob.
+  cors-init:
+    image: node:20-alpine
+    network_mode: host
+    working_dir: /app
+    command: sh -c "npm init -y >/dev/null && npm i --no-audit @azure/storage-blob@12.24.0 && node azurite-cors.js"
+    volumes:
+      - ./scripts/azurite-cors.js:/app/azurite-cors.js:ro
+    depends_on: [azurite]
+    restart: "no"
+
+  wa.api:
+    build:
+      context: .
+      dockerfile: src/wa.api/Dockerfile
+    ports: ["8080:8080"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      # launchSettings.json's applicationUrl only applies under `dotnet run`; in Docker Kestrel
+      # binds default :5000. Pin the Local port; "+" = bind all interfaces so the bridge -> host
+      # publish (8080:8080) reaches it from Windows.
+      ASPNETCORE_URLS: "http://+:8080"
+      ConnectionStrings__WaDb: "Server=host.docker.internal,1433;Database=wa;User Id=sa;Password=YourStrong!Passw0rd;Trust Server Certificate=True"
+      Wa__Blob__AccountUrl: "http://host.docker.internal:10000/devstoreaccount1"
+      Wa__Blob__AccountKey: "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
+      Wa__Jwt__Secret: "1f3a9c0e2d4b6f8a0c1e3d5b7f9a2c4e6d8b0f1a3c5e7d9b1f3a5c7e9d1b3f5a"
+      Wa__Url__Public: "http://localhost:5173"
+      Wa__Url__Api: "http://localhost:8080"
+      Wa__Cors__AllowedOrigins: "http://localhost:5173"
+      Wa__AdminEmails: "dev@example.com"
+      # API -> workers zip trigger (f-zip): both sides sign with x-zip-sign = Wa:Zip:SignKey.
+      # Bridge containers can't see each other's localhost; reach workers via the host-published port.
+      Wa__ZipFunction__BaseUrl: "http://host.docker.internal:8081"
+      Wa__Zip__SignKey: "local-zip-signing-key-m0-dev-only"
+    depends_on: [migrate, cors-init]
+
+  wa.web:
+    build:
+      context: .
+      dockerfile: src/wa.web/Dockerfile
+    ports: ["5173:5173"]
+    # SPA hardcodes http://localhost:8080/api/v1 -> browser hits the host-published API port. Serves :5173.
+
+  wa.workers:
+    build:
+      context: .
+      dockerfile: src/wa.workers/Dockerfile
+    ports: ["8081:8081"]
+    environment:
+      # Workers read raw env var names (colons in the key, not ConnectionStrings__ style).
+      WaDb: "Server=host.docker.internal,1433;Database=wa;User Id=sa;Password=YourStrong!Passw0rd;Trust Server Certificate=True"
+      "Wa:Blob:AccountUrl": "http://host.docker.internal:10000/devstoreaccount1"
+      "Wa:Blob:AccountKey": "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
+      "Wa:Jwt:Secret": "1f3a9c0e2d4b6f8a0c1e3d5b7f9a2c4e6d8b0f1a3c5e7d9b1f3a5c7e9d1b3f5a"
+      # Email is log-only in dev (no real SMTP) — read links from the workers console/Serilog.
+      "Wa:Email:Sender": "log"
+      "Wa:Zip:SignKey": "local-zip-signing-key-m0-dev-only"
+    depends_on: [wa.api]

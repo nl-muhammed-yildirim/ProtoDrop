@@ -207,6 +207,10 @@ public class ResendFilesGoneTests
             return Task.CompletedTask;
         }
 
+        // Finalize no longer buffers blobs: these mirror the server-side copy + metadata size read.
+        public Task CopyAsync(string sourcePath, string destinationPath, CancellationToken ct = default) => Task.CompletedTask;
+        public Task<long> GetSizeAsync(string path, CancellationToken ct = default) => Task.FromResult(0L);
+
         public Task<Stream> DownloadAsync(string path, CancellationToken ct = default) =>
             throw new NotSupportedException("Only ExistsAsync is exercised by this suite.");
 

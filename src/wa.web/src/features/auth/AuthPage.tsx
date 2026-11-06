@@ -83,6 +83,8 @@ export function AuthPage({ onSignedIn }: AuthPageProps) {
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        // Cross-origin :5173 → :8080 — the API's Set-Cookie (wa.session) is dropped without this.
+        credentials: 'include',
         body: JSON.stringify(forgotActive ? { email } : { email, password }),
       })
       if (res.ok) {

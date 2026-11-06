@@ -1,4 +1,5 @@
 using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 using Microsoft.Extensions.Logging;
 using wa.application.Ports;
 namespace wa.infrastructure.Blob;
@@ -64,6 +65,34 @@ public sealed class AzureBlobStore : IBlobStore
             .DownloadAsync(cancellationToken);
         // The port contract returns an owned stream; the caller disposes it.
         return download.Value.Content;
+    }
+
+    public async Task CopyAsync(
+        string sourcePath, string destinationPath, CancellationToken cancellationToken = default)
+    {
+        var (srcContainer, srcBlobName) = SplitPath(sourcePath);
+        var (dstContainer, dstBlobName) = SplitPath(destinationPath);
+        // Server-side copy — no bytes pass through this process. SyncCopyFromUri is synchronous in the SDK:
+        // it returns only after the destination holds exactly the source blob's bytes, which finalize relies on
+        // before writing DB rows that reference the transfer path (TA-4.2#2 step 4 ordering). StartCopyFromUri
+        // would instead return a Pending operation and let finalize race ahead of the copy finishing.
+        var srcUrl = _svc.GetBlobContainerClient(srcContainer)
+            .GetBlobClient(srcBlobName)
+            .Uri;
+        await _svc.GetBlobContainerClient(dstContainer)
+            .GetBlobClient(dstBlobName)
+            .SyncCopyFromUriAsync(srcUrl, cancellationToken: cancellationToken);
+    }
+
+    public async Task<long> GetSizeAsync(
+        string path, CancellationToken cancellationToken = default)
+    {
+        var (container, blobName) = SplitPath(path);
+        // Metadata read only — no content download; a 2.5 GB blob must not be streamed into RAM for the ±0 check.
+        var info = await _svc.GetBlobContainerClient(container)
+            .GetBlobClient(blobName)
+            .GetPropertiesAsync(cancellationToken: cancellationToken);
+        return info.Value.ContentLength;
     }
 
     public async Task<bool> ExistsAsync(

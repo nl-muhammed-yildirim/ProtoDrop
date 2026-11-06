@@ -468,6 +468,19 @@ public class FinalizeTransferHandlerTests
             return Task.CompletedTask;
         }
 
+        // Mirror the production port: server-side copy lands in both stores so GetSizeAsync + Upload assertions see it.
+        public Task CopyAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken = default)
+        {
+            if (!Blobs.TryGetValue(sourcePath, out var bytes))
+                throw new KeyNotFoundException($"Blob not found: {sourcePath}");
+            Blobs[destinationPath] = bytes;
+            Uploads[destinationPath] = bytes;
+            return Task.CompletedTask;
+        }
+
+        public Task<long> GetSizeAsync(string path, CancellationToken cancellationToken = default) =>
+            Blobs.TryGetValue(path, out var bytes) ? Task.FromResult((long)bytes.Length) : Task.FromResult(-1L);
+
         public Task<Stream> DownloadAsync(string path, CancellationToken cancellationToken = default)
         {
             if (!Blobs.TryGetValue(path, out var bytes))

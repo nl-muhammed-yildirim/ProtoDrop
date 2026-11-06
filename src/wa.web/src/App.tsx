@@ -6,6 +6,7 @@ import { clearSession, readSession } from './core/auth/session'
 import { useUploadEngine } from './core/upload/UploadEngine'
 import DropZone from './features/landing/DropZone'
 import StagingList from './features/landing/StagingList'
+import { useFinalize } from './features/landing/finalizeState'
 import AuthPage from './features/auth/AuthPage'
 import { matchAccountPath } from './features/auth/authRoute'
 import ProfilePage from './features/profile/ProfilePage'
@@ -46,6 +47,8 @@ export default function App() {
   // T-011-10 (FR-011-2): admin console — /admin/{screen}; role gating happens inside AdminShell via /auth/me.
   const adminScreen = matchAdminPath(pathname)
   const hasFiles = useUploadEngine((s) => s.files.length > 0)
+  // T-001-10 handoff: once finalize mints the linkId, hide the DropZone so LinkScreen is the only surface (no upload area above it).
+  const finalized = useFinalize((s) => s.finalized)
 
   // T-008-09 (D-5): post-delete toast — App state survives the ProfilePage unmount on redirect; DropZone renders it.
   const [deleteToast, setDeleteToast] = useState<string | null>(null)
@@ -120,7 +123,8 @@ export default function App() {
           <RecipientPage linkId={linkId} />
         ) : (
           <>
-            <DropZone toast={deleteToast} />
+            {/* T-001-10 handoff: once the link is minted, hide the drop zone — LinkScreen (inside StagingList) becomes the only surface. */}
+            {finalized === null && <DropZone toast={deleteToast} />}
             {hasFiles && <StagingList />}
           </>
         )}
