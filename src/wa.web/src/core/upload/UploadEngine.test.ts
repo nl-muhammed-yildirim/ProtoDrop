@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { clientTelemetryLog } from '../telemetry/clientTelemetry'
 import { BLOCK_SIZE_BYTES, MAX_ATTEMPTS, RETRY_BACKOFF_MS, fileAttempts, setSleepFnForTests, useUploadEngine, type Draft } from './UploadEngine'
 import { formatBytes } from './formatBytes'
 
@@ -279,6 +280,31 @@ describe('UploadEngine retry/backoff (T-001-08)', () => {
     expect(seenA[seenA.length - 1]!).toBe('done') // A's final state.
     expect(seenB).toContain('uploading')
     expect(seenB[seenB.length - 1]!).toBe('failed') // B's final state — row-local, no shared failure flag (FR-001-6).
+  })
+
+  it('final failure emits upload_failed once (T-012-02, TA-10.2)', async () => {
+    const size = 16 // one block per file — smallest real path through the pool
+    clientTelemetryLog.splice(0) // module-level record — keep tests hermetic.
+    stubFetch((req) => (stageUrl(req.url) && req.url.includes('/a?') ? new Response('gone', { status: 404 }) : new Response(null, { status: 201 })))
+    const [idA] = state().addFiles([{ name: 'a.bin', size, file: new File(['x'.repeat(size)], 'a.bin') }])
+
+    await state().start(makeDraft([`https://host/c/a?sv=2024&sp=cwr`]))
+
+    // Exactly one upload_failed entry — the outer catch after Promise.all(workers) is the only emission site.
+    const uploadFailed = clientTelemetryLog.filter((e) => e.event === 'upload_failed')
+    expect(uploadFailed).toHaveLength(1)
+    expect(uploadFailed[0].props).toEqual({ fileId: idA, retries: MAX_ATTEMPTS - 1 }) // the file's retry count from fileAttempts.
+  })
+
+  it('no-file early return does NOT emit upload_failed (T-012-02)', async () => {
+    clientTelemetryLog.splice(0) // module-level record — keep tests hermetic.
+    stubFetch()
+    state().addFiles([{ name: 'a.bin', size: 16 }]) // no File registered — stagedHandles.get(id) is undefined.
+
+    await state().start(makeDraft([`https://host/c/a?sv=2024&sp=cwr`]))
+
+    expect(state().files[0].status).toBe('failed') // the no-file early return at L114 marks it failed...
+    expect(clientTelemetryLog.filter((e) => e.event === 'upload_failed')).toHaveLength(0) // ...but must NOT emit.
   })
 })
 

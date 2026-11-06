@@ -2,6 +2,8 @@ import { BlockBlobClient } from '@azure/storage-blob'
 
 import { create } from 'zustand'
 
+import { trackClientEvent } from '../telemetry/clientTelemetry'
+
 /**
  * UploadEngine store — the exact TA-8.3 contract (T-001-01).
  * State: `{ files: [{id, name, size, status, progress}], overall: {sentBytes, totalBytes} }`.
@@ -147,6 +149,9 @@ async function uploadFile(
     const ok = await Promise.all(Array.from({ length: MAX_PARALLEL_BLOCKS }, () => worker()))
     if (!ok.every(Boolean)) throw new Error('block stage failed') // wait for ALL workers before returning — no stragglers into retry (FR-001-5)
   } catch {
+    // T-012-02 (TA-10.2): final-failure path — all retries exhausted, uploadFile returns false.
+    // The no-file early return and the commit-failed branch must NOT emit; only this outer catch does.
+    trackClientEvent('upload_failed', { fileId: id, retries: fileAttempts.get(id)?.retries })
     setStatus(id, 'failed') // progress frozen at last completed bytes; row-local Retry (T-001-08)
     return false
   }
