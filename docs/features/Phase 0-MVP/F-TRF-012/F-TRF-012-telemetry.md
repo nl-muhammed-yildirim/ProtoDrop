@@ -79,9 +79,9 @@ AC-012-3: An event payload contains a file name
 
 | Story | Task | File | Status |
 |---|---|---|---|
-| US-012-01 | T-012-01 traceparent in → out: worker log context + browser outgoing header (FR-012-1, AC-012-1) | `US-012-01-correlation/T-012-01-worker-client-traceparent.md` | ☐ |
-| US-012-01 | T-012-02 Browser telemetry sink: formalize growth CTA + emit upload_failed / download_completed (FR-012-1, AC-012-1) | `US-012-01-correlation/T-012-02-client-telemetry-sink.md` | ☐ |
-| US-012-02 | T-012-03 Five TA-10.4 dashboards in dev App Insights (FR-012-2) | `US-012-02-dashboards/T-012-03-five-dashboards.md` | ☐ |
-| US-012-03 | T-012-04 Six TA-10.3 alerts wired in dev (FR-012-4) | `US-012-03-alerts/T-012-04-six-ta103-alerts.md` | ☐ |
+| US-012-01 | T-012-01 traceparent in → out: worker log context + browser outgoing header (FR-012-1, AC-012-1) | `US-012-01-correlation/T-012-01-worker-client-traceparent.md` | ☑ |
+| US-012-01 | T-012-02 Browser telemetry sink: formalize growth CTA + emit upload_failed / download_completed (FR-012-1, AC-012-1) | `US-012-01-correlation/T-012-02-client-telemetry-sink.md` | ☑ |
+| US-012-02 | T-012-03 Five TA-10.4 dashboards in dev App Insights (FR-012-2) | `US-012-02-dashboards/T-012-03-five-dashboards.md` | ☑ |
+| US-012-03 | T-012-04 Six TA-10.3 alerts wired in dev (FR-012-4) | `US-012-03-alerts/T-012-04-six-ta103-alerts.md` | ☑ |
 
 **Story done when:** all tasks checked + full AGENT.md §4 gate green + each story's ACs verified. Then T-025 can be marked `done` in `Milestone-Backlog.md`. T-025's scope line ("W3C traceparent in → out on API + workers + client, correlationId on every log line / error JSON; 5 dashboards per TA-10.4; 6 alerts per TA-10.3") is covered by: T-012-01 (workers + browser header; the API half already shipped as T-056-01/T-056-05), T-012-02 (browser upload/download events in App Insights with the right correlationId — AC-012-1 block 2), T-012-03 + T-012-04 (exit checks "All 5 dashboards live in dev App Insights" / "All 6 alerts in dev"). FR-012-1/AC-012-1 is US-012-01's AC and gates the feature: it holds only when both T-012 tasks are done.
