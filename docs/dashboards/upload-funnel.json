@@ -1,0 +1,46 @@
+{
+  "name": "Upload funnel",
+  "id": "8ac05f38-5050-4c80-a55e-aad3f814f309",
+  "items": [
+    {
+      "type": "ApplicationInsights.MsQuotedVersionedDashboardItem",
+      "id": "d95fe6b0-8f84-43be-b6e4-04438ee7f541",
+      "name": "Upload events over time",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "colSpan": 6,
+        "rowSpan": 4
+      },
+      "metadata": {
+        "colors": {}
+      },
+      "data": {
+        "baseType": "Timeseries",
+        "type": "applicationInsightsEntityData",
+        "query": "customEvents\n| where name in ('upload_started', 'upload_completed', 'upload_failed')\n| summarize count() by bin(timestamp, 1h), name",
+        "title": "Upload events over time (24h)"
+      }
+    },
+    {
+      "type": "ApplicationInsights.MsQuotedVersionedDashboardItem",
+      "id": "3661a452-2d93-4fdc-ad61-d68e6700a5db",
+      "name": "Upload success rate",
+      "position": {
+        "x": 6,
+        "y": 0,
+        "colSpan": 3,
+        "rowSpan": 4
+      },
+      "metadata": {
+        "colors": {}
+      },
+      "data": {
+        "baseType": "Number",
+        "type": "applicationInsightsEntityData",
+        "query": "customEvents\n| where name in ('upload_started', 'upload_completed')\n| summarize started = count_if(name == 'upload_started'), completed = count_if(name == 'upload_completed')\n| extend successRate = 100.0 * completed / max(started, 1)\n| project successRate",
+        "title": "Upload success rate % (24h)"
+      }
+    }
+  ]
+}
