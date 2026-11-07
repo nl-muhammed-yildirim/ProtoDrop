@@ -1,0 +1,19 @@
+{
+  "name": "wa-dev-alert-emails",
+  "type": "Microsoft.Insights/actionGroups",
+  "apiVersion": "2022-06-01",
+  "location": "global",
+  "properties": {
+    "actions": [
+      {
+        "actionType": "email",
+        "odata.id": "wa-dev-operator-email",
+        "emailRecipient": "{OPERATOR_EMAIL}",
+        "sender": "{OPERATOR_EMAIL}",
+        "senderDisplayName": "Wa Dev Alerts",
+        "enableMentionInEmailSummary": true,
+        "additionalFields": {}
+      }
+    ]
+  }
+}

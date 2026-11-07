@@ -1,0 +1,34 @@
+{
+  "name": "upload-success-low",
+  "type": "Microsoft.Insights/scheduledQueryRules",
+  "apiVersion": "2021-08-01",
+  "location": "global",
+  "properties": {
+    "displayName": "Upload success low",
+    "description": "TA-10.3 'Upload success low' (P1): upload.success_rate < 0.99 for 15 min. M0: no code-side emitter for upload.success_rate \u2014 this log-search rule over the closed events upload_started/upload_completed IS the alert (task file DECISION). Links to dashboard 'Upload funnel' (id 8ac05f38-5050-4c80-a55e-aad3f814f309, docs/dashboards/upload-funnel.json). dev: informational (launch traffic is synthetic)",
+    "enabled": true,
+    "scopes": [
+      "/subscriptions/{SUB}/resourceGroups/rg-wa-dev/providers/Microsoft.Insights/components/wa-dev-ai"
+    ],
+    "severity": 0,
+    "evaluationFrequency": "PT15M",
+    "windowSize": "PT15M",
+    "criteria": {
+      "allOf": [
+        {
+          "query": "customEvents\n| where name in ('upload_started', 'upload_completed') and timestamp >= ago(15m)\n| summarize started = count_if(name == 'upload_started'), completed = count_if(name == 'upload_completed')\n| extend successRate = 100.0 * completed / max(started, 1)",
+          "metricMeasureColumn": "successRate",
+          "dimensions": [],
+          "operator": "LessThan",
+          "threshold": 99,
+          "timeAggregation": "Average"
+        }
+      ]
+    },
+    "actions": {
+      "actionGroups": [
+        "/subscriptions/{SUB}/resourceGroups/rg-wa-dev/providers/Microsoft.Insights/actionGroups/wa-dev-alert-emails"
+      ]
+    }
+  }
+}
