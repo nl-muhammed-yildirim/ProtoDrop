@@ -1,0 +1,34 @@
+{
+  "name": "dlq",
+  "type": "Microsoft.Insights/scheduledQueryRules",
+  "apiVersion": "2021-08-01",
+  "location": "global",
+  "properties": {
+    "displayName": "DLQ",
+    "description": "TA-10.3 'DLQ' (P2): dlq_count > 0. The modern criteria shape measures the summarized count column, so literal GreaterThan 0 fires on >=1 dlq_count event in the last 5 min and stays silent when the window is empty (count = 0). Links to dashboard 'Job health' (id f1c8ca79-7c78-4aad-a512-6051a3bfb327, docs/dashboards/job-health.json). dev: informational (launch traffic is synthetic)",
+    "enabled": true,
+    "scopes": [
+      "/subscriptions/{SUB}/resourceGroups/rg-wa-dev/providers/Microsoft.Insights/components/wa-dev-ai"
+    ],
+    "severity": 1,
+    "evaluationFrequency": "PT5M",
+    "windowSize": "PT5M",
+    "criteria": {
+      "allOf": [
+        {
+          "query": "customEvents\n| where name == 'dlq_count' and timestamp >= ago(5m)\n| summarize count()",
+          "metricMeasureColumn": "count",
+          "dimensions": [],
+          "operator": "GreaterThan",
+          "threshold": 0,
+          "timeAggregation": "Total"
+        }
+      ]
+    },
+    "actions": {
+      "actionGroups": [
+        "/subscriptions/{SUB}/resourceGroups/rg-wa-dev/providers/Microsoft.Insights/actionGroups/wa-dev-alert-emails"
+      ]
+    }
+  }
+}

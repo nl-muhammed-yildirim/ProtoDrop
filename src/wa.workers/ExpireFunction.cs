@@ -3,6 +3,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using wa.application.UseCases.Transfers;
+using wa.domain.Correlation;
 
 namespace wa.workers;
 
@@ -29,6 +30,10 @@ public class ExpireFunction
         FunctionContext context,
         [TimerTrigger("0 */15 * * * *")] TimerTriggerAttribute trigger)
     {
+        // T-012-01: timer-triggered — no inbound header, so always generate a fresh valid traceparent (EC-056-1).
+        var tp = W3CTraceParser.New();
+        using var scope = _logger.BeginScope(new Dictionary<string, object?> { ["CorrelationId"] = tp.CorrelationId, ["TraceParent"] = tp.ToHeader() });
+
         var now = DateTime.UtcNow;
         try
         {

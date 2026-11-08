@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import LinkScreen from './LinkScreen'
+import { getTraceParent } from '../../core/traceparent'
 
 interface ReSendScreenProps {
   originalTransferId: string
@@ -51,6 +52,7 @@ export function ReSendScreen({ originalTransferId, onUpload }: ReSendScreenProps
         const res = await fetch(RESEND_ENDPOINT.replace('{id}', originalTransferId), {
           method: 'POST',
           credentials: 'include',
+          headers: { traceparent: getTraceParent() },
         })
         if (res.status === 410) {
           // T-010-03 (FR-010-4): FILES_GONE — Problem+JSON body with code === "FILES_GONE" → single-screen state.

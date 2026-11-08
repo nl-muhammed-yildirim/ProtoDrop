@@ -35,6 +35,12 @@ public static class W3CTraceParser
     /// <summary>Generates a fresh trace-id (16 random bytes) for requests without an inbound header.</summary>
     public static string NewTraceId() => Guid.NewGuid().ToString("n");
 
+    /// <summary>Generates a fresh valid W3C traceparent (version "00", new 32-hex trace-id, new 16-hex parent-id, flags "07") for surfaces without an inbound header.</summary>
+    public static TraceParent New() => new(SupportedVersion, NewTraceId(), Guid.NewGuid().ToString("n")[..ParentIdLength], "07");
+
+    /// <summary>Returns true when the value is a valid W3C traceparent (version "00", 32-hex trace-id, 16-hex parent-id, 2-hex flags); false for null/empty/malformed/wrong-version/all-zero.</summary>
+    public static bool IsValid(string? value) => Parse(value) is not null;
+
     private static bool IsAllHex(string s, int length) =>
         s.Length == length && s.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
 }

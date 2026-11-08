@@ -12,7 +12,8 @@ public static class JobAuth
     {
         var expected = config["Wa:Jobs:SignKey"];
         if (expected is null || expected.Length == 0) return false;
-        var values = req.Headers.GetValues("x-job-sign");
+        // HttpHeadersCollection inherits BCL HttpHeaders: GetValues throws on absent headers, so use TryGetValues.
+        req.Headers.TryGetValues("x-job-sign", out var values);
         if (values is null) return false;
         var provided = string.Join(",", values);
         if (provided.Length == 0) return false;

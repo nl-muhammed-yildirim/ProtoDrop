@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import type { StoredProfile } from '../../core/auth/session'
 import { ME_BASE } from './ProfilePage'
+import { getTraceParent } from '../../core/traceparent'
 
 interface DangerZoneProps {
   profile: StoredProfile           // display name feeds the modal copy interpolation only
@@ -36,7 +37,7 @@ export function DangerZone({ profile, onDeleteAccount }: DangerZoneProps) {
     setDeleting(true)
     setError(null)
     try {
-      const res = await fetch(ME_BASE, { method: 'DELETE', credentials: 'include' })
+      const res = await fetch(ME_BASE, { method: 'DELETE', credentials: 'include', headers: { traceparent: getTraceParent() } })
       if (!res.ok) throw new Error('Could not delete your account. Please try again.')
       onDeleteAccount()   // App clears session + navigates to / — this component unmounts here; no state after.
     } catch {

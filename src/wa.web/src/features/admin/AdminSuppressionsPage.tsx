@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import type { SuppressionRowDto } from './adminData'
 import { formatCreatedAt } from './adminData'
+import { getTraceParent } from '../../core/traceparent'
 
 interface AdminSuppressionsPageProps {
   role: 'SuperAdmin' | 'Operator'   // T-011-10 precedent — AdminShell narrows /auth/me's role and passes it down.
@@ -32,7 +33,7 @@ export function AdminSuppressionsPage({ role }: AdminSuppressionsPageProps) {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`${API_BASE}/admin/suppressions`, { credentials: 'include' })
+      const res = await fetch(`${API_BASE}/admin/suppressions`, { credentials: 'include', headers: { traceparent: getTraceParent() } })
       if (!res.ok) throw new Error('Could not load suppressions.')
       setRows((await res.json()) as SuppressionRowDto[])
     } catch {
@@ -51,6 +52,7 @@ export function AdminSuppressionsPage({ role }: AdminSuppressionsPageProps) {
       const res = await fetch(`${API_BASE}/admin/suppressions/${row.id}`, {
         method: 'DELETE',
         credentials: 'include',
+        headers: { traceparent: getTraceParent() },
       })
       if (res.status !== 200) throw new Error('Could not remove the suppression. Please try again.')
       setToast('Suppression removed.')

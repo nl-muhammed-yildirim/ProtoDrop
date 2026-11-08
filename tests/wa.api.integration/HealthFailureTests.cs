@@ -16,6 +16,8 @@ public class HealthFailureTests
     {
         Environment.SetEnvironmentVariable("Wa__Blob__AccountUrl", "http://127.0.0.1:10000/devstoreaccount1");
         Environment.SetEnvironmentVariable("Wa__Blob__AccountKey", "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==");
+        // ISessionTokenMinter (Program.cs L130) reads this eagerly during host build — set it here so the test is self-contained (sibling-class race otherwise).
+        Environment.SetEnvironmentVariable("Wa__Jwt__Secret", "test-jwt-secret");
     }
 
     private static readonly TestFactory factory = new();

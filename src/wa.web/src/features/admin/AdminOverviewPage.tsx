@@ -4,6 +4,7 @@ import { formatBytes } from '../../core/upload/formatBytes'
 import { ADMIN_TRANSFERS_PATH } from './adminRoute'
 import type { OverviewDto } from './overviewData'
 import { formatUpdatedAt, statusLabel, statusTone } from './overviewData'
+import { getTraceParent } from '../../core/traceparent'
 
 // T-011-03 (FR-011-2): fixed local port, no proxy, no env vars yet (AuthPage + FilesPage precedent).
 const API_BASE = 'http://localhost:8080/api/v1'
@@ -24,7 +25,7 @@ export function AdminOverviewPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch(`${API_BASE}/admin/overview`, { credentials: 'include' })
+        const res = await fetch(`${API_BASE}/admin/overview`, { credentials: 'include', headers: { traceparent: getTraceParent() } })
         if (!res.ok) {
           setState({ kind: 'error', message: 'Failed to load overview. Please try again.' })
           return

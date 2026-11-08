@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { useUploadEngine } from '../../core/upload/UploadEngine'
+import { getTraceParent } from '../../core/traceparent'
 import { MAX_EMAILS, parseRecipients, validateAddress } from './recipients'
 
 interface LinkScreenProps {
@@ -169,6 +170,7 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
           headers: {
             'Content-Type': 'application/json',
             'Idempotency-Key': crypto.randomUUID(),
+            traceparent: getTraceParent(),
           },
           body: JSON.stringify({
             emails,

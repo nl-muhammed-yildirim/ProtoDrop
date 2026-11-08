@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import type { StoredProfile } from '../../core/auth/session'
 import { writeSession } from '../../core/auth/session'
+import { getTraceParent } from '../../core/traceparent'
 
 interface AuthPageProps {
   onSignedIn: (p: StoredProfile) => void
@@ -82,7 +83,7 @@ export function AuthPage({ onSignedIn }: AuthPageProps) {
     try {
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', traceparent: getTraceParent() },
         // Cross-origin :5173 → :8080 — the API's Set-Cookie (wa.session) is dropped without this.
         credentials: 'include',
         body: JSON.stringify(forgotActive ? { email } : { email, password }),
@@ -126,7 +127,7 @@ export function AuthPage({ onSignedIn }: AuthPageProps) {
     try {
       const res = await fetch(`${API_BASE}/auth/magic-link`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', traceparent: getTraceParent() },
         body: JSON.stringify({ email }),
       })
       if (res.ok) {

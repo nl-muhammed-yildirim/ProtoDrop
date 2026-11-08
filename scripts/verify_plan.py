@@ -150,12 +150,20 @@ def main() -> int:
            and ev not in known_dotted:
             errors += 1; fail(f"cited telemetry name {ev!r} not an exact member of TelemetryEvents")
 
-    # CSS tokens must exist in :root — unless every mention is negated ("no --fs-h2 token").
+    # CSS tokens must exist in :root — unless every mention is negated ("no --fs-h2 token")
+    # or sits on an az/shell command line (a CLI flag like `--email-recipients`, not a CSS token).
+    def _line_of(s: int) -> str:
+        ls = plan.rfind("\n", 0, s) + 1
+        le = plan.find("\n", s)
+        return plan[ls:len(plan) if le == -1 else le]
+
+    az_cli_re = re.compile(r"\baz\s+(?:monitor|rest|storage)\b")
     for token in sorted(set(re.findall(r"--[a-z][a-z0-9-]*", plan))):
         if token not in css:
             mentions = [m.start() for m in re.finditer(re.escape(token), plan)]
             positive = any(not re.search(r"\b(no|never)\s+", plan[max(0, s - 8):s]) for s in mentions)
-            if positive:
+            cli_only = all(az_cli_re.search(_line_of(s)) for s in mentions)
+            if positive and not cli_only:
                 errors += 1; fail(f"cited CSS token {token} missing from index.css :root")
 
     # Count claims like "18 members" near ProblemCodes must match the live count.

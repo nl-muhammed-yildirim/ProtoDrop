@@ -94,8 +94,8 @@ public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransfer
             Note: transfer.Note,
             Files: files,
             HasDownloadAll: transfer.FileCount >= 2 && transfer.TotalBytes <= limits.MaxZipSize,
-            // T-007-01: the -1 sentinel is the same column TA-7.2's flip uses — page and cap stay consistent (T-007-01 helper).
-            DownloadsLeft: limits.IsMaxDownloadsInfinite() ? null : transfer.MaxDownloads - transfer.DownloadsCount,
+            // T-007-01: -1 sentinel means infinite cap for THIS transfer (FR-003-5 hides the line).
+            DownloadsLeft: transfer.MaxDownloads < 0 ? null : transfer.MaxDownloads - transfer.DownloadsCount,
             PasswordRequired: passwordRequired);
     }
 
