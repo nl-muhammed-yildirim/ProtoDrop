@@ -184,6 +184,27 @@ app.MapGet("/health", async (ISender sender, CancellationToken ct) =>
         return Results.Json(ProblemWriter.Build(503, ProblemCodes.Internal, "A required component is unreachable."), statusCode: 503);
     }
 });
+
+// T-013-01 (FR-013-2): dev-only chaos endpoint — forces both failure shapes for E2E without prod surface.
+// kind=internal → InvalidOperationException → GlobalErrorMiddleware → 500 INTERNAL Problem+JSON.
+// kind=rate_limited → ProblemWriter.WriteCompleteAsync(429, RATE_LIMITED) — byte-identical to the real limiter breach path (L115).
+if (app.Environment.IsDevelopment())
+{
+    app.MapGet("/api/v1/dev/chaos", async (HttpContext httpContext, HttpRequest request) =>
+    {
+        var kind = request.Query["kind"].FirstOrDefault();
+        switch (kind)
+        {
+            case "internal":
+                throw new InvalidOperationException("T-013-01 chaos: forced internal failure"); // bubbles to GlobalErrorMiddleware → 500 INTERNAL
+            case "rate_limited":
+                await ProblemWriter.WriteCompleteAsync(httpContext, 429, ProblemCodes.RateLimited, "Too many requests — limit is 5 per minute.");
+                return; // WriteCompleteAsync already commits headers + writes the body — do NOT also return Results.Json (double-serialize)
+            default:
+                throw new BusinessException(ProblemCodes.Validation, "kind must be one of internal / rate_limited.");
+        }
+    });
+}
 app.MapPost("/api/v1/transfers/draft", async (CreateDraftCommand cmd, ISender sender, CancellationToken ct) =>
 {
     CreateDraftResult result;
