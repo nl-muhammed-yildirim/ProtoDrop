@@ -89,7 +89,7 @@ AC-013-4: An unknown route is opened
 
 | Story | Task | File | Status |
 |---|---|---|---|
-| US-013-01 | T-013-01 Error mapper guarantee + dev injected-failure endpoint: unhandled → 500 Problem+JSON (code `INTERNAL`) with correlationId; closed-list only (FR-013-6/2, TA-4.1.3) | `US-013-01-error-screens/T-013-01-error-mapper-and-dev-injection.md` | ☐ |
+| US-013-01 | T-013-01 Error mapper guarantee + dev injected-failure endpoint: unhandled → 500 Problem+JSON (code `INTERNAL`) with correlationId; closed-list only (FR-013-6/2, TA-4.1.3) | `US-013-01-error-screens/T-013-01-error-mapper-and-dev-injection.md` | ☑ |
 | US-013-01 | T-013-02 Error screens UI: §4.6 layout, 500 page + SPA 404, code→screen/state map (FR-013-1/2/5/6) | `US-013-01-error-screens/T-013-02-error-screens-ui.md` | ☐ |
 | US-013-02 | T-013-03 Blob-down detection & mapping: 5-retry ladder at block level + SAS-mint-time 503/`INTERNAL` (FR-013-3) | `US-013-02-degraded-storage/T-013-03-blob-down-mapping.md` | ☐ |
 | US-013-02 | T-013-04 Degraded-storage row states: "Storage temporarily unavailable — retry." + per-file unavailable (FR-013-3, AC-013-2) | `US-013-02-degraded-storage/T-013-04-degraded-storage-ui.md` | ☐ |
