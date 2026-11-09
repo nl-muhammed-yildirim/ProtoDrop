@@ -1,0 +1,42 @@
+/* T-013-02 (FR-013-1/2/5, UI-Reference §4.6): The single §4.6 error layout — full page, centered;
+ * alert icon; one line at var(--fs-h1) (DECISION: no --fs-h2 in :root); one primary button;
+ * optional ref line at var(--fs-tiny) with var(--fg-muted). Only existing :root tokens — no new tokens. */
+
+.es {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 16px;
+  padding: 24px;
+  text-align: center;
+}
+
+.es-icon {
+  color: var(--fg-muted);
+}
+
+.es-heading {
+  font-size: var(--fs-h1);
+  margin: 0;
+}
+
+/* RATE_LIMITED hint — second line under the heading (EC-013-3: 60 s hint, no Ref). */
+.es-hint {
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+  margin: 0;
+}
+
+/* Primary button — reuses .btn-primary from index.css (L162); this only adds layout spacing. */
+.es-action {
+  margin-top: 8px;
+}
+
+/* Ref line — "Ref: {id8}" in --fs-tiny / --fg-muted (EC-013-3: label localized, id raw). */
+.es-ref {
+  font-size: var(--fs-tiny);
+  color: var(--fg-muted);
+  margin: 0;
+}
