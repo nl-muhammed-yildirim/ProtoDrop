@@ -2,7 +2,7 @@
 
 ## Agent pipeline (Orchestrator → Architect → Coder → Reviewer)
 
-The four roles are defined in `.agents/agents/*.md`, each pinned to its local Ollama model (`ollama/Qwen3.8:*`). The machine config that pins them is `~/.hermes/config.yaml` → `delegation:` (backend `model_map`: architect/coder/reviewer options, `max_concurrent_children: 1`, `sync_top_level: true`).
+The four roles are defined in `.agents/agents/*.md`, each pinned to its local Ollama model (`ollama/Qwen3.8:*`). The machine config that pins them is `C:\Users\myild\AppData\Local\hermes\config.yaml` → `delegation:` (backend `model_map`: architect/coder/reviewer options, `max_concurrent_children: 1`, `gateway_mode: inline`; NOTE a `sync_top_level: true` sits there too but is a decoy — only the protodrop-cycle plugin reads it).
 
 | Role | Mode | Model | Job |
 |---|---|---|---|
@@ -15,7 +15,7 @@ Cycle per task: **architect (plan) → coder (develop) → reviewer (review)** �
 
 ## Subagents
 - **Only ONE model works at a time** (local Ollama, 16 GB VRAM): while a subagent runs, its role model must stay resident in VRAM — any parent-side request loads the Orchestrator model and evicts it mid-stream.
-- **Synchronous spawns only**: launch each subagent with `async: false` (foreground) and no timeout; wait for that same tool call to return before doing anything else. `delegation.sync_top_level: true` in config.yaml makes top-level `delegate_task` calls JOIN synchronously — the spawn blocks until the child finishes, then its result arrives in that same call.
+- **Synchronous spawns only**: launch each subagent with `async: false` (foreground) and no timeout; wait for that same tool call to return before doing anything else. `delegation.gateway_mode: inline` in config.yaml makes top-level `delegate_task` calls JOIN synchronously — the spawn blocks until the child finishes, then its result arrives in that same call. (`sync_top_level: true` also sits in the delegation block but is a decoy — only the protodrop-cycle plugin reads it; don't chase it as the sync knob.)
 - **No status checking while a child runs**: do NOT call `action='list'`, do NOT tail the live transcript to wait, and do NOT end your turn early expecting to poll later. The blocking spawn IS the wait — polling is what evicts the child's model (the historical bug). One blocking spawn per step (plan→develop→review), then read that same tool result for the verdict.
 - No parallel subagent calls: spawn only ONE at a time (`max_concurrent_children: 1`); wait for its completion before spawning the next.
 - Child sessions start blank — every spawn must carry full task context: T-xxx ID, scope + exit check from the backlog row, ACs/ECs list, relevant TA-* sections, and any plan or findings text.
