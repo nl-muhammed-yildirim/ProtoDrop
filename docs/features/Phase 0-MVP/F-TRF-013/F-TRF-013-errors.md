@@ -92,7 +92,7 @@ AC-013-4: An unknown route is opened
 | US-013-01 | T-013-01 Error mapper guarantee + dev injected-failure endpoint: unhandled → 500 Problem+JSON (code `INTERNAL`) with correlationId; closed-list only (FR-013-6/2, TA-4.1.3) | `US-013-01-error-screens/T-013-01-error-mapper-and-dev-injection.md` | ☑ |
 | US-013-01 | T-013-02 Error screens UI: §4.6 layout, 500 page + SPA 404, code→screen/state map (FR-013-1/2/5/6) | `US-013-01-error-screens/T-013-02-error-screens-ui.md` | ☑ |
 | US-013-02 | T-013-03 Blob-down detection & mapping: 5-retry ladder at block level + SAS-mint-time 503/`INTERNAL` (FR-013-3) | `US-013-02-degraded-storage/T-013-03-blob-down-mapping.md` | ☑ |
-| US-013-02 | T-013-04 Degraded-storage row states: "Storage temporarily unavailable — retry." + per-file unavailable (FR-013-3, AC-013-2) | `US-013-02-degraded-storage/T-013-04-degraded-storage-ui.md` | ☐ |
+| US-013-02 | T-013-04 Degraded-storage row states: "Storage temporarily unavailable — retry." + per-file unavailable (FR-013-3, AC-013-2) | `US-013-02-degraded-storage/T-013-04-degraded-storage-ui.md` | ☑ |
 | US-013-03 | T-013-05 Degraded-email: send unaffected (201 + working link) + admin email health counts (FR-013-4, AC-013-3) | `US-013-03-degraded-email/T-013-05-degraded-email-health.md` | ☐ |
 
 **Story done when:** all tasks checked + full AGENT.md §4 gate green + AC-013-1…AC-013-3 verified with the forced-failure dev tests (500 → Problem+JSON under the ref, blob 503 at upload/mint, fake-sender DLQ on send) and the Ref id, degraded states, and code map live per the T-025 row scope + exit check. The dashboard/alert half of T-025 is owned by F-TRF-012 (T-012-03/T-012-04), so T-025 can be marked `done` in `Milestone-Backlog.md` only once both features' rows are checked.
