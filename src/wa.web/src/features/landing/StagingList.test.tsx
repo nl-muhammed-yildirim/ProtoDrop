@@ -231,5 +231,44 @@ describe('StagingList', () => {
       expect(after).not.toContain('class="sl-retry"')
       expect(after).toContain('>100%<') // progress restored to full via resume, not reset.
     })
+
+    it('a blob-503 failure after the retry ladder shows "Storage temporarily unavailable — retry." + Retry; siblings unaffected (AC-013-2 block 1)', async () => {
+      setSleepFnForTests(async () => {})
+      // A's blocks die with 503 five times; B is untouched. The engine's 503 detection reads statusCode/status.
+      stubFetch((req) => (killBlock(req, '/a?') ? new Response('Service Unavailable', { status: 503 }) : new Response(null, { status: 201 })))
+      const [idA] = useUploadEngine.getState().addFiles([
+        { name: 'a.bin', size: 48, file: new File(['x'.repeat(48)], 'a.bin') },
+        { name: 'b.bin', size: 48, file: new File(['y'.repeat(48)], 'b.bin') },
+      ])
+      await useUploadEngine.getState().start(makeDraft([`https://host/c/a?sv=2024&sp=cwr`, `https://host/c/b?sv=2024&sp=cwr`]))
+
+      const rows = renderClient(createElement(StagingList)).split('<li class="sl-row')
+      expect(rows[1]!).toContain('>Storage temporarily unavailable — retry.<') // the FR-013-3 degraded copy (TA-8.5 keys).
+      expect(rows[1]!).toContain('aria-live="polite"') // polite announcement on the row state text (F-TRF-016-3).
+      expect(rows[1]!).toContain('class="sl-retry"') // per-file Retry button.
+      expect(rows[1]!).toContain('aria-label="Retry a.bin"')
+      void idA // row identity proven by the aria-label + sibling checks below.
+      expect(rows[2]!).not.toContain('sl-row-failed') // B: unaffected — row-local state (FR-013-3).
+      expect(rows[2]!).toContain('class="sl-done"')
+    })
+
+    it('a successful retry clears the degraded state — no error message, no flag (EC-013-2)', async () => {
+      setSleepFnForTests(async () => {})
+      let kill = true
+      stubFetch((req) => (kill && killBlock(req, '/a?') ? new Response('Service Unavailable', { status: 503 }) : new Response(null, { status: 201 })))
+      const [idA] = useUploadEngine.getState().addFiles([{ name: 'a.bin', size: 48, file: new File(['x'.repeat(48)], 'a.bin') }])
+      await useUploadEngine.getState().start(makeDraft([`https://host/c/a?sv=2024&sp=cwr`]))
+      expect(useUploadEngine.getState().files.find((f) => f.id === idA)?.isBlobUnavailable).toBe(true) // the flag is set on the row.
+
+      kill = false // network back — the Retry button's onClick is exactly this call.
+      await useUploadEngine.getState().retry(idA)
+
+      const file = useUploadEngine.getState().files.find((f) => f.id === idA)
+      expect(file?.status).toBe('done')
+      expect(file?.isBlobUnavailable).toBe(false) // EC-013-2: the state self-clears on success.
+      const after = renderClient(createElement(StagingList))
+      expect(after).not.toContain('Storage temporarily unavailable — retry.') // degraded copy gone.
+      expect(after).toContain('>100%<')
+    })
   })
 })

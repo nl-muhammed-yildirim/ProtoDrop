@@ -922,7 +922,10 @@ describe('RecipientPage (T-003-06 — per-file download wiring)', () => {
     })
 
     expect(useRecipientStore.getState().status).toBe('active') // page still works — row-level error only.
-    expect(host.querySelector('.rp-download-error')?.textContent).toBe('File temporarily unavailable.')
+    const error = host.querySelector('.rp-download-error') as HTMLParagraphElement
+    expect(error.textContent).toBe('File temporarily unavailable.') // copy from DEGRADED_COPY (TA-8.5 keys).
+    expect(error.getAttribute('aria-live')).toBe('polite') // T-013-04: polite announcement, not an assertive role="alert".
+    expect(host.querySelectorAll('.rp-row')).toHaveLength(2) // the file list still renders — other rows remain actionable.
     host.remove()
   })
 

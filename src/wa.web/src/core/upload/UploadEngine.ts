@@ -35,6 +35,8 @@ export interface StagedFile {
   status: FileStatus
   /** Bytes-based progress, 0..1 — `size * progress` is the bytes already sent. */
   progress: number
+  /** T-013-04 (FR-013-3): true when the failure was a blob 503 after the retry ladder — the row renders the degraded copy. */
+  isBlobUnavailable?: boolean
 }
 
 export interface DraftFile { fileId: string; uploadUrl: string }
@@ -81,6 +83,13 @@ function setProgress(id: string, progress: number): void {
 function setStatus(id: string, status: FileStatus): void {
   const state = useUploadEngine.getState()
   const files = state.files.map((f) => (f.id === id ? { ...f, status } : f))
+  useUploadEngine.setState({ files, overall: totals(files) })
+}
+
+/** T-013-04 (FR-013-3): sets the row's degraded flag — true on a blob-503 failure, false on success/retry re-arm. */
+function setBlobUnavailable(id: string, value: boolean): void {
+  const state = useUploadEngine.getState()
+  const files = state.files.map((f) => (f.id === id ? { ...f, isBlobUnavailable: value } : f))
   useUploadEngine.setState({ files, overall: totals(files) })
 }
 
@@ -159,6 +168,7 @@ async function uploadFile(
     const isBlobUnavailable = blobUnavailableFlags.get(id) === true
     trackClientEvent('upload_failed', { fileId: id, retries: fileAttempts.get(id)?.retries, ...(isBlobUnavailable ? { reason: 'blob_unavailable' } : {}) })
     setStatus(id, 'failed') // progress frozen at last completed bytes; row-local Retry (T-001-08)
+    setBlobUnavailable(id, isBlobUnavailable) // T-013-04 (FR-013-3): expose the degraded state on the row.
     return false
   }
 
@@ -166,11 +176,13 @@ async function uploadFile(
     await client.commitBlockList(blockOffsets(size).map((off) => blockId(size, off)))
   } catch {
     setStatus(id, 'failed') // staged blocks stay resumable; progress frozen (FR-001-5)
+    setBlobUnavailable(id, false) // T-013-04: a commit failure is not a blob-503 degradation — the row keeps the generic copy.
     return false
   }
 
   setProgress(id, 1)
   setStatus(id, 'done')
+  setBlobUnavailable(id, false) // T-013-04 (EC-013-2): a successful upload clears the degraded state.
   return true
 }
 

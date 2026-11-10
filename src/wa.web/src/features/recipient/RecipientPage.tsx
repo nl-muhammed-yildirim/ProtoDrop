@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, MouseEvent } from 'react'
 
 import { formatBytes } from '../../core/upload/formatBytes'
+import { DEGRADED_COPY } from '../../core/i18n/keys'
 import ErrorScreen from '../errors/ErrorScreen'
 import { trackGrowthCta } from './growthTelemetry'
 import { useRecipientStore } from './RecipientStore'
@@ -228,8 +229,9 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
             </span>
             <span className="rp-name" title={f.name}>{f.name}</span>
             {/* T-003-06 (US-003-03 alt flow): storage degraded — the row's mint failed; the rest of the page keeps working. */}
+            {/* T-013-04 (FR-013-3): aria-live="polite" instead of role="alert" — a transient row state, not an assertive alert. */}
             {downloadErrorFileId === f.fileId && (
-              <p className="rp-download-error" role="alert">File temporarily unavailable.</p>
+              <p className="rp-download-error" aria-live="polite">{DEGRADED_COPY.downloadUnavailable}</p>
             )}
             <span className="rp-size">{formatBytes(f.sizeBytes)}</span>
             {/* T-003-06 (UI notes): subtle in-flight indicator on the row while endpoint 6 is minting — no page-level blocking UI. */}

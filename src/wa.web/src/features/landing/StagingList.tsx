@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { useUploadEngine, stagedHandles, type Draft } from '../../core/upload/UploadEngine'
+import { DEGRADED_COPY } from '../../core/i18n/keys'
 import { getTraceParent } from '../../core/traceparent'
 import { formatBytes } from '../../core/upload/formatBytes'
 import { checkLimits, getPlanLimits, limitMessage } from '../../core/upload/planLimits'
@@ -195,9 +196,10 @@ export function StagingList() {
             )}
             {f.status === 'done' && <span className="sl-done" aria-hidden="true">✓</span>}
             {/* FR-001-6 (T-001-08): row-local failure — danger text + Retry; the engine resumes from completed blocks. */}
+            {/* T-013-04 (FR-013-3): a blob-503 failure after the retry ladder renders the degraded copy instead. */}
             {f.status === 'failed' && (
               <>
-                <span className="sl-failed-msg">Upload failed — retry</span>
+                <span className="sl-failed-msg" aria-live="polite">{f.isBlobUnavailable ? DEGRADED_COPY.uploadDegraded : 'Upload failed — retry'}</span>
                 <button type="button" className="sl-retry" aria-label={`Retry ${f.name}`} onClick={() => void retryFile(f.id)}>Retry.</button>
               </>
             )}
