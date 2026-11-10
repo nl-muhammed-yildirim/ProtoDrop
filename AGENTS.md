@@ -13,6 +13,11 @@ The four roles are defined in `.agents/agents/*.md`, each pinned to its local Ol
 
 Cycle per task: **architect (plan) → coder (develop) → reviewer (review)** — review FAIL or major+ finding routes back to coder; only a PASS lets the orchestrator mark the row `done` and update PROGRESS/backlog.
 
+## Role separation (director vs writer)
+- **Only the Coder writes code and tests**: every file under `src/`, `tests/` (source + unit/integration/e2e tests) is written by a Coder subagent — never by the Orchestrator.
+- The Orchestrator is director + checker: it may edit docs (`docs/`, plans, PROGRESS, backlog), settings/config (Hermes config.yaml, Ollama Modelfiles, docker-compose, launchSettings.json), and plan markdown; it verifies diffs against the plan, runs gates, and makes the `docs:` commits.
+- When a code/test edit must land outside a normal Coder run (reviewer minor fix, dead-child leftover), dispatch a short **Coder fix round** with the exact edits listed in its context — not an Orchestrator edit, unless the user explicitly authorizes one.
+
 ## Subagents
 - **Only ONE model works at a time** (local Ollama, 16 GB VRAM): while a subagent runs, its role model must stay resident in VRAM — any parent-side request loads the Orchestrator model and evicts it mid-stream.
 - **Synchronous spawns only**: launch each subagent with `async: false` (foreground) and no timeout; wait for that same tool call to return before doing anything else. `delegation.gateway_mode: inline` in config.yaml makes top-level `delegate_task` calls JOIN synchronously — the spawn blocks until the child finishes, then its result arrives in that same call. (`sync_top_level: true` also sits in the delegation block but is a decoy — only the protodrop-cycle plugin reads it; don't chase it as the sync knob.)
