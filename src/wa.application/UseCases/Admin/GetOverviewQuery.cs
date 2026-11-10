@@ -15,6 +15,9 @@ public record GetOverviewResult(
     int NewUsersToday,
     int EmailsSent7d,
     int EmailsFailed7d,
+    int EmailPendingCount,
+    int EmailFailedTotal,
+    DateTime? LastSuccessfulDeliveryAge,
     DateTime SnapshotAtUtc,
     IReadOnlyList<RecentTransferItem> RecentTransfers);
 
@@ -30,6 +33,9 @@ public sealed class GetOverviewQueryHandler(OverviewSnapshotCache cache) : IRequ
             snapshot.Data.NewUsersToday,
             snapshot.Data.EmailsSent7d,
             snapshot.Data.EmailsFailed7d,
+            snapshot.Data.EmailPendingCount,
+            snapshot.Data.EmailFailedTotal,
+            snapshot.Data.LastSuccessfulDeliveryAge,
             snapshot.SnapshotAtUtc,
             snapshot.Data.RecentTransfers);
     }

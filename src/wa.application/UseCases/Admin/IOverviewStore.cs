@@ -18,6 +18,9 @@ public record OverviewData(
     int NewUsersToday,
     int EmailsSent7d,
     int EmailsFailed7d,
+    int EmailPendingCount,
+    int EmailFailedTotal,
+    DateTime? LastSuccessfulDeliveryAge,
     IReadOnlyList<RecentTransferItem> RecentTransfers);
 
 /// <summary>T-011-03: one row in the recent-transfers list (last 20 by CreatedAtUtc desc).</summary>

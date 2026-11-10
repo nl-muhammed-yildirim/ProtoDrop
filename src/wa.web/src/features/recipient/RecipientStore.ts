@@ -148,6 +148,12 @@ interface RecipientState {
   /** T-003-07 (FR-003-7): edge-triggered when a full download completes on an active transfer — the panel then stays visible. */
   growthPanelVisible: boolean
   error: string | null
+  /**
+   * T-013-02 (AC-013-1 surface): the captured Problem+JSON from load()'s !res.ok path, when the body carried a
+   * closed-list code. A 500 / INTERNAL is NOT terminal — it still lands in the generic 'error' status, but this
+   * field lets RecipientPage render ErrorScreen(500) with the Ref line instead of the plain .rp-error markup.
+   */
+  capturedProblem: { code: string; correlationId?: string } | null
 }
 
 interface RecipientActions {
@@ -179,6 +185,7 @@ const LOADING_SHAPE = {
   downloadedFileIds: [] as string[],
   growthPanelVisible: false,
   error: null as string | null,
+  capturedProblem: null as { code: string; correlationId?: string } | null,
 }
 
 export const useRecipientStore = create<RecipientState & RecipientActions>((set, get) => ({
@@ -200,14 +207,20 @@ export const useRecipientStore = create<RecipientState & RecipientActions>((set,
         if (!res.ok) {
           // T-003-03 (FR-003-8/9): classify by the Problem+JSON code, not the HTTP status — 410 and 404 both map to
           // 'expired' when the code is TRANSFER_EXPIRED; a non-Problem body (or parse failure) keeps the generic error.
-          const problem = (await res.json()) as { code?: string; details?: string } | null
+          const problem = (await res.json()) as { code?: string; details?: string; correlationId?: string } | null
           const terminal = classifyProblem(problem)
           if (terminal !== null) {
             // Terminal states carry no payload — LOADING_SHAPE already reset every active field, so nothing leaks.
             set({ ...LOADING_SHAPE, status: terminal.status, terminalMessage: terminal.message })
             return
           }
-          set({ status: 'error', error: ERROR_MESSAGE })
+          // T-013-02 (AC-013-1 surface): capture the Problem when it's a 500/INTERNAL — RecipientPage renders
+          // ErrorScreen(500) with the Ref line instead of the plain .rp-error markup. The generic 'error' status
+          // is preserved so existing terminal classification (TRANSFER_EXPIRED → 'expired' etc.) is unchanged.
+          const capturedProblem = problem?.code
+            ? { code: problem.code, correlationId: problem.correlationId }
+            : null
+          set({ status: 'error', error: ERROR_MESSAGE, capturedProblem })
           return
         }
         const body = (await res.json()) as {

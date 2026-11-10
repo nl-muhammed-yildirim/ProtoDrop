@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { formatBytes } from '../../core/upload/formatBytes'
 import { ADMIN_TRANSFERS_PATH } from './adminRoute'
 import type { OverviewDto } from './overviewData'
-import { formatUpdatedAt, statusLabel, statusTone } from './overviewData'
+import { formatLastDelivery, formatUpdatedAt, statusLabel, statusTone } from './overviewData'
 import { getTraceParent } from '../../core/traceparent'
 
 // T-011-03 (FR-011-2): fixed local port, no proxy, no env vars yet (AuthPage + FilesPage precedent).
@@ -89,6 +89,27 @@ export function AdminOverviewPage() {
 
       {/* FR-011-6: staleness stated on screen — the server's snapshot time, no client computation. */}
       <p className="ad-updated">Updated {formatUpdatedAt(data.snapshotAtUtc)}</p>
+
+      {/* T-013-05 (AC-013-3): email health surface — pending/failed totals + last successful delivery + broker DLQ count.
+          With email down in dev: non-zero pending while the sender saw nothing (FR-013-4). */}
+      <div className="ad-cards">
+        <div className="ad-card">
+          <div className="ad-card-value">{data.emailPendingCount}</div>
+          <div className="ad-card-label">Emails pending</div>
+        </div>
+        <div className="ad-card">
+          <div className="ad-card-value">{data.emailFailedTotal}</div>
+          <div className="ad-card-label">Emails failed (total)</div>
+        </div>
+        <div className="ad-card">
+          <div className="ad-card-value">{formatLastDelivery(data.lastSuccessfulDeliveryAge)}</div>
+          <div className="ad-card-label">Last successful delivery</div>
+        </div>
+        <div className="ad-card">
+          <div className="ad-card-value">{data.dlqCount}</div>
+          <div className="ad-card-label">DLQ count</div>
+        </div>
+      </div>
 
       <button type="button" className="au-ghost-btn" onClick={() => navigate(ADMIN_TRANSFERS_PATH)}>
         View all

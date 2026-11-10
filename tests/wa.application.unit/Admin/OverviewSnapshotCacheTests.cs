@@ -78,7 +78,7 @@ public class OverviewSnapshotCacheTests
             new("abc12345", "ada@example.com", 1, 1024L, new DateTime(2026, 11, 4, 11, 0, 0, DateTimeKind.Utc)),
             new("def67890", null, 3, 2048L, new DateTime(2026, 11, 4, 10, 0, 0, DateTimeKind.Utc))
         };
-        _store.Data = new OverviewData(42, 1048576L, 7, 15, 3, recent);
+        _store.Data = new OverviewData(42, 1048576L, 7, 15, 3, 9, 4, new DateTime(2026, 11, 4, 9, 0, 0, DateTimeKind.Utc), recent);
 
         var snapshot = await _cache.GetAsync(CancellationToken.None);
 
@@ -101,7 +101,7 @@ public class OverviewSnapshotCacheTests
         public int CallCount { get; private set; }
         public DateTime CapturedTodayStartUtc { get; private set; }
         public DateTime CapturedEmailsWindowStartUtc { get; private set; }
-        public OverviewData Data { get; set; } = new(0, 0L, 0, 0, 0, []);
+        public OverviewData Data { get; set; } = new(0, 0L, 0, 0, 0, 0, 0, null, []);
 
         public Task<OverviewData> GetAsync(DateTime todayStartUtc, DateTime emailsWindowStartUtc, CancellationToken ct)
         {

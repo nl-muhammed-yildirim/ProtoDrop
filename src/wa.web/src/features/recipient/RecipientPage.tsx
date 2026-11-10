@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, MouseEvent } from 'react'
 
 import { formatBytes } from '../../core/upload/formatBytes'
+import { DEGRADED_COPY } from '../../core/i18n/keys'
+import ErrorScreen from '../errors/ErrorScreen'
 import { trackGrowthCta } from './growthTelemetry'
 import { useRecipientStore } from './RecipientStore'
 
@@ -45,6 +47,8 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
   // T-003-06: per-row download indicator (UI notes: subtle progress/indicator; no page-level blocking UI).
   const downloadingFileId = useRecipientStore((s) => s.downloadingFileId)
   const downloadErrorFileId = useRecipientStore((s) => s.downloadErrorFileId)
+  // T-013-02 (AC-013-1 surface): the captured Problem from load()'s !res.ok — drives ErrorScreen(500) with Ref.
+  const capturedProblem = useRecipientStore((s) => s.capturedProblem)
 
   // T-003-05 (FR-003-6): gate-local state — the password value resets on unmount/remount by construction.
   const [value, setValue] = useState('')
@@ -112,6 +116,19 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
   }
 
   if (status === 'error') {
+    // T-013-02 (AC-013-1 surface): when the store captured a Problem that is a 500 (code INTERNAL / status 500),
+    // render ErrorScreen(500) with the Ref line. Re-issue = re-fetch via load(linkId), NO full reload.
+    if (capturedProblem && (capturedProblem.code === 'INTERNAL' || capturedProblem.code === 'NOT_FOUND')) {
+      return (
+        <ErrorScreen
+          titleKey="somethingWrongTitle"
+          actionLabelKey="tryAgain"
+          correlationId={capturedProblem.correlationId}
+          onAction={() => void useRecipientStore.getState().load(linkId)}
+        />
+      )
+    }
+    // T-003-03 pins this via RecipientPage.test.tsx (textContent === 'Something went wrong') — keep unchanged.
     return (
       <section className="rp" aria-label="Transfer unavailable">
         <h1 className="rp-heading rp-error">Something went wrong</h1>
@@ -212,8 +229,9 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
             </span>
             <span className="rp-name" title={f.name}>{f.name}</span>
             {/* T-003-06 (US-003-03 alt flow): storage degraded — the row's mint failed; the rest of the page keeps working. */}
+            {/* T-013-04 (FR-013-3): aria-live="polite" instead of role="alert" — a transient row state, not an assertive alert. */}
             {downloadErrorFileId === f.fileId && (
-              <p className="rp-download-error" role="alert">File temporarily unavailable.</p>
+              <p className="rp-download-error" aria-live="polite">{DEGRADED_COPY.downloadUnavailable}</p>
             )}
             <span className="rp-size">{formatBytes(f.sizeBytes)}</span>
             {/* T-003-06 (UI notes): subtle in-flight indicator on the row while endpoint 6 is minting — no page-level blocking UI. */}

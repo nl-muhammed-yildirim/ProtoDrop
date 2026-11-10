@@ -22,6 +22,8 @@ import AdminShell from './features/admin/AdminShell'
 import { matchAdminPath } from './features/admin/adminRoute'
 import { matchLinkPath } from './features/recipient/recipientRoute'
 import { matchUnsubscribePath } from './features/unsubscribe/unsubscribeRoute'
+import AppErrorBoundary from './features/errors/AppErrorBoundary'
+import ErrorScreen from './features/errors/ErrorScreen'
 
 /**
  * T-003-02 (FR-003-1): pathname routing — /t/{linkId} → recipient page; landing unchanged at /.
@@ -93,43 +95,53 @@ export default function App() {
   }
 
   return (
-    <>
-      <TopBar
-        profile={session}
-        onNavigateAccount={() => {
-          window.history.pushState('', '', session ? PROFILE_PATH : '/account')
-          window.dispatchEvent(new PopStateEvent('popstate'))
-        }}
-        onThemeChange={handleThemeChange}
-        onSignOut={handleSignOut}
-      />
-      <main>
-        {unsubscribeToken !== null ? (
-          <UnsubscribePage token={unsubscribeToken} />
-        ) : session && matchProfilePath(pathname) ? (
-          <ProfilePage profile={session} onSignedIn={setSession} onThemeChange={handleThemeChange} onDeleteAccount={handleDeleteAccount} />
-        ) : session && matchFilesPath(pathname) ? (
-          <FilesPage onNewTransfer={goHome} />
-        ) : session && resendTransferId !== null ? (
-          // T-010-03 (FR-010-4): re-send screen — the ORIGINAL transfer's ID from My Files rows; endpoint 16 mints a new draft.
-          <ReSendScreen originalTransferId={resendTransferId} onUpload={goHome} />
-        ) : session && adminScreen !== null ? (
-          // T-011-10 (FR-011-2): admin console — gated on session like files/profile; role gating inside AdminShell via /auth/me.
-          <AdminShell screen={adminScreen} />
-        ) : matchAccountPath(pathname) ? (
-          // Signed-out guest keeps the sign-in card; /account/profile with no session falls
-          // through here too (it still matches ACCOUNT_PATH_RE — order above is what wins).
-          <AuthPage onSignedIn={(p) => { setSession(p); goHome() }} />
-        ) : linkId !== null ? (
-          <RecipientPage linkId={linkId} />
-        ) : (
-          <>
-            {/* T-001-10 handoff: once the link is minted, hide the drop zone — LinkScreen (inside StagingList) becomes the only surface. */}
-            {finalized === null && <DropZone toast={deleteToast} />}
-            {hasFiles && <StagingList />}
-          </>
-        )}
-      </main>
-    </>
+    <AppErrorBoundary>
+      <>
+        <TopBar
+          profile={session}
+          onNavigateAccount={() => {
+            window.history.pushState('', '', session ? PROFILE_PATH : '/account')
+            window.dispatchEvent(new PopStateEvent('popstate'))
+          }}
+          onThemeChange={handleThemeChange}
+          onSignOut={handleSignOut}
+        />
+        <main>
+          {unsubscribeToken !== null ? (
+            <UnsubscribePage token={unsubscribeToken} />
+          ) : session && matchProfilePath(pathname) ? (
+            <ProfilePage profile={session} onSignedIn={setSession} onThemeChange={handleThemeChange} onDeleteAccount={handleDeleteAccount} />
+          ) : session && matchFilesPath(pathname) ? (
+            <FilesPage onNewTransfer={goHome} />
+          ) : session && resendTransferId !== null ? (
+            // T-010-03 (FR-010-4): re-send screen — the ORIGINAL transfer's ID from My Files rows; endpoint 16 mints a new draft.
+            <ReSendScreen originalTransferId={resendTransferId} onUpload={goHome} />
+          ) : session && adminScreen !== null ? (
+            // T-011-10 (FR-011-2): admin console — gated on session like files/profile; role gating inside AdminShell via /auth/me.
+            <AdminShell screen={adminScreen} />
+          ) : matchAccountPath(pathname) ? (
+            // Signed-out guest keeps the sign-in card; /account/profile with no session falls
+            // through here too (it still matches ACCOUNT_PATH_RE — order above is what wins).
+            <AuthPage onSignedIn={(p) => { setSession(p); goHome() }} />
+          ) : linkId !== null ? (
+            <RecipientPage linkId={linkId} />
+          ) : pathname === '/' ? (
+            <>
+              {/* T-001-10 handoff: once the link is minted, hide the drop zone — LinkScreen (inside StagingList) becomes the only surface. */}
+              {finalized === null && <DropZone toast={deleteToast} />}
+              {hasFiles && <StagingList />}
+            </>
+          ) : (
+            // T-013-02 (FR-013-5): SPA 404 — any unmatched path renders the §4.6 error layout with Go to home.
+            // No Ref line: no API request happened for an unknown SPA route.
+            <ErrorScreen
+              titleKey="notFoundTitle"
+              actionLabelKey="goHome"
+              onAction={goHome}
+            />
+          )}
+        </main>
+      </>
+    </AppErrorBoundary>
   )
 }

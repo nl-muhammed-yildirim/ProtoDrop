@@ -20,6 +20,11 @@ export interface OverviewDto {
   newUsersToday: number
   emailsSent7d: number
   emailsFailed7d: number
+  // T-013-05 (AC-013-3): email health surface — pending/failed totals + last successful delivery + broker DLQ count.
+  emailPendingCount: number
+  emailFailedTotal: number
+  lastSuccessfulDeliveryAge: string | null // nullable — null when nothing was ever delivered
+  dlqCount: number
   snapshotAtUtc: string     // ISO DateTime — the FR-011-6 staleness line states this, no client math
   recentTransfers: RecentTransferRow[]
 }
@@ -51,6 +56,19 @@ export function statusTone(status: number): 'green' | 'amber' | 'gray' {
  * (en-US) so the copy is deterministic in tests. Total: unparseable ISO → stable fallback, no throw.
  */
 export function formatUpdatedAt(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return 'Unknown'
+  const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+  return `${date}, ${time}`
+}
+
+/**
+ * T-013-05 (AC-013-3): "Last successful delivery" line — locale month-day-year + time (en-US) so the copy is
+ * deterministic in tests. Total: null or unparseable ISO → stable fallback, no throw (same defensive style as formatUpdatedAt).
+ */
+export function formatLastDelivery(iso: string | null): string {
+  if (!iso) return 'Never'
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return 'Unknown'
   const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })

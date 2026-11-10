@@ -184,6 +184,27 @@ app.MapGet("/health", async (ISender sender, CancellationToken ct) =>
         return Results.Json(ProblemWriter.Build(503, ProblemCodes.Internal, "A required component is unreachable."), statusCode: 503);
     }
 });
+
+// T-013-01 (FR-013-2): dev-only chaos endpoint — forces both failure shapes for E2E without prod surface.
+// kind=internal → InvalidOperationException → GlobalErrorMiddleware → 500 INTERNAL Problem+JSON.
+// kind=rate_limited → ProblemWriter.WriteCompleteAsync(429, RATE_LIMITED) — byte-identical to the real limiter breach path (L115).
+if (app.Environment.IsDevelopment())
+{
+    app.MapGet("/api/v1/dev/chaos", async (HttpContext httpContext, HttpRequest request) =>
+    {
+        var kind = request.Query["kind"].FirstOrDefault();
+        switch (kind)
+        {
+            case "internal":
+                throw new InvalidOperationException("T-013-01 chaos: forced internal failure"); // bubbles to GlobalErrorMiddleware → 500 INTERNAL
+            case "rate_limited":
+                await ProblemWriter.WriteCompleteAsync(httpContext, 429, ProblemCodes.RateLimited, "Too many requests — limit is 5 per minute.");
+                return; // WriteCompleteAsync already commits headers + writes the body — do NOT also return Results.Json (double-serialize)
+            default:
+                throw new BusinessException(ProblemCodes.Validation, "kind must be one of internal / rate_limited.");
+        }
+    });
+}
 app.MapPost("/api/v1/transfers/draft", async (CreateDraftCommand cmd, ISender sender, CancellationToken ct) =>
 {
     CreateDraftResult result;
@@ -445,7 +466,10 @@ app.MapGet("/api/v1/public/transfers/{linkId}/download-all-url", async (string l
         DownloadAllState.DownloadLimit => Results.Json(ProblemWriter.Build(410, ProblemCodes.MaxDownloadsReached, DownloadLimitDetails(result.SenderEmail)), statusCode: 410),
 
         // TA-9.6#1: gated transfer minted without a valid ?t= → 401 UNAUTHENTICATED (never a file-list-shaped error).
-        DownloadAllState.Unauthenticated => Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401)
+        DownloadAllState.Unauthenticated => Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401),
+
+        // T-013-03 (FR-013-3): blob account down at mint time — 503 + code INTERNAL (no new closed-list code; TA-4.1.3's INTERNAL row).
+        DownloadAllState.StorageUnavailable => Results.Json(ProblemWriter.Build(503, ProblemCodes.Internal, "A required component is unreachable."), statusCode: 503)
     };
 });
 
@@ -507,6 +531,24 @@ app.MapGet("/api/v1/admin/overview", async (HttpContext ctx, IAppUserStore users
 {
     await RequireAdminAsync(ctx, users, superadminOnly: false, ct); // T-011-01: both roles read — same as the GET at L450.
 
+    // T-013-05 (AC-013-3): DLQ count is broker-side — ServiceBusAdministrationClient from Wa:ServiceBus:ConnectionString (same key as SbEventPublisher/SbHealthProbe).
+    // Defensive: a dummy/unreachable connection (dev/test) must never 5xx the overview — FR-013-4 in spirit.
+    long dlqCount = 0;
+    var sbConnString = builder.Configuration["Wa:ServiceBus:ConnectionString"];
+    if (!string.IsNullOrEmpty(sbConnString))
+    {
+        try
+        {
+            var adminClient = new Azure.Messaging.ServiceBus.Administration.ServiceBusAdministrationClient(sbConnString);
+            var response = await adminClient.GetSubscriptionRuntimePropertiesAsync("core", "email");
+            dlqCount = response.Value.DeadLetterMessageCount;
+        }
+        catch (Exception)
+        {
+            // Broker unreachable or subscription missing — leave 0; the overview must not be blocked by SB being down.
+        }
+    }
+
     var result = await sender.Send(new wa.application.UseCases.Admin.GetOverviewQuery(), ct);
     return Results.Json(new
     {
@@ -515,6 +557,10 @@ app.MapGet("/api/v1/admin/overview", async (HttpContext ctx, IAppUserStore users
         newUsersToday = result.NewUsersToday,
         emailsSent7d = result.EmailsSent7d,
         emailsFailed7d = result.EmailsFailed7d,
+        emailPendingCount = result.EmailPendingCount,
+        emailFailedTotal = result.EmailFailedTotal,
+        lastSuccessfulDeliveryAge = result.LastSuccessfulDeliveryAge,
+        dlqCount,
         snapshotAtUtc = result.SnapshotAtUtc,
         recentTransfers = result.RecentTransfers.Select(r => new { linkId = r.LinkId, ownerEmail = r.OwnerEmail, status = r.Status, totalBytes = r.TotalBytes, createdAtUtc = r.CreatedAtUtc })
     });

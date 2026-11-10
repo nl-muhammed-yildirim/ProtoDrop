@@ -67,3 +67,23 @@ describe('App landing', () => {
     cleanup()
   })
 })
+
+describe('App SPA 404 (T-013-02, AC-013-4)', () => {
+  it('unknown route renders the 404 screen copy + one action, no stack trace or raw code visible', () => {
+    // Set pathname to an unknown route before rendering.
+    window.history.pushState('', '', '/nonexistent-route')
+    const html = renderToStaticMarkup(<App />)
+    expect(html).toContain('Oops — this page moved.')
+    expect(html).toContain('Go to home')
+    // No stack trace or raw code visible.
+    expect(html).not.toContain('ErrorBoundary')
+    expect(html).not.toContain('componentDidCatch')
+    // Reset pathname for other tests.
+    window.history.pushState('', '', '/')
+  })
+
+  it("'/' still renders landing (regression guard)", () => {
+    const html = renderToStaticMarkup(<App />)
+    expect(html).toContain('<h1 class="dz-title">Send your files.</h1>')
+  })
+})

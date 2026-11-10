@@ -4,11 +4,15 @@ using System.Text;
 using System.Text.Json;
 using Azure.Storage;
 using Azure.Storage.Blobs;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Testcontainers.Azurite;
 using Testcontainers.MsSql;
 using wa.application.Blob;
+using wa.application.Ports;
 using wa.domain;
 using wa.domain.Errors;
 using wa.infrastructure.Persistence;
@@ -402,6 +406,62 @@ public class DownloadAllUrlEndpointTests : IAsyncLifetime
         });
         return new Uri(minted.GetLeftPart(UriPartial.Authority)
             + "/" + AzuriteBuilder.AccountName + minted.AbsolutePath + "?" + string.Join("&", newParts));
+    }
+
+    // ---- T-013-03 (AC-013-2 API half): blob account down at mint time → 503 + INTERNAL (no new closed-list code) ----
+
+    [Fact]
+    public async Task BlobDown_ExistsAsync503_Returns503Internal()
+    {
+        var transferId = await SeedTransferAsync(status: 1, linkId: "d5w3f9q9", maxDownloads: 5);
+        var fileId = Guid.NewGuid();
+        await SeedFileItemsAsync(transferId, [(fileId, "first.txt", 2048L)]);
+
+        // Upload a zip blob at the canonical path so the handler reaches ExistsAsync (the 503 site).
+        await UploadZipBlobAsync(transferId, [1, 2, 3]);
+
+        // A local factory whose IBlobStore.ExistsAsync throws RequestFailedException(503) — simulates the blob account down.
+        using var client = new BlobDownTestFactory().CreateClient();
+
+        using var response = await client.GetAsync("/api/v1/public/transfers/d5w3f9q9/download-all-url");
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode); // 503 — the closed table's status for INTERNAL
+
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsByteArrayAsync());
+        Assert.Equal(ProblemCodes.Internal, doc.RootElement.GetProperty("code").GetString()); // INTERNAL — no new code (FR-013-3)
+        Assert.Equal(503, doc.RootElement.GetProperty("status").GetInt32());
+
+        // Per-file isolation (AC-013-2 bullet 2): endpoint 6's mint is pure HMAC+DB (zero IBlobStore dependency — verified in
+        // GetFileDownloadUrlHandler) — it must still succeed while the blob account is down. Same throwing-fake client, same transfer.
+        using var ep6 = await client.GetAsync("/api/v1/public/transfers/d5w3f9q9/files/" + fileId.ToString("n") + "/download-url");
+        Assert.Equal(HttpStatusCode.OK, ep6.StatusCode); // 200 — endpoint 6's mint is unaffected by the blob 503 (per-file isolation)
+
+        using var ep6Doc = JsonDocument.Parse(await ep6.Content.ReadAsByteArrayAsync());
+        Assert.True(ep6Doc.RootElement.TryGetProperty("url", out _)); // a valid SAS URL is still minted for this file
+    }
+
+    private sealed class BlobDownTestFactory : WebApplicationFactory<Program>
+    {
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            // Program.cs registers the real IBlobStore before this runs — remove, then swap in the 503 fake.
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IBlobStore>();
+                services.AddSingleton<IBlobStore>(new FakeBlobStore());
+            });
+        }
+    }
+
+    /// <summary>T-013-03 fake: ExistsAsync throws RequestFailedException(503) — the blob account is down. All other members unused.</summary>
+    private sealed class FakeBlobStore : IBlobStore
+    {
+        public Task UploadAsync(string path, Stream content, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+        public Task<Stream> DownloadAsync(string path, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+        public Task CopyAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+        public Task<long> GetSizeAsync(string path, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+        public Task<bool> ExistsAsync(string path, CancellationToken cancellationToken = default) =>
+            throw new Azure.RequestFailedException(503, "Service Unavailable");
+        public Task DeleteAsync(string path, CancellationToken cancellationToken = default) => throw new NotImplementedException();
     }
 
     private sealed class TestFactory : WebApplicationFactory<Program> { }
