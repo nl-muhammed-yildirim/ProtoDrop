@@ -39,6 +39,19 @@ public sealed class OverviewStore : IOverviewStore
         var emailsFailed7d = await _db.Set<DomainEvent>()
             .CountAsync(ev => ev.EventType == "email.failed" && ev.OccurredAtUtc >= emailsWindowStartUtc, ct);
 
+        // (g) T-013-05 (AC-013-3): email health surface — pending recipients (NotifiedAtUtc null = never notified).
+        var emailPendingCount = await _db.Set<EmailRecipient>()
+            .CountAsync(r => r.NotifiedAtUtc == null, ct);
+
+        // (h) T-013-05: all-time email.failed outbox count — the health surface's failed total (no DLQ table exists; comment at L38).
+        var emailFailedTotal = await _db.Set<DomainEvent>()
+            .CountAsync(ev => ev.EventType == "email.failed", ct);
+
+        // (i) T-013-05: last successful delivery — max(NotifiedAtUtc), null when nothing was ever delivered.
+        var lastSuccessfulDeliveryAge = await _db.Set<EmailRecipient>()
+            .Where(r => r.NotifiedAtUtc != null)
+            .MaxAsync(r => (DateTime?)r.NotifiedAtUtc, ct);
+
         // (f) Recent transfers — last 20 by CreatedAtUtc desc; owner email via subquery FirstOrDefault on AppUser.
         var recent = await _db.Set<Transfer>()
             .AsNoTracking()
@@ -52,7 +65,7 @@ public sealed class OverviewStore : IOverviewStore
                 t.CreatedAtUtc))
             .ToListAsync(ct);
 
-        return new OverviewData(activeTransfers, storageBytesUsed, newUsersToday, emailsSent7d, emailsFailed7d, recent);
+        return new OverviewData(activeTransfers, storageBytesUsed, newUsersToday, emailsSent7d, emailsFailed7d, emailPendingCount, emailFailedTotal, lastSuccessfulDeliveryAge, recent);
     }
 
     /// <summary>

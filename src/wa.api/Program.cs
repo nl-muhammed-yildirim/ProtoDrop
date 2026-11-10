@@ -531,6 +531,24 @@ app.MapGet("/api/v1/admin/overview", async (HttpContext ctx, IAppUserStore users
 {
     await RequireAdminAsync(ctx, users, superadminOnly: false, ct); // T-011-01: both roles read — same as the GET at L450.
 
+    // T-013-05 (AC-013-3): DLQ count is broker-side — ServiceBusAdministrationClient from Wa:ServiceBus:ConnectionString (same key as SbEventPublisher/SbHealthProbe).
+    // Defensive: a dummy/unreachable connection (dev/test) must never 5xx the overview — FR-013-4 in spirit.
+    long dlqCount = 0;
+    var sbConnString = builder.Configuration["Wa:ServiceBus:ConnectionString"];
+    if (!string.IsNullOrEmpty(sbConnString))
+    {
+        try
+        {
+            var adminClient = new Azure.Messaging.ServiceBus.Administration.ServiceBusAdministrationClient(sbConnString);
+            var response = await adminClient.GetSubscriptionRuntimePropertiesAsync("core", "email");
+            dlqCount = response.Value.DeadLetterMessageCount;
+        }
+        catch (Exception)
+        {
+            // Broker unreachable or subscription missing — leave 0; the overview must not be blocked by SB being down.
+        }
+    }
+
     var result = await sender.Send(new wa.application.UseCases.Admin.GetOverviewQuery(), ct);
     return Results.Json(new
     {
@@ -539,6 +557,10 @@ app.MapGet("/api/v1/admin/overview", async (HttpContext ctx, IAppUserStore users
         newUsersToday = result.NewUsersToday,
         emailsSent7d = result.EmailsSent7d,
         emailsFailed7d = result.EmailsFailed7d,
+        emailPendingCount = result.EmailPendingCount,
+        emailFailedTotal = result.EmailFailedTotal,
+        lastSuccessfulDeliveryAge = result.LastSuccessfulDeliveryAge,
+        dlqCount,
         snapshotAtUtc = result.SnapshotAtUtc,
         recentTransfers = result.RecentTransfers.Select(r => new { linkId = r.LinkId, ownerEmail = r.OwnerEmail, status = r.Status, totalBytes = r.TotalBytes, createdAtUtc = r.CreatedAtUtc })
     });
