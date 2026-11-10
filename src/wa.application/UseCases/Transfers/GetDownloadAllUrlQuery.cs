@@ -25,7 +25,7 @@ public sealed record GetDownloadAllUrlQuery(
     string? UserAgent = null) : IRequest<DownloadAllResult>;
 
 /// <summary>The download-all endpoint's state mapping (TA-4.2#7): terminal states + the auth gate + zip ready/generating.</summary>
-public enum DownloadAllState { Ok, Generating, Expired, DownloadLimit, NotFound, Unauthenticated }
+public enum DownloadAllState { Ok, Generating, Expired, DownloadLimit, NotFound, Unauthenticated, StorageUnavailable }
 
 /// <summary>Result of GetDownloadAllUrlQuery — the endpoint maps this to HTTP; the handler stays pure CQRS (TA-4.2a).</summary>
 public sealed record DownloadAllResult(
@@ -92,7 +92,16 @@ public sealed class GetDownloadAllUrlHandler : IRequestHandler<GetDownloadAllUrl
 
         // Check if the zip already exists in blob storage.
         var zipPath = BlobPaths.TransferZip(transfer.Id);
-        var zipExists = await _blobStore.ExistsAsync(zipPath, cancellationToken);
+        bool zipExists;
+        try
+        {
+            zipExists = await _blobStore.ExistsAsync(zipPath, cancellationToken);
+        }
+        catch (Azure.RequestFailedException ex) when (ex.Status == 503)
+        {
+            // T-013-03 (FR-013-3): blob account down at mint time — per-file 503 + code INTERNAL (no new closed-list code).
+            return new DownloadAllResult(DownloadAllState.StorageUnavailable);
+        }
 
         if (zipExists)
         {

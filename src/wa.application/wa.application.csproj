@@ -5,6 +5,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- T-013-03 (FR-013-3): mint-path blob 503 detection — catch Azure.RequestFailedException(503) in GetDownloadAllUrlQuery. -->
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.29.2" />
     <PackageReference Include="FluentValidation" Version="12.1.1" />
     <PackageReference Include="MediatR" Version="12.5.0" />
     <PackageReference Include="Microsoft.Extensions.Identity.Core" Version="10.0.13" />

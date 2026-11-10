@@ -466,7 +466,10 @@ app.MapGet("/api/v1/public/transfers/{linkId}/download-all-url", async (string l
         DownloadAllState.DownloadLimit => Results.Json(ProblemWriter.Build(410, ProblemCodes.MaxDownloadsReached, DownloadLimitDetails(result.SenderEmail)), statusCode: 410),
 
         // TA-9.6#1: gated transfer minted without a valid ?t= → 401 UNAUTHENTICATED (never a file-list-shaped error).
-        DownloadAllState.Unauthenticated => Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401)
+        DownloadAllState.Unauthenticated => Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401),
+
+        // T-013-03 (FR-013-3): blob account down at mint time — 503 + code INTERNAL (no new closed-list code; TA-4.1.3's INTERNAL row).
+        DownloadAllState.StorageUnavailable => Results.Json(ProblemWriter.Build(503, ProblemCodes.Internal, "A required component is unreachable."), statusCode: 503)
     };
 });
 

@@ -57,6 +57,8 @@ const uploadUrls = new Map<string, string>()
 const completedOffsets = new Map<string, Set<number>>()
 /** FR-001-6 telemetry plumbing (T-001-08 → T-001-10 finalize payload): per-file retry counts + last error code; stage failures only — commit retries are re-entry via `retry(fileId)`. */
 export const fileAttempts = new Map<string, { retries: number; lastErrorCode: string | null }>()
+/** T-013-03 (FR-013-3): tracks whether any block failure was a blob 503 — used to emit reason:'blob_unavailable' on upload_failed. */
+const blobUnavailableFlags = new Map<string, boolean>()
 /** Replaces a file's FR-001-6 record (a retry resets it so upload_failed counts stay per failure run). */
 function recordAttempts(id: string, retries: number, lastErrorCode: string | null): void {
   fileAttempts.set(id, { retries, lastErrorCode })
@@ -138,6 +140,9 @@ async function uploadFile(
             await sleepFn(RETRY_BACKOFF_MS[attempt]) // backoff between attempts; the final attempt waits nothing
           }
           recordAttempts(id, entry.retries, error instanceof Error ? error.name : 'unknown')
+          // T-013-03 (FR-013-3): detect blob 503 — RequestFailedException carries statusCode/status === 503.
+          const status = (error as Record<string, unknown>)?.statusCode ?? (error as Record<string, unknown>)?.status
+          if (status === 503) blobUnavailableFlags.set(id, true)
         }
       }
       if (!staged) return false // all 5 attempts exhausted — remaining blocks stay resumable (FR-001-5/6)
@@ -151,7 +156,8 @@ async function uploadFile(
   } catch {
     // T-012-02 (TA-10.2): final-failure path — all retries exhausted, uploadFile returns false.
     // The no-file early return and the commit-failed branch must NOT emit; only this outer catch does.
-    trackClientEvent('upload_failed', { fileId: id, retries: fileAttempts.get(id)?.retries })
+    const isBlobUnavailable = blobUnavailableFlags.get(id) === true
+    trackClientEvent('upload_failed', { fileId: id, retries: fileAttempts.get(id)?.retries, ...(isBlobUnavailable ? { reason: 'blob_unavailable' } : {}) })
     setStatus(id, 'failed') // progress frozen at last completed bytes; row-local Retry (T-001-08)
     return false
   }
@@ -197,10 +203,11 @@ export const useUploadEngine = create<UploadEngineState & UploadEngineActions>((
     return (async () => {
       if (file?.status !== 'failed') return
       recordAttempts(fileId, 0, null) // the retry re-arms the FR-001-6 counter — a subsequent failure is fresh telemetry data
+      blobUnavailableFlags.set(fileId, false) // T-013-03: re-arm the blob-503 flag so the next failure's reason reflects THIS run only.
       setStatus(fileId, 'uploading') // progress NOT reset — resume skips finished bytes (FR-001-5)
       await uploadFile(fileId, stagedHandles.get(fileId), file.size, uploadUrls.get(fileId))
     })()
   },
-  remove: (fileId) => { completedOffsets.delete(fileId); fileAttempts.delete(fileId); set((state) => { const files = state.files.filter((f) => f.id !== fileId); return { files, overall: totals(files) } }) },
-  reset: () => { stagedHandles.clear(); uploadUrls.clear(); completedOffsets.clear(); fileAttempts.clear(); set({ files: [], overall: { sentBytes: 0, totalBytes: 0 } }) },
+  remove: (fileId) => { completedOffsets.delete(fileId); fileAttempts.delete(fileId); blobUnavailableFlags.delete(fileId); set((state) => { const files = state.files.filter((f) => f.id !== fileId); return { files, overall: totals(files) } }) },
+  reset: () => { stagedHandles.clear(); uploadUrls.clear(); completedOffsets.clear(); fileAttempts.clear(); blobUnavailableFlags.clear(); set({ files: [], overall: { sentBytes: 0, totalBytes: 0 } }) },
 }))
