@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { StoredProfile } from '../../core/auth/session'
 import { writeSession } from '../../core/auth/session'
 import { getTraceParent } from '../../core/traceparent'
+import i18n from '../../core/i18n/init'
 
 interface AuthPageProps {
   onSignedIn: (p: StoredProfile) => void
@@ -66,11 +67,11 @@ export function AuthPage({ onSignedIn }: AuthPageProps) {
   const handleContinue = async (): Promise<void> => {
     setFormError(null)
     if (!isValidEmail(email)) {
-      setFormError('Enter your email address')
+      setFormError(i18n.t('auth.error.invalidEmail'))
       return
     }
     if (!forgotActive && isShortPassword(password)) {
-      setFormError('Password must be at least 8 characters')
+      setFormError(i18n.t('auth.error.shortPassword'))
       return
     }
 
@@ -103,7 +104,7 @@ export function AuthPage({ onSignedIn }: AuthPageProps) {
       }
 
       // Non-2xx: render Problem+JSON details verbatim in form-level region.
-      let detail = 'Something went wrong. Please try again.'
+      let detail = i18n.t('auth.error.generic')
       try {
         const body = (await res.json()) as { details?: string; title?: string }
         if (body.details) detail = body.details
@@ -113,14 +114,14 @@ export function AuthPage({ onSignedIn }: AuthPageProps) {
       }
       setFormError(detail)
     } catch {
-      setFormError('Something went wrong. Please try again.')
+      setFormError(i18n.t('auth.error.generic'))
     }
   }
 
   const handleGhostLink = async (): Promise<void> => {
     setFormError(null)
     if (!isValidEmail(email)) {
-      setFormError('Enter your email address')
+      setFormError(i18n.t('auth.error.invalidEmail'))
       return
     }
     // Magic link ghost: POST to /auth/magic-link (email only, no password).
@@ -136,7 +137,7 @@ export function AuthPage({ onSignedIn }: AuthPageProps) {
         startCooldown()
         return
       }
-      let detail = 'Something went wrong. Please try again.'
+      let detail = i18n.t('auth.error.generic')
       try {
         const body = (await res.json()) as { details?: string; title?: string }
         if (body.details) detail = body.details
@@ -146,7 +147,7 @@ export function AuthPage({ onSignedIn }: AuthPageProps) {
       }
       setFormError(detail)
     } catch {
-      setFormError('Something went wrong. Please try again.')
+      setFormError(i18n.t('auth.error.generic'))
     }
   }
 
@@ -160,9 +161,9 @@ export function AuthPage({ onSignedIn }: AuthPageProps) {
     return (
       <section className="au" aria-label="Link sent">
         <div className="au-card">
-          <h1 className="au-heading">Link sent to {sentEmail}</h1>
+          <h1 className="au-heading">{i18n.t('auth.linkSent.heading', { email: sentEmail })}</h1>
           <button type="button" className="au-ghost-btn" disabled={cooldownRemaining !== null}>
-            Didn't get it? Send another{cooldownRemaining !== null ? ` (${cooldownRemaining})` : ''}
+            {i18n.t('auth.resend.label')}{cooldownRemaining !== null ? ` (${cooldownRemaining})` : ''}
           </button>
         </div>
       </section>
@@ -181,7 +182,7 @@ export function AuthPage({ onSignedIn }: AuthPageProps) {
             aria-selected={tab === 'sign-in'}
             role="tab"
           >
-            Sign in
+            {i18n.t('auth.signIn.tab')}
           </button>
           <button
             type="button"
@@ -190,13 +191,13 @@ export function AuthPage({ onSignedIn }: AuthPageProps) {
             aria-selected={tab === 'sign-up'}
             role="tab"
           >
-            Sign up
+            {i18n.t('auth.signUp.tab')}
           </button>
         </div>
 
-        <h1 className="au-heading">{tab === 'sign-in' ? 'Sign in' : 'Create your account'}</h1>
+        <h1 className="au-heading">{tab === 'sign-in' ? i18n.t('auth.heading.signIn') : i18n.t('auth.heading.createAccount')}</h1>
 
-        <label className="au-label" htmlFor="auth-email">Email</label>
+        <label className="au-label" htmlFor="auth-email">{i18n.t('auth.field.emailLabel')}</label>
         <input
           id="auth-email"
           className="au-input"
@@ -208,7 +209,7 @@ export function AuthPage({ onSignedIn }: AuthPageProps) {
 
         {!forgotActive && (
           <>
-            <label className="au-label" htmlFor="auth-password">Password</label>
+            <label className="au-label" htmlFor="auth-password">{i18n.t('auth.field.passwordLabel')}</label>
             <input
               id="auth-password"
               className="au-input"
@@ -217,7 +218,7 @@ export function AuthPage({ onSignedIn }: AuthPageProps) {
               onChange={(e) => setPassword(e.target.value)}
               autoComplete={tab === 'sign-up' ? 'new-password' : 'current-password'}
             />
-            <p className="au-helper">At least 8 characters.</p>
+            <p className="au-helper">{i18n.t('auth.helper.minChars')}</p>
           </>
         )}
 
@@ -226,18 +227,18 @@ export function AuthPage({ onSignedIn }: AuthPageProps) {
         )}
 
         <button type="button" className="au-continue-btn" onClick={() => void handleContinue()}>
-          {forgotActive ? 'Send link' : 'Continue'}
+          {forgotActive ? i18n.t('auth.button.sendLink') : i18n.t('auth.button.continue')}
         </button>
 
         {!forgotActive && (
           <button type="button" className="au-ghost-btn" onClick={() => void handleGhostLink()}>
-            Email me a magic link
+            {i18n.t('auth.ghost.magicLink')}
           </button>
         )}
 
         {!forgotActive && (
           <button type="button" className="au-ghost-btn" onClick={handleForgotPassword}>
-            Forgot password?
+            {i18n.t('auth.ghost.forgotPassword')}
           </button>
         )}
       </div>
