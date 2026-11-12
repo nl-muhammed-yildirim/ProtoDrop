@@ -1,3 +1,5 @@
+import i18n from '../../core/i18n/init'
+
 /**
  * T-013-02 (FR-013-1/2/5, UI-Reference §4.6): The single §4.6 error layout — full page, centered;
  * icon `alert`; one line at --fs-h1 (DECISION: no --fs-h2 in :root); one primary button; optional ref line
@@ -10,16 +12,16 @@
 // TA-8.5 {area}.{screen} pattern — English values verbatim from spec (T-026 will localize).
 export const ERROR_COPY = {
   // 500 screen (FR-013-2): "Something went wrong." + Try again + Ref from correlationId.
-  somethingWrongTitle: 'Something went wrong.',
-  tryAgain: 'Try again',
+  somethingWrongTitle: i18n.t('error.title.somethingWrong'),
+  tryAgain: i18n.t('landing.staging.tryAgain'),
   // SPA 404 screen (FR-013-5): "Oops — this page moved." + Go to home, NO ref line (no request happened).
-  notFoundTitle: 'Oops — this page moved.',
-  goHome: 'Go to home',
+  notFoundTitle: i18n.t('error.title.notFound'),
+  goHome: i18n.t('error.action.goHome'),
   // EC-013-3: the "Ref:" label is localized; the id is not.
-  refLabel: 'Ref:',
+  refLabel: i18n.t('error.ref.label'),
   // RATE_LIMITED (EC-013-3): "A moment of calm, then try again." with the 60 s hint — NO Ref line.
-  rateLimitedTitle: 'A moment of calm, then try again.',
-  rateLimitedHint: 'Please wait about 60 seconds before trying again.',
+  rateLimitedTitle: i18n.t('error.title.rateLimited'),
+  rateLimitedHint: i18n.t('error.hint.rateLimited'),
 } as const
 
 export interface ErrorScreenProps {

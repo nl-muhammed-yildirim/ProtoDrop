@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 import type { StoredProfile } from '../../core/auth/session'
 import { getTraceParent } from '../../core/traceparent'
+import i18n from '../../core/i18n/init'
 import DangerZone from './DangerZone'
 
 // T-008-06 wire (TA-4.2#12–13), verified against src/wa.api/Program.cs — GET/PATCH /auth/me + logout:
@@ -40,13 +41,13 @@ export function ProfilePage({ profile, onSignedIn, onThemeChange, onDeleteAccoun
         credentials: 'include',
         body: JSON.stringify({ displayName: name.trim() })   // server trims + falls back to email local part on empty (T-008-06)
       })
-      if (!res.ok) throw new Error((await res.json().catch(() => null))?.message ?? 'Could not save your display name.')
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.message ?? i18n.t('profile.error.saveNameFailed'))
       const updated = (await res.json()) as Omit<StoredProfile, never>
       // Server already fell back for empty — show the SAVED value, never "(blank)" (exit check d).
       setName(updated.displayName)
       onSignedIn({ ...profile, displayName: updated.displayName })   // App re-sets session state; TopBar initial updates too.
     } catch {
-      setError('Could not save your display name.')
+      setError(i18n.t('profile.error.saveNameFailed'))
     } finally {
       setSavingName(false)
     }
@@ -70,35 +71,35 @@ export function ProfilePage({ profile, onSignedIn, onThemeChange, onDeleteAccoun
       body: JSON.stringify({ theme: next })   // partial update — displayName untouched (T-008-06)
     })
       .then(async (res) => {
-        if (!res.ok) throw new Error((await res.json().catch(() => null))?.message ?? 'Could not save your theme.')
+        if (!res.ok) throw new Error((await res.json().catch(() => null))?.message ?? i18n.t('profile.error.saveThemeFailed'))
         const updated = (await res.json()) as Omit<StoredProfile, never>
         onSignedIn({ ...profile, theme: updated.theme })   // server-wins; round-trip the stored value.
       })
-      .catch(() => setError('Could not save your theme.'))
+      .catch(() => setError(i18n.t('profile.error.saveThemeFailed')))
       .finally(() => setSavingTheme(false))
   }
 
   return (
     <div className="pf">
-      <h1 className="pf-heading">Profile</h1>
+      <h1 className="pf-heading">{i18n.t('profile.page.heading')}</h1>
       {/* Display name */}
-      <label className="pf-label" htmlFor="pf-name">Display name</label>
+      <label className="pf-label" htmlFor="pf-name">{i18n.t('profile.field.displayNameLabel')}</label>
       <input id="pf-name" className="pf-input" type="text" value={name} maxLength={100} onChange={(e) => setName(e.target.value)} />
       <button type="button" className="pf-save-btn" disabled={savingName || name.trim() === profile.displayName} onClick={() => void saveName()}>
-        Save
+        {i18n.t('profile.button.save')}
       </button>
       {/* Theme select — same three options as TopBar; value from the account (server-wins, F-TRF-015). */}
-      <label className="pf-label" htmlFor="pf-theme">Theme</label>
+      <label className="pf-label" htmlFor="pf-theme">{i18n.t('profile.theme.label')}</label>
       <select id="pf-theme" className="pf-theme-select" value={theme} disabled={savingTheme} onChange={(e) => changeTheme(e.target.value as 'system' | 'light' | 'dark')}>
-        <option value="system">System</option>
-        <option value="light">Light</option>
-        <option value="dark">Dark</option>
+        <option value="system">{i18n.t('profile.theme.system')}</option>
+        <option value="light">{i18n.t('profile.theme.light')}</option>
+        <option value="dark">{i18n.t('profile.theme.dark')}</option>
       </select>
       {/* Plan line — read-only in MVP (FR-008-4: "Free by default"). planCode comes from the session DTO; no extra fetch. */}
-      <p className="pf-plan">{profile.planCode === 'free' ? 'Free' : profile.planCode}</p>
+      <p className="pf-plan">{profile.planCode === 'free' ? i18n.t('profile.plan.free') : profile.planCode}</p>
       {/* Danger zone divider + slot — US-008-06's Delete account button + GDPR confirm modal (T-008-09 D-1/D-4). */}
       <hr className="pf-divider" />
-      <div className="pf-danger-zone" aria-label="Danger zone">
+      <div className="pf-danger-zone" aria-label={i18n.t('profile.dangerZone.ariaLabel')}>
         <DangerZone profile={profile} onDeleteAccount={onDeleteAccount} />
       </div>
       {error && <p role="alert" className="pf-error">{error}</p>}

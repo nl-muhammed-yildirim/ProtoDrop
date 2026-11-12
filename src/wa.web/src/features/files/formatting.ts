@@ -4,6 +4,9 @@
  * Every function is total (never throws) so a bad wire row can't crash the list.
  */
 
+import { formatDate } from '../../core/i18n/format'
+import i18n from '../../core/i18n/init'
+
 // T-009-01/T-009-02 wire (TA-4.2#14), verified against src/wa.api/Program.cs MapGet("/api/v1/transfers"):
 // anonymous return serializes these camelCase fields (System.Text.Json default) — mirror them exactly.
 export interface MyTransferRowDto {
@@ -33,21 +36,23 @@ export type StatusFilter = 'all' | 'active' | 'expired'
 // Unknown byte → defensive gray text, never a throw (a future status can't crash the list).
 export function statusChip(status: number): { text: string; tone: 'green' | 'amber' | 'gray' } {
   switch (status) {
-    case 1: return { text: 'Active', tone: 'green' }
-    case 3: return { text: 'Download limit reached', tone: 'amber' }
-    case 2: return { text: 'Expired', tone: 'gray' }
+    case 1: return { text: i18n.t('files.status.active'), tone: 'green' }
+    case 3: return { text: i18n.t('files.status.limitReached'), tone: 'amber' }
+    case 2: return { text: i18n.t('files.status.expired'), tone: 'gray' }
     default: return { text: String(status), tone: 'gray' }
   }
 }
 
 /**
- * Locale month-day-year short date via toLocaleDateString (en-US) — so the "Expired {date}" copy is
- * deterministic in tests. Total: an unparseable/empty ISO string falls back to a stable string, no throw.
+ * Locale month-day-year short date via the shared Intl helper (T-014-03 / FR-014-4) — so the
+ * "Expired {date}" copy is deterministic in tests. Total: an unparseable/empty ISO string falls
+ * back to a stable string, no throw. Explicit { month: 'short' } keeps the abbreviated form the
+ * original en-US call produced (the shared default is 2-digit month for d.M.y locales).
  */
 export function formatShortDate(iso: string): string {
   const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return 'Expired'
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  if (Number.isNaN(d.getTime())) return i18n.t('files.status.expired')
+  return formatDate(iso, { month: 'short' })
 }
 
 /**
@@ -60,10 +65,10 @@ export function formatRemaining(
   nowMs: number,
 ): { kind: 'countdown'; text: string } | { kind: 'expired'; text: string } {
   const d = new Date(expiresAtUtcIso)
-  if (Number.isNaN(d.getTime())) return { kind: 'expired', text: 'Expired' }
+  if (Number.isNaN(d.getTime())) return { kind: 'expired', text: i18n.t('files.status.expired') }
 
   const remaining = d.getTime() - nowMs
-  if (remaining <= 0) return { kind: 'expired', text: `Expired ${formatShortDate(expiresAtUtcIso)}` }
+  if (remaining <= 0) return { kind: 'expired', text: i18n.t('files.expired.label', { date: formatShortDate(expiresAtUtcIso) }) }
 
   const sec = Math.floor(remaining / 1000)
   const days = Math.floor(sec / 86400)
@@ -71,15 +76,15 @@ export function formatRemaining(
   const minutes = Math.floor((sec % 3600) / 60)
   const seconds = sec % 60
 
-  if (days >= 1) return { kind: 'countdown', text: `expires in ${days} day${days === 1 ? '' : 's'}` }
-  if (hours >= 1) return { kind: 'countdown', text: `expires in ${hours}h ${minutes}m` }
-  if (minutes >= 1) return { kind: 'countdown', text: `expires in ${minutes}m ${seconds}s` }
-  return { kind: 'countdown', text: `expires in ${seconds}s` }
+  if (days >= 1) return { kind: 'countdown', text: days === 1 ? i18n.t('files.countdown.dayOne') : i18n.t('files.countdown.daysMany', { count: days }) }
+  if (hours >= 1) return { kind: 'countdown', text: i18n.t('files.countdown.hoursMinutes', { hours, minutes }) }
+  if (minutes >= 1) return { kind: 'countdown', text: i18n.t('files.countdown.minutesSeconds', { minutes, seconds }) }
+  return { kind: 'countdown', text: i18n.t('files.countdown.secondsOnly', { seconds }) }
 }
 
 // EC-009-4: a link-only transfer (no named recipients) shows "Link only" in the recipients column.
 export function recipientLabel(count: number): string {
-  if (count === 0) return 'Link only'
+  if (count === 0) return i18n.t('files.recipient.linkOnly')
   return String(count)
 }
 

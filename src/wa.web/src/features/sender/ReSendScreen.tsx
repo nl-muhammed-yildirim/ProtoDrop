@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import LinkScreen from './LinkScreen'
 import { getTraceParent } from '../../core/traceparent'
+import i18n from '../../core/i18n/init'
 
 interface ReSendScreenProps {
   originalTransferId: string
@@ -78,15 +79,15 @@ export function ReSendScreen({ originalTransferId, onUpload }: ReSendScreenProps
   }, [originalTransferId, loadKey])
 
   if (state.phase === 'loading') {
-    return <p className="rs-loading" role="status">Loading…</p>
+    return <p className="rs-loading" role="status">{i18n.t('link.resend.loading')}</p>
   }
 
   if (state.phase === 'filesGone') {
     // T-010-03 (EC-010-3): FILES_GONE is a screen-level state — no LinkScreen, no form, no error toast.
     return (
-      <section className="rs-filesgone" aria-label="Files were deleted">
-        <h1 className="rs-filesgone-heading">Files were deleted — upload again.</h1>
-        <button type="button" className="btn-primary rs-filesgone-upload" onClick={onUpload}>Upload</button>
+      <section className="rs-filesgone" aria-label={i18n.t('link.resend.filesDeletedAria')}>
+        <h1 className="rs-filesgone-heading">{i18n.t('link.resend.filesDeletedHeading')}</h1>
+        <button type="button" className="btn-primary rs-filesgone-upload" onClick={onUpload}>{i18n.t('link.resend.uploadButton')}</button>
       </section>
     )
   }
@@ -94,9 +95,9 @@ export function ReSendScreen({ originalTransferId, onUpload }: ReSendScreenProps
   if (state.phase === 'error') {
     // T-010-03: generic error — non-410 failure → inline message + retry (same pattern as LinkScreen's sendError).
     return (
-      <section className="rs-error" aria-label="Failed to load re-send details">
-        <p role="alert" className="rs-error-message">Failed to load re-send details. Please try again.</p>
-        <button type="button" className="btn-primary rs-error-retry" onClick={() => { setState({ phase: 'loading' }); setLoadKey((k) => k + 1) }}>Try again</button>
+      <section className="rs-error" aria-label={i18n.t('link.resend.errorAria')}>
+        <p role="alert" className="rs-error-message">{i18n.t('link.resend.errorMessage')}</p>
+        <button type="button" className="btn-primary rs-error-retry" onClick={() => { setState({ phase: 'loading' }); setLoadKey((k) => k + 1) }}>{i18n.t('link.resend.tryAgain')}</button>
       </section>
     )
   }
@@ -110,7 +111,7 @@ export function ReSendScreen({ originalTransferId, onUpload }: ReSendScreenProps
       initialRecipients={result.recipients.join('\n')}
       initialNote={result.note ?? ''}
       passwordRequired={result.passwordRequired}
-      sentHeading="New link ready."
+      sentHeading={i18n.t('link.resend.newLinkReady')}
       bannerFiles={{ firstFile: result.files[0].name, count: result.files.length }}
     />
   )

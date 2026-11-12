@@ -1,6 +1,8 @@
 // T-011-13 (FR-011-2 / FR-011-5): shared wire types + pure helpers for the Flags and Suppressions
 // screens (endpoints 23/24/25 — Program.cs L706–L748, L463–L494, L497–L503). No React here.
 
+import { formatDate, formatTime } from '../../core/i18n/format'
+
 // Endpoint 23 GET /api/v1/admin/flags — bare JSON array, ordered by key ascending, 52 fixed rows,
 // NO paging (Program.cs L708–L715). Reads write no audit row (AC-011-3).
 export interface FlagRowDto {
@@ -37,7 +39,7 @@ export interface AuditRecentRowDto {
 export function formatCreatedAt(iso: string): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return 'Unknown'
-  const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+  const date = formatDate(iso, { month: 'short' })
+  const time = formatTime(iso)
   return `${date}, ${time}`
 }

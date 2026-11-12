@@ -4,6 +4,8 @@
  * so a bad wire row can't crash the screen. Do NOT import across features — admin owns its own helpers.
  */
 
+import { formatDate, formatTime } from '../../core/i18n/format'
+
 // T-011-06 wire shape (TA-4.2#22), verified against src/wa.api/Program.cs L578–L614:
 // GET /api/v1/admin/users returns { items: [...], nextCursor } — mirror the row fields exactly.
 export interface AdminUserRowDto {
@@ -74,7 +76,7 @@ export function parseSearchResponse(json: { items?: unknown[]; nextCursor?: stri
 export function formatCreatedAt(iso: string): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return 'Unknown'
-  const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+  const date = formatDate(iso, { month: 'short' })
+  const time = formatTime(iso)
   return `${date}, ${time}`
 }

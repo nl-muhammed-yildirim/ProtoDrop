@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import i18n from '../i18n/init'
 
 import { formatBytes, formatBytesShort } from './formatBytes'
 
@@ -77,5 +78,16 @@ describe('formatBytesShort', () => {
 
   it('does not show trailing zeros for whole numbers above bytes', () => {
     expect(formatBytesShort(512 * 1024 ** 2)).toBe('512 MB')
+  })
+})
+
+// T-014-03 (EC-014-2): the NUMBER is localized via Intl; the unit stays English in all locales.
+describe('T-014-03 formatBytes de locale', () => {
+  it('localizes the number but keeps the English unit (de)', async () => {
+    await i18n.changeLanguage('de')
+    expect(formatBytes(1536)).toBe('1,50 KB') // de decimal comma; "KB" stays English.
+    expect(formatBytesShort(1024 ** 2)).toBe('1 MB')
+    // Restore for other suites.
+    await i18n.changeLanguage('en')
   })
 })

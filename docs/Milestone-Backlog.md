@@ -56,7 +56,7 @@ Status: `pending` → `done` (date). `CURRENT` = first non-done task.
 
 | ID | Scope | Spec links | Exit check | Status |
 |---|---|---|---|---|
-| T-026 | i18n full pass: 8 locales, detection, fallback + `translation_missing`, localized emails | F-TRF-014, TA-8.5 | AC-014-1…014-2; no hardcoded strings (lint) | pending |
+| T-026 | i18n full pass: 8 locales, detection, fallback + `translation_missing`, localized emails | F-TRF-014, TA-8.5 | AC-014-1…014-2; no hardcoded strings (lint) | done 2026-11-12 (feature-end gate: domain.unit 63/63 · application.unit 368/368 · api.integration 103/103 Testcontainers · wa.web lint clean + vitest 364/364 + tsc -b/vite green. Feature-level reviewer PASS with one MAJOR cross-task finding — AC-014-3 account-locale **write** path missing (read path correct + tested; nothing writes `protoDrop.accountLocale`, no profile "Select language" control, no server locale field) → deferred to F-TRF-008 per Open-Decisions Part 3 2026-11-12 entry; T-026 exit check cites AC-014-1…AC-014-2 only. Tasks T-014-01…04 all done, each with task-level reviewer PASS) |
 | T-027 | Dark mode + a11y (WCAG 2.1 AA on P0 surfaces) + mobile web pass | F-TRF-015…017, UI-Reference | No flash-of-wrong-theme; keyboard-only full flow; mobile matrix green in staging | pending |
 | T-028 | Playwright e2e suite vs staging (guest loop, password, expiry via flag override, My Files CRUD, i18n spot-check) | TA-14.1 | E2E green on staging deploy | pending |
 | T-029 | Load test (k6): 5 GB synthetic, API p50/p99, recipient TTFB from 2 zones | TA-14.1, TA-15 | Upload < 10 min @ 100 Mbps; SLOs met | pending |

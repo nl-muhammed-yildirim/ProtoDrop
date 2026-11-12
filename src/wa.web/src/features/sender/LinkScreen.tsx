@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useUploadEngine } from '../../core/upload/UploadEngine'
 import { getTraceParent } from '../../core/traceparent'
 import { MAX_EMAILS, parseRecipients, validateAddress } from './recipients'
+import i18n from '../../core/i18n/init'
 
 interface LinkScreenProps {
   linkId: string
@@ -154,7 +155,7 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
 
   // T-002-08: shared blocking reason — invalid address or cap exceeded; wrapper spans' title explains why (§4.2).
   const blockReason: string | null =
-    capExceeded ? `Maximum ${MAX_EMAILS} recipients` : invalidAddresses.length > 0 ? 'Fix the invalid recipient address(es) above' : null
+    capExceeded ? i18n.t('link.ready.maxRecipients', { max: MAX_EMAILS }) : invalidAddresses.length > 0 ? i18n.t('link.ready.fixInvalid') : null
 
   const blankOr = (value: string): string | undefined => (value.trim() === '' ? undefined : value) // blank sender fields are omitted.
 
@@ -214,21 +215,21 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
   }
 
   return (
-    <section className="ls" aria-label={sendState === 'sent' ? 'Transfer sent.' : 'Your link is ready'}>
+    <section className="ls" aria-label={sendState === 'sent' ? i18n.t('link.ready.transferSent') : i18n.t('link.ready.linkReady')}>
       <div className="ls-card">
         {sendState === 'sent' ? (
           // T-002-08 (FR-002-7): confirmation screen — in-place swap, no route navigation.
           <>
-            <h1 className="ls-heading">{sentHeading ?? 'Transfer sent.'}</h1>
-            <p className="ls-sent-sub">Share the link or send it again later.</p>
+            <h1 className="ls-heading">{sentHeading ?? i18n.t('link.ready.transferSent')}</h1>
+            <p className="ls-sent-sub">{i18n.t('link.ready.shareLater')}</p>
             <div className="ls-field">
               <span className="ls-url">{url}</span>
               <button type="button" className="ls-copy-btn" onClick={() => void handleCopy()}>
-                {copied ? 'Copied ✓' : 'Copy'}
+                {copied ? i18n.t('link.ready.copied') : i18n.t('link.ready.copy')}
               </button>
             </div>
             {copied && (
-              <p className="ls-copy-success" role="status">Copied ✓</p>
+              <p className="ls-copy-success" role="status">{i18n.t('link.ready.copied')}</p>
             )}
             {/* M0: client-side pre-fill via onSendAgain — F-TRF-010's endpoint 16 does the re-draft later. */}
             <button
@@ -236,51 +237,51 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
               className="ls-send-btn"
               onClick={() => onSendAgain?.(useUploadEngine.getState().files.map((f) => ({ name: f.name, size: f.size })))}
             >
-              Send again
+              {i18n.t('link.ready.sendAgain')}
             </button>
           </>
         ) : (
           <>
-            <h1 className="ls-heading">Your link is ready</h1>
+            <h1 className="ls-heading">{i18n.t('link.ready.linkReady')}</h1>
             {/* T-010-03 (EC-010-3): re-send banner — first file name + "and N more files" (all-or-nothing; no per-file selection). */}
             {bannerFiles && (
               <p className="ls-banner">
                 {bannerFiles.count === 1
-                  ? `Re-sending '${bannerFiles.firstFile}'. You can change the details before sending.`
-                  : `Re-sending '${bannerFiles.firstFile}' and ${bannerFiles.count - 1} more files. You can change the details before sending.`}
+                  ? i18n.t('link.ready.resendSingle', { file: bannerFiles.firstFile })
+                  : i18n.t('link.ready.resendMany', { file: bannerFiles.firstFile, more: bannerFiles.count - 1 })}
               </p>
             )}
             <div className="ls-field">
               <span className="ls-url">{url}</span>
               <button type="button" className="ls-copy-btn" onClick={() => void handleCopy()}>
-                {copied ? 'Copied ✓' : 'Copy'}
+                {copied ? i18n.t('link.ready.copied') : i18n.t('link.ready.copy')}
               </button>
             </div>
             {copied && (
-              <p className="ls-copy-success" role="status">Copied ✓</p>
+              <p className="ls-copy-success" role="status">{i18n.t('link.ready.copied')}</p>
             )}
             {/* T-002-05: recipients field — parse + validate on blur; per-address inline errors, no blocking modal */}
             <div className="ls-recipients">
-              <label className="ls-recipients-label" htmlFor="recipients-textarea">Recipients</label>
+              <label className="ls-recipients-label" htmlFor="recipients-textarea">{i18n.t('link.ready.recipientsLabel')}</label>
               <textarea
                 id="recipients-textarea"
                 className="ls-recipients-textarea"
                 value={recipientsRaw}
                 onChange={handleRecipientsChange}
                 onBlur={handleRecipientsBlur}
-                placeholder="one@address.com"
+                placeholder={i18n.t('link.ready.recipientsPlaceholder')}
               />
-              <p className="ls-recipients-helper">One per line — you can also separate with commas.</p>
+              <p className="ls-recipients-helper">{i18n.t('link.ready.helperText')}</p>
               {invalidAddresses.map((addr) => (
                 <p key={addr} className="ls-recipients-error">{addr}</p>
               ))}
               {capExceeded && (
-                <p className="ls-recipients-error">Maximum {MAX_EMAILS} recipients</p>
+                <p className="ls-recipients-error">{i18n.t('link.ready.maxRecipients', { max: MAX_EMAILS })}</p>
               )}
             </div>
             {/* T-002-07: sender name, email, and note fields */}
             <div className="ls-sender">
-              <label className="ls-sender-label" htmlFor="from-name">From</label>
+              <label className="ls-sender-label" htmlFor="from-name">{i18n.t('link.ready.fromLabel')}</label>
               <input
                 id="from-name"
                 type="text"
@@ -288,11 +289,11 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
                 value={fromName}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFromName(e.target.value)}
                 maxLength={100}
-                placeholder="Your name"
+                placeholder={i18n.t('link.ready.yourNamePlaceholder')}
               />
             </div>
             <div className="ls-sender">
-              <label className="ls-sender-label" htmlFor="sender-email">Your email (optional)</label>
+              <label className="ls-sender-label" htmlFor="sender-email">{i18n.t('link.ready.emailLabel')}</label>
               <input
                 id="sender-email"
                 type="email"
@@ -300,33 +301,33 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
                 value={senderEmail}
                 onChange={handleEmailChange}
                 onBlur={handleEmailBlur}
-                placeholder="you@example.com"
+                placeholder={i18n.t('link.ready.emailPlaceholder')}
               />
               {emailError && (
-                <p className="ls-sender-error">Please enter a valid email address</p>
+                <p className="ls-sender-error">{i18n.t('link.ready.emailError')}</p>
               )}
             </div>
             <div className="ls-sender">
-              <label className="ls-sender-label" htmlFor="note-textarea">Note (optional)</label>
+              <label className="ls-sender-label" htmlFor="note-textarea">{i18n.t('link.ready.noteLabel')}</label>
               <textarea
                 id="note-textarea"
                 className="ls-note-textarea"
                 value={note}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNote(e.target.value)}
                 maxLength={500}
-                placeholder="Add a note for the recipient…"
+                placeholder={i18n.t('link.ready.addNotePlaceholder')}
               />
               <span className={`ls-char-counter${note.length >= 450 ? ' ls-char-counter--warning' : ''}`}>
-                {note.length}/500
+                {`${note.length}/500`}
               </span>
               {noteTooLong && (
-                <p className="ls-sender-error">Note is too long</p>
+                <p className="ls-sender-error">{i18n.t('link.ready.noteTooLong')}</p>
               )}
             </div>
             {/* T-010-03 (FR-010-2, UI-Reference §5.2): password field — starts empty; the label notes a password was set on the original. */}
             <div className="ls-password-field">
               <label className="ls-sender-label" htmlFor="link-password">
-                Password{passwordRequired === true ? ' (was set on original)' : ''}
+                {i18n.t('link.ready.passwordLabel')}{passwordRequired === true ? i18n.t('link.ready.passwordSuffix') : ''}
               </label>
               <div className="ls-password-row">
                 <input
@@ -335,27 +336,27 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
                   className="ls-password-input"
                   value={passwordValue}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPasswordValue(e.target.value)}
-                  placeholder="Optional"
+                  placeholder={i18n.t('link.ready.optionalPlaceholder')}
                   autoComplete="new-password"
                 />
                 <button
                   type="button"
                   className="ls-password-toggle"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-label={showPassword ? i18n.t('link.ready.hidePasswordAria') : i18n.t('link.ready.showPasswordAria')}
                   aria-pressed={showPassword}
                   onClick={() => setShowPassword((s) => !s)}
                 >
-                  {showPassword ? 'Hide' : 'Show'}
+                  {showPassword ? i18n.t('link.ready.hideButton') : i18n.t('link.ready.showButton')}
                 </button>
               </div>
             </div>
             {/* T-002-08: Send transfer + Copy link only — disabled while blocked or in flight; wrapper spans carry the title (§4.2). */}
             <div className="ls-actions">
               <span className="ls-actions-wrap" title={blockReason ?? undefined}>
-                <button type="button" className="ls-send-btn" onClick={() => void handleSendTransfer()} disabled={sending || blockReason !== null}>Send transfer</button>
+                <button type="button" className="ls-send-btn" onClick={() => void handleSendTransfer()} disabled={sending || blockReason !== null}>{i18n.t('link.ready.sendTransferButton')}</button>
               </span>
               <span className="ls-actions-wrap" title={blockReason ?? undefined}>
-                <button type="button" className="ls-copyonly-btn" onClick={() => void handleCopyLinkOnly()} disabled={sending || blockReason !== null}>Copy link only</button>
+                <button type="button" className="ls-copyonly-btn" onClick={() => void handleCopyLinkOnly()} disabled={sending || blockReason !== null}>{i18n.t('link.ready.copyLinkOnlyButton')}</button>
               </span>
             </div>
             {sendError && (
