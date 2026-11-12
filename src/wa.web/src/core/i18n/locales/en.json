@@ -157,5 +157,12 @@
   "error.action.goHome": "Go to home",
   "error.ref.label": "Ref:",
   "error.title.rateLimited": "A moment of calm, then try again.",
-  "error.hint.rateLimited": "Please wait about 60 seconds before trying again."
+  "error.hint.rateLimited": "Please wait about 60 seconds before trying again.",
+  "link.ready.recipientsPlaceholder": "one@address.com",
+  "link.ready.emailPlaceholder": "you@example.com",
+  "recipient.active.filesAria": "Files",
+  "auth.linkSent.sectionAria": "Link sent",
+  "auth.page.ariaLabel": "Auth",
+  "plural.test.files_one": "{{count}} file",
+  "plural.test.files_other": "{{count}} files"
 }

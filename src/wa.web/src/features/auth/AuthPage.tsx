@@ -159,7 +159,7 @@ export function AuthPage({ onSignedIn }: AuthPageProps) {
   if (phase === 'link-sent') {
     // "Link sent to {email}" state — form removed entirely (no double-submission possible).
     return (
-      <section className="au" aria-label="Link sent">
+      <section className="au" aria-label={i18n.t('auth.linkSent.sectionAria')}>
         <div className="au-card">
           <h1 className="au-heading">{i18n.t('auth.linkSent.heading', { email: sentEmail })}</h1>
           <button type="button" className="au-ghost-btn" disabled={cooldownRemaining !== null}>
@@ -171,7 +171,7 @@ export function AuthPage({ onSignedIn }: AuthPageProps) {
   }
 
   return (
-    <section className="au" aria-label="Auth">
+    <section className="au" aria-label={i18n.t('auth.page.ariaLabel')}>
       <div className="au-card">
         {/* Copy-only tabs — same fields, same button per FR-008-3 / EC-008-4. */}
         <div className="au-tabs">

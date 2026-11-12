@@ -26,6 +26,7 @@ export function TopBar({ profile, onNavigateAccount, onThemeChange, onSignOut }:
 
   return (
     <header className="tb" aria-label={i18n.t('topbar.header.ariaLabel')}>
+      {/* eslint-disable-next-line no-restricted-syntax -- brand name (proper noun), not translated. */}
       <span className="tb-wordmark">ProtoDrop</span>
       {profile ? (
         <div className="tb-avatar-wrap">

@@ -157,5 +157,12 @@
   "error.action.goHome": "Ana sayfaya git",
   "error.ref.label": "Referans:",
   "error.title.rateLimited": "Bir an sakinlik, sonra tekrar dene.",
-  "error.hint.rateLimited": "Tekrar denemeden önce yaklaşık 60 saniye bekleyin."
+  "error.hint.rateLimited": "Tekrar denemeden önce yaklaşık 60 saniye bekleyin.",
+  "link.ready.recipientsPlaceholder": "one@address.com",
+  "link.ready.emailPlaceholder": "you@example.com",
+  "recipient.active.filesAria": "Dosyalar",
+  "auth.linkSent.sectionAria": "Başlantı gönderildi",
+  "auth.page.ariaLabel": "Giriş",
+  "plural.test.files_one": "{{count}} dosya",
+  "plural.test.files_other": "{{count}} dosya"
 }

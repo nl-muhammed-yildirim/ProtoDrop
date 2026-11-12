@@ -157,5 +157,12 @@
   "error.action.goHome": "Ir para a página inicial",
   "error.ref.label": "Ref:",
   "error.title.rateLimited": "Um momento de calma e tente novamente.",
-  "error.hint.rateLimited": "Aguarde cerca de 60 segundos antes de tentar novamente."
+  "error.hint.rateLimited": "Aguarde cerca de 60 segundos antes de tentar novamente.",
+  "link.ready.recipientsPlaceholder": "one@address.com",
+  "link.ready.emailPlaceholder": "you@example.com",
+  "recipient.active.filesAria": "Arquivos",
+  "auth.linkSent.sectionAria": "Link enviado",
+  "auth.page.ariaLabel": "Iniciar sessão",
+  "plural.test.files_one": "{{count}} arquivo",
+  "plural.test.files_other": "{{count}} arquivos"
 }

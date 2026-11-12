@@ -65,6 +65,9 @@ i18n.init({
   resources,
   lng: resolveInitialLanguage(),
   fallbackLng: 'en',
+  // Probed (T-014-03 / AC-014-2): i18next only emits the missingKey event when saveMissing is set —
+  // without it the telemetry handler below never fires. No store mutation of imported bundles observed.
+  saveMissing: true,
   interpolation: {
     // React escapes rendered strings; double-escaping would mangle values.
     escapeValue: false,

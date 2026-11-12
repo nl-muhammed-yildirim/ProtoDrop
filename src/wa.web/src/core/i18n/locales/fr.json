@@ -157,5 +157,12 @@
   "error.action.goHome": "Retour à l'accueil",
   "error.ref.label": "Réf. :",
   "error.title.rateLimited": "Un moment de calme, puis réessayez.",
-  "error.hint.rateLimited": "Veuillez attendre environ 60 secondes avant de réessayer."
+  "error.hint.rateLimited": "Veuillez attendre environ 60 secondes avant de réessayer.",
+  "link.ready.recipientsPlaceholder": "one@address.com",
+  "link.ready.emailPlaceholder": "you@example.com",
+  "recipient.active.filesAria": "Fichiers",
+  "auth.linkSent.sectionAria": "Lien envoyé",
+  "auth.page.ariaLabel": "Connexion",
+  "plural.test.files_one": "{{count}} fichier",
+  "plural.test.files_other": "{{count}} fichiers"
 }

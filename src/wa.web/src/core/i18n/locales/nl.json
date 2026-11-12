@@ -157,5 +157,12 @@
   "error.action.goHome": "Naar de startpagina",
   "error.ref.label": "Ref:",
   "error.title.rateLimited": "Een momentje rust, en probeer het opnieuw.",
-  "error.hint.rateLimited": "Wacht ongeveer 60 seconden voordat je het opnieuw probeert."
+  "error.hint.rateLimited": "Wacht ongeveer 60 seconden voordat je het opnieuw probeert.",
+  "link.ready.recipientsPlaceholder": "one@address.com",
+  "link.ready.emailPlaceholder": "you@example.com",
+  "recipient.active.filesAria": "Bestanden",
+  "auth.linkSent.sectionAria": "Link verzonden",
+  "auth.page.ariaLabel": "Inloggen",
+  "plural.test.files_one": "{{count}} bestand",
+  "plural.test.files_other": "{{count}} bestanden"
 }

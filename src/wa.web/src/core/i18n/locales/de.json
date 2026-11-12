@@ -157,5 +157,12 @@
   "error.action.goHome": "Zur Startseite",
   "error.ref.label": "Referenz:",
   "error.title.rateLimited": "Ein Moment der Ruhe, dann versuche es erneut.",
-  "error.hint.rateLimited": "Bitte warte etwa 60 Sekunden, bevor du es erneut versuchst."
+  "error.hint.rateLimited": "Bitte warte etwa 60 Sekunden, bevor du es erneut versuchst.",
+  "link.ready.recipientsPlaceholder": "one@address.com",
+  "link.ready.emailPlaceholder": "you@example.com",
+  "recipient.active.filesAria": "Dateien",
+  "auth.linkSent.sectionAria": "Link gesendet",
+  "auth.page.ariaLabel": "Anmeldung",
+  "plural.test.files_one": "{{count}} Datei",
+  "plural.test.files_other": "{{count}} Dateien"
 }

@@ -217,7 +217,7 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
       {note && note.trim() !== '' && (
         <blockquote className="rp-note">{note}</blockquote>
       )}
-      <ul className="rp-list" aria-label="Files">
+      <ul className="rp-list" aria-label={i18n.t('recipient.active.filesAria')}>
         {files.map((f) => (
           <li key={f.fileId} className="rp-row">
             <span className="rp-icon" aria-hidden="true">

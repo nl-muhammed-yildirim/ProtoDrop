@@ -157,5 +157,12 @@
   "error.action.goHome": "Vai alla home",
   "error.ref.label": "Rif:",
   "error.title.rateLimited": "Un momento di calma, poi riprova.",
-  "error.hint.rateLimited": "Aspetta circa 60 secondi prima di riprovare."
+  "error.hint.rateLimited": "Aspetta circa 60 secondi prima di riprovare.",
+  "link.ready.recipientsPlaceholder": "one@address.com",
+  "link.ready.emailPlaceholder": "you@example.com",
+  "recipient.active.filesAria": "File",
+  "auth.linkSent.sectionAria": "Link inviato",
+  "auth.page.ariaLabel": "Accesso",
+  "plural.test.files_one": "{{count}} file",
+  "plural.test.files_other": "{{count}} files"
 }

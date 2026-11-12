@@ -269,7 +269,7 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
                 value={recipientsRaw}
                 onChange={handleRecipientsChange}
                 onBlur={handleRecipientsBlur}
-                placeholder="one@address.com"
+                placeholder={i18n.t('link.ready.recipientsPlaceholder')}
               />
               <p className="ls-recipients-helper">{i18n.t('link.ready.helperText')}</p>
               {invalidAddresses.map((addr) => (
@@ -301,7 +301,7 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
                 value={senderEmail}
                 onChange={handleEmailChange}
                 onBlur={handleEmailBlur}
-                placeholder="you@example.com"
+                placeholder={i18n.t('link.ready.emailPlaceholder')}
               />
               {emailError && (
                 <p className="ls-sender-error">{i18n.t('link.ready.emailError')}</p>
