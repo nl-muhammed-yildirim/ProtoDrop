@@ -1,4 +1,13 @@
 {
   "landing.dropzone.uploadDegraded": "Archiviazione temporaneamente non disponibile — riprova.",
-  "recipient.download.unavailable": "File temporaneamente non disponibile."
+  "recipient.download.unavailable": "File temporaneamente non disponibile.",
+  "landing.dropzone.pasteToast": "Immagine aggiunta",
+  "landing.dropzone.skipToast": "Alcuni file sono stati ignorati",
+  "landing.dropzone.ariaLabel": "Carica i file",
+  "landing.dropzone.title": "Invia i tuoi file.",
+  "landing.dropzone.orChooseFiles": "o scegli i file",
+  "landing.dropzone.chooseFiles": "Scegli i file",
+  "landing.staging.perFileLimitSingle": "Questo file supera il limite di {{limit}} per file. Eliminalo per continuare.",
+  "landing.staging.perFileLimitMany": "{{count}} file superano il limite di {{limit}} per file. Eliminali per continuare.",
+  "landing.staging.totalLimit": "La dimensione del trasferimento ({{total}}) supera il limite di {{limit}}. Elimina i file per continuare."
 }

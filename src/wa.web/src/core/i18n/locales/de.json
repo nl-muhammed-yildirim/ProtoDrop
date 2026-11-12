@@ -1,4 +1,13 @@
 {
   "landing.dropzone.uploadDegraded": "Speicher vorübergehend nicht verfügbar — bitte erneut versuchen.",
-  "recipient.download.unavailable": "Datei vorübergehend nicht verfügbar."
+  "recipient.download.unavailable": "Datei vorübergehend nicht verfügbar.",
+  "landing.dropzone.pasteToast": "Bild hinzugefügt",
+  "landing.dropzone.skipToast": "Einige Dateien wurden übersprungen",
+  "landing.dropzone.ariaLabel": "Dateien hochladen",
+  "landing.dropzone.title": "Sende deine Dateien.",
+  "landing.dropzone.orChooseFiles": "oder wähle Dateien",
+  "landing.dropzone.chooseFiles": "Dateien auswählen",
+  "landing.staging.perFileLimitSingle": "Diese Datei überschreitet das Limit von {{limit}} pro Datei. Entferne sie, um fortzufahren.",
+  "landing.staging.perFileLimitMany": "{{count}} Dateien überschreiten das Limit von {{limit}} pro Datei. Entferne sie, um fortzufahren.",
+  "landing.staging.totalLimit": "Transfergröße {{total}} überschreitet das Limit von {{limit}}. Entferne Dateien, um fortzufahren."
 }

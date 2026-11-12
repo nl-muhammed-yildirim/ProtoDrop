@@ -18,6 +18,7 @@ export const CLIENT_TELEMETRY_EVENTS = [
   'growth_cta_clicked',
   'upload_failed',
   'download_completed',
+  'translation_missing',
 ] as const
 
 export type ClientTelemetryEvent = (typeof CLIENT_TELEMETRY_EVENTS)[number]

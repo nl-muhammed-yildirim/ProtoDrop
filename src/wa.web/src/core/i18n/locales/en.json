@@ -1,4 +1,13 @@
 {
   "landing.dropzone.uploadDegraded": "Storage temporarily unavailable — retry.",
-  "recipient.download.unavailable": "File temporarily unavailable."
+  "recipient.download.unavailable": "File temporarily unavailable.",
+  "landing.dropzone.pasteToast": "Image added",
+  "landing.dropzone.skipToast": "Some files were skipped",
+  "landing.dropzone.ariaLabel": "Upload files",
+  "landing.dropzone.title": "Send your files.",
+  "landing.dropzone.orChooseFiles": "or choose files",
+  "landing.dropzone.chooseFiles": "Choose files",
+  "landing.staging.perFileLimitSingle": "This file exceeds the {{limit}} per-file limit. Remove it to continue.",
+  "landing.staging.perFileLimitMany": "{{count}} files exceed the {{limit}} per-file limit. Remove them to continue.",
+  "landing.staging.totalLimit": "Transfer size {{total}} exceeds the {{limit}} limit. Remove files to continue."
 }

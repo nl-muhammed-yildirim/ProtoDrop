@@ -1,4 +1,13 @@
 {
   "landing.dropzone.uploadDegraded": "Opslag tijdelijk niet beschikbaar — probeer opnieuw.",
-  "recipient.download.unavailable": "Bestand tijdelijk niet beschikbaar."
+  "recipient.download.unavailable": "Bestand tijdelijk niet beschikbaar.",
+  "landing.dropzone.pasteToast": "Afbeelding toegevoegd",
+  "landing.dropzone.skipToast": "Sommige bestanden werden overgeslagen",
+  "landing.dropzone.ariaLabel": "Bestanden uploaden",
+  "landing.dropzone.title": "Stuur je bestanden.",
+  "landing.dropzone.orChooseFiles": "of kies bestanden",
+  "landing.dropzone.chooseFiles": "Bestanden kiezen",
+  "landing.staging.perFileLimitSingle": "Dit bestand overschrijdt de limiet van {{limit}} per bestand. Verwijder het om door te gaan.",
+  "landing.staging.perFileLimitMany": "{{count}} bestanden overschrijden de limiet van {{limit}} per bestand. Verwijder ze om door te gaan.",
+  "landing.staging.totalLimit": "Transfergrootte {{total}} overschrijdt de limiet van {{limit}}. Verwijder bestanden om door te gaan."
 }

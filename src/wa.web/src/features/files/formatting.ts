@@ -4,6 +4,8 @@
  * Every function is total (never throws) so a bad wire row can't crash the list.
  */
 
+import { formatDate } from '../../core/i18n/format'
+
 // T-009-01/T-009-02 wire (TA-4.2#14), verified against src/wa.api/Program.cs MapGet("/api/v1/transfers"):
 // anonymous return serializes these camelCase fields (System.Text.Json default) — mirror them exactly.
 export interface MyTransferRowDto {
@@ -41,13 +43,15 @@ export function statusChip(status: number): { text: string; tone: 'green' | 'amb
 }
 
 /**
- * Locale month-day-year short date via toLocaleDateString (en-US) — so the "Expired {date}" copy is
- * deterministic in tests. Total: an unparseable/empty ISO string falls back to a stable string, no throw.
+ * Locale month-day-year short date via the shared Intl helper (T-014-03 / FR-014-4) — so the
+ * "Expired {date}" copy is deterministic in tests. Total: an unparseable/empty ISO string falls
+ * back to a stable string, no throw. Explicit { month: 'short' } keeps the abbreviated form the
+ * original en-US call produced (the shared default is 2-digit month for d.M.y locales).
  */
 export function formatShortDate(iso: string): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return 'Expired'
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  return formatDate(iso, { month: 'short' })
 }
 
 /**

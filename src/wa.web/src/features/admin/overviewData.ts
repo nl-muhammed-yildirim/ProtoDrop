@@ -4,6 +4,8 @@
  * bad wire row can't crash the screen. Do NOT import across features — admin owns its own helpers.
  */
 
+import { formatDate, formatTime } from '../../core/i18n/format'
+
 // T-011-03 wire shape (TA-4.2#20), verified against src/wa.api/Program.cs L513–L521:
 // GET /api/v1/admin/overview returns exactly these camelCase fields — mirror them, no more.
 export interface RecentTransferRow {
@@ -52,14 +54,14 @@ export function statusTone(status: number): 'green' | 'amber' | 'gray' {
 }
 
 /**
- * FR-011-6: "Updated {time}" line — locale month-day-year + time via toLocaleDateString/toLocaleTimeString
- * (en-US) so the copy is deterministic in tests. Total: unparseable ISO → stable fallback, no throw.
+ * FR-011-6: "Updated {time}" line — locale month-day-year + time via the shared Intl helpers
+ * (T-014-03 / FR-014-4) so the copy is deterministic in tests. Total: unparseable ISO → stable fallback, no throw.
  */
 export function formatUpdatedAt(iso: string): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return 'Unknown'
-  const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+  const date = formatDate(iso, { month: 'short' })
+  const time = formatTime(iso)
   return `${date}, ${time}`
 }
 
@@ -71,7 +73,7 @@ export function formatLastDelivery(iso: string | null): string {
   if (!iso) return 'Never'
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return 'Unknown'
-  const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+  const date = formatDate(iso, { month: 'short' })
+  const time = formatTime(iso)
   return `${date}, ${time}`
 }

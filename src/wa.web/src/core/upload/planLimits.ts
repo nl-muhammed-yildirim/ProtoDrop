@@ -1,4 +1,5 @@
 import { formatBytes } from './formatBytes'
+import i18n from '../i18n/init'
 
 /**
  * Effective plan limits the client pre-checks against (T-001-04).
@@ -74,12 +75,12 @@ export function limitMessage(files: readonly Sizable[], result: LimitCheckResult
     // removing the marked rows clears both, so this takes precedence.
     const limit = formatBytes(plan.maxSingleFile)
     return n === 1
-      ? `This file exceeds the ${limit} per-file limit. Remove it to continue.`
-      : `${n} files exceed the ${limit} per-file limit. Remove them to continue.`
+      ? i18n.t('landing.staging.perFileLimitSingle', { limit })
+      : i18n.t('landing.staging.perFileLimitMany', { count: n, limit })
   }
   if (result.overTotal) {
     const total = formatBytes(files.reduce((sum, f) => sum + f.size, 0))
-    return `Transfer size ${total} exceeds the ${formatBytes(plan.maxTransferSize)} limit. Remove files to continue.`
+    return i18n.t('landing.staging.totalLimit', { total, limit: formatBytes(plan.maxTransferSize) })
   }
   return null
 }

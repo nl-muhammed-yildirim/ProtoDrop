@@ -1,4 +1,13 @@
 {
   "landing.dropzone.uploadDegraded": "Depolama geçici olarak kullanılamıyor — tekrar deneyin.",
-  "recipient.download.unavailable": "Dosya geçici olarak kullanılamıyor."
+  "recipient.download.unavailable": "Dosya geçici olarak kullanılamıyor.",
+  "landing.dropzone.pasteToast": "Görsel eklendi",
+  "landing.dropzone.skipToast": "Bazı dosyalar atlandı",
+  "landing.dropzone.ariaLabel": "Dosyaları yükle",
+  "landing.dropzone.title": "Dosyalarını gönder.",
+  "landing.dropzone.orChooseFiles": "veya dosya seç",
+  "landing.dropzone.chooseFiles": "Dosya seç",
+  "landing.staging.perFileLimitSingle": "Bu dosya {{limit}} dosya başına sınırını aşıyor. Devam etmek için kaldırın.",
+  "landing.staging.perFileLimitMany": "{{count}} dosya {{limit}} dosya başına sınırını aşıyor. Devam etmek için kaldırın.",
+  "landing.staging.totalLimit": "Aktarım boyutu ({{total}}), {{limit}} sınırını aşıyor. Devam etmek için dosyaları kaldırın."
 }

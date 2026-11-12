@@ -16,6 +16,7 @@ import pt from './locales/pt.json'
 import it from './locales/it.json'
 import de from './locales/de.json'
 import tr from './locales/tr.json'
+import { trackClientEvent } from '../telemetry/clientTelemetry'
 
 const resources = {
   en: { translation: en },
@@ -71,11 +72,12 @@ i18n.init({
 })
 
 // Dev-only missingKey handler (TA-8.5 / EC-014-1): warn key + locale so T-014-03's
-// sweep catches gaps early. translation_missing telemetry wiring is T-014-03 scope.
+// sweep catches gaps early, plus translation_missing telemetry (AC-014-2).
 i18n.on('missingKey', (lngs, _ns, key) => {
   if (import.meta.env.DEV) {
     console.warn(`[i18n] missing key "${key}" for locale(s) ${lngs.join(', ')}`)
   }
+  trackClientEvent('translation_missing', { key, locale: i18n.language })
 })
 
 // T-025's app.initialized properties read this (no new event — the closed lists don't have it).

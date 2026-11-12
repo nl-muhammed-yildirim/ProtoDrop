@@ -1,4 +1,13 @@
 {
   "landing.dropzone.uploadDegraded": "Armazenamento temporariamente indisponível — tente novamente.",
-  "recipient.download.unavailable": "Arquivo temporariamente indisponível."
+  "recipient.download.unavailable": "Arquivo temporariamente indisponível.",
+  "landing.dropzone.pasteToast": "Imagem adicionada",
+  "landing.dropzone.skipToast": "Alguns arquivos foram ignorados",
+  "landing.dropzone.ariaLabel": "Enviar arquivos",
+  "landing.dropzone.title": "Envie seus arquivos.",
+  "landing.dropzone.orChooseFiles": "ou escolha arquivos",
+  "landing.dropzone.chooseFiles": "Escolher arquivos",
+  "landing.staging.perFileLimitSingle": "Este arquivo excede o limite de {{limit}} por arquivo. Remova-o para continuar.",
+  "landing.staging.perFileLimitMany": "{{count}} arquivos excedem o limite de {{limit}} por arquivo. Remova-os para continuar.",
+  "landing.staging.totalLimit": "O tamanho da transferência ({{total}}) excede o limite de {{limit}}. Remova arquivos para continuar."
 }
