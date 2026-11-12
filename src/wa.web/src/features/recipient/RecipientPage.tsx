@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, MouseEvent } from 'react'
 
 import { formatBytes } from '../../core/upload/formatBytes'
-import { DEGRADED_COPY } from '../../core/i18n/keys'
+import i18n from '../../core/i18n/init'
 import ErrorScreen from '../errors/ErrorScreen'
 import { trackGrowthCta } from './growthTelemetry'
 import { useRecipientStore } from './RecipientStore'
@@ -112,7 +112,7 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
   }
 
   if (status === 'loading') {
-    return <p className="rp-loading" role="status">Loading…</p>
+    return <p className="rp-loading" role="status">{i18n.t('recipient.loading.label')}</p>
   }
 
   if (status === 'error') {
@@ -130,9 +130,9 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
     }
     // T-003-03 pins this via RecipientPage.test.tsx (textContent === 'Something went wrong') — keep unchanged.
     return (
-      <section className="rp" aria-label="Transfer unavailable">
-        <h1 className="rp-heading rp-error">Something went wrong</h1>
-        <p className="rp-sub">Please try again later.</p>
+      <section className="rp" aria-label={i18n.t('recipient.error.sectionAria')}>
+        <h1 className="rp-heading rp-error">{i18n.t('recipient.error.heading')}</h1>
+        <p className="rp-sub">{i18n.t('recipient.error.subtext')}</p>
       </section>
     )
   }
@@ -143,7 +143,7 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
     // email-less 410 bodies are both email-less, so their screens stay byte-identical by construction.
     // T-003-05: this branch also wins over a gated transfer — terminal states take precedence over the password gate.
     return (
-      <section className="rp rp-terminal" aria-label="Transfer unavailable">
+      <section className="rp rp-terminal" aria-label={i18n.t('recipient.terminal.sectionAria')}>
         <span className="rp-icon rp-terminal-icon" aria-hidden="true">
           {/* Same inline file icon as the rows below — TA-8.2: features self-contained. */}
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -153,7 +153,7 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
         </span>
         <h1 className="rp-heading">{terminalMessage}</h1>
         {/* T-003-07 (FR-003-8/9): the terminal screen's single action — this CTA to the upload surface. */}
-        <a className="btn-primary rp-terminal-action" href="/" onClick={handleGrowthCtaClick('terminal-state')}>Send something</a>
+        <a className="btn-primary rp-terminal-action" href="/" onClick={handleGrowthCtaClick('terminal-state')}>{i18n.t('recipient.terminal.cta')}</a>
       </section>
     )
   }
@@ -162,10 +162,10 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
     // T-003-05 (FR-003-6): the gate — the ONLY content on a gated transfer is this card: sender name + form.
     // No note, no file list, no sizes, nothing to enumerate or leak (byte-leak audit in RecipientPage.test.tsx).
     return (
-      <section className="rp rp-gate" aria-label={`From ${from} — password required`}>
-        <h1 className="rp-heading">From: {from}</h1>
+      <section className="rp rp-gate" aria-label={i18n.t('recipient.gate.sectionAria', { name: from })}>
+        <h1 className="rp-heading">{i18n.t('recipient.gate.fromHeading')}{from}</h1>
         <form className="rp-password-card" onSubmit={handleSubmit}>
-          <label className="rp-password-label" htmlFor="rp-password-input">Password</label>
+          <label className="rp-password-label" htmlFor="rp-password-input">{i18n.t('recipient.gate.passwordLabel')}</label>
           <div className={`rp-password-row${unlockError ? ' rp-shake' : ''}`}>
             <input
               id="rp-password-input"
@@ -178,7 +178,7 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
             <button
               type="button"
               className="rp-password-toggle"
-              aria-label={show ? 'Hide password' : 'Show password'}
+              aria-label={show ? i18n.t('recipient.gate.hidePasswordAria') : i18n.t('recipient.gate.showPasswordAria')}
               aria-pressed={show}
               onClick={() => setShow((s) => !s)}
             >
@@ -203,7 +203,7 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
             <p className="rp-password-error" role="alert">{unlockError}</p>
           )}
           <button type="submit" className="btn-primary rp-password-submit" disabled={unlocking || value.length === 0}>
-            Unlock
+            {i18n.t('recipient.gate.unlockButton')}
           </button>
         </form>
       </section>
@@ -211,8 +211,8 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
   }
 
   return (
-    <section className="rp" aria-label={`Files from ${from}`}>
-      <h1 className="rp-heading">From: {from}</h1>
+    <section className="rp" aria-label={i18n.t('recipient.active.sectionAria', { name: from })}>
+      <h1 className="rp-heading">{i18n.t('recipient.active.fromHeading')}{from}</h1>
       {/* Note as plain-text blockquote — no markdown (TA-8.2); overflow-wrap handles long unbroken URLs. */}
       {note && note.trim() !== '' && (
         <blockquote className="rp-note">{note}</blockquote>
@@ -231,30 +231,30 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
             {/* T-003-06 (US-003-03 alt flow): storage degraded — the row's mint failed; the rest of the page keeps working. */}
             {/* T-013-04 (FR-013-3): aria-live="polite" instead of role="alert" — a transient row state, not an assertive alert. */}
             {downloadErrorFileId === f.fileId && (
-              <p className="rp-download-error" aria-live="polite">{DEGRADED_COPY.downloadUnavailable}</p>
+              <p className="rp-download-error" aria-live="polite">{i18n.t('recipient.download.unavailable')}</p>
             )}
             <span className="rp-size">{formatBytes(f.sizeBytes)}</span>
             {/* T-003-06 (UI notes): subtle in-flight indicator on the row while endpoint 6 is minting — no page-level blocking UI. */}
-            <button type="button" className="rp-download" disabled={downloadingFileId !== null} aria-label={`Download ${f.name}, ${formatBytes(f.sizeBytes)}`} onClick={() => handleDownload(f.fileId)}>
-              {downloadingFileId === f.fileId ? 'Downloading…' : 'Download'}
+            <button type="button" className="rp-download" disabled={downloadingFileId !== null} aria-label={i18n.t('recipient.active.downloadAria', { name: f.name, size: formatBytes(f.sizeBytes) })} onClick={() => handleDownload(f.fileId)}>
+              {downloadingFileId === f.fileId ? i18n.t('recipient.active.downloading') : i18n.t('recipient.active.downloadButton')}
             </button>
           </li>
         ))}
       </ul>
       {/* FR-003-1: Download all when >1 file — hasDownloadAll comes from the server (TA-4.2#4), so the client never recomputes it. */}
       {hasDownloadAll && (
-        <button type="button" className="btn-primary rp-download-all" onClick={handleDownloadAll}>Download all</button>
+        <button type="button" className="btn-primary rp-download-all" onClick={handleDownloadAll}>{i18n.t('recipient.active.downloadAll')}</button>
       )}
       {/* T-003-03 (FR-003-5): "Downloads left: N" under the list — null = unlimited (Business, hidden);
       * shown only for finite caps past the first download (a 0 remaining is already the terminal limit screen). */}
       {downloadsLeft !== null && downloadsLeft > 0 && (
-        <p className="rp-downloads-left">Downloads left: {downloadsLeft}</p>
+        <p className="rp-downloads-left">{i18n.t('recipient.active.downloadsLeft', { count: downloadsLeft })}</p>
       )}
       {/* T-003-07 (FR-003-7): growth panel — shown once per full download, below the file list; partials never render it. */}
       {growthPanelVisible && (
-        <div className="rp-growth" role="region" aria-label="Send something">
-          <p className="rp-growth-copy">Ready to send some of your own?</p>
-          <button type="button" className="btn-primary rp-growth-cta" onClick={handleGrowthCtaClick('post-download')}>Send something</button>
+        <div className="rp-growth" role="region" aria-label={i18n.t('recipient.active.growthAria')}>
+          <p className="rp-growth-copy">{i18n.t('recipient.active.growthCopy')}</p>
+          <button type="button" className="btn-primary rp-growth-cta" onClick={handleGrowthCtaClick('post-download')}>{i18n.t('recipient.active.growthCta')}</button>
         </div>
       )}
       {/* T-003-08 (FR-003-10): mobile ≤640 px — sticky Download bar (CSS hides it at >640 px, shows it at ≤640 px).
@@ -262,15 +262,15 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
          the in-flow button stays where it is; CSS visibility rules handle which one is seen. */}
       <div className="rp-sticky">
         {hasDownloadAll ? (
-          <button type="button" className="btn-primary" onClick={handleDownloadAll}>Download all</button>
+          <button type="button" className="btn-primary" onClick={handleDownloadAll}>{i18n.t('recipient.active.downloadAll')}</button>
         ) : files.length > 0 ? (
           <button
             type="button"
             className="btn-primary"
-            aria-label={`Download ${files[0].name}, ${formatBytes(files[0].sizeBytes)}`}
+            aria-label={i18n.t('recipient.active.downloadAria', { name: files[0].name, size: formatBytes(files[0].sizeBytes) })}
             onClick={() => handleDownload(files[0].fileId)}
           >
-            Download
+            {i18n.t('recipient.active.downloadButton')}
           </button>
         ) : null}
       </div>
