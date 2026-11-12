@@ -157,21 +157,21 @@ export function StagingList() {
   if (finalizeError) {
     // EC-002-1: finalize failed — blobs are staged, so retrying re-finalizes with the same key; no half-filled form.
     return (
-      <section className="sl" aria-label="Finalize failed">
-        <p role="alert" className="sl-limit-msg">Upload finished but the link could not be prepared. Please try again.</p>
+      <section className="sl" aria-label={i18n.t('landing.staging.finalizeFailed')}>
+        <p role="alert" className="sl-limit-msg">{i18n.t('landing.staging.finalizeFailedMsg')}</p>
         <div className="sl-footer">
-          <button type="button" className="btn-primary sl-send" onClick={() => void send()}>Try again</button>
+          <button type="button" className="btn-primary sl-send" onClick={() => void send()}>{i18n.t('landing.staging.tryAgain')}</button>
         </div>
       </section>
     )
   }
 
   return (
-    <section className="sl" aria-label="Staged files">
+    <section className="sl" aria-label={i18n.t('landing.staging.sectionLabel')}>
       {/* Overall line (FR-001-5): combined bytes uploaded / total, recomputed on every store transition. */}
       {/* role=status (polite): the text re-renders only on store transitions — block completions / status changes — never per byte (F-TRF-016-3). */}
       {files.length > 0 && (
-        <p className="sl-overall" role="status">Uploading… {formatBytes(overall.sentBytes)} of {formatBytes(overall.totalBytes)}</p>
+        <p className="sl-overall" role="status">{i18n.t('landing.staging.uploading', { done: formatBytes(overall.sentBytes), total: formatBytes(overall.totalBytes) })}</p>
       )}
       <ul className="sl-list">
         {files.map((f) => (
@@ -199,20 +199,20 @@ export function StagingList() {
             {/* T-013-04 (FR-013-3): a blob-503 failure after the retry ladder renders the degraded copy instead. */}
             {f.status === 'failed' && (
               <>
-                <span className="sl-failed-msg" aria-live="polite">{f.isBlobUnavailable ? i18n.t('landing.dropzone.uploadDegraded') : 'Upload failed — retry'}</span>
-                <button type="button" className="sl-retry" aria-label={`Retry ${f.name}`} onClick={() => void retryFile(f.id)}>Retry.</button>
+                <span className="sl-failed-msg" aria-live="polite">{f.isBlobUnavailable ? i18n.t('landing.dropzone.uploadDegraded') : i18n.t('landing.staging.failedMsg')}</span>
+                <button type="button" className="sl-retry" aria-label={i18n.t('landing.staging.retryAria', { name: f.name })} onClick={() => void retryFile(f.id)}>{i18n.t('landing.staging.retryButton')}</button>
               </>
             )}
             <button
               type="button"
               className="sl-remove"
-              aria-label={`Remove ${f.name}`}
+              aria-label={i18n.t('landing.staging.removeFile', { name: f.name })}
               onClick={() => removeFile(f.id)}
             >✕</button>
           </li>
         ))}
       </ul>
-      <p className="sl-total">{files.length} {files.length === 1 ? 'file' : 'files'} · {formatBytes(overall.totalBytes)}</p>
+      <p className="sl-total">{files.length === 1 ? i18n.t('landing.staging.totalSingle', { total: formatBytes(overall.totalBytes) }) : i18n.t('landing.staging.totalMany', { count: files.length, total: formatBytes(overall.totalBytes) })}</p>
       {message && (
         <p className="sl-limit-msg" role="alert">
           {message}
@@ -221,7 +221,7 @@ export function StagingList() {
       <div className="sl-footer">
         {/* Disabled buttons don't fire their own mouse events — the span wrapper carries title. */}
         <span className="sl-send-wrap" title={message ?? undefined}>
-          <button type="button" className="btn-primary sl-send" onClick={() => void send()} disabled={files.length === 0 || message !== null}>Send.</button>
+          <button type="button" className="btn-primary sl-send" onClick={() => void send()} disabled={files.length === 0 || message !== null}>{i18n.t('landing.staging.send')}</button>
         </span>
       </div>
     </section>

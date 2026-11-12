@@ -9,5 +9,17 @@
   "landing.dropzone.chooseFiles": "Choisir des fichiers",
   "landing.staging.perFileLimitSingle": "Ce fichier dépasse la limite de {{limit}} par fichier. Supprimez-le pour continuer.",
   "landing.staging.perFileLimitMany": "{{count}} fichiers dépassent la limite de {{limit}} par fichier. Supprimez-les pour continuer.",
-  "landing.staging.totalLimit": "La taille du transfert ({{total}}) dépasse la limite de {{limit}}. Supprimez des fichiers pour continuer."
+  "landing.staging.totalLimit": "La taille du transfert ({{total}}) dépasse la limite de {{limit}}. Supprimez des fichiers pour continuer.",
+  "landing.staging.sectionLabel": "Fichiers en attente",
+  "landing.staging.uploading": "Téléversement… {{done}} sur {{total}}",
+  "landing.staging.failedMsg": "Échec du téléversement — réessayer",
+  "landing.staging.retryAria": "Retéléverser {{name}}",
+  "landing.staging.retryButton": "Réessayer.",
+  "landing.staging.removeFile": "Supprimer {{name}}",
+  "landing.staging.totalSingle": "1 fichier · {{total}}",
+  "landing.staging.totalMany": "{{count}} fichiers · {{total}}",
+  "landing.staging.finalizeFailed": "Finalisation échouée",
+  "landing.staging.finalizeFailedMsg": "Le téléversement est terminé, mais le lien n'a pas pu être préparé. Veuillez réessayer.",
+  "landing.staging.tryAgain": "Réessayer",
+  "landing.staging.send": "Envoyer."
 }

@@ -9,5 +9,17 @@
   "landing.dropzone.chooseFiles": "Dateien auswählen",
   "landing.staging.perFileLimitSingle": "Diese Datei überschreitet das Limit von {{limit}} pro Datei. Entferne sie, um fortzufahren.",
   "landing.staging.perFileLimitMany": "{{count}} Dateien überschreiten das Limit von {{limit}} pro Datei. Entferne sie, um fortzufahren.",
-  "landing.staging.totalLimit": "Transfergröße {{total}} überschreitet das Limit von {{limit}}. Entferne Dateien, um fortzufahren."
+  "landing.staging.totalLimit": "Transfergröße {{total}} überschreitet das Limit von {{limit}}. Entferne Dateien, um fortzufahren.",
+  "landing.staging.sectionLabel": "Zwischengespeicherte Dateien",
+  "landing.staging.uploading": "Lade hoch… {{done}} von {{total}}",
+  "landing.staging.failedMsg": "Hochladen fehlgeschlagen — erneut versuchen",
+  "landing.staging.retryAria": "{{name}} erneut hochladen",
+  "landing.staging.retryButton": "Erneut.",
+  "landing.staging.removeFile": "{{name}} entfernen",
+  "landing.staging.totalSingle": "1 Datei · {{total}}",
+  "landing.staging.totalMany": "{{count}} Dateien · {{total}}",
+  "landing.staging.finalizeFailed": "Finalisierung fehlgeschlagen",
+  "landing.staging.finalizeFailedMsg": "Das Hochladen ist fertig, aber der Link konnte nicht vorbereitet werden. Bitte versuche es erneut.",
+  "landing.staging.tryAgain": "Erneut versuchen",
+  "landing.staging.send": "Senden."
 }

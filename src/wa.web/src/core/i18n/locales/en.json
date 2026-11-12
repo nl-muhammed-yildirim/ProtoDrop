@@ -9,5 +9,17 @@
   "landing.dropzone.chooseFiles": "Choose files",
   "landing.staging.perFileLimitSingle": "This file exceeds the {{limit}} per-file limit. Remove it to continue.",
   "landing.staging.perFileLimitMany": "{{count}} files exceed the {{limit}} per-file limit. Remove them to continue.",
-  "landing.staging.totalLimit": "Transfer size {{total}} exceeds the {{limit}} limit. Remove files to continue."
+  "landing.staging.totalLimit": "Transfer size {{total}} exceeds the {{limit}} limit. Remove files to continue.",
+  "landing.staging.sectionLabel": "Staged files",
+  "landing.staging.uploading": "Uploading… {{done}} of {{total}}",
+  "landing.staging.failedMsg": "Upload failed — retry",
+  "landing.staging.retryAria": "Retry {{name}}",
+  "landing.staging.retryButton": "Retry.",
+  "landing.staging.removeFile": "Remove {{name}}",
+  "landing.staging.totalSingle": "1 file · {{total}}",
+  "landing.staging.totalMany": "{{count}} files · {{total}}",
+  "landing.staging.finalizeFailed": "Finalize failed",
+  "landing.staging.finalizeFailedMsg": "Upload finished but the link could not be prepared. Please try again.",
+  "landing.staging.tryAgain": "Try again",
+  "landing.staging.send": "Send."
 }

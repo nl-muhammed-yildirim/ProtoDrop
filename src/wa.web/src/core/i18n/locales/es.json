@@ -9,5 +9,17 @@
   "landing.dropzone.chooseFiles": "Elegir archivos",
   "landing.staging.perFileLimitSingle": "Este archivo supera el límite de {{limit}} por archivo. Elimínalo para continuar.",
   "landing.staging.perFileLimitMany": "{{count}} archivos superan el límite de {{limit}} por archivo. Elimínalos para continuar.",
-  "landing.staging.totalLimit": "El tamaño de la transferencia ({{total}}) supera el límite de {{limit}}. Elimina archivos para continuar."
+  "landing.staging.totalLimit": "El tamaño de la transferencia ({{total}}) supera el límite de {{limit}}. Elimina archivos para continuar.",
+  "landing.staging.sectionLabel": "Archivos en cola",
+  "landing.staging.uploading": "Subiendo… {{done}} de {{total}}",
+  "landing.staging.failedMsg": "Error al subir — reintentar",
+  "landing.staging.retryAria": "Reintentar {{name}}",
+  "landing.staging.retryButton": "Reintentar.",
+  "landing.staging.removeFile": "Eliminar {{name}}",
+  "landing.staging.totalSingle": "1 archivo · {{total}}",
+  "landing.staging.totalMany": "{{count}} archivos · {{total}}",
+  "landing.staging.finalizeFailed": "Finalización fallida",
+  "landing.staging.finalizeFailedMsg": "La subida terminó, pero no se pudo preparar el enlace. Inténtalo de nuevo.",
+  "landing.staging.tryAgain": "Reintentar",
+  "landing.staging.send": "Enviar."
 }

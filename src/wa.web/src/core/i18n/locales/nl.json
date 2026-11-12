@@ -9,5 +9,17 @@
   "landing.dropzone.chooseFiles": "Bestanden kiezen",
   "landing.staging.perFileLimitSingle": "Dit bestand overschrijdt de limiet van {{limit}} per bestand. Verwijder het om door te gaan.",
   "landing.staging.perFileLimitMany": "{{count}} bestanden overschrijden de limiet van {{limit}} per bestand. Verwijder ze om door te gaan.",
-  "landing.staging.totalLimit": "Transfergrootte {{total}} overschrijdt de limiet van {{limit}}. Verwijder bestanden om door te gaan."
+  "landing.staging.totalLimit": "Transfergrootte {{total}} overschrijdt de limiet van {{limit}}. Verwijder bestanden om door te gaan.",
+  "landing.staging.sectionLabel": "Voorbereide bestanden",
+  "landing.staging.uploading": "Uploaden… {{done}} van {{total}}",
+  "landing.staging.failedMsg": "Upload mislukt — opnieuw proberen",
+  "landing.staging.retryAria": "{{name}} opnieuw uploaden",
+  "landing.staging.retryButton": "Opnieuw.",
+  "landing.staging.removeFile": "{{name}} verwijderen",
+  "landing.staging.totalSingle": "1 bestand · {{total}}",
+  "landing.staging.totalMany": "{{count}} bestanden · {{total}}",
+  "landing.staging.finalizeFailed": "Finaliseren mislukt",
+  "landing.staging.finalizeFailedMsg": "De upload is voltooid, maar de link kon niet worden voorbereid. Probeer het opnieuw.",
+  "landing.staging.tryAgain": "Opnieuw proberen",
+  "landing.staging.send": "Verstuur."
 }

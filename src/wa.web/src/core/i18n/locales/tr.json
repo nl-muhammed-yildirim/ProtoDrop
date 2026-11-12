@@ -9,5 +9,17 @@
   "landing.dropzone.chooseFiles": "Dosya seç",
   "landing.staging.perFileLimitSingle": "Bu dosya {{limit}} dosya başına sınırını aşıyor. Devam etmek için kaldırın.",
   "landing.staging.perFileLimitMany": "{{count}} dosya {{limit}} dosya başına sınırını aşıyor. Devam etmek için kaldırın.",
-  "landing.staging.totalLimit": "Aktarım boyutu ({{total}}), {{limit}} sınırını aşıyor. Devam etmek için dosyaları kaldırın."
+  "landing.staging.totalLimit": "Aktarım boyutu ({{total}}), {{limit}} sınırını aşıyor. Devam etmek için dosyaları kaldırın.",
+  "landing.staging.sectionLabel": "Hazırlanan dosyalar",
+  "landing.staging.uploading": "Yükleniyor… {{done}} / {{total}}",
+  "landing.staging.failedMsg": "Yükleme başarısız — tekrar dene",
+  "landing.staging.retryAria": "{{name}}'yi yeniden yükle",
+  "landing.staging.retryButton": "Tekrar dene.",
+  "landing.staging.removeFile": "{{name}} dosyasını kaldır",
+  "landing.staging.totalSingle": "1 dosya · {{total}}",
+  "landing.staging.totalMany": "{{count}} dosya · {{total}}",
+  "landing.staging.finalizeFailed": "Sonlandırma başarısız",
+  "landing.staging.finalizeFailedMsg": "Yükleme tamamlandı ama bağlantı hazırlanamadı. Lütfen tekrar deneyin.",
+  "landing.staging.tryAgain": "Tekrar dene",
+  "landing.staging.send": "Gönder."
 }
