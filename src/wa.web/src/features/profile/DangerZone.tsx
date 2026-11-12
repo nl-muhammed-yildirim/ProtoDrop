@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { StoredProfile } from '../../core/auth/session'
 import { ME_BASE } from './ProfilePage'
 import { getTraceParent } from '../../core/traceparent'
+import i18n from '../../core/i18n/init'
 
 interface DangerZoneProps {
   profile: StoredProfile           // display name feeds the modal copy interpolation only
@@ -38,10 +39,10 @@ export function DangerZone({ profile, onDeleteAccount }: DangerZoneProps) {
     setError(null)
     try {
       const res = await fetch(ME_BASE, { method: 'DELETE', credentials: 'include', headers: { traceparent: getTraceParent() } })
-      if (!res.ok) throw new Error('Could not delete your account. Please try again.')
+      if (!res.ok) throw new Error(i18n.t('profile.error.deleteAccountFailed'))
       onDeleteAccount()   // App clears session + navigates to / — this component unmounts here; no state after.
     } catch {
-      setError('Could not delete your account. Please try again.')
+      setError(i18n.t('profile.error.deleteAccountFailed'))
     } finally {
       setDeleting(false)  // only reachable when the modal is still mounted (the error path).
     }
@@ -50,21 +51,21 @@ export function DangerZone({ profile, onDeleteAccount }: DangerZoneProps) {
   return (
     <>
       <button type="button" className="pf-delete-btn" onClick={() => setOpen(true)}>
-        Delete account
+        {i18n.t('profile.delete.button')}
       </button>
       {open && (
         <div className="pf-modal-backdrop" onClick={close} aria-hidden="true">
           <div className="pf-modal" role="dialog" aria-modal="true" aria-labelledby="pf-delete-title" onClick={(e) => e.stopPropagation()}>
-            <h2 className="pf-modal-title" id="pf-delete-title">Delete your account?</h2>
+            <h2 className="pf-modal-title" id="pf-delete-title">{i18n.t('profile.delete.title')}</h2>
             {/* Pinned GDPR copy (task spec instructions §2) — {display name} interpolates profile.displayName. */}
             <p className="pf-modal-copy">
-              Your account and profile are deleted. Your active transfers keep working and show 'From: {profile.displayName}' without your email.
+              {i18n.t('profile.delete.gdprCopy', { name: profile.displayName })}
             </p>
             {error && <p role="alert" className="pf-modal-error">{error}</p>}
             <div className="pf-modal-actions">
-              <button type="button" className="pf-modal-cancel" disabled={deleting} onClick={() => void close()}>Cancel</button>
+              <button type="button" className="pf-modal-cancel" disabled={deleting} onClick={() => void close()}>{i18n.t('profile.delete.cancel')}</button>
               <button type="button" className="pf-modal-confirm" autoFocus disabled={deleting} onClick={() => void confirm()} aria-busy={deleting}>
-                {deleting ? 'Deleting…' : 'Delete'}
+                {deleting ? i18n.t('profile.delete.deleting') : i18n.t('profile.delete.confirm')}
               </button>
             </div>
           </div>
