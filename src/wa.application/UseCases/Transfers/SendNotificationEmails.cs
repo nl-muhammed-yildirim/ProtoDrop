@@ -120,8 +120,8 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
                 continue;
             }
 
-            // T-006-04: Render per-recipient with their preferred locale (fallback handled inside renderer).
-            var locale = recipient.PreferredLanguage ?? "en";
+            // T-014-04: Resolve locale using pure resolver (ADR-011 per-recipient attribute).
+            var locale = TemplateLocaleResolver.Resolve(recipient.PreferredLanguage);
             var (subject, htmlBody, textBody) = _templateRenderer.Render(templateData, locale);
 
             try
@@ -150,7 +150,8 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
                     {
                         transferId = context.TransferId,
                         to = recipient.Address,
-                        attempt = attempt
+                        attempt = attempt,
+                        locale // T-014-04: TA-10.2 — email_sent carries the locale used
                     }
                 };
                 await _eventPublisher.PublishAsync(emailSentEnvelope, ct);

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 using wa.application.Ports;
+using wa.application.Telemetry;
 using wa.infrastructure.Email;
 
 namespace wa.workers.unit.Email;
@@ -11,7 +12,7 @@ namespace wa.workers.unit.Email;
 public class StubbleTemplateRendererTests : IDisposable
 {
     private readonly StubbleTemplateRenderer _renderer;
-    private readonly CapturingLogger _logger = new();
+    private readonly CapturingLogger<StubbleTemplateRenderer> _logger = new();
 
     public StubbleTemplateRendererTests()
     {
@@ -88,12 +89,26 @@ public class StubbleTemplateRendererTests : IDisposable
 
         var (subject, htmlBody, textBody) = _renderer.Render(data, "jp"); // Japanese — not in supported set
 
-        // Fallback telemetry emitted.
-        Assert.Contains("email.template_fallback", _logger.Messages);
+        // Fallback telemetry emitted (log line carries the offending locale — T-014-04).
+        Assert.Contains("email.template_fallback: locale=jp", _logger.Messages);
 
         // Output is English template content.
         Assert.Contains("has shared files with you", htmlBody);
         Assert.Equal("Transfer from Alice", subject);
+    }
+
+    [Fact]
+    public void Render_UnknownLocale_EmitsTelemetryEvent_NotJustLog()
+    {
+        // T-014-04: fallback must be a proper TA-10.2 telemetry event via WaTelemetryReporter, not only a log line.
+        var telemetryLogger = new CapturingLogger<WaTelemetryReporter>();
+        var reporter = new WaTelemetryReporter(telemetryLogger, new byte[32]);
+        var renderer = new StubbleTemplateRenderer(new CapturingLogger<StubbleTemplateRenderer>(), reporter);
+
+        renderer.Render(CreateTestData(), "jp"); // unknown locale → fallback path
+
+        // The closed-set event name is emitted through the telemetry pipeline (template text IS exactly the name).
+        Assert.Contains("email.template_fallback", telemetryLogger.Messages);
     }
 
     [Fact]
@@ -134,8 +149,8 @@ public class StubbleTemplateRendererTests : IDisposable
         CtaUrl: "https://protodrop.com/t/ABCD1234",
         ExpiryDays: 7);
 
-    /// <summary>Captures log messages for assertion.</summary>
-    private sealed class CapturingLogger : ILogger<StubbleTemplateRenderer>, IDisposable
+    /// <summary>Captures log messages for assertion (generic over the logger category).</summary>
+    private sealed class CapturingLogger<T> : ILogger<T>, IDisposable
     {
         public List<string> Messages { get; } = [];
 

@@ -92,7 +92,9 @@ var host = new HostBuilder()
         // T-006-01: f-email consumer
         services.AddSingleton<EventDeduplicator>(sp => new EventDeduplicator(() => DateTimeOffset.UtcNow));
         services.AddSingleton<IEmailStore>(sp => new EmailStore(sp.GetRequiredService<WaDbContext>()));
-        services.AddSingleton<ITemplateRenderer>(sp => new StubbleTemplateRenderer(sp.GetRequiredService<ILogger<StubbleTemplateRenderer>>()));
+        services.AddSingleton<ITemplateRenderer>(sp => new StubbleTemplateRenderer(
+            sp.GetRequiredService<ILogger<StubbleTemplateRenderer>>(),
+            sp.GetRequiredService<wa.application.Telemetry.WaTelemetryReporter>())); // T-014-04: fallback telemetry event
 
         // IEmailSender selection: log if Wa:Email:Sender=="log" else CommunicationHubEmailSender (TA-0.2 rule 7).
         var emailSenderType = Environment.GetEnvironmentVariable("Wa:Email:Sender");

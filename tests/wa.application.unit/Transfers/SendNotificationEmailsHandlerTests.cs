@@ -361,6 +361,101 @@ public class SendNotificationEmailsHandlerTests
         Assert.Equal("en", _templateRenderer.LastLocale);
     }
 
+    [Fact]
+    public async Task Handle_RecipientWithPreferredLanguage_de_EmailSentPayloadContainsLocaleDe()
+    {
+        // T-014-04 / TA-10.2: email_sent payload carries the locale used (per ADR-011).
+        var transferId = Guid.NewGuid();
+        _store.Context = new EmailTransferContext(
+            transferId,
+            "Alice",
+            null,
+            DateTime.UtcNow.AddDays(30),
+            "ABCD1234",
+            [new FileEntry("report.pdf", 1536)]);
+
+        _store.Recipients = new List<EmailRecipient>
+        {
+            new() { Id = Guid.NewGuid(), TransferId = transferId, Address = "a@x.com", PreferredLanguage = "de" }
+        };
+
+        var envelope = CreateEnvelope(transferId, ["a@x.com"]);
+        await _handler.HandleAsync(envelope, 1, 5, CancellationToken.None);
+
+        Assert.Single(_emailSender.Sent);
+        Assert.Equal("de", _templateRenderer.LastLocale);
+
+        // TA-10.2: email_sent carries the locale used.
+        var sent = _eventPublisher.Published.Where(e => e.Type == EventType.EmailSent).ToList();
+        Assert.Single(sent);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(sent[0].Payload));
+        Assert.Equal("de", doc.RootElement.GetProperty("locale").GetString());
+    }
+
+    [Fact]
+    public async Task Handle_MixedLocales_NlAndTr_EachRecipientGetsOwnLanguage()
+    {
+        // AC (US-014-03 gherkin): 2-recipient send with locales "nl" and "tr" → each gets their own language.
+        var transferId = Guid.NewGuid();
+        _store.Context = new EmailTransferContext(
+            transferId,
+            "Alice",
+            null,
+            DateTime.UtcNow.AddDays(30),
+            "ABCD1234",
+            [new FileEntry("report.pdf", 1536)]);
+
+        var nlRecipient = Guid.NewGuid();
+        var trRecipient = Guid.NewGuid();
+        _store.Recipients = new List<EmailRecipient>
+        {
+            new() { Id = nlRecipient, TransferId = transferId, Address = "nl@x.com", PreferredLanguage = "nl" },
+            new() { Id = trRecipient, TransferId = transferId, Address = "tr@y.com", PreferredLanguage = "tr" }
+        };
+
+        var envelope = CreateEnvelope(transferId, ["nl@x.com", "tr@y.com"]);
+        await _handler.HandleAsync(envelope, 1, 5, CancellationToken.None);
+
+        Assert.Equal(2, _emailSender.Sent.Count);
+        // Per-recipient selection: renderer called once per recipient with their resolved locale.
+        Assert.Equal(["nl", "tr"], _templateRenderer.LocalesInOrder);
+
+        // Each email_sent payload carries its own recipient's locale (TA-10.2).
+        var sent = _eventPublisher.Published.Where(e => e.Type == EventType.EmailSent).ToList();
+        Assert.Equal(2, sent.Count);
+        using var docNl = JsonDocument.Parse(JsonSerializer.Serialize(sent[0].Payload));
+        Assert.Equal("nl@x.com", docNl.RootElement.GetProperty("to").GetString());
+        Assert.Equal("nl", docNl.RootElement.GetProperty("locale").GetString());
+        using var docTr = JsonDocument.Parse(JsonSerializer.Serialize(sent[1].Payload));
+        Assert.Equal("tr@y.com", docTr.RootElement.GetProperty("to").GetString());
+        Assert.Equal("tr", docTr.RootElement.GetProperty("locale").GetString());
+    }
+
+    [Fact]
+    public async Task Handle_RecipientWithUnknownPreferredLanguage_FallsBackToEn()
+    {
+        // EC-014-4: unknown locale → en template (no failure, no mixed-language body).
+        var transferId = Guid.NewGuid();
+        _store.Context = new EmailTransferContext(
+            transferId,
+            "Alice",
+            null,
+            DateTime.UtcNow.AddDays(30),
+            "ABCD1234",
+            [new FileEntry("report.pdf", 1536)]);
+
+        _store.Recipients = new List<EmailRecipient>
+        {
+            new() { Id = Guid.NewGuid(), TransferId = transferId, Address = "a@x.com", PreferredLanguage = "jp" }
+        };
+
+        var envelope = CreateEnvelope(transferId, ["a@x.com"]);
+        await _handler.HandleAsync(envelope, 1, 5, CancellationToken.None);
+
+        Assert.Single(_emailSender.Sent);
+        Assert.Equal("en", _templateRenderer.LastLocale); // resolver falls back to en (not "jp")
+    }
+
     private static EventEnvelope CreateEnvelope(Guid transferId, string[] emails)
     {
         var payload = new
@@ -435,10 +530,13 @@ public class SendNotificationEmailsHandlerTests
     private sealed class StubTemplateRenderer : ITemplateRenderer
     {
         public string? LastLocale { get; private set; }
+        /// <summary>T-014-04: every locale the renderer was called with, in send order (per-recipient verification).</summary>
+        public List<string> LocalesInOrder { get; } = [];
 
         public (string Subject, string HtmlBody, string TextBody) Render(TemplateData data, string locale)
         {
             LastLocale = locale;
+            LocalesInOrder.Add(locale);
 
             var html = $"""
                 <html>

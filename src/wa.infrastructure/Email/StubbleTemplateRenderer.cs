@@ -3,6 +3,8 @@ using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using Stubble.Core;
 using wa.application.Ports;
+using wa.application.Telemetry;
+using wa.domain.Telemetry;
 
 namespace wa.infrastructure.Email;
 
@@ -15,6 +17,7 @@ public sealed class StubbleTemplateRenderer : ITemplateRenderer
 {
     private readonly Dictionary<string, (string Html, string Txt)> _templates;
     private readonly ILogger<StubbleTemplateRenderer> _logger;
+    private readonly WaTelemetryReporter? _telemetry; // T-014-04: emit fallback as telemetry event
 
     /// <summary>Per-locale subject format strings (TA-6.7: one place, never inline in code).</summary>
     private static readonly Dictionary<string, string> SubjectFormats = new()
@@ -31,9 +34,10 @@ public sealed class StubbleTemplateRenderer : ITemplateRenderer
 
     private static readonly string[] SupportedLocales = ["en", "nl", "fr", "es", "pt", "it", "de", "tr"];
 
-    public StubbleTemplateRenderer(ILogger<StubbleTemplateRenderer> logger)
+    public StubbleTemplateRenderer(ILogger<StubbleTemplateRenderer> logger, WaTelemetryReporter? telemetry = null)
     {
         _logger = logger;
+        _telemetry = telemetry;
         var basePath = Path.Combine(AppContext.BaseDirectory, "Emails", "templates", "transfer");
         _templates = new Dictionary<string, (string Html, string Txt)>();
 
@@ -62,7 +66,11 @@ public sealed class StubbleTemplateRenderer : ITemplateRenderer
         // Resolve locale with fallback to English.
         if (!_templates.TryGetValue(locale, out var templates))
         {
-            _logger.LogInformation("email.template_fallback");
+            _logger.LogInformation("email.template_fallback: locale={Locale}", locale);
+
+            // T-014-04: Emit as proper telemetry event (TA-10.2), not just a log line.
+            _telemetry?.LogEvent(TelemetryEvents.EmailTemplateFallback);
+
             locale = "en";
             templates = _templates["en"];
         }
