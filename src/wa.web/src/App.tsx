@@ -5,6 +5,7 @@ import type { StoredProfile } from './core/auth/session'
 import { clearSession, readSession } from './core/auth/session'
 import { useUploadEngine } from './core/upload/UploadEngine'
 import { getTraceParent } from './core/traceparent'
+import i18n from './core/i18n/init'
 import DropZone from './features/landing/DropZone'
 import StagingList from './features/landing/StagingList'
 import { useFinalize } from './features/landing/finalizeState'
@@ -83,7 +84,7 @@ export default function App() {
     // fires on a confirmed 2xx; local state then clears unconditionally — a failed server outcome is impossible here.
     clearSession()
     setSession(null)
-    setDeleteToast('Your account was deleted.')
+    setDeleteToast(i18n.t('app.toast.accountDeleted'))
     goHome()   // pushState / + popstate dispatch (existing App helper) → ProfilePage unmounts, landing renders.
   }
 

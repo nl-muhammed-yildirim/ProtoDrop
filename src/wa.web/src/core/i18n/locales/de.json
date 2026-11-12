@@ -148,5 +148,14 @@
   "profile.error.deleteAccountFailed": "Das Konto konnte nicht gelöscht werden. Bitte versuche es erneut.",
   "profile.delete.cancel": "Abbrechen",
   "profile.delete.deleting": "Löscht…",
-  "profile.delete.confirm": "Löschen"
+  "profile.delete.confirm": "Löschen",
+  "topbar.header.ariaLabel": "Leiste",
+  "topbar.menu.signOut": "Abmelden",
+  "app.toast.accountDeleted": "Dein Konto wurde gelöscht.",
+  "error.title.somethingWrong": "Etwas ist schiefgelaufen.",
+  "error.title.notFound": "Ups — diese Seite hat sich verlegt.",
+  "error.action.goHome": "Zur Startseite",
+  "error.ref.label": "Referenz:",
+  "error.title.rateLimited": "Ein Moment der Ruhe, dann versuche es erneut.",
+  "error.hint.rateLimited": "Bitte warte etwa 60 Sekunden, bevor du es erneut versuchst."
 }

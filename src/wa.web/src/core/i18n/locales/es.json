@@ -148,5 +148,14 @@
   "profile.error.deleteAccountFailed": "No se pudo eliminar la cuenta. Inténtalo de nuevo.",
   "profile.delete.cancel": "Cancelar",
   "profile.delete.deleting": "Eliminando…",
-  "profile.delete.confirm": "Eliminar"
+  "profile.delete.confirm": "Eliminar",
+  "topbar.header.ariaLabel": "Barra superior",
+  "topbar.menu.signOut": "Cerrar sesión",
+  "app.toast.accountDeleted": "Tu cuenta fue eliminada.",
+  "error.title.somethingWrong": "Algo salió mal.",
+  "error.title.notFound": "Ups — esta página se movió.",
+  "error.action.goHome": "Ir a la página de inicio",
+  "error.ref.label": "Ref:",
+  "error.title.rateLimited": "Un momento de calma y luego inténtalo de nuevo.",
+  "error.hint.rateLimited": "Espera unos 60 segundos antes de intentarlo de nuevo."
 }

@@ -148,5 +148,14 @@
   "profile.error.deleteAccountFailed": "Het account kon niet worden verwijderd. Probeer het opnieuw.",
   "profile.delete.cancel": "Annuleren",
   "profile.delete.deleting": "Verwijderen…",
-  "profile.delete.confirm": "Verwijderen"
+  "profile.delete.confirm": "Verwijderen",
+  "topbar.header.ariaLabel": "Balk",
+  "topbar.menu.signOut": "Afmelden",
+  "app.toast.accountDeleted": "Je account is verwijderd.",
+  "error.title.somethingWrong": "Er ging iets mis.",
+  "error.title.notFound": "Oeps — deze pagina is verplaatst.",
+  "error.action.goHome": "Naar de startpagina",
+  "error.ref.label": "Ref:",
+  "error.title.rateLimited": "Een momentje rust, en probeer het opnieuw.",
+  "error.hint.rateLimited": "Wacht ongeveer 60 seconden voordat je het opnieuw probeert."
 }

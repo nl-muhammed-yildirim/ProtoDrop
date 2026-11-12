@@ -148,5 +148,14 @@
   "profile.error.deleteAccountFailed": "Le compte n'a pas pu être supprimé. Veuillez réessayer.",
   "profile.delete.cancel": "Annuler",
   "profile.delete.deleting": "Suppression…",
-  "profile.delete.confirm": "Supprimer"
+  "profile.delete.confirm": "Supprimer",
+  "topbar.header.ariaLabel": "Barre supérieure",
+  "topbar.menu.signOut": "Déconnexion",
+  "app.toast.accountDeleted": "Votre compte a été supprimé.",
+  "error.title.somethingWrong": "Une erreur est survenue.",
+  "error.title.notFound": "Oups — cette page a déménagé.",
+  "error.action.goHome": "Retour à l'accueil",
+  "error.ref.label": "Réf. :",
+  "error.title.rateLimited": "Un moment de calme, puis réessayez.",
+  "error.hint.rateLimited": "Veuillez attendre environ 60 secondes avant de réessayer."
 }

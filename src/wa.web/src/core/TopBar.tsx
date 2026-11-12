@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import type { StoredProfile } from './auth/session'
+import i18n from './i18n/init'
 
 interface TopBarProps {
   profile: StoredProfile | null
@@ -24,7 +25,7 @@ export function TopBar({ profile, onNavigateAccount, onThemeChange, onSignOut }:
   const initial = (profile ? profile.displayName : '').trim().charAt(0) || (profile ? profile.email.charAt(0) : '')
 
   return (
-    <header className="tb" aria-label="Top bar">
+    <header className="tb" aria-label={i18n.t('topbar.header.ariaLabel')}>
       <span className="tb-wordmark">ProtoDrop</span>
       {profile ? (
         <div className="tb-avatar-wrap">
@@ -33,18 +34,18 @@ export function TopBar({ profile, onNavigateAccount, onThemeChange, onSignOut }:
           </button>
           {menuOpen && (
             <div className="tb-dropdown" role="menu">
-              <button type="button" className="tb-dropdown-row" role="menuitem" onClick={() => onNavigateAccount()}>Profile</button>
-              <select className="tb-theme-select" value={profile.theme} aria-label="Theme" onChange={(e) => onThemeChange(e.target.value as 'system' | 'light' | 'dark')} onClick={() => setMenuOpen(false)}>
-                <option value="system">System</option>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
+              <button type="button" className="tb-dropdown-row" role="menuitem" onClick={() => onNavigateAccount()}>{i18n.t('profile.page.heading')}</button>
+              <select className="tb-theme-select" value={profile.theme} aria-label={i18n.t('profile.theme.label')} onChange={(e) => onThemeChange(e.target.value as 'system' | 'light' | 'dark')} onClick={() => setMenuOpen(false)}>
+                <option value="system">{i18n.t('profile.theme.system')}</option>
+                <option value="light">{i18n.t('profile.theme.light')}</option>
+                <option value="dark">{i18n.t('profile.theme.dark')}</option>
               </select>
-              <button type="button" className="tb-dropdown-row" role="menuitem" onClick={onSignOut}>Sign out</button>
+              <button type="button" className="tb-dropdown-row" role="menuitem" onClick={onSignOut}>{i18n.t('topbar.menu.signOut')}</button>
             </div>
           )}
         </div>
       ) : (
-        <button type="button" className="tb-signin" onClick={onNavigateAccount}>Sign in</button>
+        <button type="button" className="tb-signin" onClick={onNavigateAccount}>{i18n.t('auth.signIn.tab')}</button>
       )}
     </header>
   )

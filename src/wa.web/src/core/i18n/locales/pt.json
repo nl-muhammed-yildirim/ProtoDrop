@@ -148,5 +148,14 @@
   "profile.error.deleteAccountFailed": "Não foi possível excluir a conta. Tente novamente.",
   "profile.delete.cancel": "Cancelar",
   "profile.delete.deleting": "Excluindo…",
-  "profile.delete.confirm": "Excluir"
+  "profile.delete.confirm": "Excluir",
+  "topbar.header.ariaLabel": "Barra superior",
+  "topbar.menu.signOut": "Sair",
+  "app.toast.accountDeleted": "Sua conta foi excluída.",
+  "error.title.somethingWrong": "Algo deu errado.",
+  "error.title.notFound": "Ops — esta página mudou de lugar.",
+  "error.action.goHome": "Ir para a página inicial",
+  "error.ref.label": "Ref:",
+  "error.title.rateLimited": "Um momento de calma e tente novamente.",
+  "error.hint.rateLimited": "Aguarde cerca de 60 segundos antes de tentar novamente."
 }

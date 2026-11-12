@@ -148,5 +148,14 @@
   "profile.error.deleteAccountFailed": "Could not delete your account. Please try again.",
   "profile.delete.cancel": "Cancel",
   "profile.delete.deleting": "Deleting…",
-  "profile.delete.confirm": "Delete"
+  "profile.delete.confirm": "Delete",
+  "topbar.header.ariaLabel": "Top bar",
+  "topbar.menu.signOut": "Sign out",
+  "app.toast.accountDeleted": "Your account was deleted.",
+  "error.title.somethingWrong": "Something went wrong.",
+  "error.title.notFound": "Oops — this page moved.",
+  "error.action.goHome": "Go to home",
+  "error.ref.label": "Ref:",
+  "error.title.rateLimited": "A moment of calm, then try again.",
+  "error.hint.rateLimited": "Please wait about 60 seconds before trying again."
 }

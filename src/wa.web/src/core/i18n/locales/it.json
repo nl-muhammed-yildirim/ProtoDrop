@@ -148,5 +148,14 @@
   "profile.error.deleteAccountFailed": "L'account non è stato eliminato. Riprova.",
   "profile.delete.cancel": "Annulla",
   "profile.delete.deleting": "Eliminazione…",
-  "profile.delete.confirm": "Elimina"
+  "profile.delete.confirm": "Elimina",
+  "topbar.header.ariaLabel": "Barra superiore",
+  "topbar.menu.signOut": "Esci",
+  "app.toast.accountDeleted": "Il tuo account è stato eliminato.",
+  "error.title.somethingWrong": "Qualcosa è andato storto.",
+  "error.title.notFound": "Ops — questa pagina si è spostata.",
+  "error.action.goHome": "Vai alla home",
+  "error.ref.label": "Rif:",
+  "error.title.rateLimited": "Un momento di calma, poi riprova.",
+  "error.hint.rateLimited": "Aspetta circa 60 secondi prima di riprovare."
 }

@@ -148,5 +148,14 @@
   "profile.error.deleteAccountFailed": "Hesap silinemedi. Lütfen tekrar deneyin.",
   "profile.delete.cancel": "İptal",
   "profile.delete.deleting": "Siliniyor…",
-  "profile.delete.confirm": "Sil"
+  "profile.delete.confirm": "Sil",
+  "topbar.header.ariaLabel": "Üst çubuk",
+  "topbar.menu.signOut": "Çıkış yap",
+  "app.toast.accountDeleted": "Hesabın silindi.",
+  "error.title.somethingWrong": "Bir şeyler ters gitti.",
+  "error.title.notFound": "Oops — bu sayfa taşındı.",
+  "error.action.goHome": "Ana sayfaya git",
+  "error.ref.label": "Referans:",
+  "error.title.rateLimited": "Bir an sakinlik, sonra tekrar dene.",
+  "error.hint.rateLimited": "Tekrar denemeden önce yaklaşık 60 saniye bekleyin."
 }
