@@ -98,7 +98,7 @@ main > * {
   min-height: 44px;
   padding: 12px 24px;
   background: var(--accent);
-  color: #FFFFFF;
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — both palettes keep ≥ 4.5:1, not a parity defect (T-015-03 audit) */
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-body);
@@ -352,7 +352,7 @@ main:has(.sl) .dz {
   min-height: 36px;
   padding: 8px 16px;
   background: var(--accent);
-  color: #FFFFFF;
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — both palettes keep ≥ 4.5:1, not a parity defect (T-015-03 audit) */
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-small);
@@ -515,7 +515,7 @@ main:has(.sl) .dz {
   min-height: 44px;
   padding: 12px 24px;
   background: var(--accent);
-  color: #FFFFFF;
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — both palettes keep ≥ 4.5:1, not a parity defect (T-015-03 audit) */
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-body);
@@ -547,7 +547,7 @@ main:has(.sl) .dz {
   min-height: 44px;
   padding: 12px 24px;
   background: var(--accent);
-  color: #FFFFFF;
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — both palettes keep ≥ 4.5:1, not a parity defect (T-015-03 audit) */
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-body);
@@ -565,7 +565,7 @@ main:has(.sl) .dz {
   min-height: 44px;
   padding: 12px 24px;
   background: var(--accent);
-  color: #FFFFFF;
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — both palettes keep ≥ 4.5:1, not a parity defect (T-015-03 audit) */
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-body);
@@ -782,7 +782,7 @@ main:has(.sl) .dz {
   min-height: 44px; /* F-TRF-017-4 touch targets */
   padding: 12px 24px;
   background: var(--accent);
-  color: #FFFFFF;
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — both palettes keep ≥ 4.5:1, not a parity defect (T-015-03 audit) */
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-body);
@@ -863,7 +863,7 @@ main:has(.sl) .dz {
   margin-top: 8px;
   padding: 12px 24px;
   background: var(--accent);
-  color: #FFFFFF;
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — both palettes keep ≥ 4.5:1, not a parity defect (T-015-03 audit) */
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-small);
@@ -932,7 +932,7 @@ main:has(.sl) .dz {
 }
 
 .pf-delete-btn:hover {
-  color: #FFFFFF;
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — both palettes keep ≥ 4.5:1, not a parity defect (T-015-03 audit) */
   background: var(--danger);   /* red-tinted → solid on hover (ghost-danger) */
 }
 
@@ -943,7 +943,7 @@ main:has(.sl) .dz {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(16, 20, 24, 0.5);
+  background: rgba(16, 20, 24, 0.5); /* T-015-03 audit: shared modal-scrim darkening overlay — reads correctly in both palettes, documented out of scope */
 }
 
 .pf-modal {
@@ -1005,7 +1005,7 @@ main:has(.sl) .dz {
   min-height: 44px; /* F-TRF-017-4 touch targets */
   padding: 12px 24px;
   background: var(--danger);
-  color: #FFFFFF;
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — both palettes keep ≥ 4.5:1, not a parity defect (T-015-03 audit) */
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-small);
@@ -1048,7 +1048,7 @@ main:has(.sl) .dz {
   min-height: 44px; /* F-TRF-017-4 touch targets */
   padding: 12px 24px;
   background: var(--accent);
-  color: #FFFFFF;
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — both palettes keep ≥ 4.5:1, not a parity defect (T-015-03 audit) */
   border: none;
   border-radius: var(--radius-md);
   font-size: var(--fs-small);
@@ -1438,4 +1438,11 @@ main:has(.sl) .dz {
   font-family: monospace;
   font-size: var(--fs-small);
   color: var(--fg);
+}
+
+/* T-015-03 (F-TRF-015, UI-Reference §3): dark elevation — a flat 1px ring in the border token instead of a shadow.
+   Same element set as the light shadows (.dz-toast line above / .tb-dropdown), no layout change; --border is tokens.css's only border-named color token. */
+html[data-theme='dark'] .dz-toast,
+html[data-theme='dark'] .tb-dropdown {
+  box-shadow: 0 0 0 1px var(--border);
 }

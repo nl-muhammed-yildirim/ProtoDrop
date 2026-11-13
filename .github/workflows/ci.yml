@@ -93,6 +93,16 @@ jobs:
           done < <(find dist -type f)
           echo "dist gzip total: ${total} bytes"
 
+  # AGENT.md §4 (T-015-03, FR-015-2): token-diff parity check — plain node script over tokens.css; no npm install needed.
+  theme-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/check-theme-tokens.mjs
+
   # FR-051-2: multi-stage build, tagged wa-api:ci-<sha>; no push at M0 (push gated on AZURE_CONTAINER_REGISTRY, E-003).
   docker:
     runs-on: ubuntu-latest
