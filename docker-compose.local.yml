@@ -51,7 +51,7 @@ services:
       Wa__Jwt__Secret: "1f3a9c0e2d4b6f8a0c1e3d5b7f9a2c4e6d8b0f1a3c5e7d9b1f3a5c7e9d1b3f5a"
       Wa__Url__Public: "http://localhost:5173"
       Wa__Url__Api: "http://localhost:8080"
-      Wa__Cors__AllowedOrigins: "http://localhost:5173"
+      Wa__Cors__AllowedOrigins: "http://localhost:5173,http://127.0.0.1:5173"
       Wa__AdminEmails: "dev@example.com"
       # API -> workers zip trigger (f-zip): both sides sign with x-zip-sign = Wa:Zip:SignKey.
       # Bridge containers can't see each other's localhost; reach workers via the host-published port.
