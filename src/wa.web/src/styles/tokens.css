@@ -1,0 +1,55 @@
+/* T-015-01 (F-TRF-015, TA-8.2): theme color tokens — the full 14-token light/dark pairs from UI-Reference §1 / F-TRF-015's UI notes.
+   The pre-paint script in index.html always resolves [data-theme] on <html> before first paint (FR-015-3), so these blocks are the
+   only source of color tokens: :root is the light default, and each explicit scope defines ALL 14 — including --success/--warning,
+   which T-008-07's [data-theme] overrides were missing. Font-size + radius tokens stay in index.css :root; only colors live here. */
+
+:root {
+  --bg: #FFFFFF;
+  --bg-subtle: #F5F6F8;
+  --bg-elevated: #FFFFFF;
+  --fg: #101418;
+  --fg-muted: #5F6B7A;
+  --fg-faint: #93A0AF; /* T-008-03: missing UI-Reference §1 token */
+  --accent: #4185F4;
+  --accent-hover: #2F6FD8;
+  --accent-soft: #EAF1FD;
+  --border: #DDE2E8;
+  --danger: #D6453D;
+  --danger-soft: #FBEBEA; /* T-008-03: missing UI-Reference §1 token */
+  --success: #2E9E5B;
+  --warning: #C77C11;
+}
+
+html[data-theme='dark'] :root, html[data-theme='dark'] {
+  --bg: #0F1115;
+  --bg-subtle: #171A21;
+  --bg-elevated: #1C2028;
+  --fg: #E8EAED;
+  --fg-muted: #8A94A3;
+  --fg-faint: #667080; /* T-008-03: missing UI-Reference §1 token */
+  --accent: #5A9BF7;
+  --accent-hover: #74ACF9;
+  --accent-soft: #1B2A44;
+  --border: #2A2F3A;
+  --danger: #E3645C;
+  --danger-soft: #2B1817; /* T-008-03: missing UI-Reference §1 token */
+  --success: #43B978;
+  --warning: #E0A43C;
+}
+
+html[data-theme='light'] :root, html[data-theme='light'] {
+  --bg: #FFFFFF;
+  --bg-subtle: #F5F6F8;
+  --bg-elevated: #FFFFFF;
+  --fg: #101418;
+  --fg-muted: #5F6B7A;
+  --fg-faint: #93A0AF; /* T-008-03: missing UI-Reference §1 token */
+  --accent: #4185F4;
+  --accent-hover: #2F6FD8;
+  --accent-soft: #EAF1FD;
+  --border: #DDE2E8;
+  --danger: #D6453D;
+  --danger-soft: #FBEBEA; /* T-008-03: missing UI-Reference §1 token */
+  --success: #2E9E5B;
+  --warning: #C77C11;
+}
