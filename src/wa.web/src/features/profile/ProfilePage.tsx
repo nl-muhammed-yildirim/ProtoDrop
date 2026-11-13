@@ -1,6 +1,9 @@
 import { useState } from 'react'
 
 import type { StoredProfile } from '../../core/auth/session'
+import { writeSession } from '../../core/auth/session'
+// T-015-02 (F-TRF-015): resolve the explicit data-theme via the shared pure function — System mode no longer falls back to :root light.
+import { resolveTheme } from '../../core/theme/resolveTheme'
 import { getTraceParent } from '../../core/traceparent'
 import i18n from '../../core/i18n/init'
 import DangerZone from './DangerZone'
@@ -54,10 +57,11 @@ export function ProfilePage({ profile, onSignedIn, onThemeChange, onDeleteAccoun
   }
 
   function changeTheme(next: 'system' | 'light' | 'dark') {
-    // Apply the attribute pre-paint-style immediately so there's no flicker, then persist to the account.
-    // F-TRF-015: guests fall back to prefers-color-scheme; a signed-in user's stored theme wins.
-    if (next === 'system') document.documentElement.removeAttribute('data-theme')
-    else document.documentElement.setAttribute('data-theme', next)
+    // Apply the resolved theme pre-paint-style immediately so there's no flicker, then persist to the account.
+    // T-015-02 (F-TRF-015): resolve via the shared pure function and ALWAYS set an explicit attribute —
+    // System mode follows the OS live instead of falling back to :root light after removeAttribute.
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches   // jsdom tests install a stub (matchMediaStub.ts)
+    document.documentElement.setAttribute('data-theme', resolveTheme(next, prefersDark))
 
     setThemeLocal(next)
     onThemeChange(next)   // App updates its session state so TopBar's select stays in sync (D-4).
@@ -74,6 +78,7 @@ export function ProfilePage({ profile, onSignedIn, onThemeChange, onDeleteAccoun
         if (!res.ok) throw new Error((await res.json().catch(() => null))?.message ?? i18n.t('profile.error.saveThemeFailed'))
         const updated = (await res.json()) as Omit<StoredProfile, never>
         onSignedIn({ ...profile, theme: updated.theme })   // server-wins; round-trip the stored value.
+        writeSession(updated)   // T-015-02 (AC-015-1): persist to the mirror index.html's pre-paint bootstrap reads — next paint resolves before first paint.
       })
       .catch(() => setError(i18n.t('profile.error.saveThemeFailed')))
       .finally(() => setSavingTheme(false))

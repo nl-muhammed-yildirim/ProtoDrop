@@ -49,6 +49,7 @@ dotnet test tests/wa.application.unit
 dotnet test tests/wa.api.integration     # Testcontainers: Docker must be running
 cd src/wa.web
 npm run lint && npm run test && npm run build
+node ../scripts/check-theme-tokens.mjs   # T-015-03 (FR-015-2): token-diff parity — all 14 tokens in :root/dark/light, dark ≠ light per token; CI job theme-check runs the same script from repo root.
 ```
 
 Plus, per task: the task's own **exit check** in `Milestone-Backlog.md`.

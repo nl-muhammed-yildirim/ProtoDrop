@@ -3,22 +3,9 @@
   box-sizing: border-box;
 }
 
-:root {
-  --bg: #FFFFFF;
-  --bg-subtle: #F5F6F8;
-  --bg-elevated: #FFFFFF;
-  --fg: #101418;
-  --fg-muted: #5F6B7A;
-  --fg-faint: #93A0AF; /* T-008-03: missing UI-Reference §1 token */
-  --accent: #4185F4;
-  --accent-hover: #2F6FD8;
-  --accent-soft: #EAF1FD;
-  --border: #DDE2E8;
-  --danger: #D6453D;
-  --danger-soft: #FBEBEA; /* T-008-03: missing UI-Reference §1 token */
-  --success: #2E9E5B;
-  --warning: #C77C11;
+/* T-015-01 (F-TRF-015): color tokens moved to styles/tokens.css (:root + [data-theme] scopes, imported first in main.tsx). */
 
+:root {
   --fs-display: 40px;
   --fs-h1: 28px;
   --fs-body: 16px;
@@ -27,58 +14,6 @@
   --radius-sm: 6px;
   --radius-md: 10px; /* T-008-03: missing UI-Reference §1 token */
   --radius-lg: 16px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0F1115;
-    --bg-subtle: #171A21;
-    --bg-elevated: #1C2028;
-    --fg: #E8EAED;
-    --fg-muted: #8A94A3;
-    --fg-faint: #667080; /* T-008-03: missing UI-Reference §1 token */
-    --accent: #5A9BF7;
-    --accent-hover: #74ACF9;
-    --accent-soft: #1B2A44;
-    --border: #2A2F3A;
-    --danger: #E3645C;
-    --danger-soft: #2B1817; /* T-008-03: missing UI-Reference §1 token */
-    --success: #43B978;
-    --warning: #E0A43C;
-  }
-}
-
-/* T-008-07 (F-TRF-015): explicit stored theme wins over OS prefers-color-scheme in both directions.
-   The pre-paint script in index.html sets [data-theme] from the signed-in profile; guests have no
-   attribute → they stay on the @media (prefers-color-scheme: dark) fallback above. */
-html[data-theme='dark'] :root, html[data-theme='dark'] {
-  --bg: #0F1115;
-  --bg-subtle: #171A21;
-  --bg-elevated: #1C2028;
-  --fg: #E8EAED;
-  --fg-muted: #8A94A3;
-  --fg-faint: #667080; /* T-008-03: missing UI-Reference §1 token */
-  --accent: #5A9BF7;
-  --accent-hover: #74ACF9;
-  --accent-soft: #1B2A44;
-  --border: #2A2F3A;
-  --danger: #E3645C;
-  --danger-soft: #2B1817; /* T-008-03: missing UI-Reference §1 token */
-}
-
-html[data-theme='light'] :root, html[data-theme='light'] {
-  --bg: #FFFFFF;
-  --bg-subtle: #F5F6F8;
-  --bg-elevated: #FFFFFF;
-  --fg: #101418;
-  --fg-muted: #5F6B7A;
-  --fg-faint: #93A0AF; /* T-008-03: missing UI-Reference §1 token */
-  --accent: #4185F4;
-  --accent-hover: #2F6FD8;
-  --accent-soft: #EAF1FD;
-  --border: #DDE2E8;
-  --danger: #D6453D;
-  --danger-soft: #FBEBEA; /* T-008-03: missing UI-Reference §1 token */
 }
 
 body {
@@ -163,7 +98,7 @@ main > * {
   min-height: 44px;
   padding: 12px 24px;
   background: var(--accent);
-  color: #FFFFFF;
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — documented contract, not a parity defect (T-015-03 audit); measured contrast below WCAG AA in both palettes (light 3.57/4.40, dark 2.81/3.36) — F-TRF-016 owns the P0-surface a11y pass */
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-body);
@@ -417,7 +352,7 @@ main:has(.sl) .dz {
   min-height: 36px;
   padding: 8px 16px;
   background: var(--accent);
-  color: #FFFFFF;
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — documented contract, not a parity defect (T-015-03 audit); measured contrast below WCAG AA in both palettes (light 3.57/4.40, dark 2.81/3.36) — F-TRF-016 owns the P0-surface a11y pass */
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-small);
@@ -580,7 +515,7 @@ main:has(.sl) .dz {
   min-height: 44px;
   padding: 12px 24px;
   background: var(--accent);
-  color: #FFFFFF;
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — documented contract, not a parity defect (T-015-03 audit); measured contrast below WCAG AA in both palettes (light 3.57/4.40, dark 2.81/3.36) — F-TRF-016 owns the P0-surface a11y pass */
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-body);
@@ -612,7 +547,7 @@ main:has(.sl) .dz {
   min-height: 44px;
   padding: 12px 24px;
   background: var(--accent);
-  color: #FFFFFF;
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — documented contract, not a parity defect (T-015-03 audit); measured contrast below WCAG AA in both palettes (light 3.57/4.40, dark 2.81/3.36) — F-TRF-016 owns the P0-surface a11y pass */
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-body);
@@ -630,7 +565,7 @@ main:has(.sl) .dz {
   min-height: 44px;
   padding: 12px 24px;
   background: var(--accent);
-  color: #FFFFFF;
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — documented contract, not a parity defect (T-015-03 audit); measured contrast below WCAG AA in both palettes (light 3.57/4.40, dark 2.81/3.36) — F-TRF-016 owns the P0-surface a11y pass */
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-body);
@@ -847,7 +782,7 @@ main:has(.sl) .dz {
   min-height: 44px; /* F-TRF-017-4 touch targets */
   padding: 12px 24px;
   background: var(--accent);
-  color: #FFFFFF;
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — documented contract, not a parity defect (T-015-03 audit); measured contrast below WCAG AA in both palettes (light 3.57/4.40, dark 2.81/3.36) — F-TRF-016 owns the P0-surface a11y pass */
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-body);
@@ -928,7 +863,7 @@ main:has(.sl) .dz {
   margin-top: 8px;
   padding: 12px 24px;
   background: var(--accent);
-  color: #FFFFFF;
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — documented contract, not a parity defect (T-015-03 audit); measured contrast below WCAG AA in both palettes (light 3.57/4.40, dark 2.81/3.36) — F-TRF-016 owns the P0-surface a11y pass */
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-small);
@@ -997,7 +932,7 @@ main:has(.sl) .dz {
 }
 
 .pf-delete-btn:hover {
-  color: #FFFFFF;
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — documented contract, not a parity defect (T-015-03 audit); measured contrast below WCAG AA in both palettes (light 3.57/4.40, dark 2.81/3.36) — F-TRF-016 owns the P0-surface a11y pass */
   background: var(--danger);   /* red-tinted → solid on hover (ghost-danger) */
 }
 
@@ -1008,7 +943,7 @@ main:has(.sl) .dz {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(16, 20, 24, 0.5);
+  background: rgba(16, 20, 24, 0.5); /* T-015-03 audit: shared modal-scrim darkening overlay — reads correctly in both palettes, documented out of scope */
 }
 
 .pf-modal {
@@ -1070,7 +1005,7 @@ main:has(.sl) .dz {
   min-height: 44px; /* F-TRF-017-4 touch targets */
   padding: 12px 24px;
   background: var(--danger);
-  color: #FFFFFF;
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — documented contract, not a parity defect (T-015-03 audit); measured contrast below WCAG AA in both palettes (light 3.57/4.40, dark 2.81/3.36) — F-TRF-016 owns the P0-surface a11y pass */
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-small);
@@ -1113,7 +1048,7 @@ main:has(.sl) .dz {
   min-height: 44px; /* F-TRF-017-4 touch targets */
   padding: 12px 24px;
   background: var(--accent);
-  color: #FFFFFF;
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — documented contract, not a parity defect (T-015-03 audit); measured contrast below WCAG AA in both palettes (light 3.57/4.40, dark 2.81/3.36) — F-TRF-016 owns the P0-surface a11y pass */
   border: none;
   border-radius: var(--radius-md);
   font-size: var(--fs-small);
@@ -1503,4 +1438,11 @@ main:has(.sl) .dz {
   font-family: monospace;
   font-size: var(--fs-small);
   color: var(--fg);
+}
+
+/* T-015-03 (F-TRF-015, UI-Reference §3): dark elevation — a flat 1px ring in the border token instead of a shadow.
+   Same element set as the light shadows (.dz-toast line above / .tb-dropdown), no layout change; --border is tokens.css's only border-named color token. */
+html[data-theme='dark'] .dz-toast,
+html[data-theme='dark'] .tb-dropdown {
+  box-shadow: 0 0 0 1px var(--border);
 }
