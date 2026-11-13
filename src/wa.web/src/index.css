@@ -98,7 +98,7 @@ main > * {
   min-height: 44px;
   padding: 12px 24px;
   background: var(--accent);
-  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — both palettes keep ≥ 4.5:1, not a parity defect (T-015-03 audit) */
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — documented contract, not a parity defect (T-015-03 audit); measured contrast below WCAG AA in both palettes (light 3.57/4.40, dark 2.81/3.36) — F-TRF-016 owns the P0-surface a11y pass */
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-body);
@@ -352,7 +352,7 @@ main:has(.sl) .dz {
   min-height: 36px;
   padding: 8px 16px;
   background: var(--accent);
-  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — both palettes keep ≥ 4.5:1, not a parity defect (T-015-03 audit) */
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — documented contract, not a parity defect (T-015-03 audit); measured contrast below WCAG AA in both palettes (light 3.57/4.40, dark 2.81/3.36) — F-TRF-016 owns the P0-surface a11y pass */
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-small);
@@ -515,7 +515,7 @@ main:has(.sl) .dz {
   min-height: 44px;
   padding: 12px 24px;
   background: var(--accent);
-  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — both palettes keep ≥ 4.5:1, not a parity defect (T-015-03 audit) */
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — documented contract, not a parity defect (T-015-03 audit); measured contrast below WCAG AA in both palettes (light 3.57/4.40, dark 2.81/3.36) — F-TRF-016 owns the P0-surface a11y pass */
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-body);
@@ -547,7 +547,7 @@ main:has(.sl) .dz {
   min-height: 44px;
   padding: 12px 24px;
   background: var(--accent);
-  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — both palettes keep ≥ 4.5:1, not a parity defect (T-015-03 audit) */
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — documented contract, not a parity defect (T-015-03 audit); measured contrast below WCAG AA in both palettes (light 3.57/4.40, dark 2.81/3.36) — F-TRF-016 owns the P0-surface a11y pass */
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-body);
@@ -565,7 +565,7 @@ main:has(.sl) .dz {
   min-height: 44px;
   padding: 12px 24px;
   background: var(--accent);
-  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — both palettes keep ≥ 4.5:1, not a parity defect (T-015-03 audit) */
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — documented contract, not a parity defect (T-015-03 audit); measured contrast below WCAG AA in both palettes (light 3.57/4.40, dark 2.81/3.36) — F-TRF-016 owns the P0-surface a11y pass */
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-body);
@@ -782,7 +782,7 @@ main:has(.sl) .dz {
   min-height: 44px; /* F-TRF-017-4 touch targets */
   padding: 12px 24px;
   background: var(--accent);
-  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — both palettes keep ≥ 4.5:1, not a parity defect (T-015-03 audit) */
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — documented contract, not a parity defect (T-015-03 audit); measured contrast below WCAG AA in both palettes (light 3.57/4.40, dark 2.81/3.36) — F-TRF-016 owns the P0-surface a11y pass */
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-body);
@@ -863,7 +863,7 @@ main:has(.sl) .dz {
   margin-top: 8px;
   padding: 12px 24px;
   background: var(--accent);
-  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — both palettes keep ≥ 4.5:1, not a parity defect (T-015-03 audit) */
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — documented contract, not a parity defect (T-015-03 audit); measured contrast below WCAG AA in both palettes (light 3.57/4.40, dark 2.81/3.36) — F-TRF-016 owns the P0-surface a11y pass */
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-small);
@@ -932,7 +932,7 @@ main:has(.sl) .dz {
 }
 
 .pf-delete-btn:hover {
-  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — both palettes keep ≥ 4.5:1, not a parity defect (T-015-03 audit) */
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — documented contract, not a parity defect (T-015-03 audit); measured contrast below WCAG AA in both palettes (light 3.57/4.40, dark 2.81/3.36) — F-TRF-016 owns the P0-surface a11y pass */
   background: var(--danger);   /* red-tinted → solid on hover (ghost-danger) */
 }
 
@@ -1005,7 +1005,7 @@ main:has(.sl) .dz {
   min-height: 44px; /* F-TRF-017-4 touch targets */
   padding: 12px 24px;
   background: var(--danger);
-  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — both palettes keep ≥ 4.5:1, not a parity defect (T-015-03 audit) */
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — documented contract, not a parity defect (T-015-03 audit); measured contrast below WCAG AA in both palettes (light 3.57/4.40, dark 2.81/3.36) — F-TRF-016 owns the P0-surface a11y pass */
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-small);
@@ -1048,7 +1048,7 @@ main:has(.sl) .dz {
   min-height: 44px; /* F-TRF-017-4 touch targets */
   padding: 12px 24px;
   background: var(--accent);
-  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — both palettes keep ≥ 4.5:1, not a parity defect (T-015-03 audit) */
+  color: #FFFFFF; /* UI-Reference §4.5 contract: white text on accent/danger — documented contract, not a parity defect (T-015-03 audit); measured contrast below WCAG AA in both palettes (light 3.57/4.40, dark 2.81/3.36) — F-TRF-016 owns the P0-surface a11y pass */
   border: none;
   border-radius: var(--radius-md);
   font-size: var(--fs-small);
