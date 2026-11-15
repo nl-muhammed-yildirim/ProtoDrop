@@ -79,8 +79,8 @@ AC-015-4: Every screen in the app
 
 | Story | Task | File | Status |
 |---|---|---|---|
-| US-015-02 | T-015-01 Theme tokens + pre-paint bootstrap: both palettes in `tokens.css`, `core/theme` resolution (account > preference > default) (FR-015-1/3, TA-8.2) | `US-015-02-theme-parity/T-015-01-tokens-and-bootstrap.md` | ☐ |
-| US-015-01 | T-015-02 Profile theme select + live `system` OS tracking via matchMedia (FR-015-4) | `US-015-01-theme-choice/T-015-02-profile-theme-select-live-system.md` | ☐ |
-| US-015-02 | T-015-03 Full-screen theme parity audit + token-diff CI check (FR-015-2) | `US-015-02-theme-parity/T-015-03-parity-audit-and-token-diff.md` | ☐ |
+| US-015-02 | T-015-01 Theme tokens + pre-paint bootstrap: both palettes in `tokens.css`, `core/theme` resolution (account > preference > default) (FR-015-1/3, TA-8.2) | `US-015-02-theme-parity/T-015-01-tokens-and-bootstrap.md` | ☑ 2026-11-13 |
+| US-015-01 | T-015-02 Profile theme select + live `system` OS tracking via matchMedia (FR-015-4) | `US-015-01-theme-choice/T-015-02-profile-theme-select-live-system.md` | ☑ 2026-11-13 |
+| US-015-02 | T-015-03 Full-screen theme parity audit + token-diff CI check (FR-015-2) | `US-015-02-theme-parity/T-015-03-parity-audit-and-token-diff.md` | ☑ 2026-11-13 |
 
 **Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified (AC-015-1…AC-015-4, EC-015-1…EC-015-3). Then T-027 can be marked `done` in `Milestone-Backlog.md` — its exit is "No flash-of-wrong-theme" plus the screen-by-screen dark pass (the manual matrix of F-TRF-015's test plan, T-015-03).

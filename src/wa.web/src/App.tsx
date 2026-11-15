@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react'
 
 import TopBar from './core/TopBar'
 import type { StoredProfile } from './core/auth/session'
-import { clearSession, readSession } from './core/auth/session'
+import { clearSession, readSession, writeSession } from './core/auth/session'
+// T-015-02 (FR-015-4 / AC-015-3): live OS theme tracking — listener registered only while in system mode.
+import { useSystemTheme } from './core/theme/useSystemTheme'
+import { resolveTheme } from './core/theme/resolveTheme'
 import { useUploadEngine } from './core/upload/UploadEngine'
 import { getTraceParent } from './core/traceparent'
 import i18n from './core/i18n/init'
@@ -37,6 +40,10 @@ export default function App() {
   const [pathname, setPathname] = useState(() => (typeof window === 'undefined' ? '/' : window.location.pathname))
   // T-008-03: lazy-init from localStorage; the typeof-window guard inside readSession keeps SSR null.
   const [session, setSession] = useState<StoredProfile | null>(() => readSession())
+
+  // T-015-02 (FR-015-4 / AC-015-3): live OS tracking — guests are system by default (FR-015-1); the hook
+  // registers its matchMedia listener only while in system mode, so explicit light/dark never follow the OS.
+  useSystemTheme(session?.theme ?? 'system')
 
   useEffect(() => {
     const onPop = () => setPathname(window.location.pathname)
@@ -93,6 +100,10 @@ export default function App() {
     // component that initiated it (ProfilePage.changeTheme or — in this task's scope — nothing else,
     // because TopBar's select is wired to the same onThemeChange but its own PATCH lives in D-4).
     setSession((s) => (s ? { ...s, theme } : s))
+    if (!session) return   // guests have no mirror to update — nothing else for them here.
+    // T-015-02 (D-1): TopBar's select fires only onThemeChange — App owns the resolved attribute switch + persistence so both surfaces work in place.
+    document.documentElement.setAttribute('data-theme', resolveTheme(theme, window.matchMedia('(prefers-color-scheme: dark)').matches))   // jsdom tests install a stub (matchMediaStub.ts)
+    writeSession({ ...session, theme })   // T-015-02 (AC-015-1): keep the bootstrap's localStorage mirror fresh for TopBar-initiated changes.
   }
 
   return (

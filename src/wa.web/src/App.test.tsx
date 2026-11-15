@@ -3,10 +3,15 @@ import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { act } from 'react-dom/test-utils'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { beforeAll, beforeEach, afterEach, describe, expect, it } from 'vitest'
 
 import App from './App'
-import { writeSession, clearSession } from './core/auth/session'
+import { writeSession, clearSession, readSession } from './core/auth/session'
+// T-015-02 (FR-015-4): jsdom has no window.matchMedia — the useSystemTheme effect needs a controllable stub.
+import type { MatchMediaStub } from './test/matchMediaStub'
+import { installMatchMediaStub } from './test/matchMediaStub'
+// T-015-02: mirrors index.html's pre-paint script (jsdom never runs it) to seed each test's initial data-theme.
+import { resolveTheme } from './core/theme/resolveTheme'
 
 // The jsdom environment here has no localStorage. Provide a minimal in-memory shim so the
 // client-side session persistence (App's lazy-init readSession / TopBar switch) is testable
@@ -25,7 +30,12 @@ function installLocalStorageShim(): void {
   Object.defineProperty(window, 'localStorage', { value: ls, configurable: true })
 }
 
-beforeAll(() => installLocalStorageShim())
+// T-015-02 (FR-015-4): jsdom has no window.matchMedia — App's useSystemTheme effect needs a controllable stub.
+let mqStub: MatchMediaStub
+beforeAll(() => {
+  installLocalStorageShim()
+  mqStub = installMatchMediaStub(false)   // initial OS preference: light (matches=false).
+})
 
 ;(globalThis as unknown as Record<string, boolean>).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -46,6 +56,18 @@ function renderClientApp(): { host: HTMLElement; cleanup: () => void } {
 beforeEach(() => {
   clearSession()
 })
+
+// T-015-02: data-theme lives on the shared jsdom documentElement — start each test clean (jsdom's initial state)
+// and leave it clean so other files' tests don't inherit a leftover value.
+beforeEach(() => { document.documentElement.removeAttribute('data-theme') })
+
+function setNativeSelectValue(el: HTMLSelectElement, value: string): void {
+  const proto = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value')
+  ;(proto?.set as ((v: string) => void) | undefined)?.call(el, value)
+  el.dispatchEvent(new Event('change', { bubbles: true }))
+}
+
+afterEach(() => { document.documentElement.removeAttribute('data-theme') })
 
 describe('App landing', () => {
   it('renders the drop zone heading and ARIA (F-TRF-001)', () => {
@@ -85,5 +107,72 @@ describe('App SPA 404 (T-013-02, AC-013-4)', () => {
   it("'/' still renders landing (regression guard)", () => {
     const html = renderToStaticMarkup(<App />)
     expect(html).toContain('<h1 class="dz-title">Send your files.</h1>')
+  })
+})
+
+describe('App live OS theme tracking (T-015-02, FR-015-4 / AC-015-3)', () => {
+  // jsdom never runs index.html's pre-paint script — mirror it here so each test starts from the same
+  // state a real browser load would produce (explicit attribute before React mounts).
+  function simulatePrePaintBootstrap(stored: 'system' | 'light' | 'dark' | undefined): void {
+    document.documentElement.setAttribute('data-theme', resolveTheme(stored, mqStub.matches))
+  }
+
+  it("guest + OS dark → data-theme=\"dark\" live without reload (AC-015-3)", async () => {
+    mqStub.flipMatches(false)   // initial OS preference: light.
+    simulatePrePaintBootstrap(undefined)   // guest — index.html resolves the OS preference pre-paint.
+    const { cleanup } = renderClientApp()
+
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light')   // bootstrap state before any change.
+
+    mqStub.flipMatches(true)  // user switches their OS to dark with the tab open…
+    await act(async () => { mqStub.fireChange() })
+
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')   // …the listener did it live, no reload (AC-015-3).
+    cleanup()
+  })
+
+  it("explicit light does NOT follow an OS change to dark (EC-015-1)", async () => {
+    mqStub.flipMatches(false)  // initial OS preference: light.
+    writeSession({ userId: 'u1', email: 'a@b.c', displayName: 'Ada Lovelace', theme: 'light', planCode: 'free' })
+    simulatePrePaintBootstrap('light')   // index.html honors the stored explicit choice pre-paint.
+    const { cleanup } = renderClientApp()
+
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light')   // bootstrap state before any change.
+
+    mqStub.flipMatches(true)                  // OS flips to dark while in explicit mode…
+    await act(async () => { mqStub.fireChange() })
+
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light')  // …and the app stays light (EC-015-1).
+    cleanup()
+  })
+
+  it("explicit dark does NOT follow an OS change to light (EC-015-1)", async () => {
+    mqStub.flipMatches(true)   // initial OS preference: dark.
+    writeSession({ userId: 'u1', email: 'a@b.c', displayName: 'Ada Lovelace', theme: 'dark', planCode: 'free' })
+    simulatePrePaintBootstrap('dark')   // index.html honors the stored explicit choice pre-paint.
+    const { cleanup } = renderClientApp()
+
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')   // bootstrap state before any change.
+
+    mqStub.flipMatches(false)                // OS flips to light while in explicit mode…
+    await act(async () => { mqStub.fireChange() })
+
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')   // …and the app stays dark (EC-015-1).
+    cleanup()
+  })
+
+  it("TopBar-initiated theme change persists to the session mirror so the next paint's bootstrap reads it (AC-015-1 client half)", async () => {
+    writeSession({ userId: 'u1', email: 'a@b.c', displayName: 'Ada Lovelace', theme: 'system', planCode: 'free' })
+    const { host, cleanup } = renderClientApp()
+
+    const avatar = host.querySelector('.tb-avatar') as HTMLButtonElement
+    act(() => { avatar.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    const select = host.querySelector('.tb-theme-select') as HTMLSelectElement
+    await act(async () => {
+      setNativeSelectValue(select, 'dark')   // TopBar's select fires only onThemeChange — App persists the mirror.
+    })
+
+    expect(readSession()?.theme).toBe('dark')   // index.html's pre-paint bootstrap will resolve dark before first paint next load (AC-015-1).
+    cleanup()
   })
 })

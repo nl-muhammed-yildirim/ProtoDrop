@@ -8,6 +8,9 @@ import ProfilePage from './ProfilePage'
 import App from '../../App'
 import type { StoredProfile } from '../../core/auth/session'
 import { clearSession, readSession, writeSession } from '../../core/auth/session'
+// T-015-02 (FR-015-4): jsdom has no window.matchMedia — changeTheme's resolved-set path needs a controllable stub.
+import type { MatchMediaStub } from '../../test/matchMediaStub'
+import { installMatchMediaStub } from '../../test/matchMediaStub'
 
 ;(globalThis as unknown as Record<string, boolean>).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -79,14 +82,18 @@ function setNativeSelectValue(el: HTMLSelectElement, value: string): void {
 
 const BASE_PROFILE: StoredProfile = { userId: 'u1', email: 'a@b.c', displayName: 'A', theme: 'system', planCode: 'free' }
 
+// T-015-02 (FR-015-4): jsdom has no window.matchMedia — changeTheme's resolved-set path reads it.
+let mqStub: MatchMediaStub
 beforeEach(() => {
   installLocalStorageShim()
+  mqStub = installMatchMediaStub(false)   // initial OS preference: light (matches=false).
   clearSession()
 })
 
 afterEach(() => {
   vi.useRealTimers()
   vi.unstubAllGlobals()
+  document.documentElement.removeAttribute('data-theme')   // shared jsdom element — keep tests hermetic.
 })
 
 describe('ProfilePage (T-008-07)', () => {
@@ -343,5 +350,65 @@ describe('ProfilePage (T-008-07)', () => {
       .toBe("Your account and profile are deleted. Your active transfers keep working and show 'From: Ada Lovelace' without your email.")
     root.unmount()
     host.remove()
+  })
+
+  describe('T-015-02 (F-TRF-015): theme select + live system OS tracking', () => {
+    it("System mode follows the OS preference — resolved-set path, no removeAttribute fallback to :root light", async () => {
+      mqStub.flipMatches(true)   // OS prefers dark.
+
+      const captured: { url?: string; init?: RequestInit } = {}
+      stubFetch(captured, () => Promise.resolve(new Response(JSON.stringify({ ...BASE_PROFILE, theme: 'system' }), { status: 200 })))
+
+      const onSignedIn = vi.fn()
+      const { host, cleanup } = renderProfilePage(BASE_PROFILE, onSignedIn)
+
+      // Selecting 'system' must resolve to the OS preference — the old removeAttribute path fell back to :root light.
+      const select = host.querySelector('#pf-theme') as HTMLSelectElement
+      await act(async () => {
+        setNativeSelectValue(select, 'system')
+        await Promise.resolve()   // flush the PATCH .then (writeSession).
+      })
+
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
+      cleanup()
+    })
+
+    it("explicit choice does NOT follow OS changes — App's useSystemTheme registers no listener for explicit modes (EC-015-1)", async () => {
+      mqStub.flipMatches(true)   // OS prefers dark.
+
+      const captured: { url?: string; init?: RequestInit } = {}
+      stubFetch(captured, () => Promise.resolve(new Response(JSON.stringify({ ...BASE_PROFILE, theme: 'light' }), { status: 200 })))
+
+      const onSignedIn = vi.fn()
+      const { host, cleanup } = renderProfilePage(BASE_PROFILE, onSignedIn)
+
+      // Pick explicit light while the OS is dark — the resolved-set path must honor the account choice.
+      const select = host.querySelector('#pf-theme') as HTMLSelectElement
+      await act(async () => {
+        setNativeSelectValue(select, 'light')
+        await Promise.resolve()   // flush the PATCH .then (writeSession).
+      })
+
+      expect(document.documentElement.getAttribute('data-theme')).toBe('light')
+      cleanup()
+    })
+
+    it("persistence: after changeTheme to Dark, readSession() returns theme='dark' — the mirror index.html's bootstrap reads (AC-015-1 client half)", async () => {
+      const captured: { url?: string; init?: RequestInit } = {}
+      stubFetch(captured, () => Promise.resolve(new Response(JSON.stringify({ ...BASE_PROFILE, theme: 'dark' }), { status: 200 })))
+
+      writeSession(BASE_PROFILE)   // signed-in session — the mirror exists before the change.
+      const onSignedIn = vi.fn()
+      const { host, cleanup } = renderProfilePage(BASE_PROFILE, onSignedIn)
+
+      const select = host.querySelector('#pf-theme') as HTMLSelectElement
+      await act(async () => {
+        setNativeSelectValue(select, 'dark')
+        await Promise.resolve()   // flush the PATCH .then (writeSession).
+      })
+
+      expect(readSession()?.theme).toBe('dark')   // next paint's bootstrap resolves dark before first paint.
+      cleanup()
+    })
   })
 })
