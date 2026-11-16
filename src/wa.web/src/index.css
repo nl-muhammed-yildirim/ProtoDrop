@@ -1127,7 +1127,7 @@ main:has(.sl) .dz {
 /* Text + color (F-TRF-016): the text is the primary signal, bg stays neutral. */
 .mf-chip-green { color: var(--success); }
 .mf-chip-amber { color: var(--warning); }
-.mf-chip-gray  { color: var(--fg-faint); }
+.mf-chip-gray  { color: var(--fg-muted); /* T-016-06: --fg-faint is placeholders/disabled only (F-TRF-016 UI notes); gray chip text needs 4.5:1 */ }
 
 .mf-countdown {
   flex: none;
@@ -1336,7 +1336,7 @@ main:has(.sl) .dz {
 
 .ad-chip-green { color: var(--success); }
 .ad-chip-amber { color: var(--warning); }
-.ad-chip-gray  { color: var(--fg-faint); }
+.ad-chip-gray  { color: var(--fg-muted); /* T-016-06: --fg-faint is placeholders/disabled only (F-TRF-016 UI notes); gray chip text needs 4.5:1 */ }
 
 .ad-loading {
   padding: 32px 24px;
