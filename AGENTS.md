@@ -1,5 +1,7 @@
 # Rules
 
+> **Runtime scope:** the rules below describe the **Hermes + local Ollama** pipeline. When running under **Claude Code**, follow `CLAUDE.md` + `.claude/agents/*.md` + the `protodrop-cycle` skill instead (same roles and cycle; models Haiku/Opus/Sonnet; the VRAM, sync-spawn and no-polling rules do not apply). Role separation, one task at a time, and the `DECISION:` escalation format apply to both.
+
 ## Agent pipeline (Orchestrator → Architect → Coder → Reviewer)
 
 The four roles are defined in `.agents/agents/*.md`, each pinned to its local Ollama model (`ollama/Qwen3.8:*`). The machine config that pins them is `C:\Users\myild\AppData\Local\hermes\config.yaml` → `delegation:` (backend `model_map`: architect/coder/reviewer options, `max_concurrent_children: 1`, `gateway_mode: inline`; NOTE a `sync_top_level: true` sits there too but is a decoy — only the protodrop-cycle plugin reads it).
