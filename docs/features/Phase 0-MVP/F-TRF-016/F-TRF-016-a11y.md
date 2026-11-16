@@ -84,11 +84,11 @@ AC-016-4: A color-blind user (protanopia simulation)
 
 | Story | Task | File | Status |
 |---|---|---|---|
-| US-016-02 | T-016-01 `useAriaLive` helper + hidden live-region containers in `core/ui`: polite/assertive mapping, 0/25/50/75/100 % throttle (FR-016-3, EC-016-1) | `US-016-02-screen-reader/T-016-01-aria-live-helper.md` | ☐ |
-| US-016-02 | T-016-02 Wire live regions into all P0 surfaces + injected-failure Playwright E2E (FR-016-3, AC-016-2) | `US-016-02-screen-reader/T-016-02-wire-live-regions-e2e.md` | ☐ |
-| US-016-01 | T-016-03 Keyboard access audit + focus-order fixes across P0 surfaces (FR-016-2, EC-016-2/3/4) | `US-016-01-keyboard/T-016-03-keyboard-audit-and-focus-order.md` | ☐ |
-| US-016-01 | T-016-04 Playwright keyboard-only full guest flow E2E (AC-016-1) | `US-016-01-keyboard/T-016-04-keyboard-full-flow-e2e.md` | ☐ |
-| US-016-03 | T-016-05 Global `:focus-visible` ring rule + `prefers-reduced-motion` pass (FR-016-4/5, AC-016-3) | `US-016-03-contrast-focus/T-016-05-focus-ring-and-reduced-motion.md` | ☐ |
-| US-016-03 | T-016-06 Contrast audit (both themes, ≥ 4.5:1) + color-independent status signals + CI check (FR-016-1/4, AC-016-4) | `US-016-03-contrast-focus/T-016-06-contrast-audit-ci-check.md` | ☐ |
+| US-016-02 | T-016-01 `useAriaLive` helper + hidden live-region containers in `core/ui`: polite/assertive mapping, 0/25/50/75/100 % throttle (FR-016-3, EC-016-1) | `US-016-02-screen-reader/T-016-01-aria-live-helper.md` | ☑ 2026-11-15 |
+| US-016-02 | T-016-02 Wire live regions into all P0 surfaces + injected-failure Playwright E2E (FR-016-3, AC-016-2) | `US-016-02-screen-reader/T-016-02-wire-live-regions-e2e.md` | ☑ 2026-11-16 |
+| US-016-01 | T-016-03 Keyboard access audit + focus-order fixes across P0 surfaces (FR-016-2, EC-016-2/3/4) | `US-016-01-keyboard/T-016-03-keyboard-audit-and-focus-order.md` | ☑ 2026-11-16 |
+| US-016-01 | T-016-04 Playwright keyboard-only full guest flow E2E (AC-016-1) | `US-016-01-keyboard/T-016-04-keyboard-full-flow-e2e.md` | ☑ 2026-11-16 |
+| US-016-03 | T-016-05 Global `:focus-visible` ring rule + `prefers-reduced-motion` pass (FR-016-4/5, AC-016-3) | `US-016-03-contrast-focus/T-016-05-focus-ring-and-reduced-motion.md` | ☑ 2026-11-16 |
+| US-016-03 | T-016-06 Contrast audit (both themes, ≥ 4.5:1) + color-independent status signals + CI check (FR-016-1/4, AC-016-4) | `US-016-03-contrast-focus/T-016-06-contrast-audit-ci-check.md` | ☑ 2026-11-16 |
 
 **Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified (AC-016-1…AC-016-4, EC-016-1…EC-016-4). Then T-027 can be marked `done` in `Milestone-Backlog.md` — its scope is "Dark mode + a11y (WCAG 2.1 AA on P0 surfaces) + mobile web pass" and its exit check is "No flash-of-wrong-theme; keyboard-only full flow; mobile matrix green in staging" (dark-mode halves land via F-TRF-015, mobile via F-TRF-017 — this feature delivers the a11y half).
