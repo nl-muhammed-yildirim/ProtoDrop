@@ -238,7 +238,15 @@ export function StagingList() {
               type="button"
               className="sl-remove"
               aria-label={i18n.t('landing.staging.removeFile', { name: f.name })}
-              onClick={() => removeFile(f.id)}
+              // T-016-04 (D-2): removing the focused button drops focus to <body> — hand it to the next row's remove
+              // button, or Send when this was the last one. Markup-level fix; no positive tabindex anywhere.
+              onClick={(e) => {
+                const rows = Array.from(document.querySelectorAll('.sl-remove'))
+                const idx = rows.indexOf(e.currentTarget as HTMLButtonElement)
+                const nextTarget = rows[idx + 1] ?? document.querySelector('.sl-send')
+                removeFile(f.id)
+                requestAnimationFrame(() => (nextTarget as HTMLElement | null)?.focus())
+              }}
             >✕</button>
           </li>
         ))}

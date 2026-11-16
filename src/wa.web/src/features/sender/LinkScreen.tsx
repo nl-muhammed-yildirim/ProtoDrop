@@ -50,6 +50,10 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
   const copyBtnRef = useRef<HTMLButtonElement>(null)
   useEffect(() => { copyBtnRef.current?.focus() }, [])
 
+  // T-016-04 (D-3): sent-phase swap — after Send transfer the form unmounts and its focused button vanishes; focus
+  // must land on the sent-state Copy button so keyboard users stay in flow. Runs AFTER the mount effect above.
+  const sentCopyBtnRef = useRef<HTMLButtonElement>(null)
+
   // T-010-03 (AC-010-2 client half): pre-fill from the original transfer's snapshot — editable; the send body carries the form values.
   const [recipientsRaw, setRecipientsRaw] = useState(initialRecipients ?? '')
   const [invalidAddresses, setInvalidAddresses] = useState<string[]>([])
@@ -70,6 +74,9 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
   const [sendState, setSendState] = useState<SendPhase>('form')
   const [sending, setSending] = useState(false) // double-click guard — endpoint 3 is idempotent per key anyway (TA-4.1.5).
   const [sendError, setSendError] = useState<string | null>(null)
+
+  // T-016-04 (D-3): sent-phase swap focus — the form's focused button unmounts with it; land on the sent-state Copy.
+  useEffect(() => { if (sendState === 'sent') sentCopyBtnRef.current?.focus() }, [sendState])
 
   const url = `${window.location.origin}/t/${linkId}`
 
@@ -228,7 +235,8 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
             <p className="ls-sent-sub">{i18n.t('link.ready.shareLater')}</p>
             <div className="ls-field">
               <span className="ls-url">{url}</span>
-              <button type="button" className="ls-copy-btn" onClick={() => void handleCopy()}>
+              {/* T-016-04 (D-3): this is the SENT-state Copy — focus target after Send transfer swaps the form out. */}
+              <button type="button" className="ls-copy-btn" ref={sentCopyBtnRef} onClick={() => void handleCopy()}>
                 {copied ? i18n.t('link.ready.copied') : i18n.t('link.ready.copy')}
               </button>
             </div>
