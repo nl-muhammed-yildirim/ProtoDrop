@@ -109,8 +109,10 @@ main > * {
   background: var(--accent-hover);
 }
 
-.dz-button:focus-visible,
-.dz:focus-visible {
+/* T-016-05 (FR-016-4): single global focus ring — outline (not box-shadow) so it survives OS
+   high-contrast/forced-colors palettes. :focus-visible only, never bare :focus for mouse.
+   Replaces the six per-component blocks deleted in this task (AC-016-3). */
+:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -286,13 +288,6 @@ input[type='file'] {
 .sl-retry:hover {
   background: var(--bg-elevated);
   color: var(--fg);
-}
-
- .sl-send:focus-visible,
- .sl-remove:focus-visible,
- .sl-retry:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 .btn-primary:disabled {
@@ -814,18 +809,6 @@ main:has(.sl) .dz {
   cursor: default;
 }
 
-/* Focus-visible on every focusable au-/tb-/pf- element */
-.tb button:focus-visible,
-.tb select:focus-visible,
-.au button:focus-visible,
-.au input:focus-visible,
-.pf button:focus-visible,
-.pf select:focus-visible,
-.pf input:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
 /* T-008-07 (UI-Reference §5.5): profile screen — mirrors .au-card */
 .pf {
   width: 100%;
@@ -1144,7 +1127,7 @@ main:has(.sl) .dz {
 /* Text + color (F-TRF-016): the text is the primary signal, bg stays neutral. */
 .mf-chip-green { color: var(--success); }
 .mf-chip-amber { color: var(--warning); }
-.mf-chip-gray  { color: var(--fg-faint); }
+.mf-chip-gray  { color: var(--fg-muted); /* T-016-06: --fg-faint is placeholders/disabled only (F-TRF-016 UI notes); gray chip text needs 4.5:1 */ }
 
 .mf-countdown {
   flex: none;
@@ -1353,7 +1336,7 @@ main:has(.sl) .dz {
 
 .ad-chip-green { color: var(--success); }
 .ad-chip-amber { color: var(--warning); }
-.ad-chip-gray  { color: var(--fg-faint); }
+.ad-chip-gray  { color: var(--fg-muted); /* T-016-06: --fg-faint is placeholders/disabled only (F-TRF-016 UI notes); gray chip text needs 4.5:1 */ }
 
 .ad-loading {
   padding: 32px 24px;

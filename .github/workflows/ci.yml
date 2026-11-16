@@ -103,6 +103,16 @@ jobs:
           node-version: 20
       - run: node scripts/check-theme-tokens.mjs
 
+  # AGENT.md §4 (T-016-06, FR-016-4): contrast check — WCAG ratios from tokens.css, both themes; gated core pairs ≥ 4.5:1.
+  contrast-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/check-contrast.mjs
+
   # FR-051-2: multi-stage build, tagged wa-api:ci-<sha>; no push at M0 (push gated on AZURE_CONTAINER_REGISTRY, E-003).
   docker:
     runs-on: ubuntu-latest

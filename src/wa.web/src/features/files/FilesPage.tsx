@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
+import type { ReactElement } from 'react'
 
 import { formatBytes } from '../../core/upload/formatBytes'
 import type { ListTransfersResponse, MyTransferRowDto } from './formatting'
 import { getTraceParent } from '../../core/traceparent'
 import i18n from '../../core/i18n/init'
+import { useFocusTrap } from '../../core/ui/useFocusTrap'
 import {
   downloadsLabel,
   formatRemaining,
@@ -17,6 +19,41 @@ interface FilesPageProps {
 
 // T-009-05: fixed local port, no proxy, no env vars yet (AuthPage API_BASE line-14 precedent).
 const API_BASE = 'http://localhost:8080/api/v1'
+
+/**
+ * T-016-03 (EC-016-2): the delete-confirm dialog owns its own focus trap. The hook must be called by a
+ * component that renders the container — useFocusTrap's effect keys on containerRef.current, which is only
+ * non-null after this element commits (a top-level call with a conditionally-rendered ref never re-fires).
+ */
+function DeleteConfirmDialog({ targetRow, deleting, deleteError, onClose, onConfirm }: {
+  targetRow: MyTransferRowDto
+  deleting: boolean
+  deleteError: string | null
+  onClose: () => void
+  onConfirm: () => void
+}): ReactElement {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useFocusTrap(dialogRef, { onEscape: onClose })   // redundant with the window Escape listener in FilesPage but harmless; covers in-modal Escape too.
+
+  return (
+    <div className="pf-modal-backdrop" onClick={onClose} aria-hidden="true">
+      <div className="pf-modal" role="dialog" aria-modal="true" aria-labelledby="mf-delete-title" ref={dialogRef} onClick={(e) => e.stopPropagation()}>
+        <h2 className="pf-modal-title" id="mf-delete-title">{i18n.t('files.delete.title')}</h2>
+        {/* AC-009-2: the copy names exactly what's going away — count + size from the ROW data (formatBytes). */}
+        <p className="pf-modal-copy">
+          {targetRow.fileCount === 1 ? i18n.t('files.delete.oneFile') : i18n.t('files.delete.filesMany', { count: targetRow.fileCount })}, {formatBytes(targetRow.totalBytes)}. {i18n.t('files.delete.cannotUndo')}
+        </p>
+        {deleteError && <p role="alert" className="pf-modal-error">{deleteError}</p>}
+        <div className="pf-modal-actions">
+          <button type="button" className="pf-modal-cancel" disabled={deleting} onClick={onClose}>{i18n.t('files.delete.cancel')}</button>
+          <button type="button" className="pf-modal-confirm" disabled={deleting} onClick={onConfirm} aria-busy={deleting}>
+            {deleting ? i18n.t('files.delete.deleting') : i18n.t('files.action.deleteRow')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 /**
  * T-009-05 (UI-Reference §5.4): My Files screen at /files (signed-in only — App guards the branch).
@@ -42,6 +79,10 @@ export function FilesPage({ onNewTransfer }: FilesPageProps) {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  // T-016-03 (D-7): route-change focus — 'New transfer' is this page's primary action; focus it on mount.
+  const newTransferRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => { newTransferRef.current?.focus() }, [])
 
   // T-009-06 (D-6): files-page-owned success toast (NOT App's deleteToast — that is DropZone-scoped).
   // The 5 s timer auto-dismisses; the timeout id is cleared on unmount.
@@ -225,7 +266,7 @@ export function FilesPage({ onNewTransfer }: FilesPageProps) {
     <div className="mf">
       <div className="mf-header">
         <h1 className="mf-h1">{i18n.t('files.page.heading')}</h1>
-        <button type="button" className="mf-new-btn" onClick={onNewTransfer}>{i18n.t('files.page.newTransfer')}</button>
+        <button type="button" className="mf-new-btn" ref={newTransferRef} onClick={onNewTransfer}>{i18n.t('files.page.newTransfer')}</button>
       </div>
 
       <div className="mf-pills">
@@ -299,25 +340,8 @@ export function FilesPage({ onNewTransfer }: FilesPageProps) {
         </div>
       )}
 
-      {/* T-009-06 (AC-009-2 client half): delete confirm modal — DangerZone.tsx structure mirrored exactly. */}
-      {deleteTarget !== undefined && (
-        <div className="pf-modal-backdrop" onClick={closeDelete} aria-hidden="true">
-          <div className="pf-modal" role="dialog" aria-modal="true" aria-labelledby="mf-delete-title" onClick={(e) => e.stopPropagation()}>
-            <h2 className="pf-modal-title" id="mf-delete-title">{i18n.t('files.delete.title')}</h2>
-            {/* AC-009-2: the copy names exactly what's going away — count + size from the ROW data (formatBytes). */}
-            <p className="pf-modal-copy">
-              {deleteTarget.fileCount === 1 ? i18n.t('files.delete.oneFile') : i18n.t('files.delete.filesMany', { count: deleteTarget.fileCount })}, {formatBytes(deleteTarget.totalBytes)}. {i18n.t('files.delete.cannotUndo')}
-            </p>
-            {deleteError && <p role="alert" className="pf-modal-error">{deleteError}</p>}
-            <div className="pf-modal-actions">
-              <button type="button" className="pf-modal-cancel" disabled={deleting} onClick={closeDelete}>{i18n.t('files.delete.cancel')}</button>
-              <button type="button" className="pf-modal-confirm" autoFocus disabled={deleting} onClick={() => void confirmDelete()} aria-busy={deleting}>
-                {deleting ? i18n.t('files.delete.deleting') : i18n.t('files.action.deleteRow')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* T-009-06 (AC-009-2 client half): delete confirm modal — DangerZone.tsx structure mirrored exactly; T-016-03 (EC-016-2) focus trap lives inside DeleteConfirmDialog. */}
+      {deleteTarget !== undefined && <DeleteConfirmDialog targetRow={deleteTarget} deleting={deleting} deleteError={deleteError} onClose={closeDelete} onConfirm={() => void confirmDelete()} />}
 
       {/* T-009-06 (D-6): files-page-owned status region — success toasts auto-dismiss in 5 s (reuses .dz-toast). */}
       {toast !== null && <p role="status" className="dz-toast">{toast}</p>}

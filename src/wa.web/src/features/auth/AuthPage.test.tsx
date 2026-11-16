@@ -272,4 +272,31 @@ describe('AuthPage', () => {
     expect(capturedUrl).toContain('/auth/forgot-password')
     cleanup()
   })
+
+  it('mount focuses the email input (T-016-03 D-7)', () => {
+    const { host, cleanup } = renderAuth()
+    expect(document.activeElement).toBe(host.querySelector('#auth-email'))   // route-change focus: primary input on mount.
+    cleanup()
+  })
+
+  it('form error links both inputs via aria-describedby (T-016-03 EC-016-4)', () => {
+    const { host, cleanup } = renderAuth()
+
+    // Trigger a form-level error: short password fails inline before any fetch.
+    const emailInput = host.querySelector('#auth-email') as HTMLInputElement
+    const pwInput = host.querySelector('#auth-password') as HTMLInputElement
+    setNativeValue(emailInput, 'a@b.c')
+    setNativeValue(pwInput, 'short')
+
+    const continueBtn = Array.from(host.querySelectorAll('.au-continue-btn'))[0] as HTMLButtonElement
+    act(() => {
+      continueBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(host.querySelector('#auth-form-error')).not.toBeNull()   // the error region exists.
+    expect(emailInput.getAttribute('aria-describedby')).toBe('auth-form-error')
+    expect(pwInput.getAttribute('aria-describedby')).toBe('auth-form-error')
+    cleanup()
+  })
 })
+

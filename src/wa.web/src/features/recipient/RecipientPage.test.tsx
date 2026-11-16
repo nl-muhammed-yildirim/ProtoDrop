@@ -1197,22 +1197,18 @@ describe('RecipientPage (T-003-08 — mobile sticky bar, store-driven DOM)', () 
     vi.restoreAllMocks()
   })
 
-  it('active 2-file render → .rp-sticky present with a "Download all" button; in-flow .rp-download-all stays in DOM (both coexist)', async () => {
+  it('active 2-file render → exactly one download-all control (.rp-download-all), no .rp-sticky (EC-016-3)', async () => {
     stubFetch(200, activeBody()) // hasDownloadAll: true, two files — the default body.
 
     const host = await renderApp(isActive)
 
-    const sticky = host.querySelector('.rp-sticky')
-    expect(sticky).not.toBeNull()
-    expect(sticky!.textContent).toBe('Download all') // the bar's button is the Download-all one (same handler as in-flow).
-    // The in-flow Download all is still there — CSS hides it at ≤640 px, never conditional rendering.
-    const inFlow = host.querySelector('.rp-download-all') as HTMLButtonElement
-    expect(inFlow).not.toBeNull()
-    expect(host.querySelectorAll('.rp-sticky, .rp-download-all')).toHaveLength(2) // exactly both — nothing extra.
+    expect(host.querySelector('.rp-download-all')).not.toBeNull() // the sole download-all control (in-flow; CSS pins it at ≤640 px).
+    expect(host.querySelector('.rp-sticky')).toBeNull() // EC-016-3: the duplicate sticky bar is gone.
+    expect(host.querySelectorAll('.rp-sticky, .rp-download-all')).toHaveLength(1) // exactly one — nothing extra.
     host.remove()
   })
 
-  it('active single-file render → sticky bar button labelled "Download {name}, {size}"; click mints endpoint 6 SAS for that file', async () => {
+  it('active single-file render → row button labelled "Download {name}, {size}"; click mints endpoint 6 SAS for that file', async () => {
     // jsdom can't navigate — capture window.location.href via a fake getter so the store's
     // `window.location.href = body.url` lands in our setter (the T-003-06 download test's idiom).
     const realLocation = window.location as unknown
@@ -1228,7 +1224,7 @@ describe('RecipientPage (T-003-08 — mobile sticky bar, store-driven DOM)', () 
     Object.defineProperty(fakeLocation, 'pathname', { configurable: true, get: () => currentPathname })
     Object.defineProperty(window, 'location', { configurable: true, get: () => fakeLocation })
     try {
-      // Single-file body (hasDownloadAll: false) — the bar's button is the single-file Download instead.
+      // Single-file body (hasDownloadAll: false) — no download-all control; the row's own button is the only Download.
       vi.stubGlobal(
         'fetch',
         async (input: RequestInfo | URL) => {
@@ -1246,13 +1242,14 @@ describe('RecipientPage (T-003-08 — mobile sticky bar, store-driven DOM)', () 
 
       const host = await renderApp(isActive)
 
-      const stickyBtn = host.querySelector('.rp-sticky .btn-primary') as HTMLButtonElement
-      expect(stickyBtn).not.toBeNull()
-      // The exact aria-label convention (mirrors the row's existing label ~line 219).
-      expect(stickyBtn.getAttribute('aria-label')).toBe('Download render.mp4, 2.00 GB')
+      // EC-016-3 (T-016-03): no sticky bar — the row's own .rp-download button carries this exact aria-label (T-016-02).
+      const rowBtn = host.querySelector('.rp-row .rp-download') as HTMLButtonElement
+      expect(rowBtn).not.toBeNull()
+      // The exact aria-label convention.
+      expect(rowBtn.getAttribute('aria-label')).toBe('Download render.mp4, 2.00 GB')
 
       await act(async () => {
-        stickyBtn.click() // user action → store.download (the endpoint 6 fetch lands inside this act scope).
+        rowBtn.click() // user action → store.download (the endpoint 6 fetch lands inside this act scope).
         for (let i = 0; i < 400 && assignedHref === null; i++) { await Promise.resolve() }
       })
 
@@ -1269,12 +1266,12 @@ describe('RecipientPage (T-003-08 — mobile sticky bar, store-driven DOM)', () 
     }
   })
 
-  it('password-gated render → no .rp-sticky (the bar lives in the active section only)', async () => {
+  it('password-gated render → no .rp-sticky (EC-016-3: the bar is gone everywhere, not gate-only)', async () => {
     stubFetch(200, activeBody({ passwordRequired: true })) // gated body — renders only the gate.
 
     const host = await renderApp(isActive)
 
-    expect(host.querySelector('.rp-sticky')).toBeNull() // the bar is not in the gate's DOM.
+    expect(host.querySelector('.rp-sticky')).toBeNull() // no sticky bar anywhere in the DOM anymore (T-016-03).
     host.remove()
   })
 })

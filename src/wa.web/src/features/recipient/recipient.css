@@ -160,17 +160,6 @@
   width: 100%;
 }
 
-.rp-download:focus-visible,
-.rp-download-all:focus-visible,
-.rp-growth-cta:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.rp-terminal-action:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
 /* T-003-05 (FR-003-6): password gate — the single centered card on a gated transfer. Only this section and its
    contents render (RecipientPage.tsx owns the branching) — no file list, no sizes, nothing to leak. */
 .rp-gate {
@@ -238,13 +227,6 @@
   width: 100%;
 }
 
-.rp-password-input:focus-visible,
-.rp-password-toggle:focus-visible,
-.rp-password-submit:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
 /* Shake on wrong password — @media wrapper matches the .dz-toast precedent (index.css); reduced motion → text only. */
 @media (prefers-reduced-motion: no-preference) {
   .rp-shake {
@@ -259,49 +241,27 @@
   75% { transform: translateX(-4px); }
 }
 
-/* T-003-08 (FR-003-10): mobile ≤640 px — single column, sticky Download bar. Base rules stay byte-unchanged;
-   the bar itself is `position: fixed` — FR-003-10 says "sticky at the bottom of **the viewport**", and in-flow
-   `position: sticky; bottom: 0` only pins when `.rp` overflows the viewport (probed: 2 small files → docH ==
-   viewport 780 → bar sits mid-page; 15 rows → overflows → pins exactly 780). `fixed; left/right/bottom: 0`
-   pins to the exact viewport bottom for both short and long content. The page reserves bottom padding so the
-   bar never overlaps the last row / growth panel; var(--bg) is opaque so content scrolls under the bar
-   (TA-8.4; tokens only — index.css :root). */
-.rp-sticky {
-  display: none;
-}
-
+/* T-003-08 (FR-003-10): mobile ≤640 px — single column + sticky Download all bar. EC-016-3 (T-016-03): one element, two positions — the in-flow .rp-download-all button IS the sticky bar; CSS pins it to the viewport bottom at ≤640 px and leaves it in normal flow above that. */
 @media (max-width: 640px) {
   .rp {
-    padding-bottom: 96px;
+    padding-bottom: 96px; /* reserves space so the pinned bar never overlaps the last row / growth panel. */
   }
 
-  /* The in-flow Download all is the desktop/mobile duplicate — the sticky bar's button replaces it at ≤640 px. */
+  /* EC-016-3: one element, two positions — the in-flow button becomes the sticky bar on mobile. `fixed` (not in-flow `sticky`) pins to the exact viewport bottom for both short and long content; var(--bg) is opaque so content scrolls under it (TA-8.4). */
   .rp-download-all {
-    display: none;
-  }
-
-  /* Viewport-pinned bottom (T-003-08-fix): `fixed` supersedes D1's in-flow `sticky` — FR-003-10 "bottom of the
-     viewport" + "page scrolls under it" only holds when the bar is off the flow; probed both cases (n=2 / n=15).
-     .rp's 96 px padding-bottom still reserves the no-overlap gap. */
-  .rp-sticky {
-    display: flex;
     position: fixed;
-    left: 0;
-    right: 0;
+    left: 8px;
+    right: 8px;
     bottom: 0;
     padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
     background: var(--bg);
     border-top: 1px solid var(--border);
-  }
-
-  .rp-sticky .btn-primary {
-    width: 100%;
     min-height: 44px;
   }
 
   /* Kills the 300 ms tap-zoom delay on iOS; no hover-dependent affordances are added (F-TRF-017-5). */
   .rp-download,
-  .rp-sticky .btn-primary {
+  .rp-download-all {
     touch-action: manipulation;
   }
 
