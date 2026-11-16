@@ -302,6 +302,68 @@ main:has(.sl) .dz {
   gap: 12px;
 }
 
+/* T-017-01 (FR-017-2/4/5): mobile <=640 px upload surface — single column, sticky Send. bar with the overall line above it (one element, two positions — EC-016-3 / T-003-08 pattern). */
+@media (max-width: 640px) {
+  .dz {
+    min-height: auto;
+    width: calc(100% - 32px);
+    padding: 32px 16px;
+  }
+
+  .dz-title {
+    font-size: var(--fs-h1);
+  }
+
+  /* Reserved bottom space so the pinned bar never covers the last row / total / limit message. */
+  .sl {
+    padding: 0 16px 136px;
+  }
+
+  .sl-footer {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    bottom: 0;
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .sl-footer .sl-overall {
+    margin: 0;
+  }
+
+  .sl-send-wrap {
+    display: block;
+  }
+
+  .sl-send {
+    width: 100%;
+  }
+
+  .sl-row {
+    flex-wrap: wrap;
+  }
+
+  .sl-name {
+    min-width: 0;
+  }
+
+  .sl-retry {
+    min-height: 44px;
+  }
+
+  .dz-button,
+  .sl-remove,
+  .sl-retry,
+  .sl-send {
+    touch-action: manipulation;
+  }
+}
+
 /* §5.2 Link screen card */
 .ls {
   width: 100%;

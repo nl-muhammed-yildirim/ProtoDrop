@@ -50,6 +50,17 @@ beforeEach(() => {
 })
 
 describe('StagingList', () => {
+  it('overall line sits inside the footer directly above Send.; one overall line; visible remove per row (AC-017-1, FR-017-4/5)', () => {
+    stage('a.jpg', 3)
+    stage('b.jpg', 5)
+    const html = renderClient(createElement(StagingList))
+    expect(html).toMatch(/<div class="sl-footer"><p class="sl-overall" role="status">[^<]*<\/p><span class="sl-send-wrap"/)
+    expect(html.match(/class="sl-overall"/g)).toHaveLength(1)
+    expect(html.match(/class="sl-remove"/g)).toHaveLength(2)
+    expect(html).toContain('aria-label="Remove a.jpg"')
+    expect(html).toContain('aria-label="Remove b.jpg"')
+  })
+
   it('renders one row per staged file; duplicate names both render (EC-001-2)', () => {
     stage('report.pdf', 3)
     stage('report.pdf', 7)
