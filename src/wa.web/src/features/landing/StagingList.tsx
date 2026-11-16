@@ -1,6 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import i18n from '../../core/i18n/init'
+import { useAriaLive } from '../../core/ui/useAriaLive'
+import { ProgressThrottle } from '../../core/ui/ariaLiveThrottle'
+import { toastRole } from '../../core/ui/toastRole'
 import { useUploadEngine, stagedHandles, type Draft } from '../../core/upload/UploadEngine'
 import { getTraceParent } from '../../core/traceparent'
 import { formatBytes } from '../../core/upload/formatBytes'
@@ -93,6 +96,31 @@ export function StagingList() {
   const setFinalizeError = useFinalize((s) => s.setFinalizeError)
   const clearFinalize = useFinalize((s) => s.clear)
 
+  // T-016-02 (FR-016-3): hidden polite live region for progress/failure announcements — hooks run before any early return.
+  const { container: progressLive, announce } = useAriaLive({ priority: 'polite' })
+  const throttleRef = useRef(new ProgressThrottle()) // EC-016-1 points only; one instance per page (no re-mount churn).
+  const prevFailedIdsRef = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (overall.totalBytes === 0) { throttleRef.current.reset(); return }
+    const percent = Math.round((overall.sentBytes / overall.totalBytes) * 100)
+    const announced = throttleRef.current.onProgress(percent) // null for non-milestone ticks — no announcement.
+    if (announced !== null) announce(i18n.t('landing.staging.uploading', { done: formatBytes(overall.sentBytes), total: formatBytes(overall.totalBytes) }))
+  }, [overall.sentBytes, overall.totalBytes]) // D-2
+
+  useEffect(() => {
+    const current = new Set(files.filter((f) => f.status === 'failed').map((f) => f.id))
+    let newFailures = 0
+    for (const id of current) if (!prevFailedIdsRef.current.has(id)) newFailures += 1
+    if (newFailures === 1) { // D-3: exactly one new failure → name it; a batch collapses to ONE count line.
+      const failed = files.find((f) => f.status === 'failed' && !prevFailedIdsRef.current.has(f.id))
+      announce(i18n.t('landing.staging.failedAnnounce', { name: failed?.name ?? '' }))
+    } else if (newFailures > 1) {
+      announce(i18n.t('landing.staging.bulkFailed', { count: newFailures }))
+    }
+    prevFailedIdsRef.current = current
+  }, [files])
+
   // "Send again" (LinkScreen sent-phase): reset finalize + staged files so staging reappears for the next transfer.
   const handleSendAgain = (): void => {
     clearFinalize()
@@ -158,7 +186,8 @@ export function StagingList() {
     // EC-002-1: finalize failed — blobs are staged, so retrying re-finalizes with the same key; no half-filled form.
     return (
       <section className="sl" aria-label={i18n.t('landing.staging.finalizeFailed')}>
-        <p role="alert" className="sl-limit-msg">{i18n.t('landing.staging.finalizeFailedMsg')}</p>
+        {/* T-016-02: the error toast's role comes from the single-source mapping (FR-016-3). */}
+        <p role={toastRole('error')} className="sl-limit-msg">{i18n.t('landing.staging.finalizeFailedMsg')}</p>
         <div className="sl-footer">
           <button type="button" className="btn-primary sl-send" onClick={() => void send()}>{i18n.t('landing.staging.tryAgain')}</button>
         </div>
@@ -168,6 +197,8 @@ export function StagingList() {
 
   return (
     <section className="sl" aria-label={i18n.t('landing.staging.sectionLabel')}>
+      {/* T-016-02: hidden polite live region — progress milestones + failure announcements; visually clipped, no layout impact. */}
+      {progressLive}
       {/* Overall line (FR-001-5): combined bytes uploaded / total, recomputed on every store transition. */}
       {/* role=status (polite): the text re-renders only on store transitions — block completions / status changes — never per byte (F-TRF-016-3). */}
       {files.length > 0 && (

@@ -4,6 +4,7 @@ import type { FormEvent, MouseEvent } from 'react'
 import { formatBytes } from '../../core/upload/formatBytes'
 import i18n from '../../core/i18n/init'
 import ErrorScreen from '../errors/ErrorScreen'
+import { useAriaLive } from '../../core/ui/useAriaLive'
 import { trackGrowthCta } from './growthTelemetry'
 import { useRecipientStore } from './RecipientStore'
 
@@ -59,6 +60,17 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
   const postDownloadShownRef = useRef(false)
   const terminalShownRef = useRef(false)
 
+  // T-016-02 (FR-016-3): hidden polite live region for the active screen — downloads-left decrements + growth CTA.
+  const { container: recipientLive, announce } = useAriaLive({ priority: 'polite' })
+  const prevDownloadsLeftRef = useRef<number | null>(null)
+
+  useEffect(() => { // D-6a: a decrement is announced; initial load (previous === null) never announces.
+    if (prevDownloadsLeftRef.current !== null && downloadsLeft !== null && downloadsLeft < prevDownloadsLeftRef.current) {
+      announce(i18n.t('recipient.active.downloadsLeft', { count: downloadsLeft }))
+    }
+    prevDownloadsLeftRef.current = downloadsLeft
+  }, [downloadsLeft])
+
   // T-003-02: mount-time load; reset on unmount keeps tests hermetic (UploadEngine's test-cleanup convention).
   useEffect(() => {
     void useRecipientStore.getState().load(linkId)
@@ -72,6 +84,7 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
     if (growthPanelVisible && !postDownloadShownRef.current) {
       postDownloadShownRef.current = true
       trackGrowthCta('growth_cta_shown', 'post-download')
+      announce(i18n.t('recipient.active.growthCta')) // T-016-02: the new actionable region is announced once per page instance.
     }
   }, [growthPanelVisible])
   // T-003-07 (FR-003-7): growth_cta_shown terminal-state — fires on mount of the shared terminal branch (expired /
@@ -88,7 +101,9 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
   const handleDownload = (fileId: string) => {
     void useRecipientStore.getState().download(linkId, fileId)
   }
-  const handleDownloadAll = () => {}
+  const handleDownloadAll = () => {
+    // T-016-02 TODO (F-TRF-004 client): when the zip preparing state lands, announce i18n.t('recipient.active.preparing') exactly once here (ref-guarded, not per poll) via this page's polite live region.
+  }
   // T-017 (F-TRF-004) will replace this no-op — zip download-all reuses the store's per-file completion path with all fileIds.
   // T-003-08 (FR-003-10): the mobile sticky bar's Download all shares this handler — CSS hides one of the two buttons, so
   // one handler covers both; the bar's button lives at the end of the section in the JSX below.
@@ -212,6 +227,8 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
 
   return (
     <section className="rp" aria-label={i18n.t('recipient.active.sectionAria', { name: from })}>
+      {/* T-016-02: hidden polite live region — downloads-left decrements + growth CTA; visually clipped, no layout impact. */}
+      {recipientLive}
       <h1 className="rp-heading">{i18n.t('recipient.active.fromHeading')}{from}</h1>
       {/* Note as plain-text blockquote — no markdown (TA-8.2); overflow-wrap handles long unbroken URLs. */}
       {note && note.trim() !== '' && (

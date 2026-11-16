@@ -3,6 +3,7 @@ import type { DragEvent as ReactDragEvent, FormEvent } from 'react'
 
 import { useUploadEngine } from '../../core/upload/UploadEngine'
 import i18n from '../../core/i18n/init'
+import { toastRole } from '../../core/ui/toastRole'
 
 interface Entry { name: string; size: number; file?: File }
 
@@ -130,14 +131,15 @@ export function DropZone({ toast }: { toast?: string | null }) {   // T-008-09: 
         onChange={browse}
         onClick={(e) => e.stopPropagation()} // programmatic .click() bubbles; stop it from re-entering the zone handler
       />
+      {/* T-016-02 (FR-016-3): toast role from the single-source mapping — info/success toasts are polite status regions. */}
       {localToast && (
-        <div className="dz-toast" role="status">
+        <div className="dz-toast" role={toastRole('success')}>
           {localToast}
         </div>
       )}
       {/* T-008-09 (D-5): app-level post-delete toast — sibling line beside the internal paste/skip toast. */}
       {toast && (
-        <div className="dz-toast" role="status">
+        <div className="dz-toast" role={toastRole('success')}>
           {toast}
         </div>
       )}
