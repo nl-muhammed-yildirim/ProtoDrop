@@ -41,15 +41,15 @@ test.describe('T-003-08 mobile sticky bar (FR-003-10)', { mode: 'serial' }, () =
     const metrics = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: window.innerWidth }))
     expect(metrics.sw, 'no horizontal scroll at 360 px').toBeLessThanOrEqual(metrics.iw)
 
-    // Sticky bar present and pinned to the viewport's bottom (tolerant of sub-pixel rounding).
-    const stickyBar = page.locator('.rp-sticky')
+    // Sticky Download all — EC-016-3 (T-016-03) collapsed the duplicate .rp-sticky into this in-flow button; at ≤640 px it is position:fixed bottom:0.
+    const stickyBar = page.locator('.rp-download-all')
     await expect(stickyBar).toBeVisible()
     const rect = (await stickyBar.boundingBox()) as { y: number; height: number }
     const viewportHeight = 780
     expect(rect.y + rect.height, 'sticky bar bottom sits at the viewport bottom').toBeCloseTo(viewportHeight, -1)
 
-    // 2 files → hasDownloadAll (server-computed, TA-4.2#4) → the bar's button is "Download all".
-    await expect(stickyBar.locator('button')).toHaveText(/Download all/)
+    // 2 files → hasDownloadAll (server-computed, TA-4.2#4) → "Download all". It's a <button>, so assert directly on it — no inner locator needed.
+    await expect(stickyBar).toHaveText(/Download all/)
   })
 
   /** Exit check (per-file): a row Download tap mints endpoint 6 and downloads the ORIGINAL filename. */

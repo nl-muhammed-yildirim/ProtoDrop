@@ -71,6 +71,17 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
     prevDownloadsLeftRef.current = downloadsLeft
   }, [downloadsLeft])
 
+  // EC-016-3 / FR-016 focus (T-016-03): after the loading→active transition or gate render, focus lands on the first actionable element — never <body>. tabIndex={-1} keeps the section out of tab order.
+  const sectionRef = useRef<HTMLElement>(null)
+  const pwInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { // Active screen: programmatic focus via tabIndex={-1}.
+    if (status === 'active' && !passwordRequired) sectionRef.current?.focus()
+  }, [status, passwordRequired])
+  useEffect(() => { // Password gate: the input is the first actionable element on a gated transfer.
+    if (status === 'active' && passwordRequired) pwInputRef.current?.focus()
+  }, [status, passwordRequired])
+
   // T-003-02: mount-time load; reset on unmount keeps tests hermetic (UploadEngine's test-cleanup convention).
   useEffect(() => {
     void useRecipientStore.getState().load(linkId)
@@ -105,8 +116,7 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
     // T-016-02 TODO (F-TRF-004 client): when the zip preparing state lands, announce i18n.t('recipient.active.preparing') exactly once here (ref-guarded, not per poll) via this page's polite live region.
   }
   // T-017 (F-TRF-004) will replace this no-op — zip download-all reuses the store's per-file completion path with all fileIds.
-  // T-003-08 (FR-003-10): the mobile sticky bar's Download all shares this handler — CSS hides one of the two buttons, so
-  // one handler covers both; the bar's button lives at the end of the section in the JSX below.
+  // T-003-08 (FR-003-10) / EC-016-3 (T-016-03): one element, two positions — this in-flow button is the sole Download all; CSS pins it to the viewport bottom at ≤640 px.
 
   // T-003-07 (FR-003-7): shared growth-CTA navigation — pushState('/') + a synthetic popstate swaps App to the upload
   // surface in-tree (its popstate listener reads the new pathname). No full reload → UploadEngine staging survives;
@@ -183,6 +193,7 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
           <label className="rp-password-label" htmlFor="rp-password-input">{i18n.t('recipient.gate.passwordLabel')}</label>
           <div className={`rp-password-row${unlockError ? ' rp-shake' : ''}`}>
             <input
+              ref={pwInputRef}
               id="rp-password-input"
               type={show ? 'text' : 'password'}
               value={value}
@@ -226,7 +237,7 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
   }
 
   return (
-    <section className="rp" aria-label={i18n.t('recipient.active.sectionAria', { name: from })}>
+    <section className="rp" aria-label={i18n.t('recipient.active.sectionAria', { name: from })} ref={sectionRef} tabIndex={-1}>
       {/* T-016-02: hidden polite live region — downloads-left decrements + growth CTA; visually clipped, no layout impact. */}
       {recipientLive}
       <h1 className="rp-heading">{i18n.t('recipient.active.fromHeading')}{from}</h1>
@@ -274,23 +285,6 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
           <button type="button" className="btn-primary rp-growth-cta" onClick={handleGrowthCtaClick('post-download')}>{i18n.t('recipient.active.growthCta')}</button>
         </div>
       )}
-      {/* T-003-08 (FR-003-10): mobile ≤640 px — sticky Download bar (CSS hides it at >640 px, shows it at ≤640 px).
-         The in-flow Download all is hidden at ≤640 px; this bar's button takes over. No conditional rendering —
-         the in-flow button stays where it is; CSS visibility rules handle which one is seen. */}
-      <div className="rp-sticky">
-        {hasDownloadAll ? (
-          <button type="button" className="btn-primary" onClick={handleDownloadAll}>{i18n.t('recipient.active.downloadAll')}</button>
-        ) : files.length > 0 ? (
-          <button
-            type="button"
-            className="btn-primary"
-            aria-label={i18n.t('recipient.active.downloadAria', { name: files[0].name, size: formatBytes(files[0].sizeBytes) })}
-            onClick={() => handleDownload(files[0].fileId)}
-          >
-            {i18n.t('recipient.active.downloadButton')}
-          </button>
-        ) : null}
-      </div>
     </section>
   )
 }
