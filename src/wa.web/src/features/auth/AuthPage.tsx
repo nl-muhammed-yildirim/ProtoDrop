@@ -35,6 +35,10 @@ export function AuthPage({ onSignedIn }: AuthPageProps) {
   const [cooldownRemaining, setCooldownRemaining] = useState<number | null>(null)
   const cooldownRef = useRef<number | null>(null)
 
+  // T-016-03 (D-7): route-change focus — the email field is this page's primary input; focus it on mount.
+  const emailRef = useRef<HTMLInputElement>(null)
+  useEffect(() => { emailRef.current?.focus() }, [])
+
   // 1 s setInterval decrement; at 0 → null re-enables. Uses a ref so the interval is managed imperatively.
   const startCooldown = (): void => {
     setCooldownRemaining(10)
@@ -205,6 +209,8 @@ export function AuthPage({ onSignedIn }: AuthPageProps) {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           autoComplete="email"
+          ref={emailRef}
+          aria-describedby={formError ? 'auth-form-error' : undefined}   // T-016-03 (EC-016-4): link the form-level error to both inputs.
         />
 
         {!forgotActive && (
@@ -217,13 +223,14 @@ export function AuthPage({ onSignedIn }: AuthPageProps) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete={tab === 'sign-up' ? 'new-password' : 'current-password'}
+              aria-describedby={formError ? 'auth-form-error' : undefined}   // T-016-03 (EC-016-4): link the form-level error to both inputs.
             />
             <p className="au-helper">{i18n.t('auth.helper.minChars')}</p>
           </>
         )}
 
         {formError && (
-          <p className="au-error" role="alert">{formError}</p>
+          <p className="au-error" role="alert" id="auth-form-error">{formError}</p>   // T-016-03 (EC-016-4): aria-describedby target for both inputs.
         )}
 
         <button type="button" className="au-continue-btn" onClick={() => void handleContinue()}>

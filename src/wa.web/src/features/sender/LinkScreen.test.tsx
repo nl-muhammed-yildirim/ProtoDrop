@@ -97,6 +97,58 @@ describe('LinkScreen', () => {
     host.remove()
   })
 
+  it('mount focuses the Copy button (T-016-03 D-7)', () => {
+    const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g', transferId: '1' }))
+    expect(document.activeElement).toBe(host.querySelector('.ls-copy-btn'))   // ready-state Copy is the mount-focus target.
+    host.remove()
+  })
+
+  it('sender email error links via aria-describedby (T-016-03 EC-016-4)', () => {
+    const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g', transferId: '1' }))
+    const emailInput = host.querySelector('#sender-email') as HTMLInputElement
+
+    // No error yet — no describedby.
+    expect(emailInput.getAttribute('aria-describedby')).toBeNull()
+
+    const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    act(() => {
+      nativeSetter.call(emailInput, 'not-an-email')
+      emailInput.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    act(() => {
+      emailInput.dispatchEvent(new FocusEvent('blur'))   // blur triggers validation.
+    })
+
+    expect(host.querySelector('#sender-email-error')).not.toBeNull()   // the error region exists.
+    expect(emailInput.getAttribute('aria-describedby')).toBe('sender-email-error')
+    host.remove()
+  })
+
+  it('recipients summary renders with count when invalid addresses present (T-016-03 EC-016-4)', () => {
+    const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g', transferId: '1' }))
+    const textarea = host.querySelector('#recipients-textarea') as HTMLTextAreaElement
+
+    // No invalid addresses yet — no summary.
+    expect(host.querySelector('#recipients-error-summary')).toBeNull()
+    expect(textarea.getAttribute('aria-describedby')).toBeNull()
+
+    const nativeSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+    act(() => {
+      nativeSetter.call(textarea, 'bad-address\nok@x.com')
+      textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    act(() => {
+      textarea.dispatchEvent(new FocusEvent('blur'))   // blur triggers validation.
+    })
+
+    const summary = host.querySelector('#recipients-error-summary') as HTMLElement
+    expect(summary).not.toBeNull()
+    expect(summary.getAttribute('role')).toBe('alert')
+    expect(summary.textContent!.trim()).toContain('1 recipient address(es) have errors')   // count interpolated (en default).
+    expect(textarea.getAttribute('aria-describedby')).toBe('recipients-error-summary')
+    host.remove()
+  })
+
   it('renders the recipients textarea with helper text', () => {
     const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g', transferId: '1' }))
     const textarea = host.querySelector('.ls-recipients-textarea') as HTMLTextAreaElement

@@ -162,6 +162,7 @@
   "error.title.rateLimited": "Ein Moment der Ruhe, dann versuche es erneut.",
   "error.hint.rateLimited": "Bitte warte etwa 60 Sekunden, bevor du es erneut versuchst.",
   "link.ready.recipientsPlaceholder": "one@address.com",
+  "link.ready.recipientErrorsSummary": "{{count}} Empfängeradresse(n) haben Fehler",
   "link.ready.emailPlaceholder": "you@example.com",
   "recipient.active.filesAria": "Dateien",
   "auth.linkSent.sectionAria": "Link gesendet",

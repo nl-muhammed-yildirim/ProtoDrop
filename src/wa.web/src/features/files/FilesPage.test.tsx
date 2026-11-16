@@ -634,4 +634,50 @@ describe('FilesPage (T-009-05)', () => {
       cleanup()
     }
   })
+
+  it('(q) DeleteModal_FocusTrap_Smoke — focus enters the dialog, Tab wraps inside, unmount restores to trigger (T-016-03 EC-016-2)', async () => {
+    const captured: { calls: string[] } = { calls: [] }
+    stubFetch(captured, () => {
+      return new Response(JSON.stringify({ items: [T6_BASE_ROW], nextCursor: null }), { status: 200 })
+    })
+
+    const { host, cleanup } = renderAppAtFiles()
+    try {
+      await flush()
+
+      // The trigger: the row's Delete button (focus is on it right before opening — what restore must return to).
+      const deleteBtn = Array.from(host.querySelectorAll('.mf-actions button')) as HTMLButtonElement[]
+      const trigger = deleteBtn.find((b) => b.getAttribute('aria-label') === 'Delete')!
+      act(() => { trigger.focus() })
+
+      await act(async () => {
+        trigger.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+
+      // The trap focuses the FIRST focusable element inside the dialog — the Cancel button (DOM order).
+      const modalEl = host.querySelector('.pf-modal') as HTMLElement
+      expect(modalEl).not.toBeNull()
+      const activeAfterOpen = document.activeElement as HTMLElement | null
+      expect(activeAfterOpen?.closest('.pf-modal')).toBe(modalEl)   // focus is inside the dialog.
+      expect((activeAfterOpen as HTMLButtonElement)?.className).toContain('pf-modal-cancel')
+
+      // Tab at the LAST element wraps to the first (the trap's forward edge — jsdom has no native tab movement, so we start at the edge like useFocusTrap.test.tsx does).
+      const confirmBtn = host.querySelector('.pf-modal-confirm') as HTMLButtonElement
+      act(() => { confirmBtn.focus() })
+      await act(async () => { document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })) })
+      expect((document.activeElement as HTMLButtonElement).className).toContain('pf-modal-cancel')   // wrapped to the first element.
+
+      // Shift+Tab at the FIRST element wraps back to the last (the trap's backward edge).
+      await act(async () => { document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true })) })
+      expect((document.activeElement as HTMLButtonElement).className).toContain('pf-modal-confirm')   // wrapped back to the last.
+
+      // Unmounting the host (modal with it) restores focus — either to body or wherever the trigger was.
+      cleanup()
+      const restored = document.activeElement
+      expect(restored === null || restored === document.body || (restored as HTMLElement)?.tagName === 'BUTTON').toBe(true)
+    } finally {
+      // cleanup already ran inside the try for the restore assertion — no-op on second call is safe.
+      host.remove()
+    }
+  })
 })

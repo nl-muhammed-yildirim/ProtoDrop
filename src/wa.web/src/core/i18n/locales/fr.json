@@ -162,6 +162,7 @@
   "error.title.rateLimited": "Un moment de calme, puis réessayez.",
   "error.hint.rateLimited": "Veuillez attendre environ 60 secondes avant de réessayer.",
   "link.ready.recipientsPlaceholder": "one@address.com",
+  "link.ready.recipientErrorsSummary": "{{count}} adresse(s) de destinataire avec erreur(s)",
   "link.ready.emailPlaceholder": "you@example.com",
   "recipient.active.filesAria": "Fichiers",
   "auth.linkSent.sectionAria": "Lien envoyé",

@@ -46,6 +46,10 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
   const [copied, setCopied] = useState(false)
   const timeoutRef = useRef<number | null>(null)
 
+  // T-016-03 (D-7): route-change focus — the Copy button is this screen's primary action; focus it on mount.
+  const copyBtnRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => { copyBtnRef.current?.focus() }, [])
+
   // T-010-03 (AC-010-2 client half): pre-fill from the original transfer's snapshot — editable; the send body carries the form values.
   const [recipientsRaw, setRecipientsRaw] = useState(initialRecipients ?? '')
   const [invalidAddresses, setInvalidAddresses] = useState<string[]>([])
@@ -253,7 +257,8 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
             )}
             <div className="ls-field">
               <span className="ls-url">{url}</span>
-              <button type="button" className="ls-copy-btn" onClick={() => void handleCopy()}>
+              {/* T-016-03 (D-7): ready-state Copy is the mount-focus target. */}
+              <button type="button" className="ls-copy-btn" ref={copyBtnRef} onClick={() => void handleCopy()}>
                 {copied ? i18n.t('link.ready.copied') : i18n.t('link.ready.copy')}
               </button>
             </div>
@@ -262,6 +267,9 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
             )}
             {/* T-002-05: recipients field — parse + validate on blur; per-address inline errors, no blocking modal */}
             <div className="ls-recipients">
+              {invalidAddresses.length > 0 && (   // T-016-03 (EC-016-4): summary line for the bad addresses below.
+                <p id="recipients-error-summary" role="alert" className="ls-recipients-summary">{i18n.t('link.ready.recipientErrorsSummary', { count: invalidAddresses.length })}</p>
+              )}
               <label className="ls-recipients-label" htmlFor="recipients-textarea">{i18n.t('link.ready.recipientsLabel')}</label>
               <textarea
                 id="recipients-textarea"
@@ -270,6 +278,7 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
                 onChange={handleRecipientsChange}
                 onBlur={handleRecipientsBlur}
                 placeholder={i18n.t('link.ready.recipientsPlaceholder')}
+                aria-describedby={invalidAddresses.length > 0 ? 'recipients-error-summary' : undefined}   // T-016-03 (EC-016-4).
               />
               <p className="ls-recipients-helper">{i18n.t('link.ready.helperText')}</p>
               {invalidAddresses.map((addr) => (
@@ -302,9 +311,10 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
                 onChange={handleEmailChange}
                 onBlur={handleEmailBlur}
                 placeholder={i18n.t('link.ready.emailPlaceholder')}
+                aria-describedby={emailError ? 'sender-email-error' : undefined}   // T-016-03 (EC-016-4).
               />
               {emailError && (
-                <p className="ls-sender-error">{i18n.t('link.ready.emailError')}</p>
+                <p className="ls-sender-error" id="sender-email-error">{i18n.t('link.ready.emailError')}</p>
               )}
             </div>
             <div className="ls-sender">
