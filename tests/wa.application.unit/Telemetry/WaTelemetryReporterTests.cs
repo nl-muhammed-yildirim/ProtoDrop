@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.Extensions.Logging;
 using wa.application.Telemetry;
 using wa.domain.Telemetry;
@@ -117,6 +118,37 @@ public class WaTelemetryReporterTests
     [Fact]
     public void IpSlot_ReturnsTheKeyedHmacTransform_NotTheRawIp() =>
         Assert.Equal("0ee7d12715e0fe81319cd148d4b43302ac231095c09642949a3660c8c664faea", new WaTelemetryReporter(new RecordingLogger(), Key).IpSlot("10.0.0.1")); // keyed by the ctor key — same vector as wa.domain.unit's PiiTransforms tests
+
+    // ---- T-012-05 (EC-012-3 / AC-012-3): file name hashed, no raw name or secret in any property; no silent new raw-string property ----
+
+    [Fact]
+    public void FileName_ThroughSlotIntoProperty_EmitsOnlyTheSha256_NeverTheRawName()
+    {
+        var logger = new RecordingLogger();
+        var reporter = new WaTelemetryReporter(logger, Key);
+
+        reporter.TransferPageViewed(reporter.FileNameSlot("Quarterly Report.pdf")); // the only sanctioned route for a file name into a property (TA-9.4)
+
+        var entry = Assert.Single(logger.Entries);
+        var arg = Assert.IsType<string>(Assert.Single(entry.Args));
+        Assert.Equal(PiiTransforms.FileName("Quarterly Report.pdf"), arg); // the property IS the SHA-256 transform
+        Assert.Matches("^[0-9a-f]{64}$", arg); // 64 lowercase hex chars
+        Assert.DoesNotContain("Quarterly", entry.RenderedText); // AC-012-3: no raw name in the rendered event
+        Assert.DoesNotContain("Quarterly", arg); // ...nor in any property
+    }
+
+    [Fact]
+    public void StringParameters_AreAClosedSetOfSlots_NoNewRawStringProperty()
+    {
+        var actual = typeof(WaTelemetryReporter)
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .SelectMany(m => m.GetParameters().Where(p => p.ParameterType == typeof(string)).Select(p => $"{m.Name}.{p.Name}"))
+            .OrderBy(s => s, StringComparer.Ordinal)
+            .ToArray();
+
+        // EC-012-3: a new string-typed reporter parameter is a potential raw-PII property. Route PII through FileNameSlot/IpSlot (TA-9.4) and update STRING_SLOT_METHODS in scripts/check-telemetry-pii.mjs.
+        Assert.Equal(new[] { "FileNameSlot.fileName", "IpSlot.ip", "LogEvent.eventName", "TransferPageViewed.linkIdHash" }, actual);
+    }
 }
 
 /// <summary>Records exactly what M.E.L hands to a logger: the rendered text + any pre-formatted args (M.E.L's typed LogInformation overloads bake arguments into state via FormattableStringFactory, so this is what Serilog/App Insights also receive).</summary>
