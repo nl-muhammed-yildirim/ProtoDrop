@@ -1,0 +1,331 @@
+import { useEffect, useRef, useState } from 'react'
+import type { FormEvent, MouseEvent } from 'react'
+
+import { formatBytes } from '../../core/upload/formatBytes'
+import i18n from '../../core/i18n/init'
+import ErrorScreen from '../errors/ErrorScreen'
+import { useAriaLive } from '../../core/ui/useAriaLive'
+import { toastRole } from '../../core/ui/toastRole'
+import { trackGrowthCta } from './growthTelemetry'
+import { useRecipientStore } from './RecipientStore'
+
+// T-004-03: failure toast auto-dismiss (App.tsx 5 s toast precedent).
+const TOAST_DISMISS_MS = 5000
+
+interface RecipientPageProps {
+  linkId: string
+}
+
+/**
+ * T-003-02 (FR-003-1/2, AC-003-1 client half): recipient page at /t/{linkId}.
+ * loading → error → active rendering. Active screen: "From: {senderName}", optional note as a blockquote,
+ * file rows (icon + name + human size via formatBytes) each with a Download button whose aria-label is the
+ * exact exit-check string "Download {name}, {size}"; "Downloads left: N" under the list for finite caps (T-003-03, FR-003-5).
+ * T-003-03 (FR-003-8/9): expired and download-limit render one shared terminal screen (icon, one line from the
+ * store's Problem+JSON details, one action) — no file list, no sizes; 'expired' covers both 410 and 404 so those
+ * screens stay byte-identical by construction. The "Send something" anchor is a placeholder — T-003-07 wires it.
+ * T-003-05 (FR-003-6, AC-003-2 client half): when passwordRequired === true the ACTIVE screen renders ONLY the
+ * centered password card — no file list, no sizes, nothing beyond the sender name. Submit → endpoint 5; correct
+ * entry stores the JWT in sessionStorage and re-queries with ?t= (no re-prompt on same-tab refresh); wrong entry
+ * shakes + role=alert "Wrong password" while staying gated. Terminal states always take precedence over the gate —
+ * the T-003-03 shared screen wins whenever status !== 'active' (T-003-04 emits terminal codes over the wire).
+ * **No sign-up wall** — FR-003-2.
+ * T-003-07 (FR-003-7): growth loop — a full download (every requested file completed; client state only, the store
+ * owns downloadedFileIds/growthPanelVisible) reveals the "Send something" panel below the file list exactly once per
+ * page instance (partials never trigger it; re-downloads never re-announce). The terminal screen's single "Send
+ * something" anchor is this CTA too. Both CTAs push '/' + dispatch popstate — App swaps to the upload surface in-tree,
+ * no full reload, staged files survive; no unlock token or recipient state transfers (pure pathname change).
+ * growthTelemetry: growth_cta_shown / growth_cta_clicked with source 'post-download' | 'terminal-state' (TA-10.2).
+ * T-004-03 (FR-004-6, EC-004-4): Download all drives the store's downloadAll - 'preparing' swaps the label for a spinner +
+ * "Preparing your download…" (announced once per episode), shows the polling hint, keeps per-file rows usable; failure shows a
+ * role=alert toast that auto-dismisses after 5 s. The same single button serves both positions (EC-016-3).
+ * The linkId arrives by prop from App (recipientRoute.ts matches the pathname — no window here).
+ */
+export function RecipientPage({ linkId }: RecipientPageProps) {
+  const status = useRecipientStore((s) => s.status)
+  const from = useRecipientStore((s) => s.from)
+  const note = useRecipientStore((s) => s.note)
+  const files = useRecipientStore((s) => s.files)
+  const hasDownloadAll = useRecipientStore((s) => s.hasDownloadAll)
+  const downloadsLeft = useRecipientStore((s) => s.downloadsLeft)
+  const terminalMessage = useRecipientStore((s) => s.terminalMessage)
+  const passwordRequired = useRecipientStore((s) => s.passwordRequired)
+  const unlocking = useRecipientStore((s) => s.unlocking)
+  const unlockError = useRecipientStore((s) => s.unlockError)
+  // T-003-06: per-row download indicator (UI notes: subtle progress/indicator; no page-level blocking UI).
+  const downloadingFileId = useRecipientStore((s) => s.downloadingFileId)
+  const downloadErrorFileId = useRecipientStore((s) => s.downloadErrorFileId)
+  // T-013-02 (AC-013-1 surface): the captured Problem from load()'s !res.ok — drives ErrorScreen(500) with Ref.
+  const capturedProblem = useRecipientStore((s) => s.capturedProblem)
+  // T-004-03 (FR-004-6): zip preparing state + failure toast flag.
+  const downloadAllPhase = useRecipientStore((s) => s.downloadAllPhase)
+  const downloadAllFailed = useRecipientStore((s) => s.downloadAllFailed)
+
+  // T-003-05 (FR-003-6): gate-local state — the password value resets on unmount/remount by construction.
+  const [value, setValue] = useState('')
+  const [show, setShow] = useState(false)
+
+  // T-003-07 (FR-003-7): ref-guards so growth_cta_shown fires exactly once per page instance per source — the store's
+  // edge-trigger keeps the panel visible forever after the flip; the effect below only fires on that flip.
+  const postDownloadShownRef = useRef(false)
+  const terminalShownRef = useRef(false)
+
+  // T-016-02 (FR-016-3): hidden polite live region for the active screen — downloads-left decrements + growth CTA.
+  const { container: recipientLive, announce } = useAriaLive({ priority: 'polite' })
+  const prevDownloadsLeftRef = useRef<number | null>(null)
+
+  useEffect(() => { // D-6a: a decrement is announced; initial load (previous === null) never announces.
+    if (prevDownloadsLeftRef.current !== null && downloadsLeft !== null && downloadsLeft < prevDownloadsLeftRef.current) {
+      announce(i18n.t('recipient.active.downloadsLeft', { count: downloadsLeft }))
+    }
+    prevDownloadsLeftRef.current = downloadsLeft
+  }, [downloadsLeft])
+
+  useEffect(() => { // T-016-02 TODO resolved: effect fires on phase changes only, so polls (phase stays 'preparing') never re-announce.
+    if (downloadAllPhase === 'preparing') announce(i18n.t('recipient.active.preparing'))
+  }, [downloadAllPhase])
+
+  useEffect(() => { // T-004-03: the failure toast dismisses itself after TOAST_DISMISS_MS.
+    if (!downloadAllFailed) return
+    const id = setTimeout(() => useRecipientStore.getState().dismissDownloadAllError(), TOAST_DISMISS_MS)
+    return () => clearTimeout(id)
+  }, [downloadAllFailed])
+
+  // EC-016-3 / FR-016 focus (T-016-03): after the loading→active transition or gate render, focus lands on the first actionable element — never <body>. tabIndex={-1} keeps the section out of tab order.
+  const sectionRef = useRef<HTMLElement>(null)
+  const pwInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { // Active screen: programmatic focus via tabIndex={-1}.
+    if (status === 'active' && !passwordRequired) sectionRef.current?.focus()
+  }, [status, passwordRequired])
+  useEffect(() => { // Password gate: the input is the first actionable element on a gated transfer.
+    if (status === 'active' && passwordRequired) pwInputRef.current?.focus()
+  }, [status, passwordRequired])
+
+  // T-003-02: mount-time load; reset on unmount keeps tests hermetic (UploadEngine's test-cleanup convention).
+  useEffect(() => {
+    void useRecipientStore.getState().load(linkId)
+    return () => useRecipientStore.getState().reset()
+  }, [linkId])
+
+  // T-003-07 (FR-003-7): growth_cta_shown post-download — fires when the panel first becomes visible (full download
+  // completed); the ref-guard means re-downloads (panel already up) never re-fire.
+  const growthPanelVisible = useRecipientStore((s) => s.growthPanelVisible)
+  useEffect(() => {
+    if (growthPanelVisible && !postDownloadShownRef.current) {
+      postDownloadShownRef.current = true
+      trackGrowthCta('growth_cta_shown', 'post-download')
+      announce(i18n.t('recipient.active.growthCta')) // T-016-02: the new actionable region is announced once per page instance.
+    }
+  }, [growthPanelVisible])
+  // T-003-07 (FR-003-7): growth_cta_shown terminal-state — fires on mount of the shared terminal branch (expired /
+  // unknown / download-limit); exactly once per page instance (ref-guard).
+  const isTerminal = status === 'expired' || status === 'downloadLimit'
+  useEffect(() => {
+    if (isTerminal && !terminalShownRef.current) {
+      terminalShownRef.current = true
+      trackGrowthCta('growth_cta_shown', 'terminal-state')
+    }
+  }, [isTerminal])
+
+  // T-003-06 (AC-003-1 client half): real download wiring — per-row Download button calls endpoint 6.
+  const handleDownload = (fileId: string) => {
+    void useRecipientStore.getState().download(linkId, fileId)
+  }
+  const handleDownloadAll = () => {
+    void useRecipientStore.getState().downloadAll(linkId)
+  }
+  // T-003-08 (FR-003-10) / EC-016-3 (T-016-03): one element, two positions — this in-flow button is the sole Download all; CSS pins it to the viewport bottom at ≤640 px.
+
+  // T-003-07 (FR-003-7): shared growth-CTA navigation — pushState('/') + a synthetic popstate swaps App to the upload
+  // surface in-tree (its popstate listener reads the new pathname). No full reload → UploadEngine staging survives;
+  // no unlock token or recipient state transfers (they are never read here — pure pathname change, US-003-07 EC).
+  const handleGrowthCtaClick = (source: 'post-download' | 'terminal-state') => {
+    return (e: MouseEvent<Element>) => {
+      e.preventDefault()
+      trackGrowthCta('growth_cta_clicked', source)
+      window.history.pushState('', '', '/')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    }
+  }
+
+  // T-003-05 (AC-003-2): submit → endpoint 5; the store owns token storage + the ?t= re-query. Never rejects.
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    void useRecipientStore.getState().unlock(linkId, value)
+  }
+
+  if (status === 'loading') {
+    return <p className="rp-loading" role="status">{i18n.t('recipient.loading.label')}</p>
+  }
+
+  if (status === 'error') {
+    // T-013-02 (AC-013-1 surface): when the store captured a Problem that is a 500 (code INTERNAL / status 500),
+    // render ErrorScreen(500) with the Ref line. Re-issue = re-fetch via load(linkId), NO full reload.
+    if (capturedProblem && (capturedProblem.code === 'INTERNAL' || capturedProblem.code === 'NOT_FOUND')) {
+      return (
+        <ErrorScreen
+          titleKey="somethingWrongTitle"
+          actionLabelKey="tryAgain"
+          correlationId={capturedProblem.correlationId}
+          onAction={() => void useRecipientStore.getState().load(linkId)}
+        />
+      )
+    }
+    // T-003-03 pins this via RecipientPage.test.tsx (textContent === 'Something went wrong') — keep unchanged.
+    return (
+      <section className="rp" aria-label={i18n.t('recipient.error.sectionAria')}>
+        <h1 className="rp-heading rp-error">{i18n.t('recipient.error.heading')}</h1>
+        <p className="rp-sub">{i18n.t('recipient.error.subtext')}</p>
+      </section>
+    )
+  }
+
+  if (status === 'expired' || status === 'downloadLimit') {
+    // T-003-03 (FR-003-8/9, UI-Reference §4.6): one shared terminal screen — icon, one line (server Problem+JSON
+    // details verbatim), one action. Expired vs download-limit differ only in the stored message; the 404 and
+    // email-less 410 bodies are both email-less, so their screens stay byte-identical by construction.
+    // T-003-05: this branch also wins over a gated transfer — terminal states take precedence over the password gate.
+    return (
+      <section className="rp rp-terminal" aria-label={i18n.t('recipient.terminal.sectionAria')}>
+        <span className="rp-icon rp-terminal-icon" aria-hidden="true">
+          {/* Same inline file icon as the rows below — TA-8.2: features self-contained. */}
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9Z" />
+            <path d="M14 3v6h5" />
+          </svg>
+        </span>
+        <h1 className="rp-heading">{terminalMessage}</h1>
+        {/* T-003-07 (FR-003-8/9): the terminal screen's single action — this CTA to the upload surface. */}
+        <a className="btn-primary rp-terminal-action" href="/" onClick={handleGrowthCtaClick('terminal-state')}>{i18n.t('recipient.terminal.cta')}</a>
+      </section>
+    )
+  }
+
+  if (status === 'active' && passwordRequired) {
+    // T-003-05 (FR-003-6): the gate — the ONLY content on a gated transfer is this card: sender name + form.
+    // No note, no file list, no sizes, nothing to enumerate or leak (byte-leak audit in RecipientPage.test.tsx).
+    return (
+      <section className="rp rp-gate" aria-label={i18n.t('recipient.gate.sectionAria', { name: from })}>
+        <h1 className="rp-heading">{i18n.t('recipient.gate.fromHeading')}{from}</h1>
+        <form className="rp-password-card" onSubmit={handleSubmit}>
+          <label className="rp-password-label" htmlFor="rp-password-input">{i18n.t('recipient.gate.passwordLabel')}</label>
+          <div className={`rp-password-row${unlockError ? ' rp-shake' : ''}`}>
+            <input
+              ref={pwInputRef}
+              id="rp-password-input"
+              type={show ? 'text' : 'password'}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              className="rp-password-input"
+              autoComplete="current-password"
+            />
+            <button
+              type="button"
+              className="rp-password-toggle"
+              aria-label={show ? i18n.t('recipient.gate.hidePasswordAria') : i18n.t('recipient.gate.showPasswordAria')}
+              aria-pressed={show}
+              onClick={() => setShow((s) => !s)}
+            >
+              {show ? (
+                // feather eye-off — inline, features self-contained (TA-8.2).
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                  <path d="M14.12 14.12A3 3 0 1 1 10.9 10.9" />
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                </svg>
+              ) : (
+                // feather eye — inline, features self-contained (TA-8.2).
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              )}
+            </button>
+          </div>
+          {unlockError && (
+            <p className="rp-password-error" role="alert">{unlockError}</p>
+          )}
+          <button type="submit" className="btn-primary rp-password-submit" disabled={unlocking || value.length === 0}>
+            {i18n.t('recipient.gate.unlockButton')}
+          </button>
+        </form>
+      </section>
+    )
+  }
+
+  return (
+    <section className="rp" aria-label={i18n.t('recipient.active.sectionAria', { name: from })} ref={sectionRef} tabIndex={-1}>
+      {/* T-016-02: hidden polite live region — downloads-left decrements + growth CTA; visually clipped, no layout impact. */}
+      {recipientLive}
+      <h1 className="rp-heading">{i18n.t('recipient.active.fromHeading')}{from}</h1>
+      {/* Note as plain-text blockquote — no markdown (TA-8.2); overflow-wrap handles long unbroken URLs. */}
+      {note && note.trim() !== '' && (
+        <blockquote className="rp-note">{note}</blockquote>
+      )}
+      <ul className="rp-list" aria-label={i18n.t('recipient.active.filesAria')}>
+        {files.map((f) => (
+          <li key={f.fileId} className="rp-row">
+            <span className="rp-icon" aria-hidden="true">
+              {/* Inline copy of StagingList's generic file icon — TA-8.2: features self-contained. */}
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9Z" />
+                <path d="M14 3v6h5" />
+              </svg>
+            </span>
+            <span className="rp-name" title={f.name}>{f.name}</span>
+            {/* T-003-06 (US-003-03 alt flow): storage degraded — the row's mint failed; the rest of the page keeps working. */}
+            {/* T-013-04 (FR-013-3): aria-live="polite" instead of role="alert" — a transient row state, not an assertive alert. */}
+            {downloadErrorFileId === f.fileId && (
+              <p className="rp-download-error" aria-live="polite">{i18n.t('recipient.download.unavailable')}</p>
+            )}
+            <span className="rp-size">{formatBytes(f.sizeBytes)}</span>
+            {/* T-003-06 (UI notes): subtle in-flight indicator on the row while endpoint 6 is minting — no page-level blocking UI. */}
+            <button type="button" className="rp-download" disabled={downloadingFileId !== null} aria-label={i18n.t('recipient.active.downloadAria', { name: f.name, size: formatBytes(f.sizeBytes) })} onClick={() => handleDownload(f.fileId)}>
+              {downloadingFileId === f.fileId ? i18n.t('recipient.active.downloading') : i18n.t('recipient.active.downloadButton')}
+            </button>
+          </li>
+        ))}
+      </ul>
+      {/* T-004-04 (FR-004-4, AC-004-2): ≥2 files but no server Download all ⇒ over MAX_ZIP_SIZE (TA-4.2a) — absence + note, never a disabled button. */}
+      {files.length >= 2 && !hasDownloadAll && (
+        <p className="rp-cap-note">{i18n.t('recipient.active.capNote')}</p>
+      )}
+      {/* FR-003-1: Download all when >1 file — hasDownloadAll comes from the server (TA-4.2#4), so the client never recomputes it. */}
+      {hasDownloadAll && (
+        <>
+          <button type="button" className="btn-primary rp-download-all" disabled={downloadAllPhase !== 'idle'} aria-busy={downloadAllPhase === 'preparing'} onClick={handleDownloadAll}>
+            {downloadAllPhase === 'preparing' ? (
+              <>
+                <span className="rp-spinner" aria-hidden="true" />
+                {i18n.t('recipient.active.preparing')}
+              </>
+            ) : i18n.t('recipient.active.downloadAll')}
+          </button>
+          {downloadAllPhase === 'preparing' && (
+            <p className="rp-download-all-hint">{i18n.t('recipient.active.preparingHint')}</p>
+          )}
+        </>
+      )}
+      {/* T-003-03 (FR-003-5): "Downloads left: N" under the list — null = unlimited (Business, hidden);
+      * shown only for finite caps past the first download (a 0 remaining is already the terminal limit screen). */}
+      {downloadsLeft !== null && downloadsLeft > 0 && (
+        <p className="rp-downloads-left">{i18n.t('recipient.active.downloadsLeft', { count: downloadsLeft })}</p>
+      )}
+      {/* T-003-07 (FR-003-7): growth panel — shown once per full download, below the file list; partials never render it. */}
+      {growthPanelVisible && (
+        <div className="rp-growth" role="region" aria-label={i18n.t('recipient.active.growthAria')}>
+          <p className="rp-growth-copy">{i18n.t('recipient.active.growthCopy')}</p>
+          <button type="button" className="btn-primary rp-growth-cta" onClick={handleGrowthCtaClick('post-download')}>{i18n.t('recipient.active.growthCta')}</button>
+        </div>
+      )}
+      {/* T-004-03 (US-004-01 alt flow): fixed-positioned global toast - DOM position is irrelevant; role from the single-source mapping. */}
+      {downloadAllFailed && (
+        <div className="dz-toast" role={toastRole('error')}>{i18n.t('recipient.active.preparingFailed')}</div>
+      )}
+    </section>
+  )
+}
+
+export default RecipientPage

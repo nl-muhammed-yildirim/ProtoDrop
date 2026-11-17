@@ -52,7 +52,7 @@ AC-014-4: Date "2026-08-23" with locale de
 
 ## UI notes
 
-- Language switcher: profile (signed-in) — `Select language` (stored on the account); guest: browser-detected, no switcher on the landing (kept minimal per product analysis).
+- Language switcher: profile (signed-in) — `Select language` (stored per browser in localStorage `protoDrop.accountLocale` — client-only per user decision 2026-11-17, T-014-05; no server copy); guest: browser-detected, no switcher on the landing (kept minimal per product analysis).
 - All strings tone per UI-Reference §7 (calm, no exclamation points) — translation memory keeps the tone across locales.
 
 ## Technical notes
@@ -70,10 +70,22 @@ AC-014-4: Date "2026-08-23" with locale de
 - E2E: AC-014-1 (de browser, full flow in German); AC-014-3 (account override); email template rendering per locale (T-019/T-026).
 - Lint: eslint rule blocks new hardcoded strings in `features/` (T-026 exit check: "no hardcoded strings (lint)").
 
-## User stories
+## User stories & implementation tasks
 
 | ID | Story | File |
 |---|---|---|
-| US-014-01 | Use the product in my language | `US-014-01-localized-ui.md` |
-| US-014-02 | Have the right language automatically | `US-014-02-locale-detection.md` |
-| US-014-03 | Get emails in my language | `US-014-03-localized-email.md` |
+| US-014-01 | Use the product in my language | `US-014-01-localized-ui/US-014-01-localized-ui.md` |
+| US-014-02 | Have the right language automatically | `US-014-02-locale-detection/US-014-02-locale-detection.md` |
+| US-014-03 | Get emails in my language | `US-014-03-localized-email/US-014-03-localized-email.md` |
+
+**Implementation tasks:** one file per task — each story folder holds its story .md + its task files (context-friendly; execute top-to-bottom).
+
+| Story | Task | File | Status |
+|---|---|---|---|
+| US-014-01 | T-014-01 i18next init + 8 locale resource bundles at `core/i18n/locales/{lang}.json` (FR-014-1, TA-8.5) | `US-014-01-localized-ui/T-014-01-i18n-init-and-bundles.md` | ☑ 2026-11-10 |
+| US-014-02 | T-014-02 Locale detection order: account setting → browser → en, before first render (FR-014-3) | `US-014-02-locale-detection/T-014-02-locale-detection-order.md` | ☑ 2026-11-10 |
+| US-014-01 | T-014-03 String sweep: all P0 UI strings via `t()` + no-hardcoded-string lint (FR-014-2/4) | `US-014-01-localized-ui/T-014-03-string-sweep-and-lint.md` | ☑ 2026-11-12 |
+| US-014-03 | T-014-04 Email template locale selection per recipient in f-email (FR-014-5, TA-6.7) | `US-014-03-localized-email/T-014-04-email-template-locale-selection.md` | ☑ 2026-11-12 |
+| US-014-02 | T-014-05 Account language write path (AC-014-3): profile "Language" control + server-side account locale so the account setting wins over the browser | `docs/plans/T-014-05-plan.md` (gap task 2026-11-17, no story task file; deferred from T-026 per Open-Decisions 2026-11-12; "server-side" superseded — client-only per user decision 2026-11-17) | ☑ |
+
+**Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified (AC-014-1…AC-014-4, EC-014-1…EC-014-4). Then T-026 can be marked `done` in `Milestone-Backlog.md` — its exit check "no hardcoded strings (lint)" is the AC-014 gate for T-014-03. (T-014-04 has no client counterpart: it is backend f-email work depending on F-TRF-006's template machinery from T-019; US-014-02's detection is the client half that AC-014-1/AC-014-3 render through.)

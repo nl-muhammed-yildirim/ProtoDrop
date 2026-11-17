@@ -260,6 +260,9 @@ namespace wa.infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("NotifiedAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("PreferredLanguage")
+                        .HasColumnType("VARCHAR(8)");
+
                     b.Property<Guid>("TransferId")
                         .HasColumnType("uniqueidentifier");
 
@@ -964,6 +967,9 @@ namespace wa.infrastructure.Persistence.Migrations
                     b.Property<string>("SenderName")
                         .IsRequired()
                         .HasColumnType("NVARCHAR(100)");
+
+                    b.Property<Guid?>("SourcedFrom")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<byte>("Status")
                         .HasColumnType("TINYINT");

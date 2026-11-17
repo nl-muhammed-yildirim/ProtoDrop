@@ -1,0 +1,36 @@
+{
+  "name": "email-failures",
+  "type": "Microsoft.Insights/metricAlerts",
+  "apiVersion": "2018-03-01",
+  "location": "global",
+  "properties": {
+    "description": "TA-10.3 'Email failures' (P2): email_failures_1h > 50/h. Custom metric under Azure.ApplicationInsights namespace — verify in wa-dev-ai Metrics explorer before create (namespace registers lazily on first emission). Window PT1H equals the metric's per-hour value and the dashboard's email_failures_1h line. Links to dashboard 'Email health' (id f01b07ee-a968-460f-a180-bf9a2cf7fe70, docs/dashboards/email-health.json). dev: informational (launch traffic is synthetic)",
+    "severity": 1,
+    "enabled": true,
+    "scopes": [
+      "/subscriptions/{SUB}/resourceGroups/rg-wa-dev/providers/Microsoft.Insights/components/wa-dev-ai"
+    ],
+    "evaluationFrequency": "PT5M",
+    "windowSize": "PT1H",
+    "criteria": {
+      "odata.type": "Microsoft.Azure.Monitor.MultipleResourceMultipleMetricCriteria",
+      "allOf": [
+        {
+          "criterionType": "StaticThresholdCriterion",
+          "name": "email_failures_1h > 50",
+          "metricName": "email_failures_1h",
+          "metricNamespace": "Azure.ApplicationInsights",
+          "dimensions": [],
+          "operator": "GreaterThan",
+          "threshold": 50,
+          "timeAggregation": "Average"
+        }
+      ]
+    },
+    "actions": [
+      {
+        "actionGroupId": "/subscriptions/{SUB}/resourceGroups/rg-wa-dev/providers/Microsoft.Insights/actionGroups/wa-dev-alert-emails"
+      }
+    ]
+  }
+}

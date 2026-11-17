@@ -1,8 +1,16 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
+import i18n from '../../core/i18n/init'
+import { useAriaLive } from '../../core/ui/useAriaLive'
+import { ProgressThrottle } from '../../core/ui/ariaLiveThrottle'
+import { toastRole } from '../../core/ui/toastRole'
 import { useUploadEngine, stagedHandles, type Draft } from '../../core/upload/UploadEngine'
+import { getTraceParent } from '../../core/traceparent'
 import { formatBytes } from '../../core/upload/formatBytes'
 import { checkLimits, getPlanLimits, limitMessage } from '../../core/upload/planLimits'
+import LinkScreen from '../sender/LinkScreen'
+import { buildFinalizePayload, finalizeKey, type MintedFile } from './finalize'
+import { useFinalize } from './finalizeState'
 
 /**
  * Staging list (T-001-03): one row per staged file — icon, name (truncated, `title`),
@@ -21,8 +29,23 @@ import { checkLimits, getPlanLimits, limitMessage } from '../../core/upload/plan
 
  // T-001-09 (Send wiring): the API is cross-origin at a fixed local port — no proxy, no env vars yet (ADR row).
  const DRAFT_ENDPOINT = 'http://localhost:8080/api/v1/transfers/draft'
+ // T-001-10 (TA-4.2#2): finalize — server-side blob copy staging→transfers + mint linkId; {draftId} filled per send().
+ const FINALIZE_ENDPOINT = 'http://localhost:8080/api/v1/transfers/draft/{draftId}/finalize'
  const AZURITE_ACCOUNT_KEY_B64 = 'Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=='
  const AZURITE_ACCOUNT_NAME = 'devstoreaccount1'
+
+ /**
+  * T-001-10 (TA-4.2#2): finalize response wire shape — mirrors Program.cs L229 exactly (id in 'n'-form, status "Draft").
+  * linkId + id are what LinkScreen needs to render the public URL and activate endpoint 3 on send.
+  */
+ type FinalizeResult = {
+   id: string
+   linkId: string
+   status: string
+   expiresAt: string
+   totalBytes: number
+   files: Array<{ id: string; name: string }>
+ }
 
  /**
   * Re-signs each minted uploadUrl for a plain-HTTP browser leg. Azurite (and the C# integration fixture) rejects a PUT on a
@@ -66,15 +89,55 @@ export function StagingList() {
   const removeFile = useUploadEngine((s) => s.remove)
   const retryFile = useUploadEngine((s) => s.retry)
   const [sending, setSending] = useState(false) // double-click guard — start() itself serializes files (TA-8.3).
+  // T-001-10 handoff: shared store so App can hide the DropZone once LinkScreen is showing (see finalizeState.ts).
+  const finalized = useFinalize((s) => s.finalized)
+  const setFinalized = useFinalize((s) => s.setFinalized)
+  const finalizeError = useFinalize((s) => s.finalizeError)
+  const setFinalizeError = useFinalize((s) => s.setFinalizeError)
+  const clearFinalize = useFinalize((s) => s.clear)
+
+  // T-016-02 (FR-016-3): hidden polite live region for progress/failure announcements — hooks run before any early return.
+  const { container: progressLive, announce } = useAriaLive({ priority: 'polite' })
+  const throttleRef = useRef(new ProgressThrottle()) // EC-016-1 points only; one instance per page (no re-mount churn).
+  const prevFailedIdsRef = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (overall.totalBytes === 0) { throttleRef.current.reset(); return }
+    const percent = Math.round((overall.sentBytes / overall.totalBytes) * 100)
+    const announced = throttleRef.current.onProgress(percent) // null for non-milestone ticks — no announcement.
+    if (announced !== null) announce(i18n.t('landing.staging.uploading', { done: formatBytes(overall.sentBytes), total: formatBytes(overall.totalBytes) }))
+  }, [overall.sentBytes, overall.totalBytes]) // D-2
+
+  useEffect(() => {
+    const current = new Set(files.filter((f) => f.status === 'failed').map((f) => f.id))
+    let newFailures = 0
+    for (const id of current) if (!prevFailedIdsRef.current.has(id)) newFailures += 1
+    if (newFailures === 1) { // D-3: exactly one new failure → name it; a batch collapses to ONE count line.
+      const failed = files.find((f) => f.status === 'failed' && !prevFailedIdsRef.current.has(f.id))
+      announce(i18n.t('landing.staging.failedAnnounce', { name: failed?.name ?? '' }))
+    } else if (newFailures > 1) {
+      announce(i18n.t('landing.staging.bulkFailed', { count: newFailures }))
+    }
+    prevFailedIdsRef.current = current
+  }, [files])
+
+  // "Send again" (LinkScreen sent-phase): reset finalize + staged files so staging reappears for the next transfer.
+  const handleSendAgain = (): void => {
+    clearFinalize()
+    useUploadEngine.getState().reset() // clears staged files + FR-001-6 records so staging reappears.
+  }
 
   // Pure arithmetic on staged sizes; re-read every render (TA-8.3).
   const limits = getPlanLimits()
   const check = checkLimits(files, limits)
   const message = limitMessage(files, check, limits)
   // T-001-09 (Send wiring): post the whole staged selection in row order — start() mints uploadUrls by position.
+  // T-001-10: capture each file's minted fileId as it uploads so finalize can build its payload; after all files are
+  // done, POST /finalize with an Idempotency-Key (EC-002-1) and swap the staging list for LinkScreen.
   const send = async () => {
-    if (sending) return
+    if (sending || finalized !== null) return
     setSending(true)
+    setFinalizeError(false)
     try {
       const rows = files.map((f) => ({
         name: f.name,
@@ -83,24 +146,59 @@ export function StagingList() {
       }))
       const res = await fetch(DRAFT_ENDPOINT, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', traceparent: getTraceParent() },
         body: JSON.stringify({ files: rows }),
       })
       if (!res.ok) return // 422 Problem+JSON (TRANSFER_SIZE_EXCEEDED): the limit message already explains it; keep minimal.
       const draft = (await res.json()) as Draft
+      // Minted fileIds by staged-row position — Program.cs L213 Guid.Parse's each one against this list.
+      const minted: MintedFile[] = files.map((f, i) => ({
+        stagedId: f.id,
+        name: f.name,
+        sizeBytes: f.size,
+        fileId: draft.files[i]?.fileId ?? '',
+      }))
       await useUploadEngine.getState().start(await reSignForHttp(draft))
+      // start() never rejects — per-file failures surface as 'failed' status. Finalize only when every file is done;
+      // a failed row means the user retries it (T-001-08) before finalize, so don't mint a partial transfer.
+      const allDone = files.length > 0 && useUploadEngine.getState().files.every((f) => f.status === 'done')
+      if (!allDone) return
+      const finRes = await fetch(FINALIZE_ENDPOINT.replace('{draftId}', draft.draftId), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': finalizeKey(draft.draftId), traceparent: getTraceParent() },
+        body: JSON.stringify(buildFinalizePayload(minted)),
+      })
+      if (!finRes.ok) { setFinalizeError(true); return } // inline error below — the blobs are staged; retry re-finalizes (EC-002-1).
+      const result = (await finRes.json()) as FinalizeResult
+      setFinalized(result)
     } finally {
       setSending(false)
     }
   }
 
+  if (finalized !== null) {
+    // T-001-10 handoff: the hero card — full public URL + Copy + recipients/sender fields; endpoint 3 activates on send.
+    // "Send again" clears finalize + staged files → App re-renders the drop zone for the next transfer (same as ReSendScreen's Upload path).
+    return <LinkScreen linkId={finalized.linkId} transferId={finalized.id} onSendAgain={() => handleSendAgain()} />
+  }
+
+  if (finalizeError) {
+    // EC-002-1: finalize failed — blobs are staged, so retrying re-finalizes with the same key; no half-filled form.
+    return (
+      <section className="sl" aria-label={i18n.t('landing.staging.finalizeFailed')}>
+        {/* T-016-02: the error toast's role comes from the single-source mapping (FR-016-3). */}
+        <p role={toastRole('error')} className="sl-limit-msg">{i18n.t('landing.staging.finalizeFailedMsg')}</p>
+        <div className="sl-footer">
+          <button type="button" className="btn-primary sl-send" onClick={() => void send()}>{i18n.t('landing.staging.tryAgain')}</button>
+        </div>
+      </section>
+    )
+  }
+
   return (
-    <section className="sl" aria-label="Staged files">
-      {/* Overall line (FR-001-5): combined bytes uploaded / total, recomputed on every store transition. */}
-      {/* role=status (polite): the text re-renders only on store transitions — block completions / status changes — never per byte (F-TRF-016-3). */}
-      {files.length > 0 && (
-        <p className="sl-overall" role="status">Uploading… {formatBytes(overall.sentBytes)} of {formatBytes(overall.totalBytes)}</p>
-      )}
+    <section className="sl" aria-label={i18n.t('landing.staging.sectionLabel')}>
+      {/* T-016-02: hidden polite live region — progress milestones + failure announcements; visually clipped, no layout impact. */}
+      {progressLive}
       <ul className="sl-list">
         {files.map((f) => (
           <li key={f.id} className={`sl-row${check.overFileIds.has(f.id) ? ' sl-row-over' : ''}${f.status === 'failed' ? ' sl-row-failed' : ''}${f.status === 'done' ? ' sl-done' : ''}`}>
@@ -124,31 +222,46 @@ export function StagingList() {
             )}
             {f.status === 'done' && <span className="sl-done" aria-hidden="true">✓</span>}
             {/* FR-001-6 (T-001-08): row-local failure — danger text + Retry; the engine resumes from completed blocks. */}
+            {/* T-013-04 (FR-013-3): a blob-503 failure after the retry ladder renders the degraded copy instead. */}
             {f.status === 'failed' && (
               <>
-                <span className="sl-failed-msg">Upload failed — retry</span>
-                <button type="button" className="sl-retry" aria-label={`Retry ${f.name}`} onClick={() => void retryFile(f.id)}>Retry.</button>
+                <span className="sl-failed-msg" aria-live="polite">{f.isBlobUnavailable ? i18n.t('landing.dropzone.uploadDegraded') : i18n.t('landing.staging.failedMsg')}</span>
+                <button type="button" className="sl-retry" aria-label={i18n.t('landing.staging.retryAria', { name: f.name })} onClick={() => void retryFile(f.id)}>{i18n.t('landing.staging.retryButton')}</button>
               </>
             )}
             <button
               type="button"
               className="sl-remove"
-              aria-label={`Remove ${f.name}`}
-              onClick={() => removeFile(f.id)}
+              aria-label={i18n.t('landing.staging.removeFile', { name: f.name })}
+              // T-016-04 (D-2): removing the focused button drops focus to <body> — hand it to the next row's remove
+              // button, or Send when this was the last one. Markup-level fix; no positive tabindex anywhere.
+              onClick={(e) => {
+                const rows = Array.from(document.querySelectorAll('.sl-remove'))
+                const idx = rows.indexOf(e.currentTarget as HTMLButtonElement)
+                const nextTarget = rows[idx + 1] ?? document.querySelector('.sl-send')
+                removeFile(f.id)
+                requestAnimationFrame(() => (nextTarget as HTMLElement | null)?.focus())
+              }}
             >✕</button>
           </li>
         ))}
       </ul>
-      <p className="sl-total">{files.length} {files.length === 1 ? 'file' : 'files'} · {formatBytes(overall.totalBytes)}</p>
+      <p className="sl-total">{files.length === 1 ? i18n.t('landing.staging.totalSingle', { total: formatBytes(overall.totalBytes) }) : i18n.t('landing.staging.totalMany', { count: files.length, total: formatBytes(overall.totalBytes) })}</p>
       {message && (
         <p className="sl-limit-msg" role="alert">
           {message}
         </p>
       )}
       <div className="sl-footer">
+        {/* T-017-01 (FR-017-5): inside the footer so the overall line sits directly above Send. (one element, two positions). */}
+        {/* Overall line (FR-001-5): combined bytes uploaded / total, recomputed on every store transition. */}
+        {/* role=status (polite): the text re-renders only on store transitions — block completions / status changes — never per byte (F-TRF-016-3). */}
+        {files.length > 0 && (
+          <p className="sl-overall" role="status">{i18n.t('landing.staging.uploading', { done: formatBytes(overall.sentBytes), total: formatBytes(overall.totalBytes) })}</p>
+        )}
         {/* Disabled buttons don't fire their own mouse events — the span wrapper carries title. */}
         <span className="sl-send-wrap" title={message ?? undefined}>
-          <button type="button" className="btn-primary sl-send" onClick={() => void send()} disabled={files.length === 0 || message !== null}>Send.</button>
+          <button type="button" className="btn-primary sl-send" onClick={() => void send()} disabled={files.length === 0 || message !== null}>{i18n.t('landing.staging.send')}</button>
         </span>
       </div>
     </section>

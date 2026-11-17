@@ -15,6 +15,9 @@ public sealed class EmailRecipientConfiguration : IEntityTypeConfiguration<Email
 
         b.Property(r => r.Address).HasColumnType("VARCHAR(320)").IsRequired();
 
+        // T-006-04: Preferred language for email rendering (nullable — null/empty → English fallback).
+        b.Property(r => r.PreferredLanguage).HasColumnType("VARCHAR(8)");
+
         // FK_ER_T -> dbo.Transfer(Id); DDL has no ON DELETE clause = SQL Server default NO ACTION (EC-052-1).
         b.HasOne<Transfer>()
             .WithMany()

@@ -4,6 +4,8 @@ using MediatR;
 using Microsoft.Extensions.Logging;
 using wa.application.Limits;
 using wa.application.Ports;
+using wa.application.Telemetry;
+using wa.application.UseCases.Auth;
 using wa.domain;
 using wa.domain.Correlation;
 
@@ -16,7 +18,8 @@ public sealed record SendTransferCommand(
     string? SenderEmail,
     string? Note,
     IReadOnlyList<string> Emails,
-    string? Password = null) : IRequest<SendTransferResult?>;
+    string? Password = null,
+    Guid? OwnerAppUserId = null) : IRequest<SendTransferResult?>;   // T-008-08 (FR-008-7): session owner at send time — guest → null
 
 /// <summary>POST /api/v1/transfers/{id}/send result (TA-4.2#3 response shape).</summary>
 public sealed record SendTransferResult(
@@ -36,7 +39,25 @@ public interface ISendStore
 {
     Task<Transfer?> FindByIdAsync(Guid id, CancellationToken ct);
     Task SaveSendAsync(Transfer transfer, IReadOnlyList<EmailRecipient> recipients, CancellationToken ct);
+
+    // T-010-01 (AC-010-1): three new members for the re-send use case — no changes to existing signatures.
+    /// <summary>T-010-01: read all recipient email addresses stored for a transfer.</summary>
+    Task<IReadOnlyList<string>> GetRecipientAddressesAsync(Guid transferId, CancellationToken ct);
+
+    /// <summary>T-010-01 (AC-010-1): list file item rows (metadata only, no EF entities) ordered by SortOrder.</summary>
+    Task<IReadOnlyList<FileItemRow>> ListFileItemsByTransferAsync(Guid transferId, CancellationToken ct);
+
+    /// <summary>
+    /// T-010-01 (AC-010-1): one transaction — insert the new draft Transfer + new FileItem rows + the materialized
+    /// snapshot EmailRecipient rows (the editable pending state US-010-02 reads), then increment RefCount on each shared
+    /// BlobRef via guarded ExecuteUpdate (same raw-SQL guard style as PublicTransferStore.RecordSingleFileDownloadAsync;
+    /// rowsAffected &lt; 1 → InvalidOperationException). T-010-02 will insert its FILES_GONE gate inside this same transaction.
+    /// </summary>
+    Task SaveResendAsync(Transfer draft, IReadOnlyList<FileItem> fileItems, IReadOnlyList<EmailRecipient> recipients, IReadOnlyList<BlobRef> sharedBlobRefs, CancellationToken ct);
 }
+
+/// <summary>T-010-01: file item row projection (plain POCO — no EF entity in use case layer).</summary>
+public sealed record FileItemRow(Guid Id, Guid BlobRefId, string OriginalName, long SizeBytes, string? ContentType, int SortOrder);
 
 /// <summary>
 /// T-002-04 (TA-4.2#3) — the only business logic behind POST /api/v1/transfers/{id}/send:
@@ -46,20 +67,29 @@ public interface ISendStore
 public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, SendTransferResult?>
 {
     private readonly ISendStore _store;
+    private readonly ITransferStore _transferStore;
     private readonly ILimitsProvider _limits;
     private readonly IEventPublisher _eventPublisher;
+    private readonly WaTelemetryReporter _telemetry;
     private readonly ILogger<SendTransferHandler> _logger;
+    private readonly IAppUserStore _users;   // T-008-08 (FR-008-7): resolve the display-name "From" default
 
     public SendTransferHandler(
         ISendStore store,
+        ITransferStore transferStore,
         ILimitsProvider limits,
         IEventPublisher eventPublisher,
-        ILogger<SendTransferHandler> logger)
+        WaTelemetryReporter telemetry,
+        ILogger<SendTransferHandler> logger,
+        IAppUserStore users)   // T-008-08 (FR-008-7): session-owner display-name resolution — registered singleton at Program.cs L107
     {
         _store = store;
+        _transferStore = transferStore;
         _limits = limits;
         _eventPublisher = eventPublisher;
+        _telemetry = telemetry;
         _logger = logger;
+        _users = users ?? throw new ArgumentNullException(nameof(users));
     }
 
     public async Task<SendTransferResult?> Handle(SendTransferCommand request, CancellationToken cancellationToken)
@@ -75,6 +105,11 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
 
         // 3. Resolve plan limits — never a literal (TA-3.4).
         var limits = await _limits.Resolve(ILimitsProvider.GuestPlanCode, cancellationToken);
+
+        // 3b. T-007-04 / AC-007-1: send-time re-check — a flag may have changed since finalize; checks precede mutation.
+        //     Strict > : exactly-at-limit passes (inclusive cap, boundary pinned in unit tests).
+        if (transfer.TotalBytes > limits.MaxTransferSize)
+            throw new TransferSizeExceededException(transfer.TotalBytes, limits.MaxTransferSize, 0, limits.MaxSingleFile);
 
         // 4. Parse recipients: split on [\r\n,;\s]+, trim, drop empties, validate per-address, lowercase, dedupe, cap.
         var addresses = new List<string>();
@@ -99,7 +134,17 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
         var now = DateTime.UtcNow;
         transfer.Status = 1;
         transfer.ExpiresAtUtc = now.AddDays(limits.RetentionDays);
-        transfer.SenderName = request.SenderName ?? "Anonymous";
+
+        // T-008-08 (FR-008-7): send-time attribution — the session user id IS the owner (guest → null).
+        // Unconditional overwrite is deliberate: a guest-created draft sent while signed in becomes attributed,
+        // and a guest send stays NULL no matter how the draft was created. Lands ahead of T-022's My Files list.
+        transfer.OwnerAppUserId = request.OwnerAppUserId;
+
+        // T-008-08 (US-008-04 happy path step 2): "From" defaults to the display name. The per-transfer override
+        // (request.SenderName) still wins (exit check d); else the signed-in user's display name with the T-008-06
+        // email-local-part fallback for an empty/blank name; guests stay "Anonymous". SenderName is a SNAPSHOT at
+        // send time — later profile edits never rewrite it (FR-002-4).
+        transfer.SenderName = request.SenderName ?? await ResolveSenderName(request.OwnerAppUserId, cancellationToken);
         transfer.SenderEmail = request.SenderEmail;
         transfer.Note = request.Note;
 
@@ -108,6 +153,12 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
         {
             var hasher = new Microsoft.AspNetCore.Identity.PasswordHasher<string>();
             transfer.PasswordHash = hasher.HashPassword(transfer.Id.ToString("n"), request.Password);
+        }
+        else if (transfer.SourcedFrom is not null)
+        {
+            // T-010-03 (US-010-02): re-send drafts clear their copied hash when no new password is provided — the original's
+            // PBKDF2 key (original transfer ID) doesn't match this draft's ID, so keeping it would break unlock.
+            transfer.PasswordHash = null;
         }
 
         // 6. One EmailRecipient row per unique address.
@@ -147,6 +198,11 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
         // 9. Emit transfer.created via the outbox (separate operation — TA-4.1.7 at-most-once accepted at M0).
         await _eventPublisher.PublishAsync(envelope, cancellationToken);
 
+        // T-007-05 / AC-007-2 (meter): storage_bytes_active — re-run the FR-007-4 SUM expression after commit;
+        // Status 0→1 puts this row into the expression at send time, so the recomputed value IS FR-007-4's read.
+        if (transfer.OwnerAppUserId is not null)
+            _telemetry.StorageBytesActive(await _transferStore.GetActiveStorageBytesAsync(transfer.OwnerAppUserId.Value, cancellationToken));
+
         return new SendTransferResult(
             transfer.Id,
             transfer.LinkId,
@@ -168,6 +224,19 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
                 return new Guid(hex);
         }
         return Guid.NewGuid();
+    }
+
+    /// <summary>T-008-08 (FR-008-7 / US-008-04 step 2): default "From" for a signed-in send. Resolves the session owner's
+    /// display name; an empty/blank name falls back to the email local part (T-008-06 rule — never "From: (blank)").
+    /// Unknown or soft-deleted owner (e.g. account deleted mid-draft, T-008-09) → "Anonymous". Guest (null) → "Anonymous".</summary>
+    private async Task<string> ResolveSenderName(Guid? ownerAppUserId, CancellationToken ct)
+    {
+        if (ownerAppUserId is not null && await _users.GetByIdAsync(ownerAppUserId.Value, ct) is { } user)
+        {
+            var name = user.DisplayName.Trim();
+            return string.IsNullOrEmpty(name) ? user.Email.Split('@')[0] : name;   // local-part fallback — mirrors AppUserStore.UpdateProfileAsync / Signup.DeriveDisplayName verbatim
+        }
+        return "Anonymous";
     }
 
     /// <summary>Validates an email address using .NET's MailAddress (TA-4.2#3: per-address validation).</summary>
@@ -192,4 +261,14 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
 public sealed class TransferValidationException : Exception
 {
     public TransferValidationException(string message) : base(message) { }
+}
+
+/// <summary>
+/// T-010-02 (AC-010-2/EC-010-2): a re-send's shared blobs are physically gone — thrown by SendStore's gate at
+/// creation time (SaveResendAsync step 0) or send time (SaveSendAsync, SourcedFrom drafts only). The endpoints catch
+/// it and throw BusinessException(ProblemCodes.FilesGone), keeping the closed code list intact (410 FILES_GONE).
+/// </summary>
+public sealed class FilesGoneException : Exception
+{
+    public FilesGoneException() : base("The files for this transfer were deleted — upload again.") { }
 }

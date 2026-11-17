@@ -1,0 +1,15 @@
+Merhaba,
+
+{{SenderName}} dosyaları seninle paylaştı.
+
+Dosyalar:
+{{#Files}}
+- {{Name}} ({{Size}})
+{{/Files}}
+
+Dosyalarını indir:
+{{CtaUrl}}
+
+Bu bağlantı {{ExpiryDays}} gün içinde sona erer.
+
+Abonelikten ayrılmak için bu e-postaya yanıt ver veya destekle iletişime geç.

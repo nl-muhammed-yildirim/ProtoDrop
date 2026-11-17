@@ -32,11 +32,12 @@ public class EnvelopeShapeTests
             (EventType.UserCreated, "user.created"),
             (EventType.AccountDeleted, "account.deleted"),
             (EventType.PlanChanged, "plan.changed"),
-            (EventType.AdminAction, "admin.action")
+            (EventType.AdminAction, "admin.action"),
+            (EventType.MagicLinkRequested, "auth.magic_link_requested")
         };
 
-        // The closed TA-5.3 list is exactly these 11 members — anything else fails CI.
-        Assert.Equal(11, ta53Types.Length);
+        // The closed TA-5.3 list is exactly the 12 members of the closed list — 12th (MagicLinkRequested) added for T-008-04 (D-6 architecture extension).
+        Assert.Equal(12, ta53Types.Length);
         Assert.Equal(ta53Types.Select(t => t.Type), Enum.GetValues<EventType>());
 
         foreach (var (type, wireName) in ta53Types)

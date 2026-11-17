@@ -1,0 +1,66 @@
+{
+  "name": "Job health",
+  "id": "f1c8ca79-7c78-4aad-a512-6051a3bfb327",
+  "items": [
+    {
+      "type": "ApplicationInsights.MsQuotedVersionedDashboardItem",
+      "id": "c850bb0b-b03f-44ff-abb0-137bd5526007",
+      "name": "Expiry job lag",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "colSpan": 9,
+        "rowSpan": 4
+      },
+      "metadata": {
+        "colors": {}
+      },
+      "data": {
+        "baseType": "Timeseries",
+        "type": "applicationInsightsEntityData",
+        "query": "customMetrics\n| where name == 'expiry_job_lag_seconds'\n| summarize avg(value) by bin(timestamp, 1h)",
+        "title": "Expiry job lag (seconds) — threshold at 1800 s (TA-10.3 Expiry lag row)"
+      }
+    },
+    {
+      "type": "ApplicationInsights.MsQuotedVersionedDashboardItem",
+      "id": "6a931f33-ebe6-4496-8bae-f942f19ee8d4",
+      "name": "Expiry lag threshold reference",
+      "position": {
+        "x": 9,
+        "y": 0,
+        "colSpan": 3,
+        "rowSpan": 4
+      },
+      "metadata": {
+        "colors": {}
+      },
+      "data": {
+        "baseType": "Timeseries",
+        "type": "applicationInsightsEntityData",
+        "query": "range t in range(ago(24h), now(), 1h)\n| extend value = 1800.0\n| project timestamp = t, value",
+        "title": "Expiry lag threshold reference: 1800 s (30 min)"
+      }
+    },
+    {
+      "type": "ApplicationInsights.MsQuotedVersionedDashboardItem",
+      "id": "2308e9ab-502e-4bf7-bcf5-2fe0f4881280",
+      "name": "Deletion job lag proxy",
+      "position": {
+        "x": 0,
+        "y": 4,
+        "colSpan": 9,
+        "rowSpan": 4
+      },
+      "metadata": {
+        "colors": {}
+      },
+      "data": {
+        "baseType": "Timeseries",
+        "type": "applicationInsightsEntityData",
+        "query": "customEvents\n| where name == 'dlq_count'\n| summarize count() by bin(timestamp, 1h)",
+        "title": "Deletion job lag proxy (M0: dlq_count is the closed-set proxy — dedicated deletion-lag metric not in TA-10.2 set yet)"
+      }
+    }
+  ]
+}

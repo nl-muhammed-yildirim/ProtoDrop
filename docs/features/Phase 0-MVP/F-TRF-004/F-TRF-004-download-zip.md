@@ -84,9 +84,9 @@ AC-004-3: Two staged files named "report.pdf"
 
 | Story | Task | File | Status |
 |---|---|---|---|
-| US-004-01 | T-004-01 f-zip function: streaming ZipArchive, de-dup, cap check (TA-6.6) | `US-004-01-generate-zip/T-004-01-fzip-function.md` | ☐ |
-| US-004-02 | T-004-02 Endpoint 7: download-all URL, cache + race idempotency (AC-004-1) | `US-004-02-cached-zip/T-004-02-endpoint7-cache-race.md` | ☐ |
-| US-004-01 | T-004-03 Download all UI: preparing state, 2 s polling, failure toast (FR-004-6) | `US-004-01-generate-zip/T-004-03-download-all-ui.md` | ☐ |
-| US-004-03 | T-004-04 Cap note: hide Download all + "Files are large" (FR-004-4, AC-004-2) | `US-004-03-zip-cap/T-004-04-cap-note-ui.md` | ☐ |
+| US-004-01 | T-004-01 f-zip function: streaming ZipArchive, de-dup, cap check (TA-6.6) | `US-004-01-generate-zip/T-004-01-fzip-function.md` | ☑ |
+| US-004-02 | T-004-02 Endpoint 7: download-all URL, cache + race idempotency (AC-004-1) | `US-004-02-cached-zip/T-004-02-endpoint7-cache-race.md` | ☑ |
+| US-004-01 | T-004-03 Download all UI: preparing state, 2 s polling, failure toast (FR-004-6) | `US-004-01-generate-zip/T-004-03-download-all-ui.md` | ☑ |
+| US-004-03 | T-004-04 Cap note: hide Download all + "Files are large" (FR-004-4, AC-004-2) | `US-004-03-zip-cap/T-004-04-cap-note-ui.md` | ☑ |
 
 **Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-017 can be marked `done` in `Milestone-Backlog.md`.

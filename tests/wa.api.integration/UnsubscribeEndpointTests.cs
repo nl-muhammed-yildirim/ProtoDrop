@@ -1,0 +1,291 @@
+using System.Net;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using Testcontainers.Azurite;
+using Testcontainers.MsSql;
+using wa.application.Telemetry;
+using wa.application.UseCases.Transfers;
+using wa.domain;
+using wa.domain.Errors;
+using wa.domain.Telemetry;
+using wa.infrastructure.Persistence;
+
+namespace wa.api.integration;
+
+/// <summary>
+/// T-006-03 exit checks (FR-006-5, AC-006-3): GET /unsubscribe/{token} + admin suppression list/remove.
+/// Valid token → 200 + EmailSuppression row exists; double-click → idempotent no-op (same landing page);
+/// tampered token → 404 + warn telemetry; admin removal emits admin_action.
+/// Fresh Azurite + SQL 2022 per instance (TA-14.3) — same pattern as UnlockEndpointTests.
+/// </summary>
+public class UnsubscribeEndpointTests : IAsyncLifetime
+{
+    private const string TestSecret = "test-jwt-secret";
+    // T-011-01 gate: these three facts hit the gated admin routes — seed this user into Wa__AdminEmails (SuperAdmin) and sign requests with its TA-9.1 session cookie.
+    private const string AdminEmail = "gate-admin@x.com";
+
+    private AzuriteContainer _azurite = null!;
+    private MsSqlContainer _sql = null!;
+    private WaDbContext _db = null!;
+    private TestFactory _factory = null!;
+    private HttpClient _client = null!;
+    private Guid _adminUserId = default;
+
+    public async Task InitializeAsync()
+    {
+        _azurite = new AzuriteBuilder("mcr.microsoft.com/azure-storage/azurite:3.37.0").Build();
+        await _azurite.StartAsync();
+        var port = _azurite.GetMappedPublicPort(AzuriteBuilder.BlobPort);
+        var accountUrl = new Uri($"http://127.0.0.1:{port}/{AzuriteBuilder.AccountName}");
+
+        Environment.SetEnvironmentVariable("Wa__Blob__AccountUrl", accountUrl.ToString());
+        Environment.SetEnvironmentVariable("Wa__Blob__AccountKey", AzuriteBuilder.AccountKey);
+        Environment.SetEnvironmentVariable("Wa__Jwt__Secret", TestSecret);
+        Environment.SetEnvironmentVariable("Wa__Url__Public", "http://localhost:5173");
+        // Program.cs reads Wa:AdminEmails at host build — must be set before the first CreateClient below (TA-9.2 gate).
+        Environment.SetEnvironmentVariable("Wa__AdminEmails", AdminEmail);
+
+        _sql = new MsSqlBuilder().WithImage("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        await _sql.StartAsync();
+        var connString = _sql.GetConnectionString();
+        Environment.SetEnvironmentVariable("ConnectionStrings__WaDb", connString);
+
+        _db = new WaDbContext(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(connString).Options);
+        await _db.Database.MigrateAsync();
+
+        // T-011-01: the gate resolves role from AppUser.Email against the admin set — seed a SuperAdmin row (no password needed; the gate only reads email).
+        var planId = await _db.Set<Plan>().Where(p => p.Code == "free").Select(p => p.Id).FirstAsync();
+        _adminUserId = Guid.NewGuid();
+        _db.Set<AppUser>().Add(new AppUser
+        {
+            Id = _adminUserId,
+            Email = AdminEmail.ToLowerInvariant(),
+            DisplayName = "Gate Test",
+            PlanId = planId,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        await _db.SaveChangesAsync();
+
+        UnsubscribeTelemetryCapture.Lines.Clear(); // per-test isolation: assertions below cover only this test's requests (fresh host per instance)
+
+        _factory = new TestFactory();
+        _client = _factory.CreateClient();
+    }
+
+    public async Task DisposeAsync()
+    {
+        await _db.DisposeAsync();
+        await _sql.DisposeAsync();
+        await _azurite.DisposeAsync();
+    }
+
+    // ---- Exit check 1: valid token → 200 + EmailSuppression row exists for (address, sender) ----
+
+    [Fact]
+    public async Task ValidToken_Returns200_SuppressionRowExists()
+    {
+        var key = Encoding.UTF8.GetBytes(TestSecret);
+        var token = UnsubscribeToken.Create("recipient@x.com", "sender@y.com", key);
+
+        using var response = await _client.GetAsync($"/unsubscribe/{token}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var row = await _db.Set<EmailSuppression>().SingleAsync();
+        Assert.Equal("recipient@x.com", row.Address);
+        Assert.Equal("sender@y.com", row.SenderEmail);
+    }
+
+    // ---- Exit check 2: second click / stale token → no-op with same success (idempotent via UQ_ES) ----
+
+    [Fact]
+    public async Task SameTokenTwice_SecondCallStill200_OnlyOneRow()
+    {
+        var key = Encoding.UTF8.GetBytes(TestSecret);
+        var token = UnsubscribeToken.Create("dup@x.com", "sender@y.com", key);
+
+        using (var first = await _client.GetAsync($"/unsubscribe/{token}"))
+            Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+
+        using (var second = await _client.GetAsync($"/unsubscribe/{token}"))
+            Assert.Equal(HttpStatusCode.OK, second.StatusCode); // idempotent — same success landing page
+
+        var count = await _db.Set<EmailSuppression>().CountAsync();
+        Assert.Equal(1, count); // UQ_ES: only one row (SQL Server enforces the unique constraint)
+
+        // T-012-06 (AC-012-3 / TA-9.4): the real UQ_ES no-op path logs no raw address.
+        Assert.DoesNotContain(UnsubscribeTelemetryCapture.Lines, l =>
+            l.Contains("dup@x.com", StringComparison.OrdinalIgnoreCase) || l.Contains("sender@y.com", StringComparison.OrdinalIgnoreCase));
+        // T-012-07: positive assertion — the negative check above ran over the real no-op line.
+        Assert.Contains(UnsubscribeTelemetryCapture.Lines, l => l.Contains("Unsubscribe idempotent no-op", StringComparison.Ordinal));
+    }
+
+    // ---- Exit check 3: tampered token → 404 + warn telemetry ----
+
+    [Fact]
+    public async Task TamperedToken_Returns404_WarnTelemetry()
+    {
+        var key = Encoding.UTF8.GetBytes(TestSecret);
+        var validToken = UnsubscribeToken.Create("a@b.com", "c@d.com", key);
+
+        // Flip one character in the signature segment to create a tampered token.
+        var segments = validToken.Split('.', 2);
+        var sigChars = segments[1].ToCharArray();
+        sigChars[^1] = sigChars[^1] == 'A' ? 'B' : 'A';
+        var tampered = $"{segments[0]}.{new string(sigChars)}";
+
+        using var response = await _client.GetAsync($"/unsubscribe/{tampered}");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode); // 404 — don't leak "token invalid" detail
+
+        // No row inserted for the tampered token.
+        Assert.Equal(0, await _db.Set<EmailSuppression>().CountAsync());
+
+        // Warn telemetry: the log line contains "Unsubscribe token verification failed".
+        Assert.Contains(UnsubscribeTelemetryCapture.Lines, l => l.Contains("Unsubscribe token verification failed", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task GarbageToken_Returns404()
+    {
+        using var response = await _client.GetAsync("/unsubscribe/not-a-valid-token!!!");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    // ---- Exit check 4: admin list/remove + admin_action telemetry ----
+
+    [Fact]
+    public async Task AdminList_ReturnsSuppressionRows()
+    {
+        var key = Encoding.UTF8.GetBytes(TestSecret);
+        var token = UnsubscribeToken.Create("admin-test@x.com", "sender@y.com", key);
+        using (var unsub = await _client.GetAsync($"/unsubscribe/{token}"))
+            Assert.Equal(HttpStatusCode.OK, unsub.StatusCode);
+
+        // T-011-01 gate: GET /admin/suppressions requires a session (guest → 401) — sign in as the seeded SuperAdmin.
+        using var response = await WithSessionCookieAsync(HttpMethod.Get, "/api/v1/admin/suppressions");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsByteArrayAsync());
+        var arr = doc.RootElement;
+        Assert.True(arr.GetArrayLength() >= 1);
+
+        // Find our row.
+        string? foundId = null;
+        foreach (var item in arr.EnumerateArray())
+        {
+            if (item.GetProperty("address").GetString() == "admin-test@x.com" &&
+                item.GetProperty("senderEmail").GetString() == "sender@y.com")
+            {
+                foundId = item.GetProperty("id").GetString();
+                break;
+            }
+        }
+        Assert.NotNull(foundId);
+    }
+
+    [Fact]
+    public async Task AdminDelete_RemovesRow_EmitsAdminActionTelemetry()
+    {
+        var key = Encoding.UTF8.GetBytes(TestSecret);
+        var token = UnsubscribeToken.Create("del@x.com", "sender@y.com", key);
+        using (var unsub = await _client.GetAsync($"/unsubscribe/{token}"))
+            Assert.Equal(HttpStatusCode.OK, unsub.StatusCode);
+
+        // Get the row id.
+        var row = await _db.Set<EmailSuppression>().FirstAsync(s => s.Address == "del@x.com");
+
+        UnsubscribeTelemetryCapture.Lines.Clear(); // isolate this test's telemetry
+
+        // T-011-01 gate: suppression remove is SuperAdmin-only — sign in as the seeded SuperAdmin (guest → 401 UNAUTHENTICATED).
+        using (var del = await WithSessionCookieAsync(HttpMethod.Delete, $"/api/v1/admin/suppressions/{row.Id:N}"))
+            Assert.Equal(HttpStatusCode.OK, del.StatusCode);
+
+        // Row is gone.
+        var count = await _db.Set<EmailSuppression>().CountAsync(s => s.Address == "del@x.com");
+        Assert.Equal(0, count);
+
+        // admin_action telemetry emitted.
+        Assert.Contains(UnsubscribeTelemetryCapture.Lines, l => l.Contains(TelemetryEvents.AdminAction, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AdminDelete_UnknownId_Returns404()
+    {
+        // T-011-01 gate: sign in as SuperAdmin so the request reaches the handler's NOT_FOUND path (a guest would 401 at the gate first).
+        using var response = await WithSessionCookieAsync(HttpMethod.Delete, $"/api/v1/admin/suppressions/{Guid.NewGuid():N}");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    // ---- T-011-01 gate: admin routes require a session — TA-9.1 cookie idiom (same as FinalizeAccountLimitsTests) ----
+
+    /// <summary>Send a request with the seeded SuperAdmin's forged session cookie (TA-9.1: Base64(userId|exp|sig), sig = HMAC-SHA256 over Wa:Jwt:Secret).</summary>
+    private async Task<HttpResponseMessage> WithSessionCookieAsync(HttpMethod method, string url)
+    {
+        var exp = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 300;
+        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(TestSecret));
+        var unsigned = $"{_adminUserId:N}|{exp}";
+        var sig = Convert.ToBase64String(hmac.ComputeHash(Encoding.UTF8.GetBytes(unsigned)));
+        var cookieValue = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{unsigned}|{sig}"));
+
+        var request = new HttpRequestMessage(method, url);
+        request.Headers.Add("Cookie", $"wa.session={cookieValue}");
+        return await _client.SendAsync(request);
+    }
+
+    // ---- Test factory: swap the telemetry logger so we can inspect rendered log lines ----
+
+    private sealed class TestFactory : WebApplicationFactory<Program>
+    {
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            builder.ConfigureServices(services =>
+            {
+                // T-006 review: UnsubscribeService logs via ILogger<UnsubscribeService> (Program.cs DI), not the WaTelemetryReporter.
+                services.RemoveAll<ILogger<wa.infrastructure.Persistence.UnsubscribeService>>();
+                services.AddSingleton<ILogger<wa.infrastructure.Persistence.UnsubscribeService>>(_ => new CaptureLogger());
+                services.RemoveAll<ILogger<WaTelemetryReporter>>();
+                services.AddSingleton<ILogger<WaTelemetryReporter>>(_ => new CaptureLogger());
+                services.RemoveAll<WaTelemetryReporter>(); // Program.cs's singleton was already registered — this later registration wins for all consumers
+                services.AddSingleton<wa.application.Telemetry.WaTelemetryReporter>(sp =>
+                    new WaTelemetryReporter(
+                        sp.GetRequiredService<ILogger<WaTelemetryReporter>>(),
+                        System.Text.Encoding.UTF8.GetBytes(TestSecret))); // same key bytes as Program.cs — TA-9.4: the reporter is config-free
+            });
+        }
+    }
+
+    /// <summary>Captures every rendered log line into the shared list (warn telemetry assertions read it).</summary>
+    // T-006 review: implements both logger interfaces — UnsubscribeService logs via ILogger<UnsubscribeService>, admin routes via WaTelemetryReporter.
+    private sealed class CaptureLogger : ILogger<WaTelemetryReporter>, ILogger<wa.infrastructure.Persistence.UnsubscribeService>
+    {
+        public IDisposable BeginScope<TState>(TState state) where TState : notnull => NullScope.Instance;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            var message = formatter(state, exception);
+            if (!string.IsNullOrEmpty(message))
+                lock (typeof(CaptureLogger))
+                    UnsubscribeTelemetryCapture.Lines.Add(message);
+        }
+
+        private sealed class NullScope : IDisposable
+        {
+            public static readonly NullScope Instance = new();
+            public void Dispose() { }
+        }
+    }
+}
+
+// Shared across the factory host + tests (static — WebApplicationFactory caches one host per process).
+public static class UnsubscribeTelemetryCapture
+{
+    public static readonly List<string> Lines = new();
+}

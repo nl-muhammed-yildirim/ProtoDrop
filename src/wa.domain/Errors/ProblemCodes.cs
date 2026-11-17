@@ -1,7 +1,7 @@
 namespace wa.domain.Errors;
 
 /// <summary>
-/// The closed TA-4.1.3 machine-code list — exactly these 17 members, no others in MVP (golden rule: adding one later is an architecture change).
+/// The closed TA-4.1.3 machine-code list — exactly these 18 members, no others in MVP (golden rule: adding one later is an architecture change).
 /// Canonical status + title are pinned here so the wire shape never depends on caller text; at M0 only NOT_FOUND, INTERNAL and RATE_LIMITED are exercised.
 /// </summary>
 public static class ProblemCodes
@@ -22,6 +22,9 @@ public static class ProblemCodes
     public const string RateLimited = "RATE_LIMITED";
     public const string StripeWebhookMismatch = "STRIPE_WEBHOOK_MISMATCH";
     public const string EmailUnsubscribed = "EMAIL_UNSUBSCRIBED";
+    // T-008-04 (EC-008-3): magic-link token expired, redeemed, or unknown — same 410 Gone for all three (don't leak which).
+    // Deliberate extension of the closed list: single-use token expiry is semantically 410 Gone like TransferExpired.
+    public const string LinkExpired = "LINK_EXPIRED";
     public const string Internal = "INTERNAL";
 
     private static readonly Dictionary<string, (int Status, string Title)> Table = new(StringComparer.Ordinal)
@@ -42,6 +45,7 @@ public static class ProblemCodes
         [RateLimited] = (429, "Rate limited"), // US-056-03 Gherkin: 429 + Retry-After
         [StripeWebhookMismatch] = (400, "Stripe webhook mismatch"),
         [EmailUnsubscribed] = (409, "Email unsubscribed"),
+        [LinkExpired] = (410, "This link has expired"), // T-008-04 (EC-008-3): single-use token expired/redeemed/unknown — identical state for all three
         [Internal] = (500, "Internal server error") // /health's component-unreachable variant writes an explicit 503 through the same writer
     };
 

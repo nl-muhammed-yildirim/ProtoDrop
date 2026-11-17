@@ -1,12 +1,9 @@
-# Build context for src/wa.api/Dockerfile (built from repo root).
-# Keep only what the publish stage needs: wa.api + its ProjectReference chain
-# (wa.infrastructure → wa.application → wa.domain) and global.json.
+# Build context for src/wa.api, src/wa.workers and src/wa.web Dockerfiles (all built from repo root).
+# Keep only what the publish/build stages need; filter out build noise + VCS.
 .git/
 **/.vs/
 docs/
 tests/
-src/wa.web/
-src/wa.workers/
 **/bin/
 **/obj/
 **/node_modules/

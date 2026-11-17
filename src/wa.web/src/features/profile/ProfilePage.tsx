@@ -1,0 +1,129 @@
+import { useState } from 'react'
+
+import type { StoredProfile } from '../../core/auth/session'
+import { writeSession } from '../../core/auth/session'
+// T-015-02 (F-TRF-015): resolve the explicit data-theme via the shared pure function — System mode no longer falls back to :root light.
+import { resolveTheme } from '../../core/theme/resolveTheme'
+import { getTraceParent } from '../../core/traceparent'
+import i18n, { readAccountLocale, setAccountLocale, SUPPORTED_LOCALES } from '../../core/i18n/init'
+import type { SupportedLocale } from '../../core/i18n/init'
+import DangerZone from './DangerZone'
+
+// T-008-06 wire (TA-4.2#12–13), verified against src/wa.api/Program.cs — GET/PATCH /auth/me + logout:
+export const ME_BASE = 'http://localhost:8080/api/v1/auth/me'   // fixed-port absolute, AuthPage API_BASE precedent; shared with DangerZone (T-008-09 D-1)
+
+interface ProfilePageProps {
+  profile: StoredProfile                     // App owns the session; this is a prop (UnsubscribePage pattern)
+  onSignedIn: (p: StoredProfile) => void      // App re-sets session state after a successful PATCH
+  onThemeChange: (theme: 'system' | 'light' | 'dark') => void   // shared with TopBar — single source of truth in App
+  onDeleteAccount: () => void                // T-008-09: App.handleDeleteAccount — fires after the 2xx DELETE (D-2).
+}
+
+/**
+ * T-008-07 (UI-Reference §5.5): profile screen at /account/profile (signed-in only).
+ * Display name input + Save (PATCH { displayName }), theme select (PATCH { theme } — server-wins, F-TRF-015), language select (T-014-05, client-only localStorage),
+ * read-only plan line, divider, danger-zone slot with the Delete account button + GDPR confirm modal (T-008-09).
+ * First signed-in client fetch: credentials: 'include' carries the HttpOnly wa.session cookie cross-origin.
+ * Sign out is via TopBar only (D-4), so no button here and no onSignOut prop (App wires it at App level, D-3/D-6).
+ */
+export function ProfilePage({ profile, onSignedIn, onThemeChange, onDeleteAccount }: ProfilePageProps) {
+  const [name, setName] = useState(profile.displayName)
+  const [theme, setThemeLocal] = useState<'system' | 'light' | 'dark'>(profile.theme)
+  const [language, setLanguageLocal] = useState<SupportedLocale | ''>(() => readAccountLocale() ?? '')
+  const [savingName, setSavingName] = useState(false)
+  const [savingTheme, setSavingTheme] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // PATCH { displayName } only — theme is a separate field so the two Save paths stay independent.
+  async function saveName() {
+    setSavingName(true)
+    setError(null)
+    try {
+      const res = await fetch(ME_BASE, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', traceparent: getTraceParent() },
+        // First signed-in client call — HttpOnly wa.session cookie must be sent cross-origin.
+        credentials: 'include',
+        body: JSON.stringify({ displayName: name.trim() })   // server trims + falls back to email local part on empty (T-008-06)
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.message ?? i18n.t('profile.error.saveNameFailed'))
+      const updated = (await res.json()) as Omit<StoredProfile, never>
+      // Server already fell back for empty — show the SAVED value, never "(blank)" (exit check d).
+      setName(updated.displayName)
+      onSignedIn({ ...profile, displayName: updated.displayName })   // App re-sets session state; TopBar initial updates too.
+    } catch {
+      setError(i18n.t('profile.error.saveNameFailed'))
+    } finally {
+      setSavingName(false)
+    }
+  }
+
+  function changeLanguage(next: SupportedLocale | '') {
+    setLanguageLocal(next)
+    void setAccountLocale(next === '' ? null : next)   // T-014-05: client-only (Open-Decisions 2026-11-17); App re-renders on languageChanged
+  }
+
+  function changeTheme(next: 'system' | 'light' | 'dark') {
+    // Apply the resolved theme pre-paint-style immediately so there's no flicker, then persist to the account.
+    // T-015-02 (F-TRF-015): resolve via the shared pure function and ALWAYS set an explicit attribute —
+    // System mode follows the OS live instead of falling back to :root light after removeAttribute.
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches   // jsdom tests install a stub (matchMediaStub.ts)
+    document.documentElement.setAttribute('data-theme', resolveTheme(next, prefersDark))
+
+    setThemeLocal(next)
+    onThemeChange(next)   // App updates its session state so TopBar's select stays in sync (D-4).
+
+    setSavingTheme(true)
+    setError(null)
+    fetch(ME_BASE, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', traceparent: getTraceParent() },
+      credentials: 'include',
+      body: JSON.stringify({ theme: next })   // partial update — displayName untouched (T-008-06)
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error((await res.json().catch(() => null))?.message ?? i18n.t('profile.error.saveThemeFailed'))
+        const updated = (await res.json()) as Omit<StoredProfile, never>
+        onSignedIn({ ...profile, theme: updated.theme })   // server-wins; round-trip the stored value.
+        writeSession(updated)   // T-015-02 (AC-015-1): persist to the mirror index.html's pre-paint bootstrap reads — next paint resolves before first paint.
+      })
+      .catch(() => setError(i18n.t('profile.error.saveThemeFailed')))
+      .finally(() => setSavingTheme(false))
+  }
+
+  return (
+    <div className="pf">
+      <h1 className="pf-heading">{i18n.t('profile.page.heading')}</h1>
+      {/* Display name */}
+      <label className="pf-label" htmlFor="pf-name">{i18n.t('profile.field.displayNameLabel')}</label>
+      <input id="pf-name" className="pf-input" type="text" value={name} maxLength={100} onChange={(e) => setName(e.target.value)} />
+      <button type="button" className="pf-save-btn" disabled={savingName || name.trim() === profile.displayName} onClick={() => void saveName()}>
+        {i18n.t('profile.button.save')}
+      </button>
+      {/* Theme select — same three options as TopBar; value from the account (server-wins, F-TRF-015). */}
+      <label className="pf-label" htmlFor="pf-theme">{i18n.t('profile.theme.label')}</label>
+      <select id="pf-theme" className="pf-theme-select" value={theme} disabled={savingTheme} onChange={(e) => changeTheme(e.target.value as 'system' | 'light' | 'dark')}>
+        <option value="system">{i18n.t('profile.theme.system')}</option>
+        <option value="light">{i18n.t('profile.theme.light')}</option>
+        <option value="dark">{i18n.t('profile.theme.dark')}</option>
+      </select>
+      <label className="pf-label" htmlFor="pf-language">{i18n.t('profile.language.label')}</label>
+      <select id="pf-language" className="pf-theme-select" value={language} onChange={(e) => changeLanguage(e.target.value as SupportedLocale | '')}>
+        <option value="">{i18n.t('profile.language.browserDefault')}</option>
+        {SUPPORTED_LOCALES.map((code) => (
+          <option key={code} value={code} lang={code}>{i18n.t(`profile.language.${code}`)}</option>
+        ))}
+      </select>
+      {/* Plan line — read-only in MVP (FR-008-4: "Free by default"). planCode comes from the session DTO; no extra fetch. */}
+      <p className="pf-plan">{profile.planCode === 'free' ? i18n.t('profile.plan.free') : profile.planCode}</p>
+      {/* Danger zone divider + slot — US-008-06's Delete account button + GDPR confirm modal (T-008-09 D-1/D-4). */}
+      <hr className="pf-divider" />
+      <div className="pf-danger-zone" aria-label={i18n.t('profile.dangerZone.ariaLabel')}>
+        <DangerZone profile={profile} onDeleteAccount={onDeleteAccount} />
+      </div>
+      {error && <p role="alert" className="pf-error">{error}</p>}
+    </div>
+  )
+}
+
+export default ProfilePage

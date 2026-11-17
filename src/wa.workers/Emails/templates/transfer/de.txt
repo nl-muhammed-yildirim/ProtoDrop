@@ -1,0 +1,15 @@
+Hallo,
+
+{{SenderName}} hat Dateien mit dir geteilt.
+
+Dateien:
+{{#Files}}
+- {{Name}} ({{Size}})
+{{/Files}}
+
+Lade deine Dateien herunter:
+{{CtaUrl}}
+
+Dieser Link läuft in {{ExpiryDays}} Tagen ab.
+
+Um dich abzumelden, antworte auf diese E-Mail oder kontaktiere den Support.

@@ -1,0 +1,66 @@
+{
+  "name": "Link funnel",
+  "id": "d51e1596-5e77-4894-913a-08d4e374d24d",
+  "items": [
+    {
+      "type": "ApplicationInsights.MsQuotedVersionedDashboardItem",
+      "id": "a026bf34-e4b1-4c0a-800f-3fead8471489",
+      "name": "Link funnel events over time",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "colSpan": 6,
+        "rowSpan": 4
+      },
+      "metadata": {
+        "colors": {}
+      },
+      "data": {
+        "baseType": "Timeseries",
+        "type": "applicationInsightsEntityData",
+        "query": "customEvents\n| where name in ('transfer_page_viewed', 'download_started', 'download_completed')\n| summarize count() by bin(timestamp, 1h), name",
+        "title": "Link funnel events over time (24h)"
+      }
+    },
+    {
+      "type": "ApplicationInsights.MsQuotedVersionedDashboardItem",
+      "id": "158652b5-3e24-493d-9f43-f116f97d6fba",
+      "name": "View-to-download conversion",
+      "position": {
+        "x": 6,
+        "y": 0,
+        "colSpan": 3,
+        "rowSpan": 4
+      },
+      "metadata": {
+        "colors": {}
+      },
+      "data": {
+        "baseType": "Number",
+        "type": "applicationInsightsEntityData",
+        "query": "customEvents\n| where name in ('transfer_page_viewed', 'download_started')\n| summarize views = count_if(name == 'transfer_page_viewed'), downloads = count_if(name == 'download_started')\n| extend conversion = 100.0 * downloads / max(views, 1)\n| project conversion",
+        "title": "View-to-download conversion % (24h)"
+      }
+    },
+    {
+      "type": "ApplicationInsights.MsQuotedVersionedDashboardItem",
+      "id": "6513ae9c-5f61-47a8-a5f4-ac8361f1d30a",
+      "name": "Link to download seconds",
+      "position": {
+        "x": 0,
+        "y": 4,
+        "colSpan": 9,
+        "rowSpan": 4
+      },
+      "metadata": {
+        "colors": {}
+      },
+      "data": {
+        "baseType": "Timeseries",
+        "type": "applicationInsightsEntityData",
+        "query": "customMetrics\n| where name == 'link_to_download_seconds'\n| summarize avg(value) by bin(timestamp, 1h)",
+        "title": "Link to download seconds (M0: not emitted yet — renders empty until T-25 emits it)"
+      }
+    }
+  ]
+}

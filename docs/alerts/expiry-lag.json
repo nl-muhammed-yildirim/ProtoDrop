@@ -1,0 +1,36 @@
+{
+  "name": "expiry-lag",
+  "type": "Microsoft.Insights/metricAlerts",
+  "apiVersion": "2018-03-01",
+  "location": "global",
+  "properties": {
+    "description": "TA-10.3 'Expiry lag' (P1): expiry_job_lag_seconds > 1800 (30 min). Custom metric under Azure.ApplicationInsights namespace — verify in wa-dev-ai Metrics explorer before create (namespace registers lazily on first emission). Links to dashboard 'Job health' (id f1c8ca79-7c78-4aad-a512-6051a3bfb327, docs/dashboards/job-health.json). dev: informational (launch traffic is synthetic)",
+    "severity": 0,
+    "enabled": true,
+    "scopes": [
+      "/subscriptions/{SUB}/resourceGroups/rg-wa-dev/providers/Microsoft.Insights/components/wa-dev-ai"
+    ],
+    "evaluationFrequency": "PT1M",
+    "windowSize": "PT5M",
+    "criteria": {
+      "odata.type": "Microsoft.Azure.Monitor.MultipleResourceMultipleMetricCriteria",
+      "allOf": [
+        {
+          "criterionType": "StaticThresholdCriterion",
+          "name": "expiry_job_lag_seconds > 1800",
+          "metricName": "expiry_job_lag_seconds",
+          "metricNamespace": "Azure.ApplicationInsights",
+          "dimensions": [],
+          "operator": "GreaterThan",
+          "threshold": 1800,
+          "timeAggregation": "Average"
+        }
+      ]
+    },
+    "actions": [
+      {
+        "actionGroupId": "/subscriptions/{SUB}/resourceGroups/rg-wa-dev/providers/Microsoft.Insights/actionGroups/wa-dev-alert-emails"
+      }
+    ]
+  }
+}

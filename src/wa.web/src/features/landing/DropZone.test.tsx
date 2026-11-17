@@ -72,4 +72,12 @@ describe('DropZone markup', () => {
     expect(html).toContain('multiple=""')
     expect(html).toContain('aria-label="Upload files"')
   })
+
+  it('shows a visible Choose files button; the input is any-file and multiple (FR-017-2, D-1: no accept)', () => {
+    const html = renderToStaticMarkup(<DropZone />)
+    expect(html).toMatch(/class="btn-primary dz-button"[^>]*>Choose files</)
+    const input = html.match(/<input[^>]*>/)?.[0] ?? ''
+    expect(input).toContain('multiple=""')
+    expect(input).not.toContain('accept=')
+  })
 })

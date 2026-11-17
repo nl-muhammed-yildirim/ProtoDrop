@@ -1,0 +1,66 @@
+{
+  "name": "Email health",
+  "id": "f01b07ee-a968-460f-a180-bf9a2cf7fe70",
+  "items": [
+    {
+      "type": "ApplicationInsights.MsQuotedVersionedDashboardItem",
+      "id": "09b34e6d-fd23-49e7-aa9e-fc0349721e03",
+      "name": "Email sent vs failed",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "colSpan": 6,
+        "rowSpan": 4
+      },
+      "metadata": {
+        "colors": {}
+      },
+      "data": {
+        "baseType": "Timeseries",
+        "type": "applicationInsightsEntityData",
+        "query": "customEvents\n| where name in ('email_sent', 'email_failed')\n| summarize count() by bin(timestamp, 1h), name",
+        "title": "Email sent vs failed per hour (24h)"
+      }
+    },
+    {
+      "type": "ApplicationInsights.MsQuotedVersionedDashboardItem",
+      "id": "70aba03c-5708-45f2-9e22-4e6fb8b9fe03",
+      "name": "DLQ count total",
+      "position": {
+        "x": 6,
+        "y": 0,
+        "colSpan": 3,
+        "rowSpan": 4
+      },
+      "metadata": {
+        "colors": {}
+      },
+      "data": {
+        "baseType": "Number",
+        "type": "applicationInsightsEntityData",
+        "query": "customEvents\n| where name == 'dlq_count'\n| summarize count()",
+        "title": "DLQ count total (24h)"
+      }
+    },
+    {
+      "type": "ApplicationInsights.MsQuotedVersionedDashboardItem",
+      "id": "d5af048f-ce9c-4699-886a-1f4b1e9fe471",
+      "name": "Email failures 1h",
+      "position": {
+        "x": 0,
+        "y": 4,
+        "colSpan": 9,
+        "rowSpan": 4
+      },
+      "metadata": {
+        "colors": {}
+      },
+      "data": {
+        "baseType": "Timeseries",
+        "type": "applicationInsightsEntityData",
+        "query": "customMetrics\n| where name == 'email_failures_1h'\n| summarize avg(value) by bin(timestamp, 1h)",
+        "title": "Email failures 1h (24h)"
+      }
+    }
+  ]
+}

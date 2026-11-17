@@ -1,0 +1,34 @@
+{
+  "name": "5xx-spike",
+  "type": "Microsoft.Insights/scheduledQueryRules",
+  "apiVersion": "2021-08-01",
+  "location": "global",
+  "properties": {
+    "displayName": "5xx spike",
+    "description": "TA-10.3 '5xx spike' (P1): > 5% of requests over 10 min. Built-in AI 'requests' table (resultCode is AI built-in request telemetry via TA-10.5 Serilog -> AI, not a TA-10.2 name). No dedicated API-health dashboard in TA-10.4 \u2014 links to 'Business' (closest live tile, id 3e32757d-996d-4142-a9f6-33cf2e56d051, docs/dashboards/business.json). dev: informational (launch traffic is synthetic)",
+    "enabled": true,
+    "scopes": [
+      "/subscriptions/{SUB}/resourceGroups/rg-wa-dev/providers/Microsoft.Insights/components/wa-dev-ai"
+    ],
+    "severity": 0,
+    "evaluationFrequency": "PT10M",
+    "windowSize": "PT10M",
+    "criteria": {
+      "allOf": [
+        {
+          "query": "requests\n| where timestamp >= ago(10m)\n| summarize total = count(), fiveHundred = count_if(resultCode >= 500)\n| extend pct5xx = 100.0 * fiveHundred / max(total, 1)",
+          "metricMeasureColumn": "pct5xx",
+          "dimensions": [],
+          "operator": "GreaterThan",
+          "threshold": 5,
+          "timeAggregation": "Average"
+        }
+      ]
+    },
+    "actions": {
+      "actionGroups": [
+        "/subscriptions/{SUB}/resourceGroups/rg-wa-dev/providers/Microsoft.Insights/actionGroups/wa-dev-alert-emails"
+      ]
+    }
+  }
+}

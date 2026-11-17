@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import type { DragEvent as ReactDragEvent, FormEvent } from 'react'
 
 import { useUploadEngine } from '../../core/upload/UploadEngine'
+import i18n from '../../core/i18n/init'
+import { toastRole } from '../../core/ui/toastRole'
 
 interface Entry { name: string; size: number; file?: File }
 
@@ -51,13 +53,11 @@ type Toast = string | null
 /** Window paste event as browsers actually emit it; lib.dom's ClipboardEvent omits the key modifiers. */
 interface PasteEventLike { ctrlKey?: boolean; metaKey?: boolean; clipboardData?: DataTransfer | null }
 
-const SKIP_TOAST = 'Some files were skipped'
-const PASTE_TOAST = 'Image added'
 const EMPTY_ITEMS: unknown[] = []
 
-export function DropZone() {
+export function DropZone({ toast }: { toast?: string | null }) {   // T-008-09: app-level post-delete toast (App state survives the unmount)
   const [dragOver, setDragOver] = useState(false)
-  const [toast, setToast] = useState<Toast>(null)
+  const [localToast, setLocalToast] = useState<Toast>(null)
   const timerRef = useRef<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -68,19 +68,19 @@ export function DropZone() {
       if (!pe.ctrlKey && !pe.metaKey) return
       const staged = pastedImages(pe.clipboardData?.items ?? EMPTY_ITEMS)
       stageFiles(staged)
-      if (staged.length) setToast(PASTE_TOAST) // a non-image paste must not clear another visible toast
+      if (staged.length) setLocalToast(i18n.t('landing.dropzone.pasteToast')) // a non-image paste must not clear another visible toast
     }
     window.addEventListener('paste', onPaste)
     return () => { window.removeEventListener('paste', onPaste) }
   }, [])
 
   useEffect(() => {
-    if (!toast) return
-    timerRef.current = window.setTimeout(() => setToast(null), 5000)
+    if (!localToast) return
+    timerRef.current = window.setTimeout(() => setLocalToast(null), 5000)
     return () => {
       if (timerRef.current !== null) window.clearTimeout(timerRef.current)
     }
-  }, [toast])
+  }, [localToast])
 
   function drop(e: ReactDragEvent<HTMLElement>): void {
     e.preventDefault()
@@ -89,7 +89,7 @@ export function DropZone() {
     if (!dt) return
     const result = collectFiles(dt) // DataTransfer is structurally a DropSource (no cast).
     stageFiles(result.entries)
-    if (result.skipped > 0) setToast(SKIP_TOAST)
+    if (result.skipped > 0) setLocalToast(i18n.t('landing.dropzone.skipToast'))
   }
 
   function browse(e: FormEvent<HTMLInputElement>): void {
@@ -101,7 +101,7 @@ export function DropZone() {
     <div
       className={`dz${dragOver ? ' dz-dragover' : ''}`}
       role="button"
-      aria-label="Upload files"
+      aria-label={i18n.t('landing.dropzone.ariaLabel')}
       onClick={() => fileInputRef.current?.click()}
       onDragEnter={(e) => { if (e.dataTransfer) setDragOver(true) }}
       onDragLeave={() => setDragOver(false)}
@@ -116,23 +116,30 @@ export function DropZone() {
           <path d="M4 20h16" />
         </svg>
       </div>
-      <h1 className="dz-title">Send your files.</h1>
-      <p className="dz-secondary">or choose files</p>
+      <h1 className="dz-title">{i18n.t('landing.dropzone.title')}</h1>
+      <p className="dz-secondary">{i18n.t('landing.dropzone.orChooseFiles')}</p>
       <button
         type="button"
         className="btn-primary dz-button"
         onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click() }}
-      >Choose files</button>
+      >{i18n.t('landing.dropzone.chooseFiles')}</button>
       <input
         ref={fileInputRef}
         type="file"
         multiple
-        aria-label="Upload files"
+        aria-label={i18n.t('landing.dropzone.ariaLabel')}
         onChange={browse}
         onClick={(e) => e.stopPropagation()} // programmatic .click() bubbles; stop it from re-entering the zone handler
       />
+      {/* T-016-02 (FR-016-3): toast role from the single-source mapping — info/success toasts are polite status regions. */}
+      {localToast && (
+        <div className="dz-toast" role={toastRole('success')}>
+          {localToast}
+        </div>
+      )}
+      {/* T-008-09 (D-5): app-level post-delete toast — sibling line beside the internal paste/skip toast. */}
       {toast && (
-        <div className="dz-toast" role="status">
+        <div className="dz-toast" role={toastRole('success')}>
           {toast}
         </div>
       )}

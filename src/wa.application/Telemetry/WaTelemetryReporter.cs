@@ -38,6 +38,30 @@ public sealed class WaTelemetryReporter
     public void UploadCompleted(long bytes, long durationMs, int retries) =>
         _logger.LogInformation("upload_completed {bytes} bytes in {durationMs} ms after {retries} retries", bytes, durationMs, retries);
 
+    /// <summary>Emit zip_generated with its two properties — sizeBytes and durationMs (T-004-01).</summary>
+    public void ZipGenerated(long sizeBytes, long durationMs) =>
+        _logger.LogInformation("zip_generated {sizeBytes} bytes in {durationMs} ms", sizeBytes, durationMs);
+
+    /// <summary>Emit expiry_job_lag_seconds metric (TA-10.2). Alert P1 at > 1800s (TA-10.3).</summary>
+    public void ExpiryJobLag(long seconds) =>
+        _logger.LogInformation("expiry_job_lag_seconds {seconds}", seconds);
+
+    /// <summary>Emit email_failures_1h metric (TA-10.2). Alert P2 at > 50/h (TA-10.3).</summary>
+    public void EmailFailures1h() =>
+        _logger.LogInformation("email_failures_1h {count}", 1);
+
+    /// <summary>TA-4.2#11 abuse signal: forgot-password request volume (FR-008-6). TA-9.4: no PII — the counter is just 1.</summary>
+    public void ForgotPasswordRequested() =>
+        _logger.LogInformation("forgot_password_requested {count}", 1);
+
+    /// <summary>Emit storage_bytes_active metric (TA-10.2): the account's active-bytes read as FR-007-4 counts them, feeding the admin storage meter (F-TRF-011-2).</summary>
+    public void StorageBytesActive(long bytes) =>
+        _logger.LogInformation("storage_bytes_active {bytes}", bytes);
+
+    /// <summary>Emit transfer_page_viewed with its one property — the linkId hash (TA-9.4 style: never the raw 8-char id in telemetry; T-003-01). Template text keeps the exact TA-10.2 name first — App Insights queries by it.</summary>
+    public void TransferPageViewed(string linkIdHash) =>
+        _logger.LogInformation("transfer_page_viewed {linkId}", linkIdHash);
+
     // ---- TA-9.4 PII slots — "the reporter's property slots are where those transforms live" ----
 
     /// <summary>TA-9.4: file name → SHA-256 (deterministic). Call this before putting a file name into an event property.</summary>

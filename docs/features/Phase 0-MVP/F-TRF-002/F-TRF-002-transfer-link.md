@@ -84,13 +84,13 @@ AC-002-4: Collision on linkId (astronomically unlikely)
 
 | Story | Task | File | Status |
 |---|---|---|---|
-| US-002-01 | T-002-01 LinkId value object: Crockford base32, 8 chars, retry-once (FR-002-1) | `US-002-01-unique-link/T-002-01-linkid-value-object.md` | ☐ |
-| US-002-01 | T-002-02 Idempotency-Key middleware for finalize + send (TA-4.1.5, EC-002-1) | `US-002-01-unique-link/T-002-02-idempotency-middleware.md` | ☐ |
-| US-002-01 | T-002-03 Link screen: "Your link is ready" + copy field (FR-002-2/3, UI §5.2) | `US-002-01-unique-link/T-002-03-link-screen-copy-field.md` | ☐ |
-| US-002-05 | T-002-04 SendTransferCommand + endpoint 3: activate, recipients, transfer.created (T-011) | `US-002-05-link-only/T-002-04-send-transfer-endpoint.md` | ☐ |
-| US-002-02 | T-002-05 Recipients field: parse, inline validation, MAX_EMAILS cap (FR-002-5) | `US-002-02-send-by-email/T-002-05-recipients-field-ui.md` | ☐ |
-| US-002-03 | T-002-06 Password at send: PBKDF2 hash into Transfer.PasswordHash (FR-002-3/4) | `US-002-03-password/T-002-06-password-hash-send.md` | ☐ |
-| US-002-04 | T-002-07 Sender name + note fields: pre-fill, 500-char counter (FR-002-4) | `US-002-04-sender-note/T-002-07-sender-name-note-ui.md` | ☐ |
+| US-002-01 | T-002-01 LinkId value object: Crockford base32, 8 chars, retry-once (FR-002-1) | `US-002-01-unique-link/T-002-01-linkid-value-object.md` | ☑ 2026-10-16 (35309dc) — status back-filled 2026-11-17 from git history |
+| US-002-01 | T-002-02 Idempotency-Key middleware for finalize + send (TA-4.1.5, EC-002-1) | `US-002-01-unique-link/T-002-02-idempotency-middleware.md` | ☑ 2026-10-16 (6a93b0b) — status back-filled 2026-11-17 from git history |
+| US-002-01 | T-002-03 Link screen: "Your link is ready" + copy field (FR-002-2/3, UI §5.2) | `US-002-01-unique-link/T-002-03-link-screen-copy-field.md` | ☑ 2026-10-17 (76c0082) — status back-filled 2026-11-17 from git history |
+| US-002-05 | T-002-04 SendTransferCommand + endpoint 3: activate, recipients, transfer.created (T-011) | `US-002-05-link-only/T-002-04-send-transfer-endpoint.md` | ☑ 2026-10-17 (11310b4) — status back-filled 2026-11-17 from git history |
+| US-002-02 | T-002-05 Recipients field: parse, inline validation, MAX_EMAILS cap (FR-002-5) | `US-002-02-send-by-email/T-002-05-recipients-field-ui.md` | ☑ 2026-10-17 (5daffcf) — status back-filled 2026-11-17 from git history |
+| US-002-03 | T-002-06 Password at send: PBKDF2 hash into Transfer.PasswordHash (FR-002-3/4) | `US-002-03-password/T-002-06-password-hash-send.md` | ☑ 2026-10-17 (b15a6fd) — status back-filled 2026-11-17 from git history |
+| US-002-04 | T-002-07 Sender name + note fields: pre-fill, 500-char counter (FR-002-4) | `US-002-04-sender-note/T-002-07-sender-name-note-ui.md` | ☑ 2026-10-17 (cdf3748) — status back-filled 2026-11-17 from git history |
 | US-002-05 | T-002-08 "Copy link only" + confirmation screen (FR-002-6/7, AC-002-3) | `US-002-05-link-only/T-002-08-copy-link-only-confirmation.md` | ☑ 2026-10-17 (f4d758f + fix 6ee0a7d, review PASS) |
 
 **Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-011 and T-013 can be marked `done` in `Milestone-Backlog.md`.

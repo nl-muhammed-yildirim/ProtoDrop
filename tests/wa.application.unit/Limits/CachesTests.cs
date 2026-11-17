@@ -142,6 +142,9 @@ public class CachesTests
             if (Throw is not null) return Task.FromException<Plan>(Throw);
             return Task.FromResult(Plan!);
         }
+
+        // T-008-02: by-Id read (returns null or the row; never throws) — new IPlansStore member from the plan.
+        public Task<Plan?> GetByIdAsync(Guid planId, CancellationToken cancellationToken) => Task.FromResult<Plan?>(null);
     }
 
     private sealed class StubFlagsStore : IFlagsStore

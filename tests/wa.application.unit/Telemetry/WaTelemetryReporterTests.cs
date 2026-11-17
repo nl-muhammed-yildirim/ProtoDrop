@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.Extensions.Logging;
 using wa.application.Telemetry;
 using wa.domain.Telemetry;
@@ -52,6 +53,21 @@ public class WaTelemetryReporterTests
         Assert.Equal(new object[] { 123456L, 789L, 2 }, entry.Args); // bytes, durationMs, retries in that order — M.E.L bakes args into FormattedLogValues; extraction below preserves their original order
     }
 
+    // ---- T-014 (TA-4.2#4): transfer_page_viewed carries the linkId hash as its one property (DECISION B) ----
+
+    [Fact]
+    public void TransferPageViewed_EmitsExactNameWithLinkIdHashProperty()
+    {
+        var logger = new RecordingLogger();
+        var reporter = new WaTelemetryReporter(logger, Key);
+
+        reporter.TransferPageViewed("deadbeef"); // the caller passes a PiiTransforms hash — never the raw linkId (TA-9.4 style)
+
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal("transfer_page_viewed deadbeef", entry.RenderedText); // exact template text: the closed-set name + the one {linkId} property (T-014, DECISION B)
+        Assert.Equal(new object[] { "deadbeef" }, entry.Args); // the hash is the only property — never the raw 8-char id (TA-9.4 style)
+    }
+
     // ---- Closed-set gate (EC-056-4: ad-hoc names fail here, not silently later in App Insights) ----
 
     [Fact]
@@ -81,8 +97,58 @@ public class WaTelemetryReporterTests
         Assert.Equal("18b7cb099a9ea3f50ba899b5ba81e0d377a5f3b16f8f6eeb8b3e58cd4692b993", new WaTelemetryReporter(new RecordingLogger(), Key).FileNameSlot("a.txt")); // raw "a.txt" never enters a property
 
     [Fact]
+    public void StorageBytesActive_TemplateIsNamePlusBytesProperty()
+    {
+        // T-007-05 / TA-10.2: storage_bytes_active — App Insights queries by the exact template text (AC-007-2's meter half).
+        var logger = new RecordingLogger();
+        var reporter = new WaTelemetryReporter(logger, Key);
+
+        reporter.StorageBytesActive(5_368_709_120L); // exactly STORAGE_QUOTA Free — an account at 5 GB of 5 GB reads a full meter
+
+        var entry = Assert.Single(logger.Entries);
+        Assert.StartsWith("storage_bytes_active", entry.RenderedText); // the closed name leads the message text — App Insights queries by it (TA-10.2)
+        Assert.Equal("storage_bytes_active 5368709120", entry.RenderedText); // exact template text: the name + the byte count rendered, no other properties (like expiry_job_lag_seconds's {seconds})
+        Assert.Equal(new object[] { 5_368_709_120L }, entry.Args); // the byte count is the only property — long-typed, no decimals
+
+        // Closed-set gate: storage_bytes_active stays a metric (same pipeline), not an event.
+        Assert.False(TelemetryEvents.IsEvent(TelemetryEvents.StorageBytesActive));
+        Assert.Equal(30, TelemetryEvents.AllNames().Count); // closed-set count unchanged — matches wa.domain.unit's ConstMembers pin (23 events + 7 metrics)
+    }
+
+    [Fact]
     public void IpSlot_ReturnsTheKeyedHmacTransform_NotTheRawIp() =>
         Assert.Equal("0ee7d12715e0fe81319cd148d4b43302ac231095c09642949a3660c8c664faea", new WaTelemetryReporter(new RecordingLogger(), Key).IpSlot("10.0.0.1")); // keyed by the ctor key — same vector as wa.domain.unit's PiiTransforms tests
+
+    // ---- T-012-05 (EC-012-3 / AC-012-3): file name hashed, no raw name or secret in any property; no silent new raw-string property ----
+
+    [Fact]
+    public void FileName_ThroughSlotIntoProperty_EmitsOnlyTheSha256_NeverTheRawName()
+    {
+        var logger = new RecordingLogger();
+        var reporter = new WaTelemetryReporter(logger, Key);
+
+        reporter.TransferPageViewed(reporter.FileNameSlot("Quarterly Report.pdf")); // the only sanctioned route for a file name into a property (TA-9.4)
+
+        var entry = Assert.Single(logger.Entries);
+        var arg = Assert.IsType<string>(Assert.Single(entry.Args));
+        Assert.Equal(PiiTransforms.FileName("Quarterly Report.pdf"), arg); // the property IS the SHA-256 transform
+        Assert.Matches("^[0-9a-f]{64}$", arg); // 64 lowercase hex chars
+        Assert.DoesNotContain("Quarterly", entry.RenderedText); // AC-012-3: no raw name in the rendered event
+        Assert.DoesNotContain("Quarterly", arg); // ...nor in any property
+    }
+
+    [Fact]
+    public void StringParameters_AreAClosedSetOfSlots_NoNewRawStringProperty()
+    {
+        var actual = typeof(WaTelemetryReporter)
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .SelectMany(m => m.GetParameters().Where(p => p.ParameterType == typeof(string)).Select(p => $"{m.Name}.{p.Name}"))
+            .OrderBy(s => s, StringComparer.Ordinal)
+            .ToArray();
+
+        // EC-012-3: a new string-typed reporter parameter is a potential raw-PII property. Route PII through FileNameSlot/IpSlot (TA-9.4) and update STRING_SLOT_METHODS in scripts/check-telemetry-pii.mjs.
+        Assert.Equal(new[] { "FileNameSlot.fileName", "IpSlot.ip", "LogEvent.eventName", "TransferPageViewed.linkIdHash" }, actual);
+    }
 }
 
 /// <summary>Records exactly what M.E.L hands to a logger: the rendered text + any pre-formatted args (M.E.L's typed LogInformation overloads bake arguments into state via FormattableStringFactory, so this is what Serilog/App Insights also receive).</summary>

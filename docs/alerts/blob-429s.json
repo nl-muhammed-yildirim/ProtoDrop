@@ -1,0 +1,46 @@
+{
+  "name": "blob-429s",
+  "type": "Microsoft.Insights/metricAlerts",
+  "apiVersion": "2018-03-01",
+  "location": "global",
+  "properties": {
+    "description": "TA-10.3 'Blob 429s' (P2): storage 429 rate > 10/min. Platform metric Transactions on Microsoft.Storage/storageAccounts, filtered to the ResponseType throttling values (ClientAccountRequestThrottlingError / ClientAccountBandwidthThrottlingError / ClientThrottlingError = HTTP 429; OR across values per metricAlerts@2018-03-01 dimensions schema) \u2014 no code change. Deliberately has NO dashboard link (task file permits 'Business or none'; choice: none). Confirm actual dev storage name via az storage account list --resource-group rg-wa-dev (TA-11.1 says wa-{env}-blob). dev: informational (launch traffic is synthetic)",
+    "severity": 1,
+    "enabled": true,
+    "scopes": [
+      "/subscriptions/{SUB}/resourceGroups/rg-wa-dev/providers/Microsoft.Storage/storageAccounts/wa-dev-blob"
+    ],
+    "evaluationFrequency": "PT1M",
+    "windowSize": "PT1M",
+    "criteria": {
+      "odata.type": "Microsoft.Azure.Monitor.MultipleResourceMultipleMetricCriteria",
+      "allOf": [
+        {
+          "criterionType": "StaticThresholdCriterion",
+          "name": "Throttled transactions > 10",
+          "metricName": "Transactions",
+          "metricNamespace": "Microsoft.Storage/storageAccounts",
+          "dimensions": [
+            {
+              "name": "ResponseType",
+              "operator": "Include",
+              "values": [
+                "ClientAccountRequestThrottlingError",
+                "ClientAccountBandwidthThrottlingError",
+                "ClientThrottlingError"
+              ]
+            }
+          ],
+          "operator": "GreaterThan",
+          "threshold": 10,
+          "timeAggregation": "Average"
+        }
+      ]
+    },
+    "actions": [
+      {
+        "actionGroupId": "/subscriptions/{SUB}/resourceGroups/rg-wa-dev/providers/Microsoft.Insights/actionGroups/wa-dev-alert-emails"
+      }
+    ]
+  }
+}

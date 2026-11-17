@@ -813,7 +813,7 @@ Admin endpoints reject non-admins with `FORBIDDEN`.
 
 ### TA-10.2 Telemetry contract (only these; names are code)
 
-**Events** (App Insights, custom): `upload_started`, `upload_completed` (bytes, durationMs, retries), `upload_failed`, `transfer_page_viewed`, `transfer_not_found`, `password_correct`, `password_wrong`, `download_started`, `download_completed`, `zip_generated`, `zip_failed`, `email_sent`, `email_failed`, `user_created`, `login_success`, `login_failed`, `account_deleted`, `plan_changed`, `translation_missing`, `admin_action`, `dlq_count`.
+**Events** (App Insights, custom): `upload_started`, `upload_completed` (bytes, durationMs, retries), `upload_failed`, `growth_cta_shown`, `growth_cta_clicked`, `transfer_page_viewed`, `transfer_not_found`, `password_correct`, `password_wrong`, `download_started`, `download_completed`, `zip_generated`, `zip_failed`, `email_sent`, `email_failed`, `user_created`, `login_success`, `login_failed`, `account_deleted`, `plan_changed`, `translation_missing`, `admin_action`, `dlq_count`.
 
 **Metrics** (custom): `upload.success_rate` (5-min), `link_to_download_seconds`, `expiry_job_lag_seconds`, `email_failures_1h`, `active_transfers`, `storage_bytes_active`, `api.requests{status}`.
 
@@ -1022,6 +1022,8 @@ The table below is canonical. Full ADR files land in `docs/adr/` when an ADR is 
 | ADR-014 | Monorepo (`src/` + `web/` + `infra/` + `tests/`) | Polyrepo per service | One CI, atomic schema+API changes |
 | ADR-015 | **Clean (onion) architecture**: `wa.domain → wa.application → wa.infrastructure → wa.api / wa.workers`; EF confined to `wa.infrastructure/Persistence` (new v0.2) | Flat `wa.core`; 2-project core | Ports/adapters make each layer testable; EF never leaks to domain/use cases |
 | ADR-016 | **CQRS via MediatR 12.5**: one `IRequest`/handler per use case in `wa.application/UseCases/`; domain events via `IEventPublisher` (MediatR-free) (new v0.2) | MediatR `INotification` domain events; custom home-grown mediator | Frozen, known API; pipeline owns cross-cutting; 12.5 is the last stable line before 13.x breaking changes |
+| ADR-017 | Azure.Communication.Email SDK for f-email sender (v1.1.0) | Direct SMTP; SendGrid; raw REST calls | Azure-native (ADR-011), typed SDK, per-recipient attrs for i18n later |
+| ADR-018 | Stubble.Core for email template rendering (v1.10.8) | Razor templates; inline strings in code | Mustache is simple enough for M0 single-language; file-based templates live in Emails/templates/ (TA-6.7) |
 
 ---
 

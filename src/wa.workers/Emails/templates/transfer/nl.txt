@@ -1,0 +1,15 @@
+Hallo,
+
+{{SenderName}} heeft bestanden met je gedeeld.
+
+Bestanden:
+{{#Files}}
+- {{Name}} ({{Size}})
+{{/Files}}
+
+Download je bestanden:
+{{CtaUrl}}
+
+Deze link verloopt over {{ExpiryDays}} dagen.
+
+Om je af te melden, antwoord op deze e-mail of neem contact op met de ondersteuning.

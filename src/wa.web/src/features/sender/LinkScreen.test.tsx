@@ -97,6 +97,58 @@ describe('LinkScreen', () => {
     host.remove()
   })
 
+  it('mount focuses the Copy button (T-016-03 D-7)', () => {
+    const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g', transferId: '1' }))
+    expect(document.activeElement).toBe(host.querySelector('.ls-copy-btn'))   // ready-state Copy is the mount-focus target.
+    host.remove()
+  })
+
+  it('sender email error links via aria-describedby (T-016-03 EC-016-4)', () => {
+    const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g', transferId: '1' }))
+    const emailInput = host.querySelector('#sender-email') as HTMLInputElement
+
+    // No error yet — no describedby.
+    expect(emailInput.getAttribute('aria-describedby')).toBeNull()
+
+    const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    act(() => {
+      nativeSetter.call(emailInput, 'not-an-email')
+      emailInput.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    act(() => {
+      emailInput.dispatchEvent(new FocusEvent('blur'))   // blur triggers validation.
+    })
+
+    expect(host.querySelector('#sender-email-error')).not.toBeNull()   // the error region exists.
+    expect(emailInput.getAttribute('aria-describedby')).toBe('sender-email-error')
+    host.remove()
+  })
+
+  it('recipients summary renders with count when invalid addresses present (T-016-03 EC-016-4)', () => {
+    const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g', transferId: '1' }))
+    const textarea = host.querySelector('#recipients-textarea') as HTMLTextAreaElement
+
+    // No invalid addresses yet — no summary.
+    expect(host.querySelector('#recipients-error-summary')).toBeNull()
+    expect(textarea.getAttribute('aria-describedby')).toBeNull()
+
+    const nativeSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+    act(() => {
+      nativeSetter.call(textarea, 'bad-address\nok@x.com')
+      textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    act(() => {
+      textarea.dispatchEvent(new FocusEvent('blur'))   // blur triggers validation.
+    })
+
+    const summary = host.querySelector('#recipients-error-summary') as HTMLElement
+    expect(summary).not.toBeNull()
+    expect(summary.getAttribute('role')).toBe('alert')
+    expect(summary.textContent!.trim()).toContain('1 recipient address(es) have errors')   // count interpolated (en default).
+    expect(textarea.getAttribute('aria-describedby')).toBe('recipients-error-summary')
+    host.remove()
+  })
+
   it('renders the recipients textarea with helper text', () => {
     const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g', transferId: '1' }))
     const textarea = host.querySelector('.ls-recipients-textarea') as HTMLTextAreaElement
@@ -434,5 +486,110 @@ describe('LinkScreen', () => {
       expect(findButton(host, 'Send transfer')!.disabled).toBe(true)
       host.remove()
     })
+  })
+
+  // ---- T-010-03 (FR-010-2/4): re-send pre-fill props — banner, pre-filled fields, password field ----
+
+  it('AC-010-2 client: initialRecipients/initialNote pre-fill the form (editable)', () => {
+    const host = renderClient(createElement(LinkScreen, {
+      linkId: 'Ab3dEf5g', transferId: '1',
+      initialRecipients: 'a@x.com\nb@y.com',
+      initialNote: 'Original note',
+    }))
+    const textarea = host.querySelector('.ls-recipients-textarea') as HTMLTextAreaElement
+    expect(textarea.value).toBe('a@x.com\nb@y.com')
+    const note = host.querySelector('#note-textarea') as HTMLTextAreaElement
+    expect(note.value).toBe('Original note')
+    host.remove()
+  })
+
+  it('AC-010-2 client: sentHeading overrides the confirmation heading', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, writable: true })
+    stubSendFetch(201)
+
+    const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g', transferId: '1', sentHeading: 'New link ready.' }))
+    const copyOnly = host.querySelector('.ls-copyonly-btn') as HTMLButtonElement
+    await act(async () => { copyOnly.click() })
+
+    expect(host.innerHTML).toContain('New link ready.')
+    host.remove()
+  })
+
+  it('EC-010-3: banner shows first file + "and N more files" for multi-file re-sends', () => {
+    const host = renderClient(createElement(LinkScreen, {
+      linkId: 'Ab3dEf5g', transferId: '1',
+      bannerFiles: { firstFile: 'a.txt', count: 3 },
+    }))
+    const banner = host.querySelector('.ls-banner') as HTMLElement
+    expect(banner).not.toBeNull()
+    expect(banner.textContent).toBe("Re-sending 'a.txt' and 2 more files. You can change the details before sending.")
+    host.remove()
+  })
+
+  it('EC-010-3: banner shows single file without "and N more" for count=1', () => {
+    const host = renderClient(createElement(LinkScreen, {
+      linkId: 'Ab3dEf5g', transferId: '1',
+      bannerFiles: { firstFile: 'a.txt', count: 1 },
+    }))
+    const banner = host.querySelector('.ls-banner') as HTMLElement
+    expect(banner).not.toBeNull()
+    expect(banner.textContent).toBe("Re-sending 'a.txt'. You can change the details before sending.")
+    host.remove()
+  })
+
+  it('FR-010-2: password field starts empty; label notes a password was set on the original', () => {
+    const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g', transferId: '1', passwordRequired: true }))
+    const input = host.querySelector('#link-password') as HTMLInputElement
+    expect(input).not.toBeNull()
+    expect(input.value).toBe('')
+    const label = host.querySelector('.ls-password-field label') as HTMLElement
+    expect(label.textContent).toContain('Password (was set on original)')
+    host.remove()
+  })
+
+  it('FR-010-2: password field renders without suffix when passwordRequired is false', () => {
+    const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g', transferId: '1', passwordRequired: false }))
+    const input = host.querySelector('#link-password') as HTMLInputElement
+    expect(input).not.toBeNull()
+    const label = host.querySelector('.ls-password-field label') as HTMLElement
+    expect(label.textContent).toBe('Password')
+    host.remove()
+  })
+
+  it('FR-010-2: show/hide toggle switches input type and label', () => {
+    const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g', transferId: '1', passwordRequired: true }))
+    const input = host.querySelector('#link-password') as HTMLInputElement
+    const toggle = host.querySelector('.ls-password-toggle') as HTMLButtonElement
+    expect(input.type).toBe('password')
+    expect(toggle.textContent).toBe('Show')
+
+    act(() => { toggle.click() })
+    expect(input.type).toBe('text')
+    expect(toggle.textContent).toBe('Hide')
+
+    act(() => { toggle.click() })
+    expect(input.type).toBe('password')
+    host.remove()
+  })
+
+  it('FR-010-2: send body includes the password when set, omits it when empty', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, writable: true })
+    const calls = stubSendFetch(201)
+
+    const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g', transferId: '1', passwordRequired: true }))
+    const input = host.querySelector('#link-password') as HTMLInputElement
+    const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    act(() => {
+      nativeSetter.call(input, 's3cret')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    const copyOnly = host.querySelector('.ls-copyonly-btn') as HTMLButtonElement
+    await act(async () => { copyOnly.click() })
+
+    const body = JSON.parse(calls[0].body) as { password?: string }
+    expect(body.password).toBe('s3cret')
+    host.remove()
   })
 })

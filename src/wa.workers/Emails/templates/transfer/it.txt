@@ -1,0 +1,15 @@
+Ciao,
+
+{{SenderName}} ha condiviso dei file con te.
+
+File:
+{{#Files}}
+- {{Name}} ({{Size}})
+{{/Files}}
+
+Scarica i tuoi file:
+{{CtaUrl}}
+
+Questo link scade tra {{ExpiryDays}} giorni.
+
+Per annullare l'iscrizione, rispondi a questa e-mail o contatta il supporto.

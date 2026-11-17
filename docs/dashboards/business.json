@@ -1,0 +1,85 @@
+{
+  "name": "Business",
+  "id": "3e32757d-996d-4142-a9f6-33cf2e56d051",
+  "items": [
+    {
+      "type": "ApplicationInsights.MsQuotedVersionedDashboardItem",
+      "id": "ee2bd979-18f7-403a-a697-8eadcb1f1718",
+      "name": "Transfers per day proxy",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "colSpan": 6,
+        "rowSpan": 4
+      },
+      "metadata": {
+        "colors": {}
+      },
+      "data": {
+        "baseType": "Timeseries",
+        "type": "applicationInsightsEntityData",
+        "query": "customEvents\n| where name == 'user_created'\n| where timestamp > ago(30d)\n| summarize count() by bin(timestamp, 1d)",
+        "title": "Transfers/day proxy (M0: user_created is the closed-set proxy — no transfer-created event/metric yet)"
+      }
+    },
+    {
+      "type": "ApplicationInsights.MsQuotedVersionedDashboardItem",
+      "id": "2075b74f-1a6a-4e7e-81e8-0d248c05d0c3",
+      "name": "Storage bytes active",
+      "position": {
+        "x": 6,
+        "y": 0,
+        "colSpan": 3,
+        "rowSpan": 4
+      },
+      "metadata": {
+        "colors": {}
+      },
+      "data": {
+        "baseType": "Number",
+        "type": "applicationInsightsEntityData",
+        "query": "customMetrics\n| where name == 'storage_bytes_active'\n| take 1 by timestamp desc",
+        "title": "Storage bytes active (last value)"
+      }
+    },
+    {
+      "type": "ApplicationInsights.MsQuotedVersionedDashboardItem",
+      "id": "72c10c4e-e9e8-4cb2-b71c-f5c74d6a6b4c",
+      "name": "Active transfers",
+      "position": {
+        "x": 9,
+        "y": 0,
+        "colSpan": 3,
+        "rowSpan": 4
+      },
+      "metadata": {
+        "colors": {}
+      },
+      "data": {
+        "baseType": "Number",
+        "type": "applicationInsightsEntityData",
+        "query": "customMetrics\n| where name == 'active_transfers'\n| summarize avg(value)",
+        "title": "Active transfers (M0: not emitted yet — renders empty until T-25)"
+      }
+    },
+    {
+      "type": "ApplicationInsights.MsQuotedVersionedDashboardItem",
+      "id": "26196454-e984-4a23-a956-fbc715b5c1e0",
+      "name": "Plan mix placeholder",
+      "position": {
+        "x": 0,
+        "y": 4,
+        "colSpan": 12,
+        "rowSpan": 3
+      },
+      "metadata": {
+        "colors": {}
+      },
+      "data": {
+        "type": "applicationInsightsEntityData",
+        "baseType": "Text",
+        "text": "Plan mix (P1-ready — no plan data emitted at M0; D-05 plans Free/Pro/Business, plan_changed events exist in TA-10.2 but no billing rows yet)"
+      }
+    }
+  ]
+}

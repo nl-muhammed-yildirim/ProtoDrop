@@ -1,0 +1,15 @@
+Bonjour,
+
+{{SenderName}} a partagé des fichiers avec vous.
+
+Fichiers:
+{{#Files}}
+- {{Name}} ({{Size}})
+{{/Files}}
+
+Téléchargez vos fichiers:
+{{CtaUrl}}
+
+Ce lien expire dans {{ExpiryDays}} jours.
+
+Pour vous désabonner, répondez à cet e-mail ou contactez le support.
