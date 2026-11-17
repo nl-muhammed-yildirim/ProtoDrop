@@ -8,9 +8,10 @@
  *   1. height floor  - max(min-height, height) over the element's classes >= 44 px; no class may declare height < 44 px.
  *   2. width floor   - an explicit width/min-width < 44 px with no class giving >= 44 px.
  *   3. font floor    - input/select/textarea must declare font-size >= 16 px (iOS focus zoom).
- *   4. hover reveal  - a :hover rule must not set display / visibility / opacity: 0 (FR-017-5).
+ *   4. hover reveal  - a :hover rule must not set display / visibility, opacity: 0, or opacity >= 1 (reveal) (FR-017-5).
  *   5. unclassed interactive element -> cannot verify.
- * Limitations: ignores selector specificity / ancestors; runtime computed styles are T-017-04's Playwright job.
+ * Limitations: ignores selector specificity / ancestors; descendant/compound selectors are credited to their last class;
+ *   capitalised JSX components are not scanned (their rendered host element is); runtime computed styles are T-017-04's Playwright job.
  * Run from repo root `node scripts/check-tap-targets.mjs` or from src/wa.web via `npm run lint`.
  */
 
@@ -96,7 +97,7 @@ for (const r of rules) {
   for (const sel of r.selectors) {
     if (sel.includes(':hover')) {
       const d = r.decls
-      if ('display' in d || 'visibility' in d || /^0(\.0+)?$/.test(d.opacity ?? '')) {
+      if ('display' in d || 'visibility' in d || /^0(\.0+)?$/.test(d.opacity ?? '') || ('opacity' in d && Number.parseFloat(d.opacity) >= 1)) {
         violations.push(`css: "${sel}" reveals/hides content on :hover (FR-017-5)`)
       }
       continue
