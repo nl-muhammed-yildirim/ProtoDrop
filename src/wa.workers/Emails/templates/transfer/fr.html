@@ -39,9 +39,11 @@
                                 Ce lien expire dans {{ExpiryDays}} jours.
                             </p>
 
+                            {{#HasUnsubscribeUrl}}
                             <p style="margin: 16px 0 0 0; font-size: 12px; color: #999999; text-align: center;">
-                                <a href="#" style="color: #999999; text-decoration: underline;">Se désabonner</a>
+                                <a href="{{UnsubscribeUrl}}" style="color: #999999; text-decoration: underline;">Se désabonner</a>
                             </p>
+                            {{/HasUnsubscribeUrl}}
                         </td>
                     </tr>
                 </table>

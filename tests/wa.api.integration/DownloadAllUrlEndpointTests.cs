@@ -179,6 +179,48 @@ public class DownloadAllUrlEndpointTests : IAsyncLifetime
         Assert.Equal(2, await freshDb.Set<DownloadEvent>().CountAsync(e => e.TransferId == transferId)); // exactly the two successful rows
     }
 
+    // ---- T-003-10 (AC-003-5): the app's singleton context TRACKS the transfer (post-finalize state) - zip cap flip must detach, not delete ----
+
+    [Fact]
+    public async Task CapReached_TrackedInAppContext_Returns410_AndContextStaysHealthy()
+    {
+        await using var factory = new TestFactory();
+        using var client = factory.CreateClient();
+        var appDb = factory.Services.GetRequiredService<WaDbContext>();
+
+        var a = await SeedTrackedInAppContextAsync(appDb, maxDownloads: 1);
+        await UploadZipBlobAsync(a.TransferId, [1, 2, 3]);
+
+        using (var ok = await client.GetAsync($"/api/v1/public/transfers/{a.LinkId}/download-all-url"))
+            Assert.Equal(HttpStatusCode.OK, ok.StatusCode); // 0 -> 1
+
+        using var atCap = await client.GetAsync($"/api/v1/public/transfers/{a.LinkId}/download-all-url");
+        Assert.Equal(HttpStatusCode.Gone, atCap.StatusCode); // 410, never the "association severed" 500
+        using (var doc = JsonDocument.Parse(await atCap.Content.ReadAsByteArrayAsync()))
+        {
+            Assert.Equal(ProblemCodes.MaxDownloadsReached, doc.RootElement.GetProperty("code").GetString());
+            Assert.Equal(410, doc.RootElement.GetProperty("status").GetInt32());
+        }
+
+        Assert.DoesNotContain(appDb.ChangeTracker.Entries(), e => e.State == EntityState.Deleted);
+
+        // Follow-up write through the same context (another transfer's mint -> SaveChanges) stays healthy.
+        var bLink = wa.domain.ValueObjects.LinkId.Mint().Value;
+        var bId = await SeedTransferAsync(status: 1, linkId: bLink, maxDownloads: 5);
+        await SeedFileItemsAsync(bId, [(Guid.NewGuid(), "b.txt", 10L)]);
+        await UploadZipBlobAsync(bId, [1, 2, 3]);
+        using (var okB = await client.GetAsync($"/api/v1/public/transfers/{bLink}/download-all-url"))
+            Assert.Equal(HttpStatusCode.OK, okB.StatusCode);
+
+        using var ep4 = await client.GetAsync($"/api/v1/public/transfers/{a.LinkId}");
+        Assert.Equal(HttpStatusCode.Gone, ep4.StatusCode);
+
+        using var freshDb = FreshDb();
+        var capped = await freshDb.Set<Transfer>().AsNoTracking().FirstAsync(t => t.Id == a.TransferId);
+        Assert.Equal(3, capped.Status);
+        Assert.Equal(1, capped.DownloadsCount);
+    }
+
     // ---- Exit check 4: Zip doesn't exist → 202 { pollAfterSec } (trigger f-zip generation) ----
 
     [Fact]
@@ -339,6 +381,47 @@ public class DownloadAllUrlEndpointTests : IAsyncLifetime
         transfer.FileCount = files.Length;
         transfer.TotalBytes = files.Sum(f => f.sizeBytes);
         await _db.SaveChangesAsync();
+    }
+
+    /// <summary>T-003-10: seed Transfer + BlobRef + FileItem through the APP's singleton context in ONE SaveChanges, so all three stay tracked Unchanged (the post-finalize state).</summary>
+    private static async Task<(Guid TransferId, string LinkId)> SeedTrackedInAppContextAsync(WaDbContext appDb, int maxDownloads)
+    {
+        var transferId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var linkId = wa.domain.ValueObjects.LinkId.Mint().Value;
+        var blobRef = new BlobRef
+        {
+            Id = Guid.NewGuid(),
+            BlobPath = BlobPaths.TransferFile(transferId, fileId),
+            SizeBytes = 10L,
+            RefCount = 1,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+        appDb.Set<Transfer>().Add(new Transfer
+        {
+            Id = transferId,
+            LinkId = linkId,
+            Status = 1,
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+            MaxDownloads = maxDownloads,
+            SenderName = "Alice",
+            TotalBytes = 10L,
+            FileCount = 1,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        appDb.Set<BlobRef>().Add(blobRef);
+        appDb.Set<FileItem>().Add(new FileItem
+        {
+            Id = fileId,
+            TransferId = transferId,
+            BlobRefId = blobRef.Id,
+            OriginalName = "tracked.txt",
+            SizeBytes = 10L,
+            ContentType = "text/plain",
+            SortOrder = 0
+        });
+        await appDb.SaveChangesAsync();
+        return (transferId, linkId);
     }
 
     /// <summary>Upload zip blob bytes to the canonical transfer-zip path (TA-3.5) — endpoint 7's SAS streams from here.</summary>

@@ -24,23 +24,23 @@ Status: `pending` → `done` (date). `CURRENT` = first non-done task.
 
 | ID | Scope | Spec links | Exit check | Status |
 |---|---|---|---|---|
-| T-009 | `CreateDraftCommand` + endpoint 1: draft creation, per-file `cwr` SAS | F-TRF-001, TA-4.2#1, TA-7.1 | AC-001-2 (limit pre-check at API), integration test: draft → SAS upload → blob exists | pending |
-| T-010 | `FinalizeTransferCommand` + endpoint 2: idempotency, server-side blob copy, `Transfer(0)` + `FileItem` + `BlobRef`, `upload_completed` | F-TRF-001, F-TRF-002, TA-4.2#2, TA-7.1 | AC-001-1, AC-002-4 (collision), EC-002-1 (idempotency replay returns same transfer) | pending |
-| T-011 | `SendTransferCommand` + endpoint 3: emails validation/normalization, password hashing, `ExpiresAt = now + RETENTION_DAYS`, `transfer.created` | F-TRF-002, F-TRF-006-3/7, TA-4.2#3 | AC-002-1…002-3; `transfer.created` payload matches TA-5.3 | pending |
-| T-012 | Landing page (upload surface): drop zone, file list, per-file/overall progress via UploadEngine, pre-checks, toasts, "Send." button | F-TRF-001, TA-8.3, UI-Reference screens 1 | AC-001-1…001-4 in browser (Playwright manual pass); block-level retry on injected failure | pending |
-| T-013 | Sender link screen + send form + confirmation screen: copy field, emails, password, note, "Send transfer", `/t/{linkId}/sent` | F-TRF-002, UI-Reference screens 2–3 | Manual pass: full guest flow end-to-end in dev (draft→finalize→send→copy) | pending |
+| T-009 | `CreateDraftCommand` + endpoint 1: draft creation, per-file `cwr` SAS | F-TRF-001, TA-4.2#1, TA-7.1 | AC-001-2 (limit pre-check at API), integration test: draft → SAS upload → blob exists | done 2026-10-14 (F-TRF-001 T-001-05 f28007f; status back-filled 2026-11-17) |
+| T-010 | `FinalizeTransferCommand` + endpoint 2: idempotency, server-side blob copy, `Transfer(0)` + `FileItem` + `BlobRef`, `upload_completed` | F-TRF-001, F-TRF-002, TA-4.2#2, TA-7.1 | AC-001-1, AC-002-4 (collision), EC-002-1 (idempotency replay returns same transfer) | done 2026-10-16 (F-TRF-001 T-001-10 5ec7973 + F-TRF-002 T-002-01/02; status back-filled 2026-11-17) |
+| T-011 | `SendTransferCommand` + endpoint 3: emails validation/normalization, password hashing, `ExpiresAt = now + RETENTION_DAYS`, `transfer.created` | F-TRF-002, F-TRF-006-3/7, TA-4.2#3 | AC-002-1…002-3; `transfer.created` payload matches TA-5.3 | done 2026-10-17 (F-TRF-002 T-002-04/06 11310b4, b15a6fd; status back-filled 2026-11-17) |
+| T-012 | Landing page (upload surface): drop zone, file list, per-file/overall progress via UploadEngine, pre-checks, toasts, "Send." button | F-TRF-001, TA-8.3, UI-Reference screens 1 | AC-001-1…001-4 in browser (Playwright manual pass); block-level retry on injected failure | done 2026-10-15 (F-TRF-001 T-001-01…09, E2E 7724ec0; status back-filled 2026-11-17) |
+| T-013 | Sender link screen + send form + confirmation screen: copy field, emails, password, note, "Send transfer", `/t/{linkId}/sent` | F-TRF-002, UI-Reference screens 2–3 | Manual pass: full guest flow end-to-end in dev (draft→finalize→send→copy) | done 2026-10-17 (F-TRF-002 T-002-03/05/07/08; status back-filled 2026-11-17) |
 
 ## M2 — Download, Expiry, Email
 
 | ID | Scope | Spec links | Exit check | Status |
 |---|---|---|---|---|
-| T-014 | Recipient page: endpoint 4, file list, status screens (active/expired/not-found/download-limit), `downloadsLeft` | F-TRF-003, TA-4.2#4, TA-7.2 | AC-003-1, AC-003-3, AC-003-4 (404 vs 410 bodies identical) | pending |
-| T-015 | Password gate: endpoint 5 unlock JWT, sessionStorage token, wrong-password shake + telemetry | F-TRF-003-6, TA-4.2#5, TA-9.1 | AC-003-2 (refresh does not re-prompt); `password_correct/wrong` events | pending |
-| T-016 | Download URLs: endpoint 6 single-file SAS (30 min), `DownloadsCount` increment + `DownloadEvent`, download-cap check (`Status=3`) | F-TRF-003, TA-4.2#6, TA-7.2 | AC-003-5; Range-resume works on a 500 MB blob (EC-003-1) | pending |
+| T-014 | Recipient page: endpoint 4, file list, status screens (active/expired/not-found/download-limit), `downloadsLeft` | F-TRF-003, TA-4.2#4, TA-7.2 | AC-003-1, AC-003-3, AC-003-4 (404 vs 410 bodies identical) | done 2026-10-18 (F-TRF-003 T-003-01…04; status back-filled 2026-11-17) |
+| T-015 | Password gate: endpoint 5 unlock JWT, sessionStorage token, wrong-password shake + telemetry | F-TRF-003-6, TA-4.2#5, TA-9.1 | AC-003-2 (refresh does not re-prompt); `password_correct/wrong` events | done 2026-10-19 (F-TRF-003 T-003-04/05; status back-filled 2026-11-17) |
+| T-016 | Download URLs: endpoint 6 single-file SAS (30 min), `DownloadsCount` increment + `DownloadEvent`, download-cap check (`Status=3`) | F-TRF-003, TA-4.2#6, TA-7.2 | AC-003-5; Range-resume works on a 500 MB blob (EC-003-1) | done 2026-10-20 (F-TRF-003 T-003-06 + T-003-09 Range-resume E2E; status back-filled 2026-11-17) |
 | T-017 | Download-all: endpoint 7 + `f-zip` function (streaming, cap, `_1`/`_2` de-dup, 202 polling, `zip.generated`) | F-TRF-004, TA-6.6, TA-4.2#7 | AC-004-1 (exactly one zip), AC-004-2 (cap hidden), EC-004-1/2 | done |
-| T-018 | Expiry jobs: `f-expire` + `f-delete-transfers` + `f-delete-blobs` with `JobRun` claim; RefCount decrement; `transfer.expired`/`transfer.deleted` | F-TRF-005, TA-6.3–6.5, TA-7.4 | AC-005-1…005-3; double-run idempotency test | pending |
-| T-019 | Email: `f-email` (Stubble templates, CH sender, retry/DLQ), unsubscribe + `EmailSuppression`, i18n template selection | F-TRF-006, TA-6.7 | AC-006-1…006-3; dev: log-only sender switch visible | pending |
-| T-020 | Free-tier limits end-to-end: server-side enforcement at finalize/send, storage quota check, "limit reached" screens, flag-driven values | F-TRF-007, TA-3.4 | AC-007-1…007-2; quota meter visible in admin overview | pending |
+| T-018 | Expiry jobs: `f-expire` + `f-delete-transfers` + `f-delete-blobs` with `JobRun` claim; RefCount decrement; `transfer.expired`/`transfer.deleted` | F-TRF-005, TA-6.3–6.5, TA-7.4 | AC-005-1…005-3; double-run idempotency test | done 2026-10-23 (F-TRF-005 T-005-01…04; status back-filled 2026-11-17) |
+| T-019 | Email: `f-email` (Stubble templates, CH sender, retry/DLQ), unsubscribe + `EmailSuppression`, i18n template selection | F-TRF-006, TA-6.7 | AC-006-1…006-3; dev: log-only sender switch visible | done 2026-11-17 (F-TRF-006 T-006-01…05; exit check via T-006-05 EmailLogSenderE2ETests — AC-006-1/3 + log switch; AC-006-2 retry/DLQ via T-006-02; 1k burst moved to T-029) |
+| T-020 | Free-tier limits end-to-end: server-side enforcement at finalize/send, storage quota check, "limit reached" screens, flag-driven values | F-TRF-007, TA-3.4 | AC-007-1…007-2; quota meter visible in admin overview | done 2026-10-27 (F-TRF-007 T-007-01…06; quota meter on admin overview via F-TRF-011; status back-filled 2026-11-17) |
 
 ## M3 — Accounts, My Files, Re-send, Admin
 
@@ -59,7 +59,7 @@ Status: `pending` → `done` (date). `CURRENT` = first non-done task.
 | T-026 | i18n full pass: 8 locales, detection, fallback + `translation_missing`, localized emails | F-TRF-014, TA-8.5 | AC-014-1…014-2; no hardcoded strings (lint) | done 2026-11-12 (feature-end gate: domain.unit 63/63 · application.unit 368/368 · api.integration 103/103 Testcontainers · wa.web lint clean + vitest 364/364 + tsc -b/vite green. Feature-level reviewer PASS with one MAJOR cross-task finding — AC-014-3 account-locale **write** path missing (read path correct + tested; nothing writes `protoDrop.accountLocale`, no profile "Select language" control, no server locale field) → deferred to F-TRF-008 per Open-Decisions Part 3 2026-11-12 entry; T-026 exit check cites AC-014-1…AC-014-2 only. Tasks T-014-01…04 all done, each with task-level reviewer PASS) |
 | T-027 | Dark mode + a11y (WCAG 2.1 AA on P0 surfaces) + mobile web pass | F-TRF-015…017, UI-Reference | No flash-of-wrong-theme; keyboard-only full flow; mobile matrix green in staging | pending |
 | T-028 | Playwright e2e suite vs staging (guest loop, password, expiry via flag override, My Files CRUD, i18n spot-check) | TA-14.1 | E2E green on staging deploy | pending |
-| T-029 | Load test (k6): 5 GB synthetic, API p50/p99, recipient TTFB from 2 zones | TA-14.1, TA-15 | Upload < 10 min @ 100 Mbps; SLOs met | pending |
+| T-029 | Load test (k6): 5 GB synthetic, API p50/p99, recipient TTFB from 2 zones; email burst: 1k `transfer.created` recipients (moved from T-006-05 per Open-Decisions 2026-11-17) | TA-14.1, TA-15 | Upload < 10 min @ 100 Mbps; email burst p95 send→inbox < 60 s; SLOs met | pending |
 | T-030 | Beta → launch: seed prod flags per confirmed D-* decisions, runbook, launch gate checklist | 04-production-plan §12 | Launch gate 100 % green | pending |
 
 ---

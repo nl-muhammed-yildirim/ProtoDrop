@@ -23,7 +23,9 @@ A missing skill is not a blocker.
 ## Test gate (per task — run before committing)
 - `dotnet test tests/wa.domain.unit`
 - `dotnet test tests/wa.application.unit`
+- `dotnet test tests/wa.workers.unit` when anything under `src/wa.workers` or `src/wa.infrastructure` changed
 - If anything under `src/wa.web` changed, from `src/wa.web`: `npm run lint && npm run test:run && npm run build` (`npm run test` is watch mode — never use it), plus from repo root `node scripts/check-theme-tokens.mjs` and `node scripts/check-contrast.mjs` when CSS/tokens changed.
+- From repo root `node scripts/check-telemetry-pii.mjs` when a telemetry call (WaTelemetryReporter method or `trackClientEvent`) or `scripts/check-telemetry-pii.mjs` changed (plus `selftest` when the script changed).
 - **Do NOT run the full `tests/wa.api.integration` suite** (Testcontainers, 15+ min) — user rule: it runs once at feature end. If the plan adds or changes integration tests, run only those classes: `dotnet test tests/wa.api.integration --nologo -v minimal --filter "FullyQualifiedName~<Class>"` (Docker must be up; it still compiles the whole project, which catches stale stubs).
 - A failing test → fix the code (not the test, unless the task changes that behavior), re-run, then commit. A failure unrelated to your diff → prove it pre-existing (`git stash -u` → run just that test → `git stash pop`), report it, don't commit over it silently.
 

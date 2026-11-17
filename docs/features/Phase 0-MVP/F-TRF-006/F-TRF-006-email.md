@@ -90,10 +90,12 @@ AC-006-4: Transfer sent with zero emails
 
 | Story | Task | File | Status |
 |---|---|---|---|
-| US-006-01 + US-006-04 | T-006-01 f-email consumer: template render, CH send, dedup + skips (TA-6.7) | `US-006-01-recipient-email/T-006-01-femail-consumer.md` | ☐ |
-| US-006-02 | T-006-02 Retry + dead-letter: backoff via SB delivery count, email.failed (FR-006-4) | `US-006-02-retry-delivery/T-006-02-retry-dlq.md` | ☐ |
-| US-006-03 | T-006-03 Unsubscribe: /unsubscribe/{token} + EmailSuppression (FR-006-5) | `US-006-03-unsubscribe/T-006-03-unsubscribe-route.md` | ☐ |
-| US-006-05 | T-006-04 Localized templates: per-language render + en fallback (F-TRF-014-5) | `US-006-05-localized-email/T-006-04-localized-templates.md` | ☐ |
-| US-006-01 + US-006-03 | T-006-05 E2E: dev log-sender run + unsubscribe round-trip (T-019 exit check) | `US-006-01-recipient-email/T-006-05-e2e-log-sender.md` | ☐ |
+| US-006-01 + US-006-04 | T-006-01 f-email consumer: template render, CH send, dedup + skips (TA-6.7) | `US-006-01-recipient-email/T-006-01-femail-consumer.md` | ☑ 2026-10-25 (19bffa1 + fix 8e7f118) — status back-filled 2026-11-17 from git history |
+| US-006-02 | T-006-02 Retry + dead-letter: backoff via SB delivery count, email.failed (FR-006-4) | `US-006-02-retry-delivery/T-006-02-retry-dlq.md` | ☑ 2026-10-25 (d16a50f) — status back-filled 2026-11-17 from git history |
+| US-006-03 | T-006-03 Unsubscribe: /unsubscribe/{token} + EmailSuppression (FR-006-5) | `US-006-03-unsubscribe/T-006-03-unsubscribe-route.md` | ☑ 2026-10-25 (1b0908c) — status back-filled 2026-11-17 from git history |
+| US-006-05 | T-006-04 Localized templates: per-language render + en fallback (F-TRF-014-5) | `US-006-05-localized-email/T-006-04-localized-templates.md` | ☑ 2026-10-25 (07b415f + bdc0482) — status back-filled 2026-11-17 from git history |
+| US-006-01 + US-006-03 | T-006-05 E2E: dev log-sender run + unsubscribe round-trip (T-019 exit check) | `US-006-01-recipient-email/T-006-05-e2e-log-sender.md` | ☑ 2026-11-17 (plan 4af6e69, 0b45a47 + fix 444c487, review PASS; exit item 3 1k burst moved to T-029) |
+| US-006-01 | T-006-06 Fix: CommunicationHubEmailSender reads `Wa:CommunicationHub:Connection` (currently passes the from-address as the EmailClient connection string, `CommunicationHubEmailSender.cs:17`) | `docs/plans/T-006-06-plan.md` (gap task 2026-11-17, no story task file) | ☑ 2026-11-17 (plan 9d21503, d3afa24, review PASS) |
+| US-006-01 | T-006-07 Fix: wa.workers reads Wa:Blob:*, Wa:Jwt:Secret, Wa:ServiceBus:ConnectionString through IConfiguration (colon-named env reads can't be set on Linux Function hosts, `src/wa.workers/Program.cs:29-30,49,59`) | `docs/plans/T-006-07-plan.md` (gap task 2026-11-17, no story task file) | ☑ 2026-11-17 (plan 49c1b62, f05f37d, review PASS) |
 
 **Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-019 can be marked `done` in `Milestone-Backlog.md`. (US-006-04 needs no new code — its headers are covered by T-006-01.)

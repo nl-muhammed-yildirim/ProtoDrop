@@ -7,6 +7,7 @@ using Azure.Storage;
 using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.Azurite;
 using Testcontainers.MsSql;
 using wa.application.Blob;
@@ -188,6 +189,48 @@ public class DownloadUrlEndpointTests : IAsyncLifetime
         var transferAfter = await freshDb.Set<Transfer>().AsNoTracking().FirstAsync(t => t.Id == transferId);
         Assert.Equal(2, transferAfter.DownloadsCount); // still 2 — the failed mints did not increment
         Assert.Equal(2, await freshDb.Set<DownloadEvent>().CountAsync(e => e.TransferId == transferId)); // exactly the two successful rows
+    }
+
+    // ---- T-003-10 (AC-003-5): the app's singleton context TRACKS the transfer (post-finalize state) - cap flip must detach, not delete ----
+
+    [Fact]
+    public async Task CapReached_TrackedInAppContext_Returns410_AndContextStaysHealthy()
+    {
+        await using var factory = new TestFactory();
+        using var client = factory.CreateClient();
+        var appDb = factory.Services.GetRequiredService<WaDbContext>();
+
+        var a = await SeedTrackedInAppContextAsync(appDb, maxDownloads: 1);
+
+        using (var ok = await client.GetAsync($"/api/v1/public/transfers/{a.LinkId}/files/{a.FileId:n}/download-url"))
+            Assert.Equal(HttpStatusCode.OK, ok.StatusCode); // 0 -> 1
+
+        using var atCap = await client.GetAsync($"/api/v1/public/transfers/{a.LinkId}/files/{a.FileId:n}/download-url");
+        Assert.Equal(HttpStatusCode.Gone, atCap.StatusCode); // 410, never the "association severed" 500
+        using (var doc = JsonDocument.Parse(await atCap.Content.ReadAsByteArrayAsync()))
+        {
+            Assert.Equal(ProblemCodes.MaxDownloadsReached, doc.RootElement.GetProperty("code").GetString());
+            Assert.Equal(410, doc.RootElement.GetProperty("status").GetInt32());
+        }
+
+        // Singleton context must hold no Deleted entry (Local.Remove marks the row Deleted and poisons the next SaveChanges).
+        Assert.DoesNotContain(appDb.ChangeTracker.Entries(), e => e.State == EntityState.Deleted);
+
+        // Follow-up write through the same context (another transfer's mint -> SaveChanges) stays healthy.
+        var bLink = wa.domain.ValueObjects.LinkId.Mint().Value;
+        var bId = await SeedTransferAsync(status: 1, linkId: bLink, maxDownloads: 5);
+        var bFile = Guid.NewGuid();
+        await SeedFileItemsAsync(bId, [(bFile, "b.txt", 10L)]);
+        using (var okB = await client.GetAsync($"/api/v1/public/transfers/{bLink}/files/{bFile:n}/download-url"))
+            Assert.Equal(HttpStatusCode.OK, okB.StatusCode);
+
+        using var ep4 = await client.GetAsync($"/api/v1/public/transfers/{a.LinkId}");
+        Assert.Equal(HttpStatusCode.Gone, ep4.StatusCode);
+
+        using var freshDb = FreshDb();
+        var capped = await freshDb.Set<Transfer>().AsNoTracking().FirstAsync(t => t.Id == a.TransferId); // row still exists
+        Assert.Equal(3, capped.Status);
+        Assert.Equal(1, capped.DownloadsCount);
     }
 
     // ---- FR-003-9 style: 410 body byte-identical to endpoint 4's download-limit body for the same transfer ----
@@ -432,6 +475,47 @@ public class DownloadUrlEndpointTests : IAsyncLifetime
         transfer.FileCount = files.Length;
         transfer.TotalBytes = files.Sum(f => f.sizeBytes);
         await _db.SaveChangesAsync();
+    }
+
+    /// <summary>T-003-10: seed Transfer + BlobRef + FileItem through the APP's singleton context in ONE SaveChanges, so all three stay tracked Unchanged (the post-finalize state).</summary>
+    private static async Task<(Guid TransferId, string LinkId, Guid FileId)> SeedTrackedInAppContextAsync(WaDbContext appDb, int maxDownloads)
+    {
+        var transferId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var linkId = wa.domain.ValueObjects.LinkId.Mint().Value;
+        var blobRef = new BlobRef
+        {
+            Id = Guid.NewGuid(),
+            BlobPath = BlobPaths.TransferFile(transferId, fileId),
+            SizeBytes = 10L,
+            RefCount = 1,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+        appDb.Set<Transfer>().Add(new Transfer
+        {
+            Id = transferId,
+            LinkId = linkId,
+            Status = 1,
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+            MaxDownloads = maxDownloads,
+            SenderName = "Alice",
+            TotalBytes = 10L,
+            FileCount = 1,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        appDb.Set<BlobRef>().Add(blobRef);
+        appDb.Set<FileItem>().Add(new FileItem
+        {
+            Id = fileId,
+            TransferId = transferId,
+            BlobRefId = blobRef.Id,
+            OriginalName = "tracked.txt",
+            SizeBytes = 10L,
+            ContentType = "text/plain",
+            SortOrder = 0
+        });
+        await appDb.SaveChangesAsync();
+        return (transferId, linkId, fileId);
     }
 
     /// <summary>Upload blob bytes to the canonical transfer-file path (TA-3.5) — endpoint 6's SAS streams from here.</summary>

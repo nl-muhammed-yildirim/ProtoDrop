@@ -24,11 +24,12 @@ using Serilog.Context;
 using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
-// TA-10.5: console sink locally (App Insights later per environment); Microsoft.* → Warning, app at Information.
+// TA-10.5: console sink locally (App Insights later per environment); Microsoft.* and AspNetCoreRateLimit.* → Warning (TA-9.4: the limiter's blocked-request INF line carries the raw client IP), app at Information.
 builder.Host.UseSerilog((context, cfg) => cfg
     .Enrich.FromLogContext()
     .MinimumLevel.Information()
     .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .MinimumLevel.Override("AspNetCoreRateLimit", LogEventLevel.Warning)
     .WriteTo.Console());
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(PingCommand).Assembly));
 builder.Services.AddSingleton<wa.application.Ports.IDbHealthProbe, WaDbHealthProbe>();
@@ -168,7 +169,7 @@ app.UseIpRateLimiting();
 app.UseMiddleware<IdempotencyMiddleware>();
 app.UseMiddleware<SessionMiddleware>(); // TA-9.1: reads wa.session cookie → sets HttpContext.Items['wa.session.userId']; refreshes < 15 d remaining (FR-008-2)
 app.UseMiddleware<GlobalErrorMiddleware>(); // FR-056-3: every failure → TA-4.1.3 Problem+JSON (business codes keep their status, others 500 INTERNAL)
-app.UseSerilogRequestLogging(); // per-request INF line (Microsoft.* request logging is suppressed to Warning)
+app.UseSerilogRequestLogging(options => options.GetMessageTemplateProperties = LogRoute.RequestLogProperties); // per-request INF line (Microsoft.* request logging is suppressed to Warning); TA-9.4: RequestPath = route template (/unsubscribe/{token}), never the raw path
 app.MapGet("/", () => "Hello World!");
 app.MapGet("/health", async (ISender sender, CancellationToken ct) =>
 {

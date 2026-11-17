@@ -5,7 +5,8 @@ import { writeSession } from '../../core/auth/session'
 // T-015-02 (F-TRF-015): resolve the explicit data-theme via the shared pure function — System mode no longer falls back to :root light.
 import { resolveTheme } from '../../core/theme/resolveTheme'
 import { getTraceParent } from '../../core/traceparent'
-import i18n from '../../core/i18n/init'
+import i18n, { readAccountLocale, setAccountLocale, SUPPORTED_LOCALES } from '../../core/i18n/init'
+import type { SupportedLocale } from '../../core/i18n/init'
 import DangerZone from './DangerZone'
 
 // T-008-06 wire (TA-4.2#12–13), verified against src/wa.api/Program.cs — GET/PATCH /auth/me + logout:
@@ -20,7 +21,7 @@ interface ProfilePageProps {
 
 /**
  * T-008-07 (UI-Reference §5.5): profile screen at /account/profile (signed-in only).
- * Display name input + Save (PATCH { displayName }), theme select (PATCH { theme } — server-wins, F-TRF-015),
+ * Display name input + Save (PATCH { displayName }), theme select (PATCH { theme } — server-wins, F-TRF-015), language select (T-014-05, client-only localStorage),
  * read-only plan line, divider, danger-zone slot with the Delete account button + GDPR confirm modal (T-008-09).
  * First signed-in client fetch: credentials: 'include' carries the HttpOnly wa.session cookie cross-origin.
  * Sign out is via TopBar only (D-4), so no button here and no onSignOut prop (App wires it at App level, D-3/D-6).
@@ -28,6 +29,7 @@ interface ProfilePageProps {
 export function ProfilePage({ profile, onSignedIn, onThemeChange, onDeleteAccount }: ProfilePageProps) {
   const [name, setName] = useState(profile.displayName)
   const [theme, setThemeLocal] = useState<'system' | 'light' | 'dark'>(profile.theme)
+  const [language, setLanguageLocal] = useState<SupportedLocale | ''>(() => readAccountLocale() ?? '')
   const [savingName, setSavingName] = useState(false)
   const [savingTheme, setSavingTheme] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -54,6 +56,11 @@ export function ProfilePage({ profile, onSignedIn, onThemeChange, onDeleteAccoun
     } finally {
       setSavingName(false)
     }
+  }
+
+  function changeLanguage(next: SupportedLocale | '') {
+    setLanguageLocal(next)
+    void setAccountLocale(next === '' ? null : next)   // T-014-05: client-only (Open-Decisions 2026-11-17); App re-renders on languageChanged
   }
 
   function changeTheme(next: 'system' | 'light' | 'dark') {
@@ -99,6 +106,13 @@ export function ProfilePage({ profile, onSignedIn, onThemeChange, onDeleteAccoun
         <option value="system">{i18n.t('profile.theme.system')}</option>
         <option value="light">{i18n.t('profile.theme.light')}</option>
         <option value="dark">{i18n.t('profile.theme.dark')}</option>
+      </select>
+      <label className="pf-label" htmlFor="pf-language">{i18n.t('profile.language.label')}</label>
+      <select id="pf-language" className="pf-theme-select" value={language} onChange={(e) => changeLanguage(e.target.value as SupportedLocale | '')}>
+        <option value="">{i18n.t('profile.language.browserDefault')}</option>
+        {SUPPORTED_LOCALES.map((code) => (
+          <option key={code} value={code} lang={code}>{i18n.t(`profile.language.${code}`)}</option>
+        ))}
       </select>
       {/* Plan line — read-only in MVP (FR-008-4: "Free by default"). planCode comes from the session DTO; no extra fetch. */}
       <p className="pf-plan">{profile.planCode === 'free' ? i18n.t('profile.plan.free') : profile.planCode}</p>

@@ -2,7 +2,7 @@
 
 **Purpose:** Architect reads this instead of exploring from scratch. Coder cites it. Reviewer checks against it.
 **Rule:** any API shape below that changes MUST change here in the same commit; `verify_plan.py` fails on drift between plans and these facts.
-**Last updated:** 2026-10-30 (post F-TRF-008)
+**Last updated:** 2026-11-17 (Phase 0 gap sweep: endpoint table, telemetry count, token location; T-014-05 accountLocale key)
 
 ## 1. Closed sets (counts are load-bearing — cite them, don't re-enumerate in plans)
 
@@ -12,7 +12,7 @@
 `TRANSFER_EXPIRED`, `TRANSFER_DELETED`, `FILES_GONE`, `IDEMPOTENCY_CONFLICT`, `RATE_LIMITED`,
 `STRIPE_WEBHOOK_MISMATCH`, `EMAIL_UNSUBSCRIBED`, `LINK_EXPIRED`, `INTERNAL`.
 
-### Telemetry (`src/wa.domain/Telemetry/TelemetryEvents.cs`) — **23 events + 7 metrics = 28 names** (TA-10.2, "names are code")
+### Telemetry (`src/wa.domain/Telemetry/TelemetryEvents.cs`) — **23 events + 7 metrics = 30 names** (TA-10.2, "names are code")
 Events: `upload_started`, `upload_completed`, `upload_failed`, `transfer_page_viewed`,
 `transfer_not_found`, `password_correct`, `password_wrong`, `download_started`,
 `download_completed`, `zip_generated`, `zip_failed`, `email_sent`, `email_failed`,
@@ -21,7 +21,8 @@ Events: `upload_started`, `upload_completed`, `upload_failed`, `transfer_page_vi
 Metrics: `upload.success_rate`, `link_to_download_seconds`, `expiry_job_lag_seconds`,
 `email_failures_1h`, `active_transfers`, `storage_bytes_active`, `api.requests{status}`.
 
-### CSS custom properties (`src/wa.web/src/index.css` :root) — **23 tokens**
+### CSS custom properties — **22 tokens** (14 color + 8 typography/shape)
+**Colors live in `src/wa.web/src/styles/tokens.css`** (T-015-01): all 14 defined in each of `:root` (light default), `html[data-theme='dark']` and `html[data-theme='light']`; gated by `scripts/check-theme-tokens.mjs` + `check-contrast.mjs`. Typography/shape stay in `src/wa.web/src/index.css` `:root`. Light values:
 Colors: `--bg #FFFFFF`, `--bg-subtle #F5F6F8`, `--bg-elevated #FFFFFF`, `--fg #101418`,
 `--fg-muted #5F6B7A`, `--fg-faint #93A0AF`, `--accent #4185F4`, `--accent-hover #2F6FD8`,
 `--accent-soft #EAF1FD`, `--border #DDE2E8`, `--danger #D6453D`, `--danger-soft #FBEBEA`,
@@ -29,34 +30,34 @@ Colors: `--bg #FFFFFF`, `--bg-subtle #F5F6F8`, `--bg-elevated #FFFFFF`, `--fg #1
 Typography/shape: `--fs-display 40px`, `--fs-h1 28px`, `--fs-body 16px`, `--fs-small 14px`,
 `--fs-tiny 12px`, `--radius-sm 6px`, `--radius-md 10px`, `--radius-lg 16px`.
 
-## 2. API surface (`src/wa.api/Program.cs`) — **20 endpoints** (M0)
+## 2. API surface (`src/wa.api/Program.cs`) — **36 route+method mappings** (end of Phase 0; 35 always-on + 1 Development-only)
 
-| Route | Method |
-|---|---|
-| `/` | GET |
-| `/health` | GET |
-| `/api/v1/transfers/draft` | POST |
-| `/api/v1/transfers/draft/{draftId}/finalize` | POST |
-| `/api/v1/transfers/{id}/send` | POST |
-| `/api/v1/public/transfers/{linkId}` | GET |
-| `/api/v1/public/transfers/{linkId}/unlock` | POST |
-| `/api/v1/public/transfers/{linkId}/files/{fileId}/download-url` | GET |
-| `/api/v1/public/transfers/{linkId}/download-all-url` | GET |
-| `/unsubscribe/{token}` | GET |
-| `/api/v1/admin/suppressions` | GET |
-| `/api/v1/admin/suppressions/{id:guid}` | DELETE |
-| `/api/v1/auth/signup` | POST |
-| `/api/v1/auth/magic-link` | POST |
-| `/api/v1/auth/forgot-password` | POST |
-| `/api/v1/auth/magic-link/redeem` | POST |
-| `/api/v1/auth/login` | POST |
-| `/api/v1/auth/me` | GET / PATCH / DELETE |
-| (logout) | POST `/api/v1/auth/logout` |
+| Area | Route | Method |
+|---|---|---|
+| Infra | `/` · `/health` | GET · GET |
+| Infra (Development only) | `/api/v1/dev/chaos?kind=internal\|rate_limited` | GET |
+| Upload/send | `/api/v1/transfers/draft` | POST |
+| | `/api/v1/transfers/draft/{draftId}/finalize` | POST |
+| | `/api/v1/transfers/{id}/send` | POST |
+| | `/api/v1/transfers/{id}/resend` | POST |
+| My Files (owner) | `/api/v1/transfers` | GET |
+| | `/api/v1/transfers/{id}` | GET / DELETE |
+| Public (recipient) | `/api/v1/public/transfers/{linkId}` | GET |
+| | `/api/v1/public/transfers/{linkId}/unlock` | POST |
+| | `/api/v1/public/transfers/{linkId}/files/{fileId}/download-url` | GET |
+| | `/api/v1/public/transfers/{linkId}/download-all-url` | GET |
+| Email | `/unsubscribe/{token}` | GET |
+| Auth | `/api/v1/auth/signup` · `/magic-link` · `/magic-link/redeem` · `/forgot-password` · `/login` · `/logout` | POST (each) |
+| | `/api/v1/auth/me` | GET / PATCH / DELETE |
+| Admin | `/api/v1/admin/overview` · `/audit-recent` · `/suppressions` · `/transfers` · `/users` · `/flags` | GET (each) |
+| | `/api/v1/admin/suppressions/{id:guid}` · `/transfers/{id:guid}` · `/users/{id:guid}` | DELETE (each) |
+| | `/api/v1/admin/users/{id:guid}` | PATCH |
+| | `/api/v1/admin/flags/{key}` | PUT |
 
 ## 3. Auth & session wiring facts
 
 - **Session cookie:** name `wa.session`, HttpOnly, set by endpoints (NOT middleware); JS cannot read it. Client mirrors the profile DTO in localStorage under key **`protoDrop.session`** (`src/wa.web/src/core/auth/session.ts:18`).
-- **Middleware order** (`Program.cs:119–127`): Cors → Correlation → IpRateLimiting → Idempotency → Session (reads cookie, sets `HttpContext.Items['wa.session.userId']`, refreshes < 15 d remaining) → GlobalError (business codes keep status; others 500 INTERNAL) → SerilogRequestLogging.
+- **Middleware order** (`Program.cs:163–171`): Cors → Correlation → IpRateLimiting → Idempotency → Session (reads cookie, sets `HttpContext.Items['wa.session.userId']`, refreshes < 15 d remaining) → GlobalError (business codes keep status; others 500 INTERNAL) → SerilogRequestLogging.
 - **CORS** (`src/wa.api/Middleware/CorsAllowListMiddleware.cs`): allowlist from config key `Wa:Cors:AllowedOrigins` (comma-separated); echoes exact origin + `Vary: Origin`, never `*`; preflight answered by middleware with 1 h cache, allowed headers `Authorization, Content-Type, Idempotency-Key`.
 - **Stores:** `IAppUserStore` (`src/wa.application/UseCases/Auth/IAppUserStore.cs`) — `FindByEmailAsync`, `CreateAsync`, `GetByIdAsync` (null when unknown OR soft-deleted), `UpdateProfileAsync` (null arg = leave column alone; empty displayName → email local part), `SoftDeleteWithReHomeAsync` (one transaction, returns false on unknown id).
   `IAuthTokenStore` — `FindByHashAsync(sha256Hex)`, `CreateAsync(AuthToken)`, `MarkRedeemedAsync` (first redeem wins).
@@ -68,6 +69,7 @@ Typography/shape: `--fs-display 40px`, `--fs-h1 28px`, `--fs-body 16px`, `--fs-s
 |---|---|---|
 | Session mirror | `protoDrop.session` | web localStorage |
 | CSRF/idempotency header | `Idempotency-Key` | CORS-allowed header |
+| Account language (AC-014-3) | `protoDrop.accountLocale` — one of the 8 locales; absent = browser → en; survives sign-out; only `core/i18n/init.ts` (`readAccountLocale`/`setAccountLocale`) touches it | web localStorage |
 
 ## 5. Maintenance rules (for the Coder docs step)
 

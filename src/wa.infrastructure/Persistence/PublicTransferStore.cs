@@ -61,11 +61,9 @@ public sealed class PublicTransferStore : IPublicTransferStore
                 "UPDATE [Transfer] SET [Status]=3, [ExpiredAtUtc]=COALESCE([ExpiredAtUtc], GETUTCDATE()) WHERE [Id] = {0} AND [Status] = 1",
                 [transferId], ct);
 
-            // The raw-SQL UPDATE bypasses the change tracker: if this transfer is tracked in the singleton context, detach it so
-            // later SaveChanges can't resurrect the old Status/DownloadsCount (GetByLinkIdAsync reads untracked — see its summary).
-            var tracked = _db.Set<Transfer>().Local.FirstOrDefault(t => t.Id == transferId);
-            if (tracked is not null)
-                _db.Set<Transfer>().Local.Remove(tracked);
+            // The raw-SQL UPDATE bypasses the change tracker: detach any tracked copy so later SaveChanges can't resurrect the old
+            // Status/DownloadsCount (GetByLinkIdAsync reads untracked). T-003-10: a real detach — Local.Remove marks the row Deleted.
+            _db.DetachTransfer(transferId);
 
             return new SingleFileDownloadResult(SingleFileDownloadOutcome.CapReached);
         }
@@ -109,11 +107,9 @@ public sealed class PublicTransferStore : IPublicTransferStore
                 "UPDATE [Transfer] SET [Status]=3, [ExpiredAtUtc]=COALESCE([ExpiredAtUtc], GETUTCDATE()) WHERE [Id] = {0} AND [Status] = 1",
                 [transferId], ct);
 
-            // The raw-SQL UPDATE bypasses the change tracker: if this transfer is tracked in the singleton context, detach it so
-            // later SaveChanges can't resurrect the old Status/DownloadsCount (GetByLinkIdAsync reads untracked — see its summary).
-            var tracked = _db.Set<Transfer>().Local.FirstOrDefault(t => t.Id == transferId);
-            if (tracked is not null)
-                _db.Set<Transfer>().Local.Remove(tracked);
+            // The raw-SQL UPDATE bypasses the change tracker: detach any tracked copy so later SaveChanges can't resurrect the old
+            // Status/DownloadsCount (GetByLinkIdAsync reads untracked). T-003-10: a real detach — Local.Remove marks the row Deleted.
+            _db.DetachTransfer(transferId);
 
             return new SingleFileDownloadResult(SingleFileDownloadOutcome.CapReached);
         }

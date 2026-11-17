@@ -61,7 +61,7 @@ public sealed class StubbleTemplateRenderer : ITemplateRenderer
             f.Name, FormatBytes(f.SizeBytes, culture))).ToList();
 
         var templateData = new TemplateRenderModel(
-            data.SenderName, filesWithSizes, data.CtaUrl, data.ExpiryDays);
+            data.SenderName, filesWithSizes, data.CtaUrl, data.ExpiryDays, data.UnsubscribeUrl);
 
         // Resolve locale with fallback to English.
         if (!_templates.TryGetValue(locale, out var templates))
@@ -96,8 +96,8 @@ public sealed class StubbleTemplateRenderer : ITemplateRenderer
     {
         if (bytes < 1024) return $"{bytes} B";
 
-        var units = new[] { "KB", "MB", "GB" };
-        var value = (double)bytes;
+        var units = new[] { "KB", "MB", "GB", "TB" };
+        var value = bytes / 1024.0;
         var unitIndex = 0;
 
         while (value >= 1024 && unitIndex < units.Length - 1)
@@ -123,11 +123,14 @@ public sealed class StubbleTemplateRenderer : ITemplateRenderer
         string SenderName,
         IReadOnlyList<TemplateFileItem> Files,
         string CtaUrl,
-        int ExpiryDays)
+        int ExpiryDays,
+        string? UnsubscribeUrl)
     {
         public string SenderName { get; init; } = SenderName;
         public IReadOnlyList<TemplateFileItem> Files { get; init; } = Files;
         public string CtaUrl { get; init; } = CtaUrl;
         public int ExpiryDays { get; init; } = ExpiryDays;
+        public string? UnsubscribeUrl { get; init; } = UnsubscribeUrl;
+        public bool HasUnsubscribeUrl => !string.IsNullOrEmpty(UnsubscribeUrl);
     }
 }

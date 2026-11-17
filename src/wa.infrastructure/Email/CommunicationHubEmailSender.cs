@@ -12,9 +12,11 @@ public sealed class CommunicationHubEmailSender : IEmailSender
     private readonly string _fromAddress;
     private readonly ILogger<CommunicationHubEmailSender> _logger;
 
-    public CommunicationHubEmailSender(string fromAddress, ILogger<CommunicationHubEmailSender> logger)
+    /// <param name="connectionString">Wa:CommunicationHub:Connection (TA-9.3, Key Vault secret).</param>
+    /// <param name="fromAddress">Sender address of each message (Wa:Email:FromAddress).</param>
+    public CommunicationHubEmailSender(string connectionString, string fromAddress, ILogger<CommunicationHubEmailSender> logger)
     {
-        _emailClient = new Azure.Communication.Email.EmailClient(fromAddress);
+        _emailClient = new Azure.Communication.Email.EmailClient(connectionString);
         _fromAddress = fromAddress;
         _logger = logger;
     }

@@ -84,9 +84,9 @@ AC-005-3: Transfer hits download cap before time expiry
 
 | Story | Task | File | Status |
 |---|---|---|---|
-| US-005-01 | T-005-01 f-expire: timer job, batch 500, JobRun claim (TA-6.3) | `US-005-01-auto-expiry/T-005-01-fexpire-job.md` | ☐ |
-| US-005-02 | T-005-02 f-delete-transfers: grace scan, RefCount decrement, row/blob cleanup (TA-6.4) | `US-005-02-auto-deletion/T-005-02-fdelete-transfers.md` | ☐ |
-| US-005-02 | T-005-03 f-delete-blobs: hourly physical deletion of refcount-0 blobs (TA-6.5) | `US-005-02-auto-deletion/T-005-03-fdelete-blobs.md` | ☐ |
-| US-005-01 + US-005-02 | T-005-04 E2E: full lifecycle via admin flag override (RETENTION_DAYS=0) | `US-005-02-auto-deletion/T-005-04-e2e-lifecycle-flag.md` | ☐ |
+| US-005-01 | T-005-01 f-expire: timer job, batch 500, JobRun claim (TA-6.3) | `US-005-01-auto-expiry/T-005-01-fexpire-job.md` | ☑ 2026-10-22 (c41ef16 + fix 8e42b3d) — status back-filled 2026-11-17 from git history |
+| US-005-02 | T-005-02 f-delete-transfers: grace scan, RefCount decrement, row/blob cleanup (TA-6.4) | `US-005-02-auto-deletion/T-005-02-fdelete-transfers.md` | ☑ 2026-10-23 (fab9bca) — status back-filled 2026-11-17 from git history |
+| US-005-02 | T-005-03 f-delete-blobs: hourly physical deletion of refcount-0 blobs (TA-6.5) | `US-005-02-auto-deletion/T-005-03-fdelete-blobs.md` | ☑ 2026-10-23 (469e2e9) — status back-filled 2026-11-17 from git history |
+| US-005-01 + US-005-02 | T-005-04 E2E: full lifecycle via admin flag override (RETENTION_DAYS=0) | `US-005-02-auto-deletion/T-005-04-e2e-lifecycle-flag.md` | ☑ 2026-10-23 (47cf59a) — status back-filled 2026-11-17 from git history |
 
 **Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-018 can be marked `done` in `Milestone-Backlog.md`. (The download-cap flip itself is endpoint 6 — T-003-06; US-005-03 needs no new code.)

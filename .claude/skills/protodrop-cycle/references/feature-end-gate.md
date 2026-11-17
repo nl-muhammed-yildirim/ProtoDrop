@@ -5,9 +5,9 @@ Triggered when every task row of the feature is `done`. AGENT.md §4 defines the
 ## Test gates — commands and order
 
 1. `dotnet test tests/wa.domain.unit --nologo -v q` (fast)
-2. `dotnet test tests/wa.application.unit --nologo -v q` (fast)
+2. `dotnet test tests/wa.application.unit --nologo -v q` (fast); then `dotnet test tests/wa.workers.unit --nologo -v q` (fast — f-zip/f-email; added 2026-11-17)
 3. `dotnet test tests/wa.api.integration --nologo -v q` — **long** (Testcontainers per class; Docker daemon must be up). Run as background terminal with notify and continue independent work meanwhile; wait via process_manage(action=wait, timeout≈540) — it may still need a second wait.
-4. Frontend: `cd src/wa.web && npm run lint` / `npm run test:run` / `npm run build` (independent of the dotnet suites — can overlap step 3).
+4. Frontend: `cd src/wa.web && npm run lint` / `npm run test:run` / `npm run build` (independent of the dotnet suites — can overlap step 3). From repo root also `node scripts/check-telemetry-pii.mjs` and `node scripts/check-telemetry-pii.mjs selftest` (T-012-05, both must exit 0).
 
 All four green → gate satisfied. Report per-suite counts in the close-out (e.g. "domain.unit 52/52, application.unit 338/338, api.integration N/N, wa.web 281/281"). The feature-end run is the FRESH-evidence moment: re-run everything even if Coder already ran it at HEAD.
 

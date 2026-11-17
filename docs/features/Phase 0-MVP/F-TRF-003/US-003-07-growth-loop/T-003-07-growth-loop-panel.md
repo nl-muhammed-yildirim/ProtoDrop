@@ -35,6 +35,6 @@ Do exactly:
 2. On terminal states (expired / unknown / download-limit), make Send something the only action on the screen (T-003-03's placeholder anchor becomes this CTA).
 3. Keep partial downloads out of it: downloading 1 of 5 files leaves the page in its normal state; the panel appears exactly once per completed full download (no re-announce on re-download).
 4. Emit growth_cta_shown / growth_cta_clicked telemetry with a source dimension (post-download vs terminal-state) — feeds the funnel dashboards (F-TRF-012).
-Done when: AC-003-7 holds — full downloads show the panel once, partials do not, terminal states carry the single CTA to the upload surface, and both telemetry events fire with the correct source.
+Done when: FR-003-7 and the US-003-07 acceptance criteria hold — full downloads show the panel once, partials do not, terminal states carry the single CTA to the upload surface, and both telemetry events fire with the correct source.
 Constraints: "full download" is React local state (all file downloads completed, or zip completed) — no server round-trip; tone is "Send something." with no exclamation points (UI-Reference §7); do not transfer the unlock token into the new sender session.
 ```

@@ -32,8 +32,26 @@ const resources = {
 // FR-014-3 supported set — single source of truth is the resources keys above.
 const SUPPORTED_LANGUAGES = new Set(Object.keys(resources))
 
-// Account-locale override key (T-014-03 / F-TRF-008 profile switcher writes it).
+export type SupportedLocale = keyof typeof resources
+/** Ordered supported locales (en, nl, fr, es, pt, it, de, tr) — drives the profile language select. */
+export const SUPPORTED_LOCALES = Object.keys(resources) as SupportedLocale[]
+
+// Account-locale override key (T-014-05: ProfilePage language select writes it via setAccountLocale).
 const ACCOUNT_LOCALE_KEY = 'protoDrop.accountLocale'
+
+/**
+ * T-014-05: stored account locale, or null when absent/unsupported/storage blocked (never throws).
+ */
+export function readAccountLocale(): SupportedLocale | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const stored = window.localStorage.getItem(ACCOUNT_LOCALE_KEY)
+    if (stored && SUPPORTED_LANGUAGES.has(stored)) return stored as SupportedLocale
+  } catch {
+    // localStorage absent or blocked — treat as unset.
+  }
+  return null
+}
 
 /**
  * T-014-02 (FR-014-3): account setting → browser language → 'en', all synchronous, no network.
@@ -42,12 +60,8 @@ const ACCOUNT_LOCALE_KEY = 'protoDrop.accountLocale'
 export function resolveInitialLanguage(): string {
   if (typeof window === 'undefined') return 'en'
   // 1. Account setting wins over browser (AC-014-3). Missing/invalid/corrupt → fall through.
-  try {
-    const stored = window.localStorage.getItem(ACCOUNT_LOCALE_KEY)
-    if (stored && SUPPORTED_LANGUAGES.has(stored)) return stored
-  } catch {
-    // localStorage absent or blocked — fall through.
-  }
+  const stored = readAccountLocale()
+  if (stored) return stored
   // 2. Browser language base code, lowercased.
   try {
     const base = (window.navigator.language ?? '').split('-')[0].toLowerCase()
@@ -86,6 +100,22 @@ i18n.on('missingKey', (lngs, _ns, key) => {
 // T-025's app.initialized properties read this (no new event — the closed lists don't have it).
 export function getResolvedLocale(): string {
   return i18n.language
+}
+
+/**
+ * T-014-05 (AC-014-3, client-only per Open-Decisions 2026-11-17): persist the account language and switch now.
+ * null = "Browser default": removes the key and re-resolves browser → en. Storage failures never block the switch.
+ */
+export function setAccountLocale(locale: SupportedLocale | null): Promise<unknown> {
+  if (typeof window !== 'undefined') {
+    try {
+      if (locale) window.localStorage.setItem(ACCOUNT_LOCALE_KEY, locale)
+      else window.localStorage.removeItem(ACCOUNT_LOCALE_KEY)
+    } catch {
+      // localStorage blocked — still switch for this session.
+    }
+  }
+  return i18n.changeLanguage(locale ?? resolveInitialLanguage())
 }
 
 export default i18n

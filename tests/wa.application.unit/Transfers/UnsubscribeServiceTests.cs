@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using wa.domain;
 using wa.infrastructure.Persistence;
@@ -102,6 +103,36 @@ public class UnsubscribeServiceTests : IDisposable
         // Here we just verify no exception is thrown and both calls succeed.
         var second = await _service.HandleAsync(token, CancellationToken.None);
         Assert.True(second.Success);
+    }
+
+    // ---- T-012-06 (AC-012-3 / TA-9.4): the duplicate-insert no-op log line carries no address ----
+    // InMemory cannot raise UQ_ES, so a SaveChanges interceptor forces the DbUpdateException path.
+
+    [Fact]
+    public async Task DuplicateInsert_IdempotentNoOp_LogLine_HasNoAddresses()
+    {
+        var options = new DbContextOptionsBuilder<WaDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .AddInterceptors(new ThrowOnSaveInterceptor())
+            .Options;
+        using var db = new WaDbContext(options);
+        var log = new CapturingLogger<UnsubscribeService>();
+        var service = new UnsubscribeService(db, Key, log);
+        var token = UnsubscribeToken.Create("dup@x.com", "sender@y.com", Key);
+
+        var result = await service.HandleAsync(token, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Contains(log.Entries, e => e.Level == Microsoft.Extensions.Logging.LogLevel.Information);
+        Assert.False(log.Mentions("dup@x.com"));
+        Assert.False(log.Mentions("sender@y.com"));
+    }
+
+    private sealed class ThrowOnSaveInterceptor : SaveChangesInterceptor
+    {
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+            => throw new DbUpdateException("UQ_ES duplicate (simulated)");
     }
 
     // ---- Service: tampered token → not Success + no row ----

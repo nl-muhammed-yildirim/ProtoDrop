@@ -18,6 +18,7 @@ public class SignupHandlerTests
     private readonly StubPlansStore _plans;
     private readonly SessionTokenService _minter;
     private readonly Plan _freePlan;
+    private readonly CapturingLogger<SignupHandler> _log = new();
     private readonly SignupHandler _handler;
 
     public SignupHandlerTests()
@@ -32,7 +33,20 @@ public class SignupHandlerTests
             _plans,
             new WaTelemetryReporter(_telemetryLogger, System.Text.Encoding.UTF8.GetBytes("unit-test-key")),
             _minter,
-            NullLogger<SignupHandler>.Instance);
+            _log);
+    }
+
+    // ---- T-012-06 (AC-012-3 / TA-9.4): the plain ILogger line carries the user id, never the email or its local part ----
+
+    [Fact]
+    public async Task Signup_NewUser_LogLine_CarriesUserId_NotEmail()
+    {
+        await _handler.Handle(new SignupCommand("John.Doe@Example.COM", "password123"), CancellationToken.None);
+
+        AppUser created = _store.Created[0];
+        Assert.False(_log.Mentions("john.doe@example.com"));
+        Assert.False(_log.Mentions("john.doe")); // local part = derived display name, also PII
+        Assert.Contains(_log.Entries, e => e.Values.Contains(created.Id));
     }
 
     // ---- AC-008-1: new email → row created, user_created emitted once, session token returned ----

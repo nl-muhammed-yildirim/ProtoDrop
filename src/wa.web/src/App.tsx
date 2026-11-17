@@ -51,6 +51,14 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPop)
   }, [])
 
+  // T-014-05 (AC-014-3): components read i18n.t during render — re-render the tree when the language switches.
+  const [, setLanguage] = useState(() => i18n.language)
+  useEffect(() => {
+    const onChange = (lng: string) => setLanguage(lng)
+    i18n.on('languageChanged', onChange)
+    return () => i18n.off('languageChanged', onChange)
+  }, [])
+
   const linkId = matchLinkPath(pathname)
   const unsubscribeToken = matchUnsubscribePath(pathname)
   // T-010-03 (FR-010-4): re-send route — /resend/{originalTransferId}; requires a signed-in user (T-010-01 owner scope).

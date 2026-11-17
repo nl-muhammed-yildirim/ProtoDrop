@@ -46,11 +46,13 @@ Run **all** of these before marking a task done:
 ```powershell
 dotnet test tests/wa.domain.unit
 dotnet test tests/wa.application.unit
+dotnet test tests/wa.workers.unit       # Azure Functions (f-zip, f-email) unit tests — added to the gate 2026-11-17 (Phase 0 gap sweep)
 dotnet test tests/wa.api.integration     # Testcontainers: Docker must be running
 cd src/wa.web
 npm run lint && npm run test:run && npm run build   # T-017-03: `npm run lint` = eslint + scripts/check-tap-targets.mjs (44 px / 16 px floor at ≤640 px on P0 surfaces); `npm run test` is watch mode
 node ../../scripts/check-theme-tokens.mjs   # T-015-03 (FR-015-2): token-diff parity — all 14 tokens in :root/dark/light, dark ≠ light per token; CI job theme-check runs the same script from repo root.
 node ../../scripts/check-contrast.mjs       # T-016-06 (FR-016-4): WCAG contrast from tokens.css, both themes; gated core pairs ≥ 4.5:1; CI job contrast-check runs the same script from repo root.
+node ../../scripts/check-telemetry-pii.mjs && node ../../scripts/check-telemetry-pii.mjs selftest   # T-012-05 (EC-012-3): no raw email / unhashed PII / unknown property reaches a telemetry call (server reporter on any receiver + client trackClientEvent); R7 (T-012-06/07) also covers ILogger `.Log<Level>(` calls, incl. `.Path/.PathBase/.QueryString/.Message` member args. CI job pii-check runs both from repo root.
 ```
 
 Plus, per task: the task's own **exit check** in `Milestone-Backlog.md`.
@@ -87,12 +89,12 @@ docker compose -f docker-compose.local.yml up -d
 | `Wa:Blob:AccountUrl` | `http://127.0.0.1:10000/devstoreaccount1` |
 | `Wa:Blob:AccountKey` | `Eby8vdM02xNOcqTqK…> (Azurite dev key) |
 | `Wa:ServiceBus:ConnectionString` | *(optional locally; use in-memory publisher fake if unset)* |
-| `Wa:CommunicationHub:Connection` | *(optional locally; log-only sender if unset)* |
+| `Wa:CommunicationHub:Connection` | *(optional locally when `Wa:Email:Sender=log`; required otherwise — the workers throw on first email if it is missing, T-006-06)* |
 | `Wa:Jwt:Secret` | 64 hex chars (any fixed dev value) |
 | `Wa:Url:Public` | `http://localhost:5173` |
 | `Wa:Url:Api` | `http://localhost:8080` |
 | `Wa:Cors:AllowedOrigins` | `http://localhost:5173` |
-| `Wa:AdminEmails` | `dev@example.com` |
+| `Wa:AdminEmails` | `dev@example.com` — local admin login password `ProtoDropDev!2026` (local DB only; re-create after a DB reset via `POST /api/v1/auth/signup`) |
 | `Wa:Zip:SignKey` | any 32+ chars |
 
 ### 5.3 Run

@@ -8,6 +8,7 @@ import ProfilePage from './ProfilePage'
 import App from '../../App'
 import type { StoredProfile } from '../../core/auth/session'
 import { clearSession, readSession, writeSession } from '../../core/auth/session'
+import i18n from '../../core/i18n/init'
 // T-015-02 (FR-015-4): jsdom has no window.matchMedia — changeTheme's resolved-set path needs a controllable stub.
 import type { MatchMediaStub } from '../../test/matchMediaStub'
 import { installMatchMediaStub } from '../../test/matchMediaStub'
@@ -410,5 +411,65 @@ describe('ProfilePage (T-008-07)', () => {
       expect(readSession()?.theme).toBe('dark')   // next paint's bootstrap resolves dark before first paint.
       cleanup()
     })
+  })
+})
+
+describe('T-014-05 language select (AC-014-3)', () => {
+  const KEY = 'protoDrop.accountLocale'
+
+  afterEach(async () => {
+    vi.restoreAllMocks()
+    await act(async () => { await i18n.changeLanguage('en') })
+  })
+
+  it('renders 9 options, value empty without a key and nl when the key is pre-set', () => {
+    const a = renderProfilePage(BASE_PROFILE)
+    const sel = a.host.querySelector('#pf-language') as HTMLSelectElement
+    expect(sel.options.length).toBe(9)
+    expect(sel.options[0].value).toBe('')
+    expect(sel.value).toBe('')
+    a.cleanup()
+
+    window.localStorage.setItem(KEY, 'nl')
+    const b = renderProfilePage(BASE_PROFILE)
+    expect((b.host.querySelector('#pf-language') as HTMLSelectElement).value).toBe('nl')
+    b.cleanup()
+  })
+
+  it('selecting nl writes the key, calls changeLanguage and issues no request', async () => {
+    stubFetch({}, () => { throw new Error('no requests allowed for a language change') })
+    const spy = vi.spyOn(i18n, 'changeLanguage')
+    const { host, cleanup } = renderProfilePage(BASE_PROFILE)
+    await act(async () => { setNativeSelectValue(host.querySelector('#pf-language') as HTMLSelectElement, 'nl') })
+    expect(window.localStorage.getItem(KEY)).toBe('nl')
+    expect(spy).toHaveBeenCalledWith('nl')
+    cleanup()
+  })
+
+  it('selecting Browser default removes the key and re-resolves the browser language', async () => {
+    window.localStorage.setItem(KEY, 'nl')
+    const spy = vi.spyOn(i18n, 'changeLanguage')
+    const { host, cleanup } = renderProfilePage(BASE_PROFILE)
+    await act(async () => { setNativeSelectValue(host.querySelector('#pf-language') as HTMLSelectElement, '') })
+    expect(window.localStorage.getItem(KEY)).toBeNull()
+    expect(spy).toHaveBeenCalledWith('en')
+    cleanup()
+  })
+
+  it('full App: switching to nl re-renders the page in Dutch immediately', async () => {
+    writeSession(BASE_PROFILE)
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    act(() => { void root.render(createElement(App)) })
+    await act(async () => {
+      window.history.pushState('', '', '/account/profile')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+    expect(host.querySelector('label[for="pf-theme"]')?.textContent).toBe('Theme')
+    await act(async () => { setNativeSelectValue(host.querySelector('#pf-language') as HTMLSelectElement, 'nl') })
+    expect(host.querySelector('label[for="pf-theme"]')?.textContent).toBe('Thema')
+    act(() => { root.unmount() })
+    host.remove()
   })
 })

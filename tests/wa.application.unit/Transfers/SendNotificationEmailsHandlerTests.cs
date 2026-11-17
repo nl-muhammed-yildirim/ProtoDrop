@@ -18,6 +18,7 @@ public class SendNotificationEmailsHandlerTests
     private readonly StubEventPublisher _eventPublisher;
     private readonly EventDeduplicator _deduplicator;
     private readonly WaTelemetryReporter _telemetry;
+    private readonly CapturingLogger<SendNotificationEmailsHandler> _log = new();
     private readonly SendNotificationEmailsHandler _handler;
 
     public SendNotificationEmailsHandlerTests()
@@ -47,7 +48,7 @@ public class SendNotificationEmailsHandlerTests
             _deduplicator,
             _telemetry,
             config,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<SendNotificationEmailsHandler>.Instance);
+            _log);
     }
 
     [Fact]
@@ -236,6 +237,33 @@ public class SendNotificationEmailsHandlerTests
         // No email.failed on non-final attempts; nothing was sent.
         Assert.DoesNotContain(_eventPublisher.Published, e => e.Type == EventType.EmailFailed);
         Assert.Empty(_emailSender.Sent);
+    }
+
+    [Fact]
+    public async Task Handle_SendFailure_ErrorLog_CarriesRecipientId_NotAddress()
+    {
+        // T-012-06 (AC-012-3 / TA-9.4): the failure log line identifies the recipient row, never the address.
+        var transferId = Guid.NewGuid();
+        var recipientId = Guid.NewGuid();
+        _store.Context = new EmailTransferContext(
+            transferId,
+            "Alice",
+            null,
+            DateTime.UtcNow.AddDays(30),
+            "ABCD1234",
+            [new FileEntry("file.txt", 1024)]);
+        _store.Recipients = new List<EmailRecipient>
+        {
+            new() { Id = recipientId, TransferId = transferId, Address = "a@x.com" }
+        };
+        _emailSender.ThrowOnSend = new Exception("429");
+        var envelope = CreateEnvelope(transferId, ["a@x.com"]);
+
+        await Assert.ThrowsAsync<Exception>(() => _handler.HandleAsync(envelope, 1, 5, CancellationToken.None));
+
+        var error = Assert.Single(_log.Entries, e => e.Level == LogLevel.Error);
+        Assert.Contains(recipientId, error.Values);
+        Assert.False(_log.Mentions("a@x.com"));
     }
 
     [Fact]
@@ -481,6 +509,89 @@ public class SendNotificationEmailsHandlerTests
         };
     }
 
+    // ---- T-006-05: per-recipient unsubscribe URL (FR-006-2 / FR-006-5) ----
+
+    private SendNotificationEmailsHandler CreateHandler(string? jwtSecret)
+    {
+        var values = new Dictionary<string, string?>
+        {
+            ["Wa:Email:FromAddress"] = "no-reply@protodrop.com",
+            ["Wa:Url:Public"] = "https://protodrop.com"
+        };
+        if (jwtSecret is not null)
+            values["Wa:Jwt:Secret"] = jwtSecret;
+
+        return new SendNotificationEmailsHandler(
+            _store,
+            _emailSender,
+            _templateRenderer,
+            _eventPublisher,
+            _deduplicator,
+            _telemetry,
+            new ConfigurationBuilder().AddInMemoryCollection(values).Build(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<SendNotificationEmailsHandler>.Instance);
+    }
+
+    private EventEnvelope ArrangeTwoRecipients(string? senderEmail)
+    {
+        var transferId = Guid.NewGuid();
+        _store.Context = new EmailTransferContext(
+            transferId, "Alice", senderEmail, DateTime.UtcNow.AddDays(30), "ABCD1234", [new FileEntry("file.txt", 1024)]);
+        _store.Recipients = new List<EmailRecipient>
+        {
+            new() { Id = Guid.NewGuid(), TransferId = transferId, Address = "a@x.com" },
+            new() { Id = Guid.NewGuid(), TransferId = transferId, Address = "b@y.com" }
+        };
+        return CreateEnvelope(transferId, ["a@x.com", "b@y.com"]);
+    }
+
+    [Fact]
+    public async Task Handle_SenderEmailAndSecret_EachRecipientGetsOwnVerifiableUnsubscribeUrl()
+    {
+        var envelope = ArrangeTwoRecipients("sender@x.com");
+        var handler = CreateHandler("unit-secret");
+
+        await handler.HandleAsync(envelope, 1, 5, CancellationToken.None);
+
+        Assert.Equal(2, _templateRenderer.DataInOrder.Count);
+        const string prefix = "https://protodrop.com/unsubscribe/";
+        var key = System.Text.Encoding.UTF8.GetBytes("unit-secret");
+        for (var i = 0; i < 2; i++)
+        {
+            var url = _templateRenderer.DataInOrder[i].UnsubscribeUrl;
+            Assert.NotNull(url);
+            Assert.StartsWith(prefix, url);
+            var verified = UnsubscribeToken.Verify(url![prefix.Length..], key);
+            Assert.NotNull(verified);
+            Assert.Equal(_emailSender.Sent[i].To, verified!.Value.Address);
+            Assert.Equal("sender@x.com", verified.Value.SenderEmail);
+        }
+        Assert.NotEqual(_templateRenderer.DataInOrder[0].UnsubscribeUrl, _templateRenderer.DataInOrder[1].UnsubscribeUrl);
+    }
+
+    [Fact]
+    public async Task Handle_NoSenderEmail_UnsubscribeUrlNull()
+    {
+        var envelope = ArrangeTwoRecipients(null);
+        var handler = CreateHandler("unit-secret");
+
+        await handler.HandleAsync(envelope, 1, 5, CancellationToken.None);
+
+        Assert.Equal(2, _templateRenderer.DataInOrder.Count);
+        Assert.All(_templateRenderer.DataInOrder, d => Assert.Null(d.UnsubscribeUrl));
+    }
+
+    [Fact]
+    public async Task Handle_NoSecretConfigured_UnsubscribeUrlNull()
+    {
+        var envelope = ArrangeTwoRecipients("sender@x.com");
+
+        await _handler.HandleAsync(envelope, 1, 5, CancellationToken.None); // fixture config has no Wa:Jwt:Secret
+
+        Assert.Equal(2, _templateRenderer.DataInOrder.Count);
+        Assert.All(_templateRenderer.DataInOrder, d => Assert.Null(d.UnsubscribeUrl));
+    }
+
     // ---- Stubs ----
 
     private sealed class StubEmailStore : IEmailStore
@@ -532,11 +643,14 @@ public class SendNotificationEmailsHandlerTests
         public string? LastLocale { get; private set; }
         /// <summary>T-014-04: every locale the renderer was called with, in send order (per-recipient verification).</summary>
         public List<string> LocalesInOrder { get; } = [];
+        /// <summary>T-006-05: every TemplateData the renderer received, in send order.</summary>
+        public List<TemplateData> DataInOrder { get; } = [];
 
         public (string Subject, string HtmlBody, string TextBody) Render(TemplateData data, string locale)
         {
             LastLocale = locale;
             LocalesInOrder.Add(locale);
+            DataInOrder.Add(data);
 
             var html = $"""
                 <html>
