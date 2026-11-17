@@ -5,7 +5,7 @@ Triggered when every task row of the feature is `done`. AGENT.md §4 defines the
 ## Test gates — commands and order
 
 1. `dotnet test tests/wa.domain.unit --nologo -v q` (fast)
-2. `dotnet test tests/wa.application.unit --nologo -v q` (fast)
+2. `dotnet test tests/wa.application.unit --nologo -v q` (fast); then `dotnet test tests/wa.workers.unit --nologo -v q` (fast — f-zip/f-email; added 2026-11-17)
 3. `dotnet test tests/wa.api.integration --nologo -v q` — **long** (Testcontainers per class; Docker daemon must be up). Run as background terminal with notify and continue independent work meanwhile; wait via process_manage(action=wait, timeout≈540) — it may still need a second wait.
 4. Frontend: `cd src/wa.web && npm run lint` / `npm run test:run` / `npm run build` (independent of the dotnet suites — can overlap step 3).
 

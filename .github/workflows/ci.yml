@@ -38,7 +38,7 @@ jobs:
           dotnet-version: "10.0.x"
       - run: dotnet format src/wa.slnx --verify-no-changes
 
-  # AGENT.md §4: dotnet test tests/wa.domain.unit + tests/wa.application.unit (100% pass gate).
+  # AGENT.md §4: dotnet test tests/wa.domain.unit + tests/wa.application.unit + tests/wa.workers.unit (100% pass gate).
   unit:
     runs-on: ubuntu-latest
     steps:
@@ -48,6 +48,7 @@ jobs:
           dotnet-version: "10.0.x"
       - run: dotnet test tests/wa.domain.unit
       - run: dotnet test tests/wa.application.unit
+      - run: dotnet test tests/wa.workers.unit
 
   # AGENT.md §4: dotnet test tests/wa.api.integration (Testcontainers; runners have Docker — EC-051-2).
   integration:
