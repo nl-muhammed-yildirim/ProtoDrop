@@ -85,7 +85,7 @@ AC-017-3: Any P0 screen on a phone
 |---|---|---|---|
 | US-017-01 | T-017-01 Mobile upload surface: file input + sticky Send. (FR-017-2, FR-017-5) | `US-017-01-mobile-upload/T-017-01-mobile-upload-ui.md` | ☑ |
 | US-017-02 | T-017-02 Mobile download mechanics verification (Safari zip bar, original filenames) | `US-017-02-mobile-download/T-017-02-mobile-download-mechanics.md` | ☑ |
-| US-017-03 | T-017-03 44 px touch targets + no-hover affordances across P0 surfaces (FR-017-4/5) | `US-017-03-touch-ui/T-017-03-44px-tap-targets-audit.md` | ☐ |
+| US-017-03 | T-017-03 44 px touch targets + no-hover affordances across P0 surfaces (FR-017-4/5) | `US-017-03-touch-ui/T-017-03-44px-tap-targets-audit.md` | ☑ |
 | US-017-03 + US-017-01/02 | T-017-04 Playwright mobile contexts + real-device spot check (mobile matrix green) | `US-017-03-touch-ui/T-017-04-mobile-e2e-matrix.md` | ☐ |
 
 **Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified (AC-017-1/2/3 covered across T-017-01…T-017-04). Then T-027 can be marked `done` in `Milestone-Backlog.md`. T-027 also carries the dark-mode + a11y parts (F-TRF-015/016) — its exit "No flash-of-wrong-theme; keyboard-only full flow; mobile matrix green in staging" is only satisfied once those land too: the mobile matrix must be green *in staging*, including the T-017-04 real-device spot check (Safari + Chrome).

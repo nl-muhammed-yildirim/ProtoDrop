@@ -48,9 +48,9 @@ dotnet test tests/wa.domain.unit
 dotnet test tests/wa.application.unit
 dotnet test tests/wa.api.integration     # Testcontainers: Docker must be running
 cd src/wa.web
-npm run lint && npm run test && npm run build
-node ../scripts/check-theme-tokens.mjs   # T-015-03 (FR-015-2): token-diff parity — all 14 tokens in :root/dark/light, dark ≠ light per token; CI job theme-check runs the same script from repo root.
-node ../scripts/check-contrast.mjs       # T-016-06 (FR-016-4): WCAG contrast from tokens.css, both themes; gated core pairs ≥ 4.5:1; CI job contrast-check runs the same script from repo root.
+npm run lint && npm run test:run && npm run build   # T-017-03: `npm run lint` = eslint + scripts/check-tap-targets.mjs (44 px / 16 px floor at ≤640 px on P0 surfaces); `npm run test` is watch mode
+node ../../scripts/check-theme-tokens.mjs   # T-015-03 (FR-015-2): token-diff parity — all 14 tokens in :root/dark/light, dark ≠ light per token; CI job theme-check runs the same script from repo root.
+node ../../scripts/check-contrast.mjs       # T-016-06 (FR-016-4): WCAG contrast from tokens.css, both themes; gated core pairs ≥ 4.5:1; CI job contrast-check runs the same script from repo root.
 ```
 
 Plus, per task: the task's own **exit check** in `Milestone-Backlog.md`.
