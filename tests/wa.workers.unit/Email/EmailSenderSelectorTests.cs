@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Xunit;
 using wa.application.Ports;
@@ -14,7 +15,7 @@ public class EmailSenderSelectorTests
         var provider = new CapturingProvider();
         using var factory = new LoggerFactory([provider]);
 
-        var sender = EmailSenderSelector.Create("log", "no-reply@protodrop.com", factory);
+        var sender = EmailSenderSelector.Create(Config(("Wa:Email:Sender", "log")), factory);
 
         Assert.IsType<LogEmailSender>(sender);
         await sender.SendAsync(
@@ -22,6 +23,49 @@ public class EmailSenderSelectorTests
             CancellationToken.None);
         Assert.Contains(provider.Messages, m => m.StartsWith("EMAIL SENT") && m.Contains("To: to@x.com"));
     }
+
+    [Fact]
+    public void Create_NonLogWithConnection_ReturnsCommunicationHubSender()
+    {
+        using var factory = new LoggerFactory();
+
+        var sender = EmailSenderSelector.Create(Config(("Wa:CommunicationHub:Connection", FakeConnection)), factory);
+
+        Assert.IsType<CommunicationHubEmailSender>(sender);
+    }
+
+    [Fact]
+    public void Create_ExplicitNonLogSwitch_WithConnection_ReturnsCommunicationHubSender()
+    {
+        using var factory = new LoggerFactory();
+
+        var sender = EmailSenderSelector.Create(
+            Config(("Wa:Email:Sender", "acs"), ("Wa:CommunicationHub:Connection", FakeConnection)), factory);
+
+        Assert.IsType<CommunicationHubEmailSender>(sender);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Create_NonLogWithoutConnection_ThrowsNamingKey(string? connection)
+    {
+        using var factory = new LoggerFactory();
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            EmailSenderSelector.Create(Config(("Wa:CommunicationHub:Connection", connection)), factory));
+
+        Assert.Contains("Wa:CommunicationHub:Connection", ex.Message);
+    }
+
+    private const string FakeConnection =
+        "endpoint=https://fake.communication.azure.com/;accesskey=ZmFrZS1hY2Nlc3Mta2V5";
+
+    private static IConfiguration Config(params (string Key, string? Value)[] values) =>
+        new ConfigurationBuilder()
+            .AddInMemoryCollection(values.Select(v => new KeyValuePair<string, string?>(v.Key, v.Value)))
+            .Build();
 
     private sealed class CapturingProvider : ILoggerProvider
     {

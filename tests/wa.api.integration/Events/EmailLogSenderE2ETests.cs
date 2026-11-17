@@ -247,14 +247,15 @@ public class EmailLogSenderE2ETests : IAsyncLifetime
         {
             ["Wa:Url:Public"] = PublicOrigin,
             ["Wa:Jwt:Secret"] = TestSecret,
-            ["Wa:Email:FromAddress"] = FromAddress
+            ["Wa:Email:FromAddress"] = FromAddress,
+            ["Wa:Email:Sender"] = "log"
         }).Build();
 
         await using var workerDb = NewDb();
         var telemetry = new WaTelemetryReporter(_loggerFactory.CreateLogger<WaTelemetryReporter>(), Encoding.UTF8.GetBytes(TestSecret));
         var handler = new SendNotificationEmailsHandler(
             new EmailStore(workerDb),
-            EmailSenderSelector.Create("log", FromAddress, _loggerFactory), // the Wa:Email:Sender=log arm
+            EmailSenderSelector.Create(config, _loggerFactory), // the Wa:Email:Sender=log arm
             new StubbleTemplateRenderer(_loggerFactory.CreateLogger<StubbleTemplateRenderer>(), telemetry),
             new InMemoryEventPublisher(), // worker-side email_sent sink; not asserted
             new EventDeduplicator(() => DateTimeOffset.UtcNow),
