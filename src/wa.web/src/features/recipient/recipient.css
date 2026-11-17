@@ -307,4 +307,9 @@
   .rp-password-input {
     height: 44px;
   }
+
+  /* T-017-03 (AC-017-3): sender name/email in the heading wraps instead of forcing horizontal scroll at 360 px. */
+  .rp-heading {
+    overflow-wrap: anywhere;
+  }
 }

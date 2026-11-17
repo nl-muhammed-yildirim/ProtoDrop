@@ -1491,3 +1491,76 @@ html[data-theme='dark'] .dz-toast,
 html[data-theme='dark'] .tb-dropdown {
   box-shadow: 0 0 0 1px var(--border);
 }
+
+/* T-017-03 (FR-017-4/5, AC-017-3): phone <=640 px touch-target floor (44 px), 16 px inputs (no iOS focus zoom), 360 px wrap fixes.
+   Desktop above 640 px unchanged. Enforced by scripts/check-tap-targets.mjs (chained into npm run lint). */
+@media (max-width: 640px) {
+  .tb-avatar {
+    width: 44px;
+    height: 44px;
+  }
+
+  .tb-signin,
+  .tb-dropdown-row,
+  .ls-copy-btn {
+    min-height: 44px;
+  }
+
+  .mf-retry {
+    min-height: 44px;
+    padding: 0 12px;
+  }
+
+  .ls-password-toggle {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .tb-theme-select,
+  .ls-sender-input,
+  .ls-password-input,
+  .au-input,
+  .pf-input,
+  .pf-theme-select {
+    min-height: 44px;
+    font-size: var(--fs-body);
+  }
+
+  .ls-recipients-textarea,
+  .ls-note-textarea {
+    font-size: var(--fs-body);
+  }
+
+  .ls-actions {
+    flex-wrap: wrap;
+  }
+
+  .ls-recipients-error {
+    overflow-wrap: anywhere;
+  }
+
+  /* My Files (US-017-03 Edge cases): name on its own line, meta wraps, actions = a full-width row of discrete 44 px buttons. */
+  .mf-row {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .mf-name {
+    flex-basis: 100%;
+  }
+
+  .mf-meta {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: normal;
+  }
+
+  .mf-countdown {
+    min-width: 0;
+  }
+
+  .mf-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+}
