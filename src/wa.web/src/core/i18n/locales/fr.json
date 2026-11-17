@@ -85,6 +85,7 @@
   "recipient.active.preparing": "Préparation de votre téléchargement…",
   "recipient.active.preparingHint": "Cela peut prendre une minute pour les transferts volumineux.",
   "recipient.active.preparingFailed": "La préparation du téléchargement a échoué — réessayez",
+  "recipient.active.capNote": "Fichiers volumineux — téléchargez-les individuellement.",
   "auth.signIn.tab": "Connexion",
   "auth.signUp.tab": "Inscription",
   "auth.heading.signIn": "Connexion",

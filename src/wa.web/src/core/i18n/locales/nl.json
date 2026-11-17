@@ -85,6 +85,7 @@
   "recipient.active.preparing": "Uw download wordt voorbereid…",
   "recipient.active.preparingHint": "Bij grote overdrachten kan dit een minuut duren.",
   "recipient.active.preparingFailed": "Voorbereiden van de download mislukt — probeer het opnieuw",
+  "recipient.active.capNote": "Bestanden zijn groot — download ze afzonderlijk.",
   "auth.signIn.tab": "Inloggen",
   "auth.signUp.tab": "Registreren",
   "auth.heading.signIn": "Inloggen",

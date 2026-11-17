@@ -85,6 +85,7 @@
   "recipient.active.preparing": "Preparando tu descarga…",
   "recipient.active.preparingHint": "Esto puede tardar un minuto en transferencias grandes.",
   "recipient.active.preparingFailed": "No se pudo preparar la descarga — inténtalo de nuevo",
+  "recipient.active.capNote": "Los archivos son grandes — descárgalos individualmente.",
   "auth.signIn.tab": "Iniciar sesión",
   "auth.signUp.tab": "Crear cuenta",
   "auth.heading.signIn": "Iniciar sesión",

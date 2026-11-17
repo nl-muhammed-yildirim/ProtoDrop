@@ -85,6 +85,7 @@
   "recipient.active.preparing": "Ihr Download wird vorbereitet…",
   "recipient.active.preparingHint": "Bei großen Übertragungen kann das eine Minute dauern.",
   "recipient.active.preparingFailed": "Vorbereitung des Downloads fehlgeschlagen – bitte erneut versuchen",
+  "recipient.active.capNote": "Dateien sind groß — einzeln herunterladen.",
   "auth.signIn.tab": "Anmelden",
   "auth.signUp.tab": "Registrieren",
   "auth.heading.signIn": "Anmelden",

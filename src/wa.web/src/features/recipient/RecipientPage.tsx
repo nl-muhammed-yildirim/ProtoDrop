@@ -288,6 +288,10 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
           </li>
         ))}
       </ul>
+      {/* T-004-04 (FR-004-4, AC-004-2): ≥2 files but no server Download all ⇒ over MAX_ZIP_SIZE (TA-4.2a) — absence + note, never a disabled button. */}
+      {files.length >= 2 && !hasDownloadAll && (
+        <p className="rp-cap-note">{i18n.t('recipient.active.capNote')}</p>
+      )}
       {/* FR-003-1: Download all when >1 file — hasDownloadAll comes from the server (TA-4.2#4), so the client never recomputes it. */}
       {hasDownloadAll && (
         <>

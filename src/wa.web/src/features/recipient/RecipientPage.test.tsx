@@ -243,6 +243,30 @@ describe('RecipientPage (App at /t/{linkId} — T-003-02)', () => {
     expect(host.querySelector('.rp-download-all')).toBeNull()
     // The per-file Download row stays.
     expect(host.querySelectorAll('.rp-download')).toHaveLength(1)
+    expect(host.querySelector('.rp-cap-note')).toBeNull() // AC-004-2: single file → no cap note
+    host.remove()
+  })
+
+  it('over-cap 2-file transfer → no Download all, cap note shown, per-file buttons remain (AC-004-2)', async () => {
+    stubFetch(200, activeBody({ hasDownloadAll: false }))
+
+    const host = await renderApp(isActive)
+
+    expect(host.querySelector('.rp-download-all')).toBeNull()
+    expect(host.querySelector('.rp-cap-note')?.textContent).toBe('Files are large — download individually.')
+    const rows = host.querySelectorAll<HTMLButtonElement>('.rp-download')
+    expect(rows).toHaveLength(2)
+    rows.forEach((b) => expect(b.disabled).toBe(false))
+    host.remove()
+  })
+
+  it('Download all available → no cap note', async () => {
+    stubFetch(200, activeBody())
+
+    const host = await renderApp(isActive)
+
+    expect(host.querySelector('.rp-download-all')).not.toBeNull()
+    expect(host.querySelector('.rp-cap-note')).toBeNull()
     host.remove()
   })
 

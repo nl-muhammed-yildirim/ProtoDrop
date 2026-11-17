@@ -85,6 +85,7 @@
   "recipient.active.preparing": "İndiriminiz hazırlanıyor…",
   "recipient.active.preparingHint": "Büyük aktarımlarda bu bir dakika sürebilir.",
   "recipient.active.preparingFailed": "İndirme hazırlığı başarısız oldu — tekrar deneyin",
+  "recipient.active.capNote": "Dosyalar büyük — tek tek indirin.",
   "auth.signIn.tab": "Giriş yap",
   "auth.signUp.tab": "Hesap oluştur",
   "auth.heading.signIn": "Giriş yap",
