@@ -1,0 +1,88 @@
+using System.Net.Http.Headers;
+using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using wa.application.UseCases.Billing;
+
+namespace wa.infrastructure.Billing;
+
+/// <summary>
+/// US-019-01 (D-1, TA-7.5 step 1): Stripe Checkout Session creation over plain HttpClient (no Stripe package).
+/// Logs only the Stripe status code + request id (TA-9.4: never the key, never an email).
+/// </summary>
+public sealed class StripeCheckoutGateway : IStripeCheckoutGateway
+{
+    private readonly HttpClient _http;
+    private readonly string? _secretKey;
+    private readonly ILogger<StripeCheckoutGateway> _logger;
+
+    public StripeCheckoutGateway(HttpClient http, string? secretKey, ILogger<StripeCheckoutGateway> logger)
+    {
+        _http = http ?? throw new ArgumentNullException(nameof(http));
+        _secretKey = secretKey;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    public async Task<StripeCheckoutSession> CreateSubscriptionCheckoutAsync(StripeCheckoutRequest request, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(_secretKey))
+            throw new BillingUnavailableException("Stripe secret key is not configured.");
+
+        var userId = request.UserId.ToString("N");
+        var form = new Dictionary<string, string>
+        {
+            ["mode"] = "subscription",
+            ["client_reference_id"] = userId,
+            ["subscription_data[metadata][userId]"] = userId,
+            ["metadata[userId]"] = userId,
+            ["line_items[0][price]"] = request.PriceId,
+            ["line_items[0][quantity]"] = "1",
+            ["success_url"] = request.SuccessUrl,
+            ["cancel_url"] = request.CancelUrl
+        };
+
+        using var message = new HttpRequestMessage(HttpMethod.Post, "v1/checkout/sessions")
+        {
+            Content = new FormUrlEncodedContent(form)
+        };
+        message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _secretKey);
+
+        try
+        {
+            using var response = await _http.SendAsync(message, ct);
+            var requestId = response.Headers.TryGetValues("Request-Id", out var ids) ? ids.FirstOrDefault() : null;
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Stripe checkout session creation failed: status {StatusCode}, request id {StripeRequestId}",
+                    (int)response.StatusCode, requestId);
+                throw new BillingUnavailableException($"Stripe returned {(int)response.StatusCode}.");
+            }
+
+            var json = await response.Content.ReadAsStringAsync(ct);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            var id = root.TryGetProperty("id", out var idEl) && idEl.ValueKind == JsonValueKind.String ? idEl.GetString() : null;
+            var url = root.TryGetProperty("url", out var urlEl) && urlEl.ValueKind == JsonValueKind.String ? urlEl.GetString() : null;
+            if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(url))
+            {
+                _logger.LogWarning("Stripe checkout session response missing id/url: request id {StripeRequestId}", requestId);
+                throw new BillingUnavailableException("Stripe response did not include a session url.");
+            }
+
+            return new StripeCheckoutSession(id, url);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning("Stripe checkout transport failure");
+            throw new BillingUnavailableException("Stripe is unreachable.", ex);
+        }
+        catch (TaskCanceledException ex) when (!ct.IsCancellationRequested)
+        {
+            _logger.LogWarning("Stripe checkout timed out");
+            throw new BillingUnavailableException("Stripe request timed out.", ex);
+        }
+        catch (JsonException ex)
+        {
+            throw new BillingUnavailableException("Stripe response was not valid JSON.", ex);
+        }
+    }
+}

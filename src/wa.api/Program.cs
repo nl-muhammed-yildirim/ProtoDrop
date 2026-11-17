@@ -140,6 +140,11 @@ builder.Services.AddSingleton<wa.infrastructure.Persistence.UnsubscribeService>(
 // US-019-03 (D-3): webhook dedup + mirror store — factory-based (fresh context per call; concurrent deliveries never share a context).
 builder.Services.AddSingleton<wa.application.UseCases.Billing.IStripeBillingStore>(sp => new wa.infrastructure.Persistence.StripeBillingStore(
     sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+// US-019-01 (D-1): Stripe Checkout over plain HttpClient (no Stripe package). 10 s mirrors TA-4.1.7's external-call timeout.
+builder.Services.AddSingleton<wa.application.UseCases.Billing.IStripeCheckoutGateway>(sp => new wa.infrastructure.Billing.StripeCheckoutGateway(
+    new HttpClient { BaseAddress = new Uri("https://api.stripe.com/"), Timeout = TimeSpan.FromSeconds(10) },
+    builder.Configuration["Wa:Stripe:SecretKey"],
+    sp.GetRequiredService<ILogger<wa.infrastructure.Billing.StripeCheckoutGateway>>()));
 var app = builder.Build();
 
 // T-011-01 (TA-9.2 / FR-011-1): role is derived PER REQUEST from the two config lists — same cookie, role flips when a list changes (EC-011-3).
@@ -1181,6 +1186,42 @@ app.MapPost("/api/v1/billing/webhooks/stripe", async (HttpRequest request, ISend
     // Retryable StripeWebhookException → GlobalErrorMiddleware → 500 INTERNAL → Stripe redelivers (EC-019-1).
 
     return Results.Ok();
+});
+
+// US-019-01 (TA-4.2#18 / FR-019-1): POST /api/v1/billing/checkout — cookie auth; returns the Stripe-hosted Checkout URL. Persists nothing.
+app.MapPost("/api/v1/billing/checkout", async (wa.application.UseCases.Billing.CheckoutRequest req, HttpContext ctx, ISender sender, CancellationToken ct) =>
+{
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+
+    if (string.IsNullOrWhiteSpace(req?.PlanCode))
+        throw new BusinessException(ProblemCodes.Validation, "planCode is required.");
+
+    BillingInterval interval;
+    if (req.Interval is null || string.Equals(req.Interval, "monthly", StringComparison.OrdinalIgnoreCase))
+        interval = BillingInterval.Monthly;
+    else if (string.Equals(req.Interval, "annual", StringComparison.OrdinalIgnoreCase))
+        interval = BillingInterval.Annual;
+    else
+        throw new BusinessException(ProblemCodes.Validation, "interval must be 'monthly' or 'annual'.");
+
+    try
+    {
+        var session = await sender.Send(
+            new wa.application.UseCases.Billing.CreateCheckoutSessionCommand(userId, req.PlanCode.Trim(), interval), ct);
+        return Results.Ok(new { url = session.Url, sessionId = session.SessionId });
+    }
+    catch (wa.application.UseCases.Billing.CheckoutException ex)
+    {
+        var code = ex.Code == wa.application.UseCases.Billing.CheckoutException.FailureCode.NotFound
+            ? ProblemCodes.NotFound
+            : ProblemCodes.Validation;
+        throw new BusinessException(code, ex.Message, ex);
+    }
+    catch (wa.application.UseCases.Billing.BillingUnavailableException ex)
+    {
+        throw new BusinessException(ProblemCodes.BillingUnavailable, "Billing is temporarily unavailable — please try again.", ex);
+    }
 });
 
 app.Run();
