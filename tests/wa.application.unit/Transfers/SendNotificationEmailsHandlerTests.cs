@@ -18,6 +18,7 @@ public class SendNotificationEmailsHandlerTests
     private readonly StubEventPublisher _eventPublisher;
     private readonly EventDeduplicator _deduplicator;
     private readonly WaTelemetryReporter _telemetry;
+    private readonly CapturingLogger<SendNotificationEmailsHandler> _log = new();
     private readonly SendNotificationEmailsHandler _handler;
 
     public SendNotificationEmailsHandlerTests()
@@ -47,7 +48,7 @@ public class SendNotificationEmailsHandlerTests
             _deduplicator,
             _telemetry,
             config,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<SendNotificationEmailsHandler>.Instance);
+            _log);
     }
 
     [Fact]
@@ -236,6 +237,33 @@ public class SendNotificationEmailsHandlerTests
         // No email.failed on non-final attempts; nothing was sent.
         Assert.DoesNotContain(_eventPublisher.Published, e => e.Type == EventType.EmailFailed);
         Assert.Empty(_emailSender.Sent);
+    }
+
+    [Fact]
+    public async Task Handle_SendFailure_ErrorLog_CarriesRecipientId_NotAddress()
+    {
+        // T-012-06 (AC-012-3 / TA-9.4): the failure log line identifies the recipient row, never the address.
+        var transferId = Guid.NewGuid();
+        var recipientId = Guid.NewGuid();
+        _store.Context = new EmailTransferContext(
+            transferId,
+            "Alice",
+            null,
+            DateTime.UtcNow.AddDays(30),
+            "ABCD1234",
+            [new FileEntry("file.txt", 1024)]);
+        _store.Recipients = new List<EmailRecipient>
+        {
+            new() { Id = recipientId, TransferId = transferId, Address = "a@x.com" }
+        };
+        _emailSender.ThrowOnSend = new Exception("429");
+        var envelope = CreateEnvelope(transferId, ["a@x.com"]);
+
+        await Assert.ThrowsAsync<Exception>(() => _handler.HandleAsync(envelope, 1, 5, CancellationToken.None));
+
+        var error = Assert.Single(_log.Entries, e => e.Level == LogLevel.Error);
+        Assert.Contains(recipientId, error.Values);
+        Assert.False(_log.Mentions("a@x.com"));
     }
 
     [Fact]

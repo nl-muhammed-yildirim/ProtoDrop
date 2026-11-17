@@ -56,7 +56,7 @@ public sealed class UnsubscribeService
         {
             // UQ_ES unique constraint violation — the row already exists (double-click / stale token).
             // Idempotent: treat as success. EC-006-3 documented.
-            _logger.LogInformation("Unsubscribe idempotent no-op for {Address} + {SenderEmail}", address, senderEmail);
+            _logger.LogInformation("Unsubscribe idempotent no-op — suppression row already exists (UQ_ES)");
             return new UnsubscribeResult(true);
         }
     }

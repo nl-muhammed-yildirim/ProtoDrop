@@ -167,7 +167,7 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "f-email: failed to send email to {Address} attempt {Attempt}", recipient.Address, attempt);
+                _logger.LogError(ex, "f-email: failed to send email to recipient {RecipientId} attempt {Attempt}", recipient.Id, attempt);
 
                 if (attempt == maxDeliveryCount)
                 {

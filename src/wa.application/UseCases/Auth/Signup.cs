@@ -83,7 +83,7 @@ public sealed class SignupHandler : IRequestHandler<SignupCommand, SignupResult>
             };
             await _users.CreateAsync(user, cancellationToken);
             _telemetry.LogEvent(TelemetryEvents.UserCreated); // AC-008-1: user_created emitted exactly once
-            _logger.LogInformation("User created for signup email {email}", email);
+            _logger.LogInformation("User created {UserId}", userId);
         }
         else
         {

@@ -118,6 +118,10 @@ public class UnsubscribeEndpointTests : IAsyncLifetime
 
         var count = await _db.Set<EmailSuppression>().CountAsync();
         Assert.Equal(1, count); // UQ_ES: only one row (SQL Server enforces the unique constraint)
+
+        // T-012-06 (AC-012-3 / TA-9.4): the real UQ_ES no-op path logs no raw address.
+        Assert.DoesNotContain(UnsubscribeTelemetryCapture.Lines, l =>
+            l.Contains("dup@x.com", StringComparison.OrdinalIgnoreCase) || l.Contains("sender@y.com", StringComparison.OrdinalIgnoreCase));
     }
 
     // ---- Exit check 3: tampered token → 404 + warn telemetry ----

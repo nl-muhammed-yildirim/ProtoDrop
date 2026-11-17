@@ -24,6 +24,11 @@
  *   R6  bypass             — `trackClientEvent as x` imports / `= trackClientEvent` aliases in web files (calls through an alias would escape R5);
  *                            TelemetryClient / .TrackEvent( / .TrackTrace( in src/**\/*.cs, or the App Insights ingestion host in a
  *                            web file other than core/telemetry/clientTelemetry.ts (AC-056-4: the reporter / trackClientEvent are the single exits).
+ *   R7  logger call        — T-012-06: any ILogger call (`.Log[Trace|Debug|Information|Warning|Error|Critical](..)` on ANY receiver) in src/**\/*.cs
+ *                            whose template / arguments carry PII: an email literal, a {placeholder} or argument identifier naming
+ *                            email / mail / address / ip / password / passwd / secret / sas / sig / signature, or a file / sender / display /
+ *                            user / recipient / owner name (bare `name` is NOT flagged — container / account / event names are config, not PII).
+ *                            Sanctioned slot-wrapped spans (FileNameSlot / IpSlot / PiiTransforms.*) are stripped first. Log an id instead (TA-9.4).
  *
  * Allowlists are CLOSED sets: adding a telemetry property means editing one list below — that diff is the PR-visible review point (EC-012-3).
  *
@@ -33,7 +38,8 @@
  * Limitation: a paren/quote-aware text scan, not a Roslyn/TS parser. Server: a reporter method taken as a delegate / method group
  * (`var f = reporter.X; f(..)`) or invoked via reflection escapes R1/R2/R4 (R6 + the reflection pin in WaTelemetryReporterTests mitigate).
  * Client: re-exporting (`export { trackClientEvent as x }`), passing the function as a value (`wrap(trackClientEvent)`), or calling it via
- * a destructured / namespace alias other than the two shapes R6 flags escapes R5. T-069 owns the [Pii] attribute, event-DTO convention tests and general _logger templates.
+ * a destructured / namespace alias other than the two shapes R6 flags escapes R5. T-069 owns the [Pii] attribute and event-DTO convention tests.
+ * R7 is a text scan too: a PII value laundered through a neutrally named local (`var x = user.Email; _logger.LogX("{X}", x)`) escapes it.
  * Node built-ins only (TA-17: no new packages).
  */
 
@@ -81,6 +87,10 @@ function loadReporterMethods() {
 const REPORTER_METHODS = loadReporterMethods()
 const REPORTER_CALL_RE = new RegExp(`\\.\\s*(${[...REPORTER_METHODS].join('|')})\\s*\\(`, 'g')
 const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/
+/** R7: ILogger call on any receiver (does not match reporter `LogEvent(` — the level group is followed directly by `(`). */
+const LOG_CALL_RE = /\.\s*Log(?:Trace|Debug|Information|Warning|Error|Critical)?\s*\(/g
+const LOG_PII_WORDS = new Set(['email', 'mail', 'address', 'ip', 'password', 'passwd', 'secret', 'sas', 'sig', 'signature'])
+const NAME_QUALIFIERS = new Set(['file', 'sender', 'display', 'user', 'recipient', 'owner'])
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Lexing helpers
@@ -316,6 +326,46 @@ function scanCs(file, text) {
   return { findings, calls }
 }
 
+/** True when an identifier names PII for R7 (bare `name` is deliberately not PII — see header). */
+function isLogPiiIdentifier(id) {
+  const words = identifierWords(id)
+  if (words.some((w) => LOG_PII_WORDS.has(w))) return true
+  return words.includes('name') && words.some((w) => NAME_QUALIFIERS.has(w))
+}
+
+/** R7: ILogger calls over one C# file (any receiver). Pure: text in, findings + call count out. */
+function scanLog(file, text) {
+  const { nc, code } = mask(text, 'cs')
+  const findings = []
+  let calls = 0
+  for (const m of code.matchAll(LOG_CALL_RE)) {
+    const open = m.index + m[0].length - 1
+    const line = lineOf(text, m.index)
+    const call = extractCall(code, open)
+    if (!call) {
+      findings.push(finding(file, line, 'R0', 'could not find the closing paren of a logger call — scan is unreliable here'))
+      continue
+    }
+    calls++
+    const argText = nc.slice(call.start, call.end)
+    const argCode = code.slice(call.start, call.end)
+    const reasons = []
+    if (EMAIL_RE.test(argText)) reasons.push('raw email literal')
+    for (const ph of argText.matchAll(/\{(\w+)(?::[^}]*)?\}/g)) {
+      if (isLogPiiIdentifier(ph[1])) reasons.push(`placeholder {${ph[1]}}`)
+    }
+    const stripped = stripSanctioned(argCode)
+    const ids = new Set()
+    for (const im of stripped.matchAll(/[A-Za-z_][A-Za-z0-9_]*/g)) if (isLogPiiIdentifier(im[0])) ids.add(im[0])
+    for (const id of ids) reasons.push(`argument ${id}`)
+    if (/\.\s*Name\b/.test(stripped)) reasons.push('argument .Name member')
+    if (reasons.length > 0) {
+      findings.push(finding(file, line, 'R7', `logger call carries PII (${reasons.join('; ')}) — log an id instead; never a raw email/sender name/file name/IP (TA-9.4)`))
+    }
+  }
+  return { findings, calls }
+}
+
 /** Reporter log templates (R1, R3) over WaTelemetryReporter.cs. */
 function scanReporter(file, text) {
   const { nc, code } = mask(text, 'cs')
@@ -445,7 +495,7 @@ function* walk(dir) {
 
 function scanTree() {
   const findings = []
-  const counts = { csFiles: 0, tsFiles: 0, serverCalls: 0, clientCalls: 0, templates: 0 }
+  const counts = { csFiles: 0, tsFiles: 0, serverCalls: 0, clientCalls: 0, templates: 0, logCalls: 0 }
   for (const full of walk(SRC)) {
     const r = rel(full)
     const isCs = full.endsWith('.cs')
@@ -454,6 +504,9 @@ function scanTree() {
     const text = readFileSync(full, 'utf8')
     if (isCs) {
       counts.csFiles++
+      const lr = scanLog(r, text)
+      findings.push(...lr.findings)
+      counts.logCalls += lr.calls
       if (r === REPORTER_CS) {
         const res = scanReporter(r, text)
         findings.push(...res.findings)
@@ -476,17 +529,17 @@ function scanTree() {
 }
 
 function runScan() {
-  console.log('Telemetry PII guard (T-012-05, EC-012-3 / AC-012-3):')
+  console.log('Telemetry PII guard (T-012-05 / T-012-06, EC-012-3 / AC-012-3):')
   const { findings, counts } = scanTree()
-  console.log(`  scanned ${counts.csFiles} C# files, ${counts.tsFiles} web files: ${counts.serverCalls} server helper calls, ${counts.templates} reporter templates, ${counts.clientCalls} client trackClientEvent calls`)
+  console.log(`  scanned ${counts.csFiles} C# files, ${counts.tsFiles} web files: ${counts.serverCalls} server helper calls, ${counts.templates} reporter templates, ${counts.clientCalls} client trackClientEvent calls, ${counts.logCalls} logger calls`)
   findings.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line)
   for (const f of findings) console.error(`  ${f.file}:${f.line}  ${f.rule}  ${f.message}`)
   console.log('  rule  findings')
-  for (const rule of ['R0', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6']) {
+  for (const rule of ['R0', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7']) {
     const n = findings.filter((f) => f.rule === rule).length
     if (rule !== 'R0' || n > 0) console.log(`  ${rule}    ${n}`)
   }
-  if (counts.serverCalls === 0 || counts.templates === 0 || counts.clientCalls === 0) {
+  if (counts.serverCalls === 0 || counts.templates === 0 || counts.clientCalls === 0 || counts.logCalls === 0) {
     console.error('\nFAIL — scan found no call sites on a surface (path or pattern drift): the guard would pass vacuously.')
     process.exit(1)
   }
@@ -494,7 +547,7 @@ function runScan() {
     console.error(`\nFAIL — ${findings.length} telemetry PII finding(s). Route PII through FileNameSlot/IpSlot (TA-9.4) or, for a new non-PII property, extend the allowlist in scripts/check-telemetry-pii.mjs.`)
     process.exit(1)
   }
-  console.log('\nPASS — 0 findings: no raw email, unhashed PII or unknown property reaches a telemetry call.')
+  console.log('\nPASS — 0 findings: no raw email, unhashed PII or unknown property reaches a telemetry call or an ILogger line.')
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -502,7 +555,7 @@ function runScan() {
 // ---------------------------------------------------------------------------------------------------------------------
 
 function runSelfTest() {
-  const scan = { cs: (c) => scanCs('selftest.cs', c).findings, reporter: (c) => scanReporter('selftest.cs', c).findings, ts: (c) => scanTs('selftest.ts', c).findings }
+  const scan = { cs: (c) => scanCs('selftest.cs', c).findings, reporter: (c) => scanReporter('selftest.cs', c).findings, ts: (c) => scanTs('selftest.ts', c).findings, log: (c) => scanLog('selftest.cs', c).findings }
   const seeded = [
     ['S1', 'cs', 'R1', '_telemetry.TransferPageViewed(PiiTransforms.FileName("dev@example.com"));'],
     ['S2', 'cs', 'R2', '_telemetry.StorageBytesActive(user.Email.Length);'],
@@ -518,6 +571,14 @@ function runSelfTest() {
     ['S12', 'cs', 'R4', '_telemetry.TransferPageViewed(PiiTransforms.FileName(x) + request.LinkId)'],
     ['S13', 'ts', 'R6', "import { trackClientEvent as track } from '../core/telemetry/clientTelemetry'"],
     ['S14', 'ts', 'R6', 'const track = trackClientEvent'],
+    ['S15', 'log', 'R7', '_logger.LogInformation("User created for signup email {email}", email);'],
+    ['S16', 'log', 'R7', '_logger.LogError(ex, "f-email: failed to send email to {Address} attempt {Attempt}", recipient.Address, attempt);'],
+    ['S17', 'log', 'R7', 'logger.LogWarning($"sent to {user.Email}");'],
+    ['S18', 'log', 'R7', '_log.LogInformation("hello dev@example.com");'],
+    ['S19', 'log', 'R7', '_logger.LogInformation("{File}", upload.FileName);'],
+    ['S20', 'log', 'R7', '_logger.LogDebug("client {Client}", context.Connection.RemoteIpAddress);'],
+    ['S21', 'log', 'R7', '_logger.LogInformation("{Who}", transfer.SenderName);'],
+    ['S22', 'log', 'R7', '_logger.LogInformation("{F}", file.Name);'],
   ]
   const clean = [
     ['C1', 'ts', "if (x) {\n  trackClientEvent('upload_failed', { fileId: id, retries: fileAttempts.get(id)?.retries, ...(isBlobUnavailable ? { reason: 'blob_unavailable' } : {}) })\n}"],
@@ -526,6 +587,11 @@ function runSelfTest() {
     ['C4', 'ts', "trackClientEvent('download_completed', {\n  fileId: null, // TA-7.2: fileId=null for download-all.\n  bytes: totalBytes,\n  durationMs: Math.round(performance.now() - startedAt),\n})"],
     ['C6', 'cs', '_reporter.TransferPageViewed(_reporter.FileNameSlot(name));'],
     ['C7', 'ts', "import { trackClientEvent } from '../core/telemetry/clientTelemetry'"],
+    ['C8', 'log', '_logger.LogInformation("User created {UserId}", userId);'],
+    ['C9', 'log', '_logger.LogWarning("Draft rejected: {Detail}", detail);'],
+    ['C10', 'log', `_logger.LogInformation("Blob container '{C}' ensured", name);`],
+    ['C11', 'log', '_logger.LogInformation("file {Hash}", _telemetry.FileNameSlot(file.Name));'],
+    ['C12', 'log', '_telemetry.LogEvent(TelemetryEvents.UserCreated);'],
     ['C5', 'cs', '_telemetry.UploadCompleted(\n    totalBytes,\n    stopwatch.ElapsedMilliseconds,\n    totalRetries);'],
   ]
   let caught = 0
