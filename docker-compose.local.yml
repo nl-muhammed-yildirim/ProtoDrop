@@ -72,7 +72,7 @@ services:
       dockerfile: src/wa.workers/Dockerfile
     ports: ["8081:8081"]
     environment:
-      # Workers read raw env var names (colons in the key, not ConnectionStrings__ style).
+      # Workers read these through IConfiguration (T-006-07): literal `Wa:X` names (as here) and Linux-style `Wa__X` both resolve to key Wa:X.
       WaDb: "Server=host.docker.internal,1433;Database=wa;User Id=sa;Password=YourStrong!Passw0rd;Trust Server Certificate=True"
       "Wa:Blob:AccountUrl": "http://host.docker.internal:10000/devstoreaccount1"
       "Wa:Blob:AccountKey": "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
