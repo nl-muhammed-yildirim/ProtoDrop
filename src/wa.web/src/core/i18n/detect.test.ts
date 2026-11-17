@@ -73,6 +73,35 @@ describe('T-014-02 detection order (FR-014-3)', () => {
     expect(mod.getResolvedLocale()).toBe(mod.default.language)
   })
 
+  it("setAccountLocale('nl') writes the key and switches; a fresh load with a German browser still resolves nl (AC-014-3 round trip)", async () => {
+    installLocalStorageShim({})
+    setNavigatorLanguage('de-DE')
+    const mod = await importInitFresh()
+    expect(mod.default.language).toBe('de')
+    await mod.setAccountLocale('nl')
+    expect(window.localStorage.getItem(ACCOUNT_LOCALE_KEY)).toBe('nl')
+    expect(mod.default.language).toBe('nl')
+    const fresh = await importInitFresh()   // same shim instance — the written value survives
+    expect(fresh.default.language).toBe('nl')
+  })
+
+  it('setAccountLocale(null) removes the key and falls back to the browser', async () => {
+    installLocalStorageShim({ [ACCOUNT_LOCALE_KEY]: 'nl' })
+    setNavigatorLanguage('de-DE')
+    const mod = await importInitFresh()
+    expect(mod.default.language).toBe('nl')
+    await mod.setAccountLocale(null)
+    expect(window.localStorage.getItem(ACCOUNT_LOCALE_KEY)).toBeNull()
+    expect(mod.default.language).toBe('de')
+  })
+
+  it('readAccountLocale ignores unsupported values', async () => {
+    installLocalStorageShim({ [ACCOUNT_LOCALE_KEY]: 'bogus' })
+    setNavigatorLanguage('en-US')
+    const mod = await importInitFresh()
+    expect(mod.readAccountLocale()).toBeNull()
+  })
+
   it('imports without throwing when localStorage is absent (SSR safety)', async () => {
     // Remove any shim left by earlier cases: this repo's jsdom env has no window.localStorage,
     // and the typeof-window/try-catch guards in init.ts must swallow that. Also clear the
