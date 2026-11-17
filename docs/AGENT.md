@@ -88,7 +88,7 @@ docker compose -f docker-compose.local.yml up -d
 | `Wa:Blob:AccountUrl` | `http://127.0.0.1:10000/devstoreaccount1` |
 | `Wa:Blob:AccountKey` | `Eby8vdM02xNOcqTqK…> (Azurite dev key) |
 | `Wa:ServiceBus:ConnectionString` | *(optional locally; use in-memory publisher fake if unset)* |
-| `Wa:CommunicationHub:Connection` | *(optional locally; log-only sender if unset)* |
+| `Wa:CommunicationHub:Connection` | *(optional locally when `Wa:Email:Sender=log`; required otherwise — the workers throw on first email if it is missing, T-006-06)* |
 | `Wa:Jwt:Secret` | 64 hex chars (any fixed dev value) |
 | `Wa:Url:Public` | `http://localhost:5173` |
 | `Wa:Url:Api` | `http://localhost:8080` |
