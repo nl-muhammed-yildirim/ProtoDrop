@@ -11,7 +11,7 @@ namespace wa.application.Limits;
 public interface ILimitsProvider
 {
     /// <summary>The plan code guest requests resolve to — pass this for guests, no account lookup required (FR-053-6).</summary>
-    public const string GuestPlanCode = "free";
+    public const string GuestPlanCode = Plan.DefaultCode;
 
     /// <summary>Returns the effective limits for <paramref name="planCode"/>. Unknown plans throw <see cref="PlanUnknownException"/> → 404 PLAN_UNKNOWN at the API layer (AC-053-4); DB down on cache miss propagates as the underlying exception — no silent fallback to hardcoded defaults (EC-053-3).</summary>
     Task<LimitsRecord> Resolve(string planCode, CancellationToken cancellationToken = default);
