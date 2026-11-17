@@ -83,6 +83,8 @@
   "recipient.active.growthCopy": "Klaar om iets van jezelf te sturen?",
   "recipient.active.growthCta": "Stuur iets",
   "recipient.active.preparing": "Uw download wordt voorbereid…",
+  "recipient.active.preparingHint": "Bij grote overdrachten kan dit een minuut duren.",
+  "recipient.active.preparingFailed": "Voorbereiden van de download mislukt — probeer het opnieuw",
   "auth.signIn.tab": "Inloggen",
   "auth.signUp.tab": "Registreren",
   "auth.heading.signIn": "Inloggen",

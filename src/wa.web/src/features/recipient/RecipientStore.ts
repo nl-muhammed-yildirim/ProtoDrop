@@ -16,6 +16,9 @@ import { trackClientEvent } from '../../core/telemetry/clientTelemetry'
  * correct → the 7-day JWT lands in sessionStorage under pd.unlock.{linkId} (tab-isolated by design — a second
  * tab or a cleared store re-prompts, EC-003-2) and load() re-queries endpoint 4 with ?t= so a refresh in the same
  * tab never re-prompts (TA-4.2#5). Terminal codes win over the gate (T-003-03 precedence — same classifyProblem).
+ * T-004-03 (FR-004-6, EC-004-4): downloadAll(linkId) drives endpoint 7 — 200 {url} navigates like a per-file download,
+ * 202 {pollAfterSec} moves to 'preparing' and re-polls at the server's interval until 200 or the 3-minute ceiling;
+ * terminal Problem codes win (same screens as per-file), any other failure lands downloadAllFailed (toast, per-file rows stay usable).
  */
 
 export interface RecipientFile { fileId: string; name: string; sizeBytes: number }
@@ -28,7 +31,13 @@ const PUBLIC_TRANSFER_ENDPOINT = 'http://localhost:8080/api/v1/public/transfers/
 const UNLOCK_ENDPOINT = 'http://localhost:8080/api/v1/public/transfers/{linkId}/unlock'
 // T-003-06 (TA-4.2#6): endpoint 6 — mint a 30-minute read SAS; the browser streams the blob directly against storage.
 const DOWNLOAD_URL_ENDPOINT = 'http://localhost:8080/api/v1/public/transfers/{linkId}/files/{fileId}/download-url'
+// T-004-03 (TA-4.2#7): endpoint 7 — zip download URL; 200 {url} | 202 {pollAfterSec}.
+const DOWNLOAD_ALL_URL_ENDPOINT = 'http://localhost:8080/api/v1/public/transfers/{linkId}/download-all-url'
 const LOAD_TIMEOUT_MS = 30_000
+// T-004-03 (FR-004-6): fallback poll interval when a 202 omits pollAfterSec (the server sends the same 2 s) - UX timing, not a plan limit.
+const DEFAULT_POLL_AFTER_SEC = 2
+// T-004-03 (US-004-01 alt flow): give up after 3 minutes of 202s, measured from the first 202 - UX timing, not a plan limit.
+const ZIP_PREPARE_TIMEOUT_MS = 180_000
 const ERROR_MESSAGE = 'Something went wrong'
 
 // T-003-08-fix (T-055-05/TA-14.3, StagingList precedent): the local Azurite account is IP-hosted — the minted URL's
@@ -147,6 +156,10 @@ interface RecipientState {
   downloadedFileIds: string[]
   /** T-003-07 (FR-003-7): edge-triggered when a full download completes on an active transfer — the panel then stays visible. */
   growthPanelVisible: boolean
+  /** T-004-03: 'requesting' = first endpoint-7 call in flight (label unchanged - cached zip never shows preparing); 'preparing' after a 202. */
+  downloadAllPhase: 'idle' | 'requesting' | 'preparing'
+  /** T-004-03 (US-004-01 alt flow): drives the "Download preparation failed" toast; cleared when a new downloadAll starts. */
+  downloadAllFailed: boolean
   error: string | null
   /**
    * T-013-02 (AC-013-1 surface): the captured Problem+JSON from load()'s !res.ok path, when the body carried a
@@ -162,12 +175,25 @@ interface RecipientActions {
   unlock(linkId: string, password: string): Promise<void>
   /** T-003-06: GET endpoint 6 with the stored ?t= token → browser navigates to the minted SAS (streams directly from storage). */
   download(linkId: string, fileId: string): void
+  /** T-004-03 (FR-004-6): GET endpoint 7, polling at the server's pollAfterSec until the zip URL is ready, then navigate. */
+  downloadAll(linkId: string): void
+  /** T-004-03: clears the failure toast flag. */
+  dismissDownloadAllError(): void
   /** Aborts the in-flight load and restores the loading shape — keeps renders hermetic (UploadEngine reset style). */
   reset(): void
 }
 
 // One transfer page at a time; a new load (or reset) aborts the previous request.
 let activeController: AbortController | null = null
+// T-004-03: the in-flight endpoint-7 request and the pending poll timer - reset()/a new downloadAll cancel both.
+let downloadAllController: AbortController | null = null
+let downloadAllTimer: ReturnType<typeof setTimeout> | null = null
+function cancelDownloadAll(): void {
+  downloadAllController?.abort()
+  downloadAllController = null
+  if (downloadAllTimer !== null) clearTimeout(downloadAllTimer)
+  downloadAllTimer = null
+}
 
 const LOADING_SHAPE = {
   status: 'loading' as RecipientStatus,
@@ -184,11 +210,27 @@ const LOADING_SHAPE = {
   downloadErrorFileId: null as string | null,
   downloadedFileIds: [] as string[],
   growthPanelVisible: false,
+  downloadAllPhase: 'idle' as 'idle' | 'requesting' | 'preparing',
+  downloadAllFailed: false,
   error: null as string | null,
   capturedProblem: null as { code: string; correlationId?: string } | null,
 }
 
-export const useRecipientStore = create<RecipientState & RecipientActions>((set, get) => ({
+export const useRecipientStore = create<RecipientState & RecipientActions>((set, get) => {
+  // T-003-07 (FR-003-7): "full download" = every requested file completed - client-side state only, no round-trip.
+  // Shared by per-file and zip completion (T-004-03: zip passes every fileId). Re-downloads don't re-append; partials never flip it.
+  const markCompleted = (fileIds: string[]): void => {
+    const { status, files, downloadedFileIds, growthPanelVisible } = get()
+    const nextDownloadedFileIds = [...downloadedFileIds, ...fileIds.filter((id) => !downloadedFileIds.includes(id))]
+    const fullyDownloaded = files.length > 0 && files.every((f) => nextDownloadedFileIds.includes(f.fileId))
+    set({
+      downloadedFileIds: nextDownloadedFileIds,
+      // Edge-triggered once when the predicate flips false->true; a reload clears both fields (fresh page view is a
+      // fresh potential announcement), so re-downloads after the flip never hide or re-announce the panel.
+      growthPanelVisible: status === 'active' && (growthPanelVisible || fullyDownloaded),
+    })
+  }
+  return {
   ...LOADING_SHAPE,
   load: (linkId) =>
     (async () => {
@@ -315,7 +357,70 @@ export const useRecipientStore = create<RecipientState & RecipientActions>((set,
   reset: () => {
     activeController?.abort() // never let an aborted load's response land after unmount.
     activeController = null
+    cancelDownloadAll() // T-004-03: no poll or response may write state after unmount.
     set({ ...LOADING_SHAPE })
+  },
+  dismissDownloadAllError: () => set({ downloadAllFailed: false }),
+  downloadAll: (linkId) => {
+    cancelDownloadAll()
+    const startedAt = Date.now() // T-012-02: client-measured durationMs spans the whole preparing wait.
+    let preparingStartedAt: number | null = null
+    set({ downloadAllPhase: 'requesting', downloadAllFailed: false })
+    const fail = () => set({ downloadAllPhase: 'idle', downloadAllFailed: true })
+    const poll = async (): Promise<void> => {
+      const controller = new AbortController()
+      downloadAllController = controller
+      let timedOut = false
+      const timer = setTimeout(() => { timedOut = true; controller.abort() }, LOAD_TIMEOUT_MS)
+      try {
+        const token = readUnlockToken(linkId)
+        const url = DOWNLOAD_ALL_URL_ENDPOINT.replace('{linkId}', linkId)
+          + (token !== null ? `?t=${encodeURIComponent(token)}` : '')
+        const res = await fetch(url, { signal: controller.signal, headers: { traceparent: getTraceParent() } })
+        if (res.status === 202) {
+          const body = (await res.json().catch(() => null)) as { pollAfterSec?: number } | null
+          const now = Date.now()
+          preparingStartedAt ??= now
+          if (now - preparingStartedAt >= ZIP_PREPARE_TIMEOUT_MS) { fail(); return }
+          set({ downloadAllPhase: 'preparing' })
+          const sec = typeof body?.pollAfterSec === 'number' && body.pollAfterSec > 0 ? body.pollAfterSec : DEFAULT_POLL_AFTER_SEC
+          downloadAllTimer = setTimeout(() => { downloadAllTimer = null; void poll() }, sec * 1000)
+          return
+        }
+        if (!res.ok) {
+          const problem = (await res.json().catch(() => null)) as { code?: string; details?: string } | null
+          const terminal = classifyProblem(problem)
+          if (terminal !== null) {
+            set({ ...LOADING_SHAPE, status: terminal.status, terminalMessage: terminal.message })
+            return
+          }
+          fail() // 401 / 503 / junk - one failure copy; per-file rows stay usable (EC-004-4).
+          return
+        }
+        const body = (await res.json()) as { url: string }
+        // Same Azurite re-sign + same-tab navigation as per-file (AC-017-2 / EC-017-4 - a navigation, not a popup).
+        window.location.href = await browserDownloadUrl(body.url)
+        const { files, downloadsLeft } = get()
+        trackClientEvent('download_completed', {
+          fileId: null, // TA-7.2: fileId=null for download-all.
+          bytes: files.reduce((sum, f) => sum + f.sizeBytes, 0),
+          durationMs: Date.now() - startedAt,
+        })
+        // The server counted one zip download at mint time - decrement when the cap is finite.
+        set({ downloadAllPhase: 'idle', ...(downloadsLeft !== null ? { downloadsLeft: downloadsLeft - 1 } : {}) })
+        markCompleted(files.map((f) => f.fileId))
+      } catch (err) {
+        // AbortError means reset()/superseded - silent; the timeout abort is a real failure.
+        if (err instanceof Error && err.name === 'AbortError') {
+          if (timedOut) fail()
+          return
+        }
+        fail()
+      } finally {
+        clearTimeout(timer)
+      }
+    }
+    void poll()
   },
   download: (linkId, fileId) => {
     const controller = new AbortController()
@@ -357,22 +462,11 @@ export const useRecipientStore = create<RecipientState & RecipientActions>((set,
           bytes: fileForTelemetry?.sizeBytes ?? 0,
           durationMs: Date.now() - downloadStartedAt,
         })
-        // Exit check: "Downloads left" decrements by 1 when the cap is finite — the server counted at mint time.
-        const { status, files, downloadedFileIds, downloadsLeft, growthPanelVisible } = get()
-        if (downloadsLeft !== null) set({ downloadingFileId: null, downloadsLeft: downloadsLeft - 1 })
-        // T-003-07 (FR-003-7): "full download" = every requested file completed — client-side state only, no round-trip.
-        // Re-downloads don't re-append (already-complete stays true either way); T-017's zip completion reuses this path
-        // with all fileIds so the predicate covers zip with zero extra fields. Partial downloads never flip it.
-        const nextDownloadedFileIds = downloadedFileIds.includes(fileId)
-          ? downloadedFileIds
-          : [...downloadedFileIds, fileId]
-        const fullyDownloaded = files.length > 0 && files.every((f) => nextDownloadedFileIds.includes(f.fileId))
-        set({
-          downloadedFileIds: nextDownloadedFileIds,
-          // Edge-triggered once when the predicate flips false→true; a reload clears both fields (fresh page view is a
-          // fresh potential announcement), so re-downloads after the flip never hide or re-announce the panel.
-          growthPanelVisible: status === 'active' && (growthPanelVisible || fullyDownloaded),
-        })
+        // Exit check: "Downloads left" decrements by 1 when the cap is finite - the server counted at mint time.
+        // T-004-03: the in-flight indicator clears unconditionally (unlimited caps used to leave per-file buttons disabled).
+        const { downloadsLeft } = get()
+        set({ downloadingFileId: null, ...(downloadsLeft !== null ? { downloadsLeft: downloadsLeft - 1 } : {}) })
+        markCompleted([fileId])
       } catch (err) {
         // AbortError means unmounted/superseded — no row error for a cancelled page.
         if (!(err instanceof Error && err.name === 'AbortError')) {
@@ -383,4 +477,5 @@ export const useRecipientStore = create<RecipientState & RecipientActions>((set,
       }
     })()
   },
-}))
+}
+})

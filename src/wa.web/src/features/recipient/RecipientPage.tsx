@@ -5,8 +5,12 @@ import { formatBytes } from '../../core/upload/formatBytes'
 import i18n from '../../core/i18n/init'
 import ErrorScreen from '../errors/ErrorScreen'
 import { useAriaLive } from '../../core/ui/useAriaLive'
+import { toastRole } from '../../core/ui/toastRole'
 import { trackGrowthCta } from './growthTelemetry'
 import { useRecipientStore } from './RecipientStore'
+
+// T-004-03: failure toast auto-dismiss (App.tsx 5 s toast precedent).
+const TOAST_DISMISS_MS = 5000
 
 interface RecipientPageProps {
   linkId: string
@@ -32,6 +36,9 @@ interface RecipientPageProps {
  * something" anchor is this CTA too. Both CTAs push '/' + dispatch popstate — App swaps to the upload surface in-tree,
  * no full reload, staged files survive; no unlock token or recipient state transfers (pure pathname change).
  * growthTelemetry: growth_cta_shown / growth_cta_clicked with source 'post-download' | 'terminal-state' (TA-10.2).
+ * T-004-03 (FR-004-6, EC-004-4): Download all drives the store's downloadAll - 'preparing' swaps the label for a spinner +
+ * "Preparing your download…" (announced once per episode), shows the polling hint, keeps per-file rows usable; failure shows a
+ * role=alert toast that auto-dismisses after 5 s. The same single button serves both positions (EC-016-3).
  * The linkId arrives by prop from App (recipientRoute.ts matches the pathname — no window here).
  */
 export function RecipientPage({ linkId }: RecipientPageProps) {
@@ -50,6 +57,9 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
   const downloadErrorFileId = useRecipientStore((s) => s.downloadErrorFileId)
   // T-013-02 (AC-013-1 surface): the captured Problem from load()'s !res.ok — drives ErrorScreen(500) with Ref.
   const capturedProblem = useRecipientStore((s) => s.capturedProblem)
+  // T-004-03 (FR-004-6): zip preparing state + failure toast flag.
+  const downloadAllPhase = useRecipientStore((s) => s.downloadAllPhase)
+  const downloadAllFailed = useRecipientStore((s) => s.downloadAllFailed)
 
   // T-003-05 (FR-003-6): gate-local state — the password value resets on unmount/remount by construction.
   const [value, setValue] = useState('')
@@ -70,6 +80,16 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
     }
     prevDownloadsLeftRef.current = downloadsLeft
   }, [downloadsLeft])
+
+  useEffect(() => { // T-016-02 TODO resolved: effect fires on phase changes only, so polls (phase stays 'preparing') never re-announce.
+    if (downloadAllPhase === 'preparing') announce(i18n.t('recipient.active.preparing'))
+  }, [downloadAllPhase])
+
+  useEffect(() => { // T-004-03: the failure toast dismisses itself after TOAST_DISMISS_MS.
+    if (!downloadAllFailed) return
+    const id = setTimeout(() => useRecipientStore.getState().dismissDownloadAllError(), TOAST_DISMISS_MS)
+    return () => clearTimeout(id)
+  }, [downloadAllFailed])
 
   // EC-016-3 / FR-016 focus (T-016-03): after the loading→active transition or gate render, focus lands on the first actionable element — never <body>. tabIndex={-1} keeps the section out of tab order.
   const sectionRef = useRef<HTMLElement>(null)
@@ -113,9 +133,8 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
     void useRecipientStore.getState().download(linkId, fileId)
   }
   const handleDownloadAll = () => {
-    // T-016-02 TODO (F-TRF-004 client): when the zip preparing state lands, announce i18n.t('recipient.active.preparing') exactly once here (ref-guarded, not per poll) via this page's polite live region.
+    void useRecipientStore.getState().downloadAll(linkId)
   }
-  // T-017 (F-TRF-004) will replace this no-op — zip download-all reuses the store's per-file completion path with all fileIds.
   // T-003-08 (FR-003-10) / EC-016-3 (T-016-03): one element, two positions — this in-flow button is the sole Download all; CSS pins it to the viewport bottom at ≤640 px.
 
   // T-003-07 (FR-003-7): shared growth-CTA navigation — pushState('/') + a synthetic popstate swaps App to the upload
@@ -271,7 +290,19 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
       </ul>
       {/* FR-003-1: Download all when >1 file — hasDownloadAll comes from the server (TA-4.2#4), so the client never recomputes it. */}
       {hasDownloadAll && (
-        <button type="button" className="btn-primary rp-download-all" onClick={handleDownloadAll}>{i18n.t('recipient.active.downloadAll')}</button>
+        <>
+          <button type="button" className="btn-primary rp-download-all" disabled={downloadAllPhase !== 'idle'} aria-busy={downloadAllPhase === 'preparing'} onClick={handleDownloadAll}>
+            {downloadAllPhase === 'preparing' ? (
+              <>
+                <span className="rp-spinner" aria-hidden="true" />
+                {i18n.t('recipient.active.preparing')}
+              </>
+            ) : i18n.t('recipient.active.downloadAll')}
+          </button>
+          {downloadAllPhase === 'preparing' && (
+            <p className="rp-download-all-hint">{i18n.t('recipient.active.preparingHint')}</p>
+          )}
+        </>
       )}
       {/* T-003-03 (FR-003-5): "Downloads left: N" under the list — null = unlimited (Business, hidden);
       * shown only for finite caps past the first download (a 0 remaining is already the terminal limit screen). */}
@@ -284,6 +315,10 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
           <p className="rp-growth-copy">{i18n.t('recipient.active.growthCopy')}</p>
           <button type="button" className="btn-primary rp-growth-cta" onClick={handleGrowthCtaClick('post-download')}>{i18n.t('recipient.active.growthCta')}</button>
         </div>
+      )}
+      {/* T-004-03 (US-004-01 alt flow): fixed-positioned global toast - DOM position is irrelevant; role from the single-source mapping. */}
+      {downloadAllFailed && (
+        <div className="dz-toast" role={toastRole('error')}>{i18n.t('recipient.active.preparingFailed')}</div>
       )}
     </section>
   )

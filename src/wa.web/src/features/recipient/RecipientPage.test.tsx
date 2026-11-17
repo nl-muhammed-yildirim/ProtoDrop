@@ -67,6 +67,9 @@ async function renderApp(settled: () => boolean): Promise<HTMLDivElement> {
   return host
 }
 
+/** One real macrotask - crypto.subtle (browserDownloadUrl) resolves on a real async boundary, microtask flushes never advance it. */
+const tick = (): Promise<void> => new Promise((r) => setTimeout(r, 0))
+
 const isActive = (): boolean => useRecipientStore.getState().status === 'active'
 const isError = (): boolean => useRecipientStore.getState().status === 'error'
 // T-003-03: the shared terminal branch — expired (410/404) and download-limit (410).
@@ -145,12 +148,16 @@ describe('RecipientPage (App at /t/{linkId} — T-003-02)', () => {
     host.remove()
   })
 
-  it('shows Download all when the transfer has >= 2 files and clicking it does not fetch (AC-003-1)', async () => {
+  it('shows Download all when the transfer has >= 2 files; clicking it calls endpoint 7 (AC-003-1, FR-004-6)', async () => {
     const calls: string[] = []
     vi.stubGlobal(
       'fetch',
       async (input: RequestInfo | URL) => {
-        calls.push(String(input))
+        const url = String(input)
+        calls.push(url)
+        if (url.includes('/download-all-url')) {
+          return new Response(JSON.stringify({ pollAfterSec: 60 }), { status: 202, headers: { 'Content-Type': 'application/json' } })
+        }
         return new Response(JSON.stringify(activeBody()), { status: 200, headers: { 'Content-Type': 'application/json' } })
       },
     )
@@ -160,15 +167,68 @@ describe('RecipientPage (App at /t/{linkId} — T-003-02)', () => {
     const all = host.querySelector('.rp-download-all') as HTMLButtonElement
     expect(all).not.toBeNull()
     expect(all.textContent).toBe('Download all')
-    const countBefore = calls.length
+    expect(calls.filter((u) => u.includes('/download-all-url'))).toHaveLength(0) // page view mints nothing (TA-4.2#4)
 
     await act(async () => {
       all.click()
-      // Placeholder handler — no navigation, no fetch (T-003-06 / F-TRF-004 wire it).
-      await Promise.resolve()
+      for (let i = 0; i < 400 && useRecipientStore.getState().downloadAllPhase !== 'preparing'; i++) { await Promise.resolve() }
     })
 
-    expect(calls.length).toBe(countBefore) // page view + click minted nothing (TA-4.2#4)
+    const endpoint7 = calls.filter((u) => u.includes('/download-all-url'))
+    expect(endpoint7).toEqual([`http://localhost:8080/api/v1/public/transfers/${LINK_ID}/download-all-url`])
+    host.remove()
+  })
+
+  it('preparing → disabled spinner button, hint, per-file rows stay usable, announced once (FR-004-6, EC-004-4)', async () => {
+    stubFetch(200, activeBody())
+    const host = await renderApp(isActive)
+
+    await act(async () => { useRecipientStore.setState({ downloadAllPhase: 'preparing' }) })
+
+    const all = host.querySelector('.rp-download-all') as HTMLButtonElement
+    expect(all.disabled).toBe(true)
+    expect(all.getAttribute('aria-busy')).toBe('true')
+    expect(all.textContent).toBe('Preparing your download…')
+    expect(all.querySelector('.rp-spinner')).not.toBeNull()
+    expect(host.querySelector('.rp-download-all-hint')?.textContent).toBe('This can take a minute for large transfers.')
+    for (const b of Array.from(host.querySelectorAll('.rp-download')) as HTMLButtonElement[]) expect(b.disabled).toBe(false)
+
+    const live = host.querySelector('.rp [role="status"][aria-live="polite"]') as HTMLElement
+    expect(live.textContent).toBe('Preparing your download…')
+    // A further update that keeps the phase leaves the announcement untouched (polls never re-announce).
+    live.textContent = 'sentinel'
+    await act(async () => { useRecipientStore.setState({ downloadAllPhase: 'preparing', downloadedFileIds: ['f1'] }) })
+    expect(live.textContent).toBe('sentinel')
+    host.remove()
+  })
+
+  it('requesting → disabled but label unchanged and no hint (cached zip never shows preparing)', async () => {
+    stubFetch(200, activeBody())
+    const host = await renderApp(isActive)
+
+    await act(async () => { useRecipientStore.setState({ downloadAllPhase: 'requesting' }) })
+
+    const all = host.querySelector('.rp-download-all') as HTMLButtonElement
+    expect(all.disabled).toBe(true)
+    expect(all.textContent).toBe('Download all')
+    expect(host.querySelector('.rp-download-all-hint')).toBeNull()
+    expect(host.querySelector('.rp-spinner')).toBeNull()
+    host.remove()
+  })
+
+  it('downloadAllFailed → role=alert toast, button enabled (US-004-01 alt flow)', async () => {
+    stubFetch(200, activeBody())
+    const host = await renderApp(isActive)
+
+    await act(async () => { useRecipientStore.setState({ downloadAllFailed: true }) })
+
+    const toast = host.querySelector('.dz-toast') as HTMLElement
+    expect(toast).not.toBeNull()
+    expect(toast.getAttribute('role')).toBe('alert')
+    expect(toast.textContent).toBe('Download preparation failed — try again')
+    const all = host.querySelector('.rp-download-all') as HTMLButtonElement
+    expect(all.disabled).toBe(false)
+    expect(all.textContent).toBe('Download all')
     host.remove()
   })
 
@@ -861,7 +921,7 @@ describe('RecipientPage (T-003-06 — per-file download wiring)', () => {
       const btn = host.querySelector('.rp-download') as HTMLButtonElement
       await act(async () => {
         btn.click() // user action → store.download (the endpoint 6 fetch lands inside this act scope).
-        for (let i = 0; i < 400 && assignedHref === null; i++) { await Promise.resolve() }
+        for (let i = 0; i < 400 && assignedHref === null; i++) { await tick() }
       })
 
       // T-003-08-fix (T-055-05/TA-14.3, StagingList precedent): the browser navigates to the RE-ADDRESSED Azurite form —
@@ -999,7 +1059,7 @@ describe('RecipientPage (T-003-07 — growth loop)', () => {
       const buttons = Array.from(host.querySelectorAll('.rp-download')) as HTMLButtonElement[]
       await act(async () => {
         buttons[downloaded].click()
-        for (let i = 0; i < 400 && useRecipientStore.getState().downloadedFileIds.length < downloaded + 1; i++) { await Promise.resolve() }
+        for (let i = 0; i < 400 && useRecipientStore.getState().downloadedFileIds.length < downloaded + 1; i++) { await tick() }
       })
       downloaded += 1
     }
@@ -1030,7 +1090,7 @@ describe('RecipientPage (T-003-07 — growth loop)', () => {
       const first = host.querySelector('.rp-download') as HTMLButtonElement
       await act(async () => {
         first.click()
-        for (let i = 0; i < 400 && useRecipientStore.getState().downloadedFileIds.length < 1; i++) { await Promise.resolve() }
+        for (let i = 0; i < 400 && useRecipientStore.getState().downloadedFileIds.length < 1; i++) { await tick() }
       })
       expect(host.querySelector('.rp-growth')).toBeNull() // partial — the page stays in its normal state.
 
@@ -1038,7 +1098,7 @@ describe('RecipientPage (T-003-07 — growth loop)', () => {
       const second = host.querySelectorAll('.rp-download')[1] as HTMLButtonElement
       await act(async () => {
         second.click()
-        for (let i = 0; i < 400 && useRecipientStore.getState().downloadedFileIds.length < 2; i++) { await Promise.resolve() }
+        for (let i = 0; i < 400 && useRecipientStore.getState().downloadedFileIds.length < 2; i++) { await tick() }
       })
 
       const panel = host.querySelector('.rp-growth')
@@ -1073,7 +1133,7 @@ describe('RecipientPage (T-003-07 — growth loop)', () => {
       const btn = host.querySelector('.rp-download') as HTMLButtonElement
       await act(async () => {
         btn.click()
-        for (let i = 0; i < 400 && useRecipientStore.getState().downloadedFileIds.length < 1; i++) { await Promise.resolve() }
+        for (let i = 0; i < 400 && useRecipientStore.getState().downloadedFileIds.length < 1; i++) { await tick() }
       })
 
       expect(host.querySelector('.rp-growth')).toBeNull() // 1 of 5 — the panel must NOT appear.
@@ -1099,7 +1159,7 @@ describe('RecipientPage (T-003-07 — growth loop)', () => {
       await act(async () => {
         first.click()
         // The dedupe keeps downloadedFileIds.length at 2 — poll for the settled state (no in-flight row) instead.
-        for (let i = 0; i < 400 && useRecipientStore.getState().downloadingFileId !== null; i++) { await Promise.resolve() }
+        for (let i = 0; i < 400 && useRecipientStore.getState().downloadingFileId !== null; i++) { await tick() }
         for (let i = 0; i < 10; i++) { await Promise.resolve() } // flush: store update → React commit.
       })
       expect(host.querySelector('.rp-growth')).not.toBeNull() // still visible.
@@ -1250,7 +1310,7 @@ describe('RecipientPage (T-003-08 — mobile sticky bar, store-driven DOM)', () 
 
       await act(async () => {
         rowBtn.click() // user action → store.download (the endpoint 6 fetch lands inside this act scope).
-        for (let i = 0; i < 400 && assignedHref === null; i++) { await Promise.resolve() }
+        for (let i = 0; i < 400 && assignedHref === null; i++) { await tick() }
       })
 
       // T-003-08-fix (T-055-05/TA-14.3, StagingList precedent): the store re-addresses + protocol-re-signs

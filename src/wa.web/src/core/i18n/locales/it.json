@@ -83,6 +83,8 @@
   "recipient.active.growthCopy": "Pronto a inviare qualcosa di tuo?",
   "recipient.active.growthCta": "Invia qualcosa",
   "recipient.active.preparing": "Preparazione del tuo download…",
+  "recipient.active.preparingHint": "Per i trasferimenti di grandi dimensioni può richiedere un minuto.",
+  "recipient.active.preparingFailed": "Preparazione del download non riuscita — riprova",
   "auth.signIn.tab": "Accedi",
   "auth.signUp.tab": "Registrati",
   "auth.heading.signIn": "Accedi",
