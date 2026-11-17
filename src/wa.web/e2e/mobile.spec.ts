@@ -138,6 +138,9 @@ test.describe('AC-017-2 / FR-017-3 download-all + per-file (device viewport)', (
     await expect(page.locator('.dz-toast')).toHaveCount(0)
     await expect(page.locator('.rp-download-all')).toBeEnabled()
     await expect(page.locator('.rp-download-all')).toHaveText(/Download all/)
+    // EC-004-4: per-file fallback stays present and usable after the cancel.
+    await expect(page.locator('.rp-row .rp-download')).toHaveCount(2)
+    await expect(page.locator('.rp-row .rp-download').first()).toBeEnabled()
 
     // Per-file Download after a minted zip is covered by the single-file / password tests: local seeded transfers carry
     // MaxDownloads = 1 (guest default), so a second mint on THIS transfer is a cap-reached case, not a recovery check.
