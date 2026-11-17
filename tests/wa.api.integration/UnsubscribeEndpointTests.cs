@@ -122,6 +122,8 @@ public class UnsubscribeEndpointTests : IAsyncLifetime
         // T-012-06 (AC-012-3 / TA-9.4): the real UQ_ES no-op path logs no raw address.
         Assert.DoesNotContain(UnsubscribeTelemetryCapture.Lines, l =>
             l.Contains("dup@x.com", StringComparison.OrdinalIgnoreCase) || l.Contains("sender@y.com", StringComparison.OrdinalIgnoreCase));
+        // T-012-07: positive assertion — the negative check above ran over the real no-op line.
+        Assert.Contains(UnsubscribeTelemetryCapture.Lines, l => l.Contains("Unsubscribe idempotent no-op", StringComparison.Ordinal));
     }
 
     // ---- Exit check 3: tampered token → 404 + warn telemetry ----

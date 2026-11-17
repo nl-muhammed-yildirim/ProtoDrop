@@ -39,6 +39,7 @@
  * (`var f = reporter.X; f(..)`) or invoked via reflection escapes R1/R2/R4 (R6 + the reflection pin in WaTelemetryReporterTests mitigate).
  * Client: re-exporting (`export { trackClientEvent as x }`), passing the function as a value (`wrap(trackClientEvent)`), or calling it via
  * a destructured / namespace alias other than the two shapes R6 flags escapes R5. T-069 owns the [Pii] attribute and event-DTO convention tests.
+ * R7 also flags `.Path`/`.PathBase`/`.QueryString`/`.Message` member arguments (T-012-07: raw request path / exception message in a neutral slot).
  * R7 is a text scan too: a PII value laundered through a neutrally named local (`var x = user.Email; _logger.LogX("{X}", x)`) escapes it.
  * Node built-ins only (TA-17: no new packages).
  */
@@ -359,6 +360,8 @@ function scanLog(file, text) {
     for (const im of stripped.matchAll(/[A-Za-z_][A-Za-z0-9_]*/g)) if (isLogPiiIdentifier(im[0])) ids.add(im[0])
     for (const id of ids) reasons.push(`argument ${id}`)
     if (/\.\s*Name\b/.test(stripped)) reasons.push('argument .Name member')
+    const member = /\.\s*(Path|PathBase|QueryString|Message)\b/.exec(stripped)
+    if (member) reasons.push(`argument .${member[1]} member (raw request path / exception message — log LogRoute.Of(..) / a code instead)`)
     if (reasons.length > 0) {
       findings.push(finding(file, line, 'R7', `logger call carries PII (${reasons.join('; ')}) — log an id instead; never a raw email/sender name/file name/IP (TA-9.4)`))
     }
@@ -579,6 +582,8 @@ function runSelfTest() {
     ['S20', 'log', 'R7', '_logger.LogDebug("client {Client}", context.Connection.RemoteIpAddress);'],
     ['S21', 'log', 'R7', '_logger.LogInformation("{Who}", transfer.SenderName);'],
     ['S22', 'log', 'R7', '_logger.LogInformation("{F}", file.Name);'],
+    ['S23', 'log', 'R7', '_logger.LogError(ex, "Unhandled on {P}", context.Request.Path);'],
+    ['S24', 'log', 'R7', '_logger.LogWarning("Business error {Code}: {Detail}", ex.Code, ex.Message);'],
   ]
   const clean = [
     ['C1', 'ts', "if (x) {\n  trackClientEvent('upload_failed', { fileId: id, retries: fileAttempts.get(id)?.retries, ...(isBlobUnavailable ? { reason: 'blob_unavailable' } : {}) })\n}"],
@@ -592,6 +597,8 @@ function runSelfTest() {
     ['C10', 'log', `_logger.LogInformation("Blob container '{C}' ensured", name);`],
     ['C11', 'log', '_logger.LogInformation("file {Hash}", _telemetry.FileNameSlot(file.Name));'],
     ['C12', 'log', '_telemetry.LogEvent(TelemetryEvents.UserCreated);'],
+    ['C13', 'log', '_logger.LogWarning("blob delete failed for {BlobPath}", blob.BlobPath);'],
+    ['C14', 'log', '_logger.LogError(ex, "Unhandled exception on {Route}", LogRoute.Of(context));'],
     ['C5', 'cs', '_telemetry.UploadCompleted(\n    totalBytes,\n    stopwatch.ElapsedMilliseconds,\n    totalRetries);'],
   ]
   let caught = 0
