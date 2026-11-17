@@ -137,6 +137,9 @@ builder.Services.AddSingleton<wa.infrastructure.Persistence.UnsubscribeService>(
     sp.GetRequiredService<WaDbContext>(),
     System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Wa:Jwt:Secret"]!),
     sp.GetRequiredService<ILogger<wa.infrastructure.Persistence.UnsubscribeService>>()));
+// US-019-03 (D-3): webhook dedup + mirror store — factory-based (fresh context per call; concurrent deliveries never share a context).
+builder.Services.AddSingleton<wa.application.UseCases.Billing.IStripeBillingStore>(sp => new wa.infrastructure.Persistence.StripeBillingStore(
+    sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
 var app = builder.Build();
 
 // T-011-01 (TA-9.2 / FR-011-1): role is derived PER REQUEST from the two config lists — same cookie, role flips when a list changes (EC-011-3).
@@ -1153,6 +1156,31 @@ app.MapDelete("/api/v1/auth/me", async (HttpContext ctx, ISender sender, Cancell
         // Same as GET — valid cookie, no row → 404 NOT_FOUND.
         return Results.Json(ProblemWriter.Build(404, ProblemCodes.NotFound, ProblemCodes.TitleOf(ProblemCodes.NotFound)), statusCode: 404);
     }
+});
+
+// US-019-03 (TA-4.2#19 / FR-019-5): POST /api/v1/billing/webhooks/stripe — Stripe-Signature is the auth (no session gate).
+app.MapPost("/api/v1/billing/webhooks/stripe", async (HttpRequest request, ISender sender, CancellationToken ct) =>
+{
+    string payload;
+    using (var reader = new StreamReader(request.Body, System.Text.Encoding.UTF8))
+        payload = await reader.ReadToEndAsync(ct);
+
+    var secret = builder.Configuration["Wa:Stripe:WebhookSecret"];
+    if (!wa.application.UseCases.Billing.StripeWebhookSignature.IsValid(
+            request.Headers["Stripe-Signature"].ToString(), payload, secret, DateTimeOffset.UtcNow))
+        throw new BusinessException(ProblemCodes.StripeWebhookMismatch, "Stripe signature verification failed.");
+
+    try
+    {
+        await sender.Send(new wa.application.UseCases.Billing.HandleStripeWebhookCommand(payload), ct);
+    }
+    catch (wa.application.UseCases.Billing.StripeWebhookException ex) when (!ex.Retryable)
+    {
+        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+    }
+    // Retryable StripeWebhookException → GlobalErrorMiddleware → 500 INTERNAL → Stripe redelivers (EC-019-1).
+
+    return Results.Ok();
 });
 
 app.Run();
