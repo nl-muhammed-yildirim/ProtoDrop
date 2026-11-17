@@ -181,6 +181,83 @@ public class PlanCatalogIntegrationTests : IAsyncLifetime
         Assert.False(await fresh.Set<Plan>().AnyAsync(p => p.Code == "proplus2"));
     }
 
+    private static readonly Guid FreeId = Guid.Parse("11111111-0000-4000-8000-000000000001");
+    private static readonly Guid ProId = Guid.Parse("11111111-0000-4000-8000-000000000002");
+    private static readonly Guid BusinessId = Guid.Parse("11111111-0000-4000-8000-000000000003");
+
+    private FeaturesProvider NewFeaturesProvider(WaDbContext readDb) => new(
+        new PlansCache(new PlansStore(readDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow),
+        new FlagsCache(new FlagsStore(readDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow));
+
+    private async Task SetGate(string key, string value)
+    {
+        await using var writeDb = new WaDbContext(_options);
+        var flag = await writeDb.Set<FeatureFlag>().SingleAsync(f => f.Key == key);
+        flag.Value = value;
+        flag.UpdatedAtUtc = DateTime.UtcNow;
+        await writeDb.SaveChangesAsync();
+    }
+
+    private static void AssertSame(PlanFeatures expected, PlanFeatures actual)
+    {
+        Assert.Equal(expected.Ads, actual.Ads);
+        Assert.Equal(expected.Scheduling, actual.Scheduling);
+        Assert.Equal(expected.Analytics, actual.Analytics);
+        Assert.Equal(expected.Branding, actual.Branding);
+        Assert.Equal(expected.SsoScim, actual.SsoScim);
+    }
+
+    [Fact]
+    public async Task SeededGlobalGates_ExistForEveryPlanFeature() // guards key derivation against the TA-13.2 seed.
+    {
+        var keys = await _db.Set<FeatureFlag>().AsNoTracking().Select(f => f.Key).ToListAsync();
+
+        foreach (var gate in FeaturesProvider.GlobalGateKeys)
+            Assert.Contains(gate, keys);
+    }
+
+    [Fact]
+    public async Task SeededGates_Off_EveryPlanResolvesAllFeaturesOff()
+    {
+        await using var readDb = new WaDbContext(_options);
+        var provider = NewFeaturesProvider(readDb);
+
+        foreach (var id in new[] { FreeId, ProId, BusinessId })
+        {
+            var plan = await _db.Set<Plan>().AsNoTracking().SingleAsync(p => p.Id == id);
+            AssertSame(new PlanFeatures(), await provider.Resolve(plan.Code, CancellationToken.None));
+        }
+    }
+
+    [Fact]
+    public async Task GatesOn_ProRowDrives_FreeStaysOff_RowAndGateEditsApplyWithoutDeploy()
+    {
+        foreach (var key in FeaturesProvider.GlobalGateKeys) await SetGate(key, "true");
+        var free = await _db.Set<Plan>().AsNoTracking().SingleAsync(p => p.Id == FreeId);
+        var pro = await _db.Set<Plan>().AsNoTracking().SingleAsync(p => p.Id == ProId);
+
+        await using var readDb = new WaDbContext(_options);
+        var provider = NewFeaturesProvider(readDb);
+
+        AssertSame(JsonSerializer.Deserialize<PlanFeatures>(pro.FeaturesJson)!, await provider.Resolve(pro.Code, CancellationToken.None));
+        AssertSame(new PlanFeatures(), await provider.Resolve(free.Code, CancellationToken.None));
+
+        await SetGate(IFeaturesProvider.GlobalGatePrefix + "scheduling", "false");
+        Assert.False((await provider.Resolve(pro.Code, CancellationToken.None)).Scheduling);
+
+        await SetGate(IFeaturesProvider.GlobalGatePrefix + "scheduling", "true");
+        await using (var writeDb = new WaDbContext(_options))
+        {
+            var row = await writeDb.Set<Plan>().SingleAsync(p => p.Id == ProId);
+            row.FeaturesJson = row.FeaturesJson.Replace("\"analytics\":true", "\"analytics\":false");
+            Assert.Empty(PlanDefinition.Validate(row)); // validate-then-write (EC-018-2)
+            await writeDb.SaveChangesAsync();
+        }
+        var after = await provider.Resolve(pro.Code, CancellationToken.None);
+        Assert.False(after.Analytics);
+        Assert.True(after.Scheduling);
+    }
+
     private static Plan NewPlan(string code, int sortOrder, string limitsJson) => new()
     {
         Id = Guid.NewGuid(),
