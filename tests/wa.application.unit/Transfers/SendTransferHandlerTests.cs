@@ -385,6 +385,67 @@ public class SendTransferHandlerTests
         Assert.True(result!.ExpiresAtUtc >= before && result.ExpiresAtUtc <= after);
     }
 
+    private static LimitsRecord SendLimits(int retentionDays, int maxDownloads) => new()
+    {
+        MaxEmails = 20,
+        RetentionDays = retentionDays,
+        MaxDownloads = maxDownloads,
+        MaxTransferSize = 5_368_709_120,
+        MaxSingleFile = 5_368_709_120
+    };
+
+    [Fact]
+    public async Task Handle_StampsMaxDownloadsFromResolvedLimits() // T-031-04: cap comes from the plan at send, not the finalize placeholder.
+    {
+        _store.Transfer = NewDraftTransfer();
+        _store.Transfer.MaxDownloads = 1;
+        _limits.Record = SendLimits(30, 100);
+
+        await _handler.Handle(new SendTransferCommand(_store.Transfer.Id, null, null, null, []), CancellationToken.None);
+
+        Assert.Equal(100, _store.Transfer.MaxDownloads);
+    }
+
+    [Fact]
+    public async Task Handle_PlanChangedBetweenSends_ActiveKeepsSendTimeLimits_NextSendUsesNew() // AC-018-3, US-018-04 AC block 1.
+    {
+        _limits.Record = SendLimits(30, 1000);
+        var a = NewDraftTransfer();
+        _store.Transfer = a;
+        await _handler.Handle(new SendTransferCommand(a.Id, null, null, null, []), CancellationToken.None);
+        var aExpiry = a.ExpiresAtUtc;
+
+        _limits.Record = SendLimits(7, 100);
+        var b = NewDraftTransfer();
+        _store.Transfer = b;
+        await _handler.Handle(new SendTransferCommand(b.Id, null, null, null, []), CancellationToken.None);
+
+        Assert.Equal(aExpiry, a.ExpiresAtUtc);
+        Assert.Equal(1000, a.MaxDownloads);
+        Assert.InRange(b.ExpiresAtUtc, DateTime.UtcNow.AddDays(7).AddMinutes(-1), DateTime.UtcNow.AddDays(7).AddMinutes(1));
+        Assert.Equal(100, b.MaxDownloads);
+    }
+
+    [Fact]
+    public async Task Handle_LimitRaisedBetweenSends_InFlightUnaffected() // US-018-04 AC block 2.
+    {
+        _limits.Record = SendLimits(7, 100);
+        var a = NewDraftTransfer();
+        _store.Transfer = a;
+        await _handler.Handle(new SendTransferCommand(a.Id, null, null, null, []), CancellationToken.None);
+        var aExpiry = a.ExpiresAtUtc;
+
+        _limits.Record = SendLimits(14, 250);
+        var b = NewDraftTransfer();
+        _store.Transfer = b;
+        await _handler.Handle(new SendTransferCommand(b.Id, null, null, null, []), CancellationToken.None);
+
+        Assert.Equal(aExpiry, a.ExpiresAtUtc);
+        Assert.Equal(100, a.MaxDownloads);
+        Assert.InRange(b.ExpiresAtUtc, DateTime.UtcNow.AddDays(14).AddMinutes(-1), DateTime.UtcNow.AddDays(14).AddMinutes(1));
+        Assert.Equal(250, b.MaxDownloads);
+    }
+
     [Fact]
     public async Task Handle_WithPassword_StoresPbkdf2Hash_NotPlaintext()
     {
