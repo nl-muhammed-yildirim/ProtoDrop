@@ -90,15 +90,15 @@ AC-001-4: User drops an empty folder
 
 | Story | Task | File | Status |
 |---|---|---|---|
-| US-001-02 | T-001-01 UploadEngine Zustand store (TA-8.3 contract) | `US-001-02-stage-files/T-001-01-uploadengine-store.md` | ☐ |
-| US-001-01 | T-001-02 Drop zone: drag, click-to-browse, paste (FR-001-1) | `US-001-01-select-files/T-001-02-drop-zone.md` | ☐ |
-| US-001-02 | T-001-03 Staging list UI: rows, remove ✕, total line, "Send." button | `US-001-02-stage-files/T-001-03-staging-list-ui.md` | ☐ |
-| US-001-03 | T-001-04 Client-side limit pre-check + "Send." disable (FR-001-3) | `US-001-03-size-validation/T-001-04-client-limit-precheck.md` | ☐ |
-| US-001-03 | T-001-05 CreateDraftCommand + endpoint 1: draft creation, per-file cwr SAS (T-009) | `US-001-03-size-validation/T-001-05-create-draft-endpoint.md` | ☐ |
-| US-001-04 | T-001-06 UploadEngine.start: block-blob upload (8 MiB, parallelism 4, files serialized) | `US-001-04-upload-progress/T-001-06-block-upload-engine.md` | ☐ |
-| US-001-04 | T-001-07 Progress UI: per-file % + overall bytes line (FR-001-5) | `US-001-04-upload-progress/T-001-07-progress-ui.md` | ☐ |
-| US-001-05 | T-001-08 Per-block retry with backoff + row-local Retry (FR-001-6) | `US-001-05-retry-upload/T-001-08-block-retry-backoff.md` | ☐ |
-| US-001-04 | T-001-09 E2E (Playwright): AC-001-1…001-4 + injected failure (T-012 exit check) | `US-001-04-upload-progress/T-001-09-e2e-playwright.md` | ☐ |
-| US-001-04 | T-001-10 FinalizeTransferCommand + endpoint 2: idempotent finalize (T-010) | `US-001-04-upload-progress/T-001-10-finalize-endpoint.md` | ☐ |
+| US-001-02 | T-001-01 UploadEngine Zustand store (TA-8.3 contract) | `US-001-02-stage-files/T-001-01-uploadengine-store.md` | ☑ 2026-10-14 (3bb7e64) — status back-filled 2026-11-17 from git history |
+| US-001-01 | T-001-02 Drop zone: drag, click-to-browse, paste (FR-001-1) | `US-001-01-select-files/T-001-02-drop-zone.md` | ☑ 2026-10-14 (db5a9f9) — status back-filled 2026-11-17 from git history |
+| US-001-02 | T-001-03 Staging list UI: rows, remove ✕, total line, "Send." button | `US-001-02-stage-files/T-001-03-staging-list-ui.md` | ☑ 2026-10-14 (2a2fada) — status back-filled 2026-11-17 from git history |
+| US-001-03 | T-001-04 Client-side limit pre-check + "Send." disable (FR-001-3) | `US-001-03-size-validation/T-001-04-client-limit-precheck.md` | ☑ 2026-10-14 (5cd407f) — status back-filled 2026-11-17 from git history |
+| US-001-03 | T-001-05 CreateDraftCommand + endpoint 1: draft creation, per-file cwr SAS (T-009) | `US-001-03-size-validation/T-001-05-create-draft-endpoint.md` | ☑ 2026-10-14 (f28007f) — status back-filled 2026-11-17 from git history |
+| US-001-04 | T-001-06 UploadEngine.start: block-blob upload (8 MiB, parallelism 4, files serialized) | `US-001-04-upload-progress/T-001-06-block-upload-engine.md` | ☑ 2026-10-14 (bf0064a) — status back-filled 2026-11-17 from git history |
+| US-001-04 | T-001-07 Progress UI: per-file % + overall bytes line (FR-001-5) | `US-001-04-upload-progress/T-001-07-progress-ui.md` | ☑ 2026-10-14 (632bb22) — status back-filled 2026-11-17 from git history |
+| US-001-05 | T-001-08 Per-block retry with backoff + row-local Retry (FR-001-6) | `US-001-05-retry-upload/T-001-08-block-retry-backoff.md` | ☑ 2026-10-14 (14441e9) — status back-filled 2026-11-17 from git history |
+| US-001-04 | T-001-09 E2E (Playwright): AC-001-1…001-4 + injected failure (T-012 exit check) | `US-001-04-upload-progress/T-001-09-e2e-playwright.md` | ☑ 2026-10-15 (7724ec0) — status back-filled 2026-11-17 from git history |
+| US-001-04 | T-001-10 FinalizeTransferCommand + endpoint 2: idempotent finalize (T-010) | `US-001-04-upload-progress/T-001-10-finalize-endpoint.md` | ☑ 2026-10-16 (5ec7973) — status back-filled 2026-11-17 from git history |
 
 **Story done when:** all tasks checked + full AGENT.md §4 gate green + the story's ACs verified. Then T-009, T-010 and T-012 can be marked `done` in `Milestone-Backlog.md`.
