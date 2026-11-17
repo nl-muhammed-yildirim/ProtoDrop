@@ -19,6 +19,7 @@ public sealed class PlanConfiguration : IEntityTypeConfiguration<Plan>
         b.Property(p => p.Name).HasColumnType("VARCHAR(64)").IsRequired();
         b.Property(p => p.LimitsJson).HasColumnType("NVARCHAR(MAX)");
         b.Property(p => p.FeaturesJson).HasColumnType("NVARCHAR(MAX)");
+        b.Property(p => p.PriceJson).HasColumnType("NVARCHAR(MAX)");
         var sortOrder = b.Property(p => p.SortOrder);
         sortOrder.HasDefaultValue(0);
         sortOrder.Metadata.SetAnnotation("Relational:DefaultConstraintName", "DF_Plan_Sort");
@@ -27,13 +28,19 @@ public sealed class PlanConfiguration : IEntityTypeConfiguration<Plan>
         b.HasData(
             new Plan { Id = Guid.Parse("11111111-0000-4000-8000-000000000001"), Code = "free", Name = "Free", SortOrder = 1,
                 LimitsJson = "{\"maxTransferSize\":5368709120,\"maxSingleFile\":5368709120,\"maxZipSize\":4294967296,\"retentionDays\":7,\"graceDays\":3,\"maxDownloads\":100,\"maxEmails\":20,\"storageQuota\":5368709120,\"activeTransfersMax\":20}",
-                FeaturesJson = "{\"ads\":false,\"scheduling\":false,\"analytics\":false,\"branding\":false,\"sso_scim\":false}" },
+                FeaturesJson = "{\"ads\":false,\"scheduling\":false,\"analytics\":false,\"branding\":false,\"sso_scim\":false}",
+                // Free is never checked out.
+                PriceJson = "{\"currency\":\"USD\",\"monthly\":{\"amount\":0,\"stripePriceId\":null},\"annual\":{\"amount\":0,\"stripePriceId\":null},\"perSeatMonthly\":null}" },
             new Plan { Id = Guid.Parse("11111111-0000-4000-8000-000000000002"), Code = "pro", Name = "Pro", SortOrder = 2,
                 // D-07 stand-in (ESCALATIONS.md E-004): maxTransferSize 10 GB until D-07 is answered.
                 LimitsJson = "{\"maxTransferSize\":10737418240,\"maxSingleFile\":10737418240,\"maxZipSize\":9223372036854775807,\"retentionDays\":30,\"graceDays\":3,\"maxDownloads\":1000,\"maxEmails\":100,\"storageQuota\":107374182400,\"activeTransfersMax\":200}",
-                FeaturesJson = "{\"ads\":false,\"scheduling\":true,\"analytics\":true,\"branding\":true,\"sso_scim\":false}" },
+                FeaturesJson = "{\"ads\":false,\"scheduling\":true,\"analytics\":true,\"branding\":true,\"sso_scim\":false}",
+                // D-07 placeholder — prices pending D-07; stripePriceId operator-set per runbook (D-12).
+                PriceJson = "{\"currency\":\"USD\",\"monthly\":{\"amount\":900,\"stripePriceId\":null},\"annual\":{\"amount\":9000,\"stripePriceId\":null},\"perSeatMonthly\":null}" },
             new Plan { Id = Guid.Parse("11111111-0000-4000-8000-000000000003"), Code = "business", Name = "Business", SortOrder = 3,
                 LimitsJson = "{\"maxTransferSize\":107374182400,\"maxSingleFile\":107374182400,\"maxZipSize\":9223372036854775807,\"retentionDays\":90,\"graceDays\":3,\"maxDownloads\":-1,\"maxEmails\":500,\"storageQuota\":1099511627776,\"activeTransfersMax\":-1}",
-                FeaturesJson = "{\"ads\":false,\"scheduling\":true,\"analytics\":true,\"branding\":true,\"sso_scim\":true}" });
+                FeaturesJson = "{\"ads\":false,\"scheduling\":true,\"analytics\":true,\"branding\":true,\"sso_scim\":true}",
+                // D-07 placeholder — prices pending D-07; stripePriceId operator-set per runbook (D-12).
+                PriceJson = "{\"currency\":\"USD\",\"monthly\":{\"amount\":1900,\"stripePriceId\":null},\"annual\":{\"amount\":19000,\"stripePriceId\":null},\"perSeatMonthly\":1900}" });
     }
 }

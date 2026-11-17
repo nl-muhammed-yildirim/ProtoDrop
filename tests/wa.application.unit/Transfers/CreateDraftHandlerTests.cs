@@ -136,7 +136,7 @@ public class CreateDraftHandlerTests
 
     private sealed class StubLimitsProvider(LimitsRecord limits) : ILimitsProvider
     {
-        public Task<LimitsRecord> Resolve(string planCode, CancellationToken cancellationToken = default) =>
+        public Task<LimitsRecord> Resolve(string? planCode, CancellationToken cancellationToken = default) =>
             Task.FromResult(limits); // guest always resolves to free here; the handler passes GuestPlanCode.
     }
 

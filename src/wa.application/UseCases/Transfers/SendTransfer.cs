@@ -8,6 +8,7 @@ using wa.application.Telemetry;
 using wa.application.UseCases.Auth;
 using wa.domain;
 using wa.domain.Correlation;
+using wa.domain.Transfers;
 
 namespace wa.application.UseCases.Transfers;
 
@@ -130,10 +131,10 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
         if (addresses.Count > limits.MaxEmails)
             throw new TransferValidationException($"Maximum {limits.MaxEmails} recipients allowed.");
 
-        // 5. Activate the transfer: Status=1, expiry from RETENTION_DAYS, sender defaults.
+        // 5. Stamp send-time limits once (FR-018-4: retention + download cap; live rows never re-resolve), then activate.
         var now = DateTime.UtcNow;
+        SendTimeLimits.Stamp(transfer, limits, now);
         transfer.Status = 1;
-        transfer.ExpiresAtUtc = now.AddDays(limits.RetentionDays);
 
         // T-008-08 (FR-008-7): send-time attribution — the session user id IS the owner (guest → null).
         // Unconditional overwrite is deliberate: a guest-created draft sent while signed in becomes attributed,

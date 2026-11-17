@@ -61,7 +61,7 @@ public sealed class SignupHandler : IRequestHandler<SignupCommand, SignupResult>
             throw SignupValidationException.ForShortPassword();
 
         // Resolve Free plan once — FR-004: "Free by default" is a seeded row, never a literal (TA-3.4).
-        var freePlan = await _plans.GetAsync("free", cancellationToken);
+        var freePlan = await _plans.GetAsync(Plan.DefaultCode, cancellationToken);
 
         // EC-008-1/4: lookup by lowercased email — sign-up is sign-in; known emails return the existing row.
         var existing = await _users.FindByEmailAsync(email, cancellationToken);
