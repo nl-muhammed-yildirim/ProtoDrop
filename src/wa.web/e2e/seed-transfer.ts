@@ -149,6 +149,14 @@ export async function seedTransfer(
   return finalizeAndSend(request, draft.draftId, { ...opts, fileIds: draft.files.map((f) => String(f.fileId)) })
 }
 
+/**
+ * T-017-04: writes a ready zip at BlobPaths.TransferZip (`transfers/{transferId:N}/all.zip`). GetDownloadAllUrlQuery only
+ * checks blob existence there (no zip function runs locally), so a seeded blob makes endpoint 7 return 200 + a SAS URL.
+ */
+export async function seedTransferZip(transferIdN: string, bytes: Uint8Array): Promise<void> {
+  await blobService.getContainerClient('transfers').getBlockBlobClient(`${transferIdN}/all.zip`).upload(bytes, bytes.byteLength)
+}
+
 // ---- EC-003-1 (T-014 exit check): 500 MB Range-resume seeding + verification ----
 
 /** 500 MB (EC-003-1). */
