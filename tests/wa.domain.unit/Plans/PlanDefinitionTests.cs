@@ -8,7 +8,18 @@ public class PlanDefinitionTests
     private const string FreeLimits = "{\"maxTransferSize\":5368709120,\"maxSingleFile\":5368709120,\"maxZipSize\":4294967296,\"retentionDays\":7,\"graceDays\":3,\"maxDownloads\":100,\"maxEmails\":20,\"storageQuota\":5368709120,\"activeTransfersMax\":20}";
     private const string FreeFeatures = "{\"ads\":false,\"scheduling\":false,\"analytics\":false,\"branding\":false,\"sso_scim\":false}";
 
-    private static Plan Valid() => new() { Id = Guid.NewGuid(), Code = "free", Name = "Free", LimitsJson = FreeLimits, FeaturesJson = FreeFeatures, SortOrder = 1 };
+    private const string FreePrice = "{\"currency\":\"USD\",\"monthly\":{\"amount\":0,\"stripePriceId\":null},\"annual\":{\"amount\":0,\"stripePriceId\":null},\"perSeatMonthly\":null}";
+    private const string ProPrice = "{\"currency\":\"USD\",\"monthly\":{\"amount\":900,\"stripePriceId\":\"price_test_m\"},\"annual\":{\"amount\":9000,\"stripePriceId\":\"price_test_a\"},\"perSeatMonthly\":null}";
+    private const string BusinessPrice = "{\"currency\":\"USD\",\"monthly\":{\"amount\":1900,\"stripePriceId\":\"price_test_m\"},\"annual\":{\"amount\":19000,\"stripePriceId\":\"price_test_a\"},\"perSeatMonthly\":1900}";
+
+    private static Plan Valid() => new() { Id = Guid.NewGuid(), Code = "free", Name = "Free", LimitsJson = FreeLimits, FeaturesJson = FreeFeatures, PriceJson = FreePrice, SortOrder = 1 };
+
+    private static IReadOnlyList<string> ValidatePrice(string json)
+    {
+        var plan = Valid();
+        plan.PriceJson = json;
+        return PlanDefinition.Validate(plan);
+    }
 
     private static string Limits(string key, string value) =>
         FreeLimits.Replace(Pair(key), $"\"{key}\":{value}");
@@ -111,6 +122,90 @@ public class PlanDefinitionTests
         var plan = Valid();
         plan.FeaturesJson = "nope";
         Assert.Contains(PlanDefinition.Validate(plan), e => e.Contains("FeaturesJson"));
+    }
+
+    [Theory]
+    [InlineData(ProPrice)]
+    [InlineData(BusinessPrice)]
+    public void PriceJson_ValidShapes_Pass(string json)
+    {
+        Assert.Empty(ValidatePrice(json));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("not json")]
+    [InlineData("[1,2]")]
+    public void PriceJson_NotAnObject_Errors(string json)
+    {
+        Assert.Contains(ValidatePrice(json), e => e.Contains("PriceJson"));
+    }
+
+    [Fact]
+    public void PriceJson_MissingPerSeatMonthly_Errors()
+    {
+        Assert.Contains(ValidatePrice(ProPrice.Replace(",\"perSeatMonthly\":null", "")), e => e.Contains("perSeatMonthly"));
+    }
+
+    [Fact]
+    public void PriceJson_UnknownKey_Errors()
+    {
+        Assert.Contains(ValidatePrice(ProPrice.TrimEnd('}') + ",\"discount\":1}"), e => e.Contains("discount"));
+    }
+
+    [Theory]
+    [InlineData("\"usd\"")]
+    [InlineData("\"US\"")]
+    [InlineData("840")]
+    public void PriceJson_BadCurrency_Errors(string value)
+    {
+        Assert.Contains(ValidatePrice(ProPrice.Replace("\"USD\"", value)), e => e.Contains("PriceJson.currency"));
+    }
+
+    [Fact]
+    public void PriceJson_MonthlyNotObject_Errors()
+    {
+        var json = "{\"currency\":\"USD\",\"monthly\":5,\"annual\":{\"amount\":0,\"stripePriceId\":null},\"perSeatMonthly\":null}";
+        Assert.Contains(ValidatePrice(json), e => e.Contains("PriceJson.monthly"));
+    }
+
+    [Fact]
+    public void PriceJson_MonthlyMissingStripePriceId_Errors()
+    {
+        var json = ProPrice.Replace(",\"stripePriceId\":\"price_test_m\"", "");
+        Assert.Contains(ValidatePrice(json), e => e.Contains("PriceJson.monthly.stripePriceId"));
+    }
+
+    [Fact]
+    public void PriceJson_AnnualUnknownKey_Errors()
+    {
+        var json = ProPrice.Replace("\"annual\":{", "\"annual\":{\"trial\":1,");
+        Assert.Contains(ValidatePrice(json), e => e.Contains("PriceJson.annual.trial"));
+    }
+
+    [Theory]
+    [InlineData("-1")]
+    [InlineData("9.5")]
+    [InlineData("\"900\"")]
+    public void PriceJson_BadAmount_Errors(string value)
+    {
+        Assert.Contains(ValidatePrice(ProPrice.Replace("\"amount\":900,", $"\"amount\":{value},")), e => e.Contains("PriceJson.monthly.amount"));
+    }
+
+    [Theory]
+    [InlineData("\"\"")]
+    [InlineData("\"prod_123\"")]
+    public void PriceJson_BadStripePriceId_Errors(string value)
+    {
+        Assert.Contains(ValidatePrice(ProPrice.Replace("\"price_test_m\"", value)), e => e.Contains("PriceJson.monthly.stripePriceId"));
+    }
+
+    [Theory]
+    [InlineData("-1")]
+    [InlineData("\"19\"")]
+    public void PriceJson_BadPerSeatMonthly_Errors(string value)
+    {
+        Assert.Contains(ValidatePrice(BusinessPrice.Replace("\"perSeatMonthly\":1900", $"\"perSeatMonthly\":{value}")), e => e.Contains("PriceJson.perSeatMonthly"));
     }
 
     [Theory]

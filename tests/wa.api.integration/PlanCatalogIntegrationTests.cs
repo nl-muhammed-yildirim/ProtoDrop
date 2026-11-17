@@ -17,6 +17,8 @@ public class PlanCatalogIntegrationTests : IAsyncLifetime
     private const string FreeLimits = "{\"maxTransferSize\":5368709120,\"maxSingleFile\":5368709120,\"maxZipSize\":4294967296,\"retentionDays\":7,\"graceDays\":3,\"maxDownloads\":100,\"maxEmails\":20,\"storageQuota\":5368709120,\"activeTransfersMax\":20}";
     private const string FreeFeatures = "{\"ads\":false,\"scheduling\":false,\"analytics\":false,\"branding\":false,\"sso_scim\":false}";
 
+    private const string FreePrice = "{\"currency\":\"USD\",\"monthly\":{\"amount\":0,\"stripePriceId\":null},\"annual\":{\"amount\":0,\"stripePriceId\":null},\"perSeatMonthly\":null}";
+
     private MsSqlContainer _sql = null!;
     private DbContextOptions<WaDbContext> _options = null!;
     private WaDbContext _db = null!;
@@ -100,6 +102,42 @@ public class PlanCatalogIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SeededPaidPlans_PricesReadFromRow_NoStripeIdInvented() // AC-018-4 price source, US-018-03 AC block 1.
+    {
+        var pro = await _db.Set<Plan>().AsNoTracking().SingleAsync(p => p.Id == Guid.Parse("11111111-0000-4000-8000-000000000002"));
+        var business = await _db.Set<Plan>().AsNoTracking().SingleAsync(p => p.Id == Guid.Parse("11111111-0000-4000-8000-000000000003"));
+
+        var proPrice = PlanPrice.Read(pro);
+        var businessPrice = PlanPrice.Read(business);
+
+        Assert.Equal(900, proPrice.For(BillingInterval.Monthly).Amount);
+        Assert.Equal(9000, proPrice.For(BillingInterval.Annual).Amount);
+        Assert.NotNull(businessPrice.PerSeatMonthly);
+        foreach (var price in new[] { proPrice, businessPrice })
+            foreach (var interval in Enum.GetValues<BillingInterval>())
+                Assert.False(price.For(interval).IsWiredToStripe()); // operator-set (D-12), never invented.
+    }
+
+    [Fact]
+    public async Task PriceChange_IsRowUpdate_VisibleThroughPlansCache() // alternative flow: price change = data change, no deploy.
+    {
+        var proId = Guid.Parse("11111111-0000-4000-8000-000000000002");
+        await using (var writeDb = new WaDbContext(_options))
+        {
+            var pro = await writeDb.Set<Plan>().SingleAsync(p => p.Id == proId);
+            pro.PriceJson = pro.PriceJson.Replace("\"amount\":900,", "\"amount\":1200,");
+            Assert.Empty(PlanDefinition.Validate(pro)); // validate-then-write (EC-018-2)
+            await writeDb.SaveChangesAsync();
+        }
+
+        await using var readDb = new WaDbContext(_options);
+        var cache = new PlansCache(new PlansStore(readDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow);
+        var plan = await cache.GetAsync("pro", CancellationToken.None);
+
+        Assert.Equal(1200, PlanPrice.Read(plan).For(BillingInterval.Monthly).Amount);
+    }
+
+    [Fact]
     public async Task DeletingPlan_WithUsers_IsBlockedByFk()
     {
         var proId = Guid.Parse("11111111-0000-4000-8000-000000000002");
@@ -150,6 +188,7 @@ public class PlanCatalogIntegrationTests : IAsyncLifetime
         Name = code == "proplus" ? "Pro Plus" : "Pro Plus 2",
         SortOrder = sortOrder,
         LimitsJson = limitsJson,
-        FeaturesJson = FreeFeatures
+        FeaturesJson = FreeFeatures,
+        PriceJson = FreePrice
     };
 }

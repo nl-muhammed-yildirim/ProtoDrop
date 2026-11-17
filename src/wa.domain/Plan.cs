@@ -13,5 +13,7 @@ public class Plan
     public string LimitsJson { get; set; } = null!;
     /// <summary>Bool flags: ads, scheduling, analytics, branding, sso_scim — shape defined by <see cref="PlanFeatures"/>.</summary>
     public string FeaturesJson { get; set; } = null!;
+    /// <summary>Prices (FR-018-3) — shape defined by <see cref="PlanPrice"/>; read via <see cref="PlanPrice.Read"/>, never parsed elsewhere.</summary>
+    public string PriceJson { get; set; } = null!;
     public int SortOrder { get; set; }
 }
