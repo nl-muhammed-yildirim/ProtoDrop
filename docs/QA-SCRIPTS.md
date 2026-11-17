@@ -74,7 +74,7 @@ You (the human) are the QA for tasks whose exit checks say "manual pass in brows
 3. Check: resume uses a Range request (DevTools → Request Headers show `Range: bytes=…`); file completes and opens.
 4. Check: `DownloadsCount` incremented exactly once for the completed download.
 
-### S-2.4 Download all (zip) — T-017 (see M2 zip script in §3 if T-017 is not yet built; otherwise run the Playwright step of the task)
+### S-2.4 Download all (zip) — T-017 (automated: `src/wa.web/e2e/mobile.spec.ts` AC-017-2 download-all tests — ready / preparing / cancelled / single-file; run `npx playwright test e2e/mobile.spec.ts` from `src/wa.web`)
 
 ---
 
@@ -111,6 +111,16 @@ You (the human) are the QA for tasks whose exit checks say "manual pass in brows
 ### S-5.3 Mobile web matrix (T-027)
 - DevTools device toolbar: iPhone 13, Android (Pixel).
 - Send a transfer from the phone-sized viewport; open it from a second context (different device profile) → download works.
+- **Automated matrix (T-017-04):** from `src/wa.web`, with SQL + Azurite up, API on :8080 (`--launch-profile Local`) and `npm run dev` on :5173: `npx playwright test e2e/mobile.spec.ts` → projects `mobile-iphone-14` (WebKit) + `mobile-pixel-7` (Chromium) green.
+- **Real-device spot check (T-017-04 → T-027 close-out), staging, iPhone Safari + Android Chrome:**
+  1. Landing → pick 2 photos from Photos/Gallery → progress visible → link screen → **Copy**, paste into Notes.
+  2. Open a 2-file link → **Download all** → Safari download bar / Android Downloads shows `all.zip`; extract → original names.
+  3. Cancel a zip download → page shows no error; per-file **Download** still works.
+  4. 1-file link shows only the row **Download**; saved with the exact original name.
+  5. Password link → unlock → download.
+  6. Pinch-zoom works on every screen; no horizontal scroll at default zoom.
+  7. 4G Range-resume (EC-017-2): start a large file on mobile data, toggle airplane mode briefly → download resumes.
+  Record PASS/FAIL + device / OS / browser versions in `PROGRESS.md`.
 
 ---
 

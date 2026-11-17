@@ -103,6 +103,18 @@ public class GetPublicTransferHandlerTests
         Assert.True(result.HasDownloadAll); // ≥2 files AND total ≤ MaxZipSize
     }
 
+    [Fact]
+    public async Task Handle_Active_HasDownloadAll_TrueWhenTotalEqualsMaxZipSize()
+    {
+        _store.SetupActive(
+            files: [new PublicFileItem(Guid.NewGuid(), "a.txt", 2147483648), new PublicFileItem(Guid.NewGuid(), "b.txt", 2147483648)],
+            maxDownloads: 1, downloadsCount: 0, passwordHash: null); // sum == the stub's MaxZipSize (4294967296)
+
+        var result = await _handler.Handle(new GetPublicTransferQuery("abcdefgh"), CancellationToken.None);
+
+        Assert.True(result.HasDownloadAll); // cap is "exceeds", not "equals" (US-004-03 alt flow)
+    }
+
     // ---- Terminal states: minimal result, no file rows (AC-003-3, no byte leak) ----
 
     [Fact]

@@ -1,4 +1,4 @@
-import { defineConfig } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test';
 
 // T-001-09: the local stack (API :8080, Vite :5173, SQL + Azurite) is launched externally —
 // docker-compose.local.yml + supervised services — so no webServer key here.
@@ -13,4 +13,13 @@ export default defineConfig({
     baseURL: 'http://localhost:5173',
     trace: 'retain-on-failure',
   },
+  projects: [
+    { name: 'chromium', use: { browserName: 'chromium' }, testIgnore: /mobile\.spec\.ts/ },
+    { name: 'mobile-iphone-14', use: { ...devices['iPhone 14'] }, testMatch: /mobile\.spec\.ts/ },
+    {
+      name: 'mobile-pixel-7',
+      use: { ...devices['Pixel 7'], permissions: ['clipboard-read', 'clipboard-write'] },
+      testMatch: /mobile\.spec\.ts/,
+    },
+  ],
 });

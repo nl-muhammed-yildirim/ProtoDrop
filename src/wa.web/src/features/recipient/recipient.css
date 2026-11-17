@@ -112,6 +112,44 @@
   width: 100%;
 }
 
+/* T-004-03 (FR-004-6): polling hint under Download all while the zip is preparing - same muted small copy as downloads-left. */
+.rp-download-all-hint {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: var(--fs-small);
+  text-align: center;
+}
+
+/* T-004-04 (FR-004-4): over-cap note under the file list - same muted small copy as the hint. */
+.rp-cap-note {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: var(--fs-small);
+  text-align: center;
+}
+
+/* T-004-03: inline spinner for the preparing label - currentColor only, rotation gated on reduced-motion (index.css .dz-toast precedent). */
+.rp-spinner {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin-right: 0.5em;
+  vertical-align: -0.125em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rp-spinner {
+    animation: rp-spin 0.8s linear infinite;
+  }
+}
+
+@keyframes rp-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* T-003-03 (FR-003-5): "Downloads left: N" under the list, --fs-small, only for finite caps. */
 .rp-downloads-left {
   margin: 0;
@@ -268,5 +306,10 @@
   /* Guards against iOS UA padding growth — the input stays exactly 44 px tall at var(--fs-body) (no zoom-on-focus). */
   .rp-password-input {
     height: 44px;
+  }
+
+  /* T-017-03 (AC-017-3): sender name/email in the heading wraps instead of forcing horizontal scroll at 360 px. */
+  .rp-heading {
+    overflow-wrap: anywhere;
   }
 }

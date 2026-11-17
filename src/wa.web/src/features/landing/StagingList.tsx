@@ -199,11 +199,6 @@ export function StagingList() {
     <section className="sl" aria-label={i18n.t('landing.staging.sectionLabel')}>
       {/* T-016-02: hidden polite live region — progress milestones + failure announcements; visually clipped, no layout impact. */}
       {progressLive}
-      {/* Overall line (FR-001-5): combined bytes uploaded / total, recomputed on every store transition. */}
-      {/* role=status (polite): the text re-renders only on store transitions — block completions / status changes — never per byte (F-TRF-016-3). */}
-      {files.length > 0 && (
-        <p className="sl-overall" role="status">{i18n.t('landing.staging.uploading', { done: formatBytes(overall.sentBytes), total: formatBytes(overall.totalBytes) })}</p>
-      )}
       <ul className="sl-list">
         {files.map((f) => (
           <li key={f.id} className={`sl-row${check.overFileIds.has(f.id) ? ' sl-row-over' : ''}${f.status === 'failed' ? ' sl-row-failed' : ''}${f.status === 'done' ? ' sl-done' : ''}`}>
@@ -258,6 +253,12 @@ export function StagingList() {
         </p>
       )}
       <div className="sl-footer">
+        {/* T-017-01 (FR-017-5): inside the footer so the overall line sits directly above Send. (one element, two positions). */}
+        {/* Overall line (FR-001-5): combined bytes uploaded / total, recomputed on every store transition. */}
+        {/* role=status (polite): the text re-renders only on store transitions — block completions / status changes — never per byte (F-TRF-016-3). */}
+        {files.length > 0 && (
+          <p className="sl-overall" role="status">{i18n.t('landing.staging.uploading', { done: formatBytes(overall.sentBytes), total: formatBytes(overall.totalBytes) })}</p>
+        )}
         {/* Disabled buttons don't fire their own mouse events — the span wrapper carries title. */}
         <span className="sl-send-wrap" title={message ?? undefined}>
           <button type="button" className="btn-primary sl-send" onClick={() => void send()} disabled={files.length === 0 || message !== null}>{i18n.t('landing.staging.send')}</button>

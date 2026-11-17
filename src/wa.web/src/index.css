@@ -302,6 +302,68 @@ main:has(.sl) .dz {
   gap: 12px;
 }
 
+/* T-017-01 (FR-017-2/4/5): mobile <=640 px upload surface — single column, sticky Send. bar with the overall line above it (one element, two positions — EC-016-3 / T-003-08 pattern). */
+@media (max-width: 640px) {
+  .dz {
+    min-height: auto;
+    width: calc(100% - 32px);
+    padding: 32px 16px;
+  }
+
+  .dz-title {
+    font-size: var(--fs-h1);
+  }
+
+  /* Reserved bottom space so the pinned bar never covers the last row / total / limit message. */
+  .sl {
+    padding: 0 16px 136px;
+  }
+
+  .sl-footer {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    bottom: 0;
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .sl-footer .sl-overall {
+    margin: 0;
+  }
+
+  .sl-send-wrap {
+    display: block;
+  }
+
+  .sl-send {
+    width: 100%;
+  }
+
+  .sl-row {
+    flex-wrap: wrap;
+  }
+
+  .sl-name {
+    min-width: 0;
+  }
+
+  .sl-retry {
+    min-height: 44px;
+  }
+
+  .dz-button,
+  .sl-remove,
+  .sl-retry,
+  .sl-send {
+    touch-action: manipulation;
+  }
+}
+
 /* §5.2 Link screen card */
 .ls {
   width: 100%;
@@ -1428,4 +1490,77 @@ main:has(.sl) .dz {
 html[data-theme='dark'] .dz-toast,
 html[data-theme='dark'] .tb-dropdown {
   box-shadow: 0 0 0 1px var(--border);
+}
+
+/* T-017-03 (FR-017-4/5, AC-017-3): phone <=640 px touch-target floor (44 px), 16 px inputs (no iOS focus zoom), 360 px wrap fixes.
+   Desktop above 640 px unchanged. Enforced by scripts/check-tap-targets.mjs (chained into npm run lint). */
+@media (max-width: 640px) {
+  .tb-avatar {
+    width: 44px;
+    height: 44px;
+  }
+
+  .tb-signin,
+  .tb-dropdown-row,
+  .ls-copy-btn {
+    min-height: 44px;
+  }
+
+  .mf-retry {
+    min-height: 44px;
+    padding: 0 12px;
+  }
+
+  .ls-password-toggle {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .tb-theme-select,
+  .ls-sender-input,
+  .ls-password-input,
+  .au-input,
+  .pf-input,
+  .pf-theme-select {
+    min-height: 44px;
+    font-size: var(--fs-body);
+  }
+
+  .ls-recipients-textarea,
+  .ls-note-textarea {
+    font-size: var(--fs-body);
+  }
+
+  .ls-actions {
+    flex-wrap: wrap;
+  }
+
+  .ls-recipients-error {
+    overflow-wrap: anywhere;
+  }
+
+  /* My Files (US-017-03 Edge cases): name on its own line, meta wraps, actions = a full-width row of discrete 44 px buttons. */
+  .mf-row {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .mf-name {
+    flex-basis: 100%;
+  }
+
+  .mf-meta {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: normal;
+  }
+
+  .mf-countdown {
+    min-width: 0;
+  }
+
+  .mf-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
 }

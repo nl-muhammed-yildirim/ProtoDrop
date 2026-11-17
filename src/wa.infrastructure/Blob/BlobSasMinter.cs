@@ -88,14 +88,20 @@ public sealed class BlobSasMinter
             startsOn: null,
             respContentDisposition);
 
-    /// <summary>TA-3.6 recipient zip (<c>transfers</c> container): permissions <c>r</c>, 30 min, no start bound.</summary>
+    /// <summary>Signed zip disposition (FR-003-10 iOS fallback, FR-017-3): explicit attachment named all.zip, RFC 5987 form.</summary>
+    private const string ZipContentDisposition = "attachment;filename*=UTF-8''all.zip";
+
+    /// <summary>
+    /// TA-3.6 recipient zip (<c>transfers</c> container): permissions <c>r</c>, 30 min, no start bound.
+    /// Signs an <c>attachment</c> Content-Disposition (all.zip) so mobile browsers treat it as a download (FR-003-10 / FR-017-3).
+    /// </summary>
     public Uri MintRecipientZip(string transferId)
         => Mint(
             BlobPaths.TransferZip(new Guid(transferId)),
             permissions: "r",
             expiresOn: _now().Add(RecipientTtl),
             startsOn: null,
-            respContentDisposition: null);
+            respContentDisposition: ZipContentDisposition);
 
     private Uri Mint(
         string path, string permissions, DateTimeOffset expiresOn, DateTimeOffset? startsOn, string? respContentDisposition)
