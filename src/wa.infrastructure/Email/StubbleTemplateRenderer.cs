@@ -96,8 +96,8 @@ public sealed class StubbleTemplateRenderer : ITemplateRenderer
     {
         if (bytes < 1024) return $"{bytes} B";
 
-        var units = new[] { "KB", "MB", "GB" };
-        var value = (double)bytes;
+        var units = new[] { "KB", "MB", "GB", "TB" };
+        var value = bytes / 1024.0;
         var unitIndex = 0;
 
         while (value >= 1024 && unitIndex < units.Length - 1)
@@ -108,7 +108,7 @@ public sealed class StubbleTemplateRenderer : ITemplateRenderer
 
         // Locale-aware number format: de → "1,5", en → "1.5"
         var formatted = value.ToString("F1", culture ?? CultureInfo.InvariantCulture);
-        return $"{formatted} {units[unitIndex - 1]}"; // unitIndex >= 1 here (bytes >= 1024): one division = KB
+        return $"{formatted} {units[unitIndex]}";
     }
 
     /// <summary>Stubble-compatible file item with explicit string properties.</summary>

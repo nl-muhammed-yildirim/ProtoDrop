@@ -173,6 +173,27 @@ public class StubbleTemplateRendererTests : IDisposable
         Assert.Contains("photo.jpg (1.0 MB)", textBody);
     }
 
+    [Theory]
+    [InlineData(1023L, "1023 B")]
+    [InlineData(1024L, "1.0 KB")]
+    [InlineData(1536L, "1.5 KB")]
+    [InlineData(1048576L, "1.0 MB")]
+    [InlineData(1073741824L, "1.0 GB")]
+    [InlineData(5368709120L, "5.0 GB")]
+    [InlineData(1099511627776L, "1.0 TB")]
+    public void Render_FileSizeBoundaries_FormatWithMatchingUnit(long bytes, string expected)
+    {
+        var data = new TemplateData(
+            SenderName: "Alice",
+            Files: [new FileEntry("big.bin", bytes)],
+            CtaUrl: "https://protodrop.com/t/ABCD1234",
+            ExpiryDays: 7);
+
+        var (_, _, textBody) = _renderer.Render(data, "en");
+
+        Assert.Contains($"big.bin ({expected})", textBody);
+    }
+
     [Fact]
     public void Render_WithoutUnsubscribeUrl_NoFooterLink()
     {
