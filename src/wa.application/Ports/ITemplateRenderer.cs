@@ -8,7 +8,8 @@ public sealed record TemplateData(
     string SenderName,
     IReadOnlyList<FileEntry> Files,
     string CtaUrl,
-    int ExpiryDays);
+    int ExpiryDays,
+    string? UnsubscribeUrl = null);
 
 /// <summary>Template rendering port — implemented by StubbleTemplateRenderer. T-006-04: per-language rendering with locale parameter.</summary>
 public interface ITemplateRenderer

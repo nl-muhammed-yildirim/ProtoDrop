@@ -143,6 +143,45 @@ public class StubbleTemplateRendererTests : IDisposable
         Assert.Equal("Overdracht van Alice", subject);
     }
 
+    [Theory]
+    [InlineData("en")]
+    [InlineData("nl")]
+    [InlineData("fr")]
+    [InlineData("es")]
+    [InlineData("pt")]
+    [InlineData("it")]
+    [InlineData("de")]
+    [InlineData("tr")]
+    public void Render_WithUnsubscribeUrl_FooterLinkPointsAtIt(string locale)
+    {
+        var data = CreateTestData() with { UnsubscribeUrl = "https://protodrop.com/unsubscribe/tok.sig" };
+
+        var (_, htmlBody, _) = _renderer.Render(data, locale);
+
+        Assert.Contains("href=\"https://protodrop.com/unsubscribe/tok.sig\"", htmlBody);
+        Assert.DoesNotContain("href=\"#\"", htmlBody);
+    }
+
+    [Fact]
+    public void Render_FileSizes_UseCorrectUnits()
+    {
+        var data = CreateTestData(); // 1536 B → 1.5 KB, 1048576 B → 1.0 MB
+
+        var (_, _, textBody) = _renderer.Render(data, "en");
+
+        Assert.Contains("report.pdf (1.5 KB)", textBody);
+        Assert.Contains("photo.jpg (1.0 MB)", textBody);
+    }
+
+    [Fact]
+    public void Render_WithoutUnsubscribeUrl_NoFooterLink()
+    {
+        var (_, htmlBody, _) = _renderer.Render(CreateTestData(), "en");
+
+        Assert.DoesNotContain("/unsubscribe/", htmlBody);
+        Assert.DoesNotContain("href=\"#\"", htmlBody);
+    }
+
     private static TemplateData CreateTestData() => new(
         SenderName: "Alice",
         Files: [new FileEntry("report.pdf", 1536), new FileEntry("photo.jpg", 1048576)],

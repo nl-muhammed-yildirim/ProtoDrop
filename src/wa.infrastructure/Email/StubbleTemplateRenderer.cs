@@ -61,7 +61,7 @@ public sealed class StubbleTemplateRenderer : ITemplateRenderer
             f.Name, FormatBytes(f.SizeBytes, culture))).ToList();
 
         var templateData = new TemplateRenderModel(
-            data.SenderName, filesWithSizes, data.CtaUrl, data.ExpiryDays);
+            data.SenderName, filesWithSizes, data.CtaUrl, data.ExpiryDays, data.UnsubscribeUrl);
 
         // Resolve locale with fallback to English.
         if (!_templates.TryGetValue(locale, out var templates))
@@ -108,7 +108,7 @@ public sealed class StubbleTemplateRenderer : ITemplateRenderer
 
         // Locale-aware number format: de → "1,5", en → "1.5"
         var formatted = value.ToString("F1", culture ?? CultureInfo.InvariantCulture);
-        return $"{formatted} {units[unitIndex]}";
+        return $"{formatted} {units[unitIndex - 1]}"; // unitIndex >= 1 here (bytes >= 1024): one division = KB
     }
 
     /// <summary>Stubble-compatible file item with explicit string properties.</summary>
@@ -123,11 +123,14 @@ public sealed class StubbleTemplateRenderer : ITemplateRenderer
         string SenderName,
         IReadOnlyList<TemplateFileItem> Files,
         string CtaUrl,
-        int ExpiryDays)
+        int ExpiryDays,
+        string? UnsubscribeUrl)
     {
         public string SenderName { get; init; } = SenderName;
         public IReadOnlyList<TemplateFileItem> Files { get; init; } = Files;
         public string CtaUrl { get; init; } = CtaUrl;
         public int ExpiryDays { get; init; } = ExpiryDays;
+        public string? UnsubscribeUrl { get; init; } = UnsubscribeUrl;
+        public bool HasUnsubscribeUrl => !string.IsNullOrEmpty(UnsubscribeUrl);
     }
 }

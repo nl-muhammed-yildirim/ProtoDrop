@@ -13,6 +13,8 @@
          collection execution stomps those across classes; run single-threaded.
     -->
     <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- T-006-05: the E2E test renders the real f-email templates; link them (no ProjectReference to wa.workers: Program clash). -->
+    <Content Include="..\..\src\wa.workers\Emails\templates\**\*" Link="Emails\templates\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

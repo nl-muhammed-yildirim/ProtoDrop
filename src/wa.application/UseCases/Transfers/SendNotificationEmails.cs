@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -104,6 +105,7 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
         // 8. Send emails.
         var fromAddress = _config["Wa:Email:FromAddress"] ?? "no-reply@protodrop.com";
         var notifiedIds = new List<Guid>();
+        var jwtSecret = _config["Wa:Jwt:Secret"];
 
         foreach (var recipient in unNotified)
         {
@@ -122,7 +124,11 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
 
             // T-014-04: Resolve locale using pure resolver (ADR-011 per-recipient attribute).
             var locale = TemplateLocaleResolver.Resolve(recipient.PreferredLanguage);
-            var (subject, htmlBody, textBody) = _templateRenderer.Render(templateData, locale);
+            var perRecipientData = templateData with
+            {
+                UnsubscribeUrl = BuildUnsubscribeUrl(publicOrigin, recipient.Address, context.SenderEmail, jwtSecret)
+            };
+            var (subject, htmlBody, textBody) = _templateRenderer.Render(perRecipientData, locale);
 
             try
             {
@@ -197,5 +203,15 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
         {
             await _store.MarkNotifiedAsync(notifiedIds, DateTime.UtcNow, ct);
         }
+    }
+
+    /// <summary>T-006-05 (FR-006-2/5): per-recipient unsubscribe link; null when sender or signing secret is unavailable.</summary>
+    private static string? BuildUnsubscribeUrl(string publicOrigin, string address, string? senderEmail, string? secret)
+    {
+        if (string.IsNullOrEmpty(senderEmail) || string.IsNullOrEmpty(secret))
+            return null;
+
+        var token = UnsubscribeToken.Create(address, senderEmail, Encoding.UTF8.GetBytes(secret));
+        return $"{publicOrigin}/unsubscribe/{token}";
     }
 }

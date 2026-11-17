@@ -39,9 +39,11 @@
                                 Bu bağlantı {{ExpiryDays}} gün içinde sona erer.
                             </p>
 
+                            {{#HasUnsubscribeUrl}}
                             <p style="margin: 16px 0 0 0; font-size: 12px; color: #999999; text-align: center;">
-                                <a href="#" style="color: #999999; text-decoration: underline;">Abonelikten ayrıl</a>
+                                <a href="{{UnsubscribeUrl}}" style="color: #999999; text-decoration: underline;">Abonelikten ayrıl</a>
                             </p>
+                            {{/HasUnsubscribeUrl}}
                         </td>
                     </tr>
                 </table>

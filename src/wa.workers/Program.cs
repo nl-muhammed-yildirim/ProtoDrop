@@ -97,13 +97,10 @@ var host = new HostBuilder()
             sp.GetRequiredService<wa.application.Telemetry.WaTelemetryReporter>())); // T-014-04: fallback telemetry event
 
         // IEmailSender selection: log if Wa:Email:Sender=="log" else CommunicationHubEmailSender (TA-0.2 rule 7).
-        var emailSenderType = Environment.GetEnvironmentVariable("Wa:Email:Sender");
-        if (emailSenderType == "log")
-            services.AddSingleton<IEmailSender>(sp => new LogEmailSender(sp.GetRequiredService<ILogger<LogEmailSender>>()));
-        else
-            services.AddSingleton<IEmailSender>(sp => new CommunicationHubEmailSender(
-                Environment.GetEnvironmentVariable("Wa:Email:FromAddress") ?? "no-reply@protodrop.com",
-                sp.GetRequiredService<ILogger<CommunicationHubEmailSender>>()));
+        services.AddSingleton<IEmailSender>(sp => EmailSenderSelector.Create(
+            Environment.GetEnvironmentVariable("Wa:Email:Sender"),
+            Environment.GetEnvironmentVariable("Wa:Email:FromAddress") ?? "no-reply@protodrop.com",
+            sp.GetRequiredService<ILoggerFactory>()));
 
         services.AddSingleton<SendNotificationEmailsHandler>(sp => new SendNotificationEmailsHandler(
             sp.GetRequiredService<IEmailStore>(),
