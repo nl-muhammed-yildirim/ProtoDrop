@@ -190,6 +190,9 @@ public class CheckoutEndpointTests : IAsyncLifetime
             if (Failure is not null) throw Failure;
             return Task.FromResult(new StripeCheckoutSession("cs_fake", "https://checkout.stripe.test/c/cs_fake"));
         }
+
+        public Task<StripePortalSession> CreatePortalSessionAsync(string customerId, string returnUrl, CancellationToken ct) =>
+            throw new NotSupportedException();
     }
 
     private sealed class TestFactory : WebApplicationFactory<Program>

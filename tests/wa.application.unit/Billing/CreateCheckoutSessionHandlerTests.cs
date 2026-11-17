@@ -151,5 +151,8 @@ public class CreateCheckoutSessionHandlerTests
             if (Failure is not null) throw Failure;
             return Task.FromResult(new StripeCheckoutSession("cs_test_1", "https://checkout.stripe.test/s"));
         }
+
+        public Task<StripePortalSession> CreatePortalSessionAsync(string customerId, string returnUrl, CancellationToken ct) =>
+            throw new NotSupportedException();
     }
 }

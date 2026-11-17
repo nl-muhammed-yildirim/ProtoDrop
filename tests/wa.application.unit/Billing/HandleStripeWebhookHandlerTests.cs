@@ -208,6 +208,8 @@ public class HandleStripeWebhookHandlerTests
 
         public Task<Plan?> FindPlanByStripePriceIdAsync(string priceId, CancellationToken ct) => Task.FromResult(PricePlan);
 
+        public Task<string?> FindStripeCustomerIdAsync(Guid userId, CancellationToken ct) => Task.FromResult<string?>(null);
+
         public Task<StripeApplyResult> ApplySubscriptionAsync(StripeSubscriptionChange change, Guid? targetPlanId, DateTime nowUtc, CancellationToken ct)
         {
             ApplyCalls++;

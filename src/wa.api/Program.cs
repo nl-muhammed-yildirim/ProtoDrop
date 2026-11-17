@@ -1224,6 +1224,23 @@ app.MapPost("/api/v1/billing/checkout", async (wa.application.UseCases.Billing.C
     }
 });
 
+// US-019-02 (TA-4.2#18): GET /api/v1/billing/portal — cookie auth; Stripe Billing Portal URL for the user's customer, or the upgrade fallback. Persists nothing.
+app.MapGet("/api/v1/billing/portal", async (HttpContext ctx, ISender sender, CancellationToken ct) =>
+{
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+
+    try
+    {
+        var result = await sender.Send(new wa.application.UseCases.Billing.GetPortalSessionQuery(userId), ct);
+        return Results.Ok(new { url = result.Url, fallback = result.Url is null ? "upgrade" : (string?)null });
+    }
+    catch (wa.application.UseCases.Billing.BillingUnavailableException ex)
+    {
+        throw new BusinessException(ProblemCodes.BillingUnavailable, "Billing is temporarily unavailable — please try again.", ex);
+    }
+});
+
 app.Run();
 
 // Empty partial class so WebApplicationFactory<Program> can resolve the entry point.

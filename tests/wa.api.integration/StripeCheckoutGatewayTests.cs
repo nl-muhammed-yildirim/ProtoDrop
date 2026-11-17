@@ -94,4 +94,53 @@ public class StripeCheckoutGatewayTests
         await Assert.ThrowsAsync<BillingUnavailableException>(() => Make(handler, key).CreateSubscriptionCheckoutAsync(Request, default));
         Assert.Null(handler.Seen);
     }
+
+    // ---- US-019-02: portal session ----
+
+    [Fact]
+    public async Task Portal_Success_PostsExpectedForm_AndParsesSession()
+    {
+        var handler = new FakeHandler { Respond = _ => Json(HttpStatusCode.OK, "{\"id\":\"bps_1\",\"url\":\"https://billing.stripe.test/p/1\"}") };
+        var session = await Make(handler).CreatePortalSessionAsync("cus_1", "https://app/return", default);
+
+        Assert.Equal("bps_1", session.SessionId);
+        Assert.Equal("https://billing.stripe.test/p/1", session.Url);
+        Assert.Equal(HttpMethod.Post, handler.Seen!.Method);
+        Assert.Equal("/v1/billing_portal/sessions", handler.Seen.RequestUri!.AbsolutePath);
+        Assert.Equal("Bearer", handler.Seen.Headers.Authorization!.Scheme);
+        Assert.Equal("sk_test_x", handler.Seen.Headers.Authorization.Parameter);
+
+        var form = System.Web.HttpUtility.ParseQueryString(handler.Body!);
+        Assert.Equal("cus_1", form["customer"]);
+        Assert.Equal("https://app/return", form["return_url"]);
+    }
+
+    [Fact]
+    public async Task Portal_NonSuccessStatus_BillingUnavailable()
+    {
+        var handler = new FakeHandler { Respond = _ => Json(HttpStatusCode.InternalServerError, "{\"error\":{}}") };
+        await Assert.ThrowsAsync<BillingUnavailableException>(() => Make(handler).CreatePortalSessionAsync("cus_1", "https://app/return", default));
+    }
+
+    [Fact]
+    public async Task Portal_TransportFailure_BillingUnavailable()
+    {
+        var handler = new FakeHandler { Respond = _ => throw new HttpRequestException("boom") };
+        await Assert.ThrowsAsync<BillingUnavailableException>(() => Make(handler).CreatePortalSessionAsync("cus_1", "https://app/return", default));
+    }
+
+    [Fact]
+    public async Task Portal_MissingUrl_BillingUnavailable()
+    {
+        var handler = new FakeHandler { Respond = _ => Json(HttpStatusCode.OK, "{\"id\":\"bps_1\"}") };
+        await Assert.ThrowsAsync<BillingUnavailableException>(() => Make(handler).CreatePortalSessionAsync("cus_1", "https://app/return", default));
+    }
+
+    [Fact]
+    public async Task Portal_BlankSecret_BillingUnavailable_NoHttpCall()
+    {
+        var handler = new FakeHandler();
+        await Assert.ThrowsAsync<BillingUnavailableException>(() => Make(handler, " ").CreatePortalSessionAsync("cus_1", "https://app/return", default));
+        Assert.Null(handler.Seen);
+    }
 }

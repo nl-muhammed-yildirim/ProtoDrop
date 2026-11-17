@@ -39,4 +39,7 @@ public interface IStripeBillingStore
     /// set AppUser.PlanId when <paramref name="targetPlanId"/> has a value. UserUnresolved rolls everything back.
     /// </summary>
     Task<StripeApplyResult> ApplySubscriptionAsync(StripeSubscriptionChange change, Guid? targetPlanId, DateTime nowUtc, CancellationToken ct);
+
+    /// <summary>US-019-02: the Stripe customer id of the user's most recently updated Subscription mirror row; null when none.</summary>
+    Task<string?> FindStripeCustomerIdAsync(Guid userId, CancellationToken ct);
 }

@@ -24,9 +24,6 @@ public sealed class StripeCheckoutGateway : IStripeCheckoutGateway
 
     public async Task<StripeCheckoutSession> CreateSubscriptionCheckoutAsync(StripeCheckoutRequest request, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(_secretKey))
-            throw new BillingUnavailableException("Stripe secret key is not configured.");
-
         var userId = request.UserId.ToString("N");
         var form = new Dictionary<string, string>
         {
@@ -40,7 +37,28 @@ public sealed class StripeCheckoutGateway : IStripeCheckoutGateway
             ["cancel_url"] = request.CancelUrl
         };
 
-        using var message = new HttpRequestMessage(HttpMethod.Post, "v1/checkout/sessions")
+        var (id, url) = await PostFormAsync("v1/checkout/sessions", form, "checkout", ct);
+        return new StripeCheckoutSession(id, url);
+    }
+
+    public async Task<StripePortalSession> CreatePortalSessionAsync(string customerId, string returnUrl, CancellationToken ct)
+    {
+        var form = new Dictionary<string, string>
+        {
+            ["customer"] = customerId,
+            ["return_url"] = returnUrl
+        };
+
+        var (id, url) = await PostFormAsync("v1/billing_portal/sessions", form, "portal", ct);
+        return new StripePortalSession(id, url);
+    }
+
+    private async Task<(string Id, string Url)> PostFormAsync(string path, Dictionary<string, string> form, string operation, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(_secretKey))
+            throw new BillingUnavailableException("Stripe secret key is not configured.");
+
+        using var message = new HttpRequestMessage(HttpMethod.Post, path)
         {
             Content = new FormUrlEncodedContent(form)
         };
@@ -52,8 +70,8 @@ public sealed class StripeCheckoutGateway : IStripeCheckoutGateway
             var requestId = response.Headers.TryGetValues("Request-Id", out var ids) ? ids.FirstOrDefault() : null;
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning("Stripe checkout session creation failed: status {StatusCode}, request id {StripeRequestId}",
-                    (int)response.StatusCode, requestId);
+                _logger.LogWarning("Stripe {Operation} session creation failed: status {StatusCode}, request id {StripeRequestId}",
+                    operation, (int)response.StatusCode, requestId);
                 throw new BillingUnavailableException($"Stripe returned {(int)response.StatusCode}.");
             }
 
@@ -64,20 +82,20 @@ public sealed class StripeCheckoutGateway : IStripeCheckoutGateway
             var url = root.TryGetProperty("url", out var urlEl) && urlEl.ValueKind == JsonValueKind.String ? urlEl.GetString() : null;
             if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(url))
             {
-                _logger.LogWarning("Stripe checkout session response missing id/url: request id {StripeRequestId}", requestId);
+                _logger.LogWarning("Stripe {Operation} session response missing id/url: request id {StripeRequestId}", operation, requestId);
                 throw new BillingUnavailableException("Stripe response did not include a session url.");
             }
 
-            return new StripeCheckoutSession(id, url);
+            return (id, url);
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogWarning("Stripe checkout transport failure");
+            _logger.LogWarning("Stripe {Operation} transport failure", operation);
             throw new BillingUnavailableException("Stripe is unreachable.", ex);
         }
         catch (TaskCanceledException ex) when (!ct.IsCancellationRequested)
         {
-            _logger.LogWarning("Stripe checkout timed out");
+            _logger.LogWarning("Stripe {Operation} timed out", operation);
             throw new BillingUnavailableException("Stripe request timed out.", ex);
         }
         catch (JsonException ex)

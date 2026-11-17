@@ -30,6 +30,16 @@ public sealed class StripeBillingStore : IStripeBillingStore
         return null;
     }
 
+    public async Task<string?> FindStripeCustomerIdAsync(Guid userId, CancellationToken ct)
+    {
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        return await db.Set<Subscription>().AsNoTracking()
+            .Where(s => s.AppUserId == userId && s.StripeCustomerId != null)
+            .OrderByDescending(s => s.UpdatedAtUtc)
+            .Select(s => s.StripeCustomerId)
+            .FirstOrDefaultAsync(ct);
+    }
+
     public async Task<StripeApplyResult> ApplySubscriptionAsync(
         StripeSubscriptionChange change, Guid? targetPlanId, DateTime nowUtc, CancellationToken ct)
     {
