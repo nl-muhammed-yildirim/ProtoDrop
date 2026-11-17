@@ -102,6 +102,12 @@ public class DownloadAllUrlEndpointTests : IAsyncLifetime
 
         // Byte-exact — the zip blob round-trips through the SAS (exit check: not re-zipped).
         Assert.Equal(bytes, streamed.ToArray());
+
+        // AC-017-2 server half: Azurite honors the signed rscd, so the browser gets an attachment named all.zip.
+        Assert.True(streamResponse.Content.Headers.TryGetValues("Content-Disposition", out var cd));
+        var disposition = string.Join(",", cd!);
+        Assert.StartsWith("attachment", disposition);
+        Assert.Contains("filename*=UTF-8''all.zip", disposition);
     }
 
     // ---- Exit check 2: DownloadsCount +1 and exactly one DownloadEvent row per mint (fileId = null for download-all) ----
@@ -370,9 +376,11 @@ public class DownloadAllUrlEndpointTests : IAsyncLifetime
 
         // Unescape the tokens that go into the string-to-sign.
         var se = Uri.UnescapeDataString(parts.Single(p => p.k == "se").v);
+        var rscdPart = parts.FirstOrDefault(p => p.k == "rscd");
+        var rscdVal = rscdPart.k is not null ? Uri.UnescapeDataString(rscdPart.v) : string.Empty;
 
         // TA-3.6 16-line blob SAS string-to-sign: sp=r (read), no start bound, Azurite canonical path,
-        // protocol re-signed for the plain-HTTP leg, no rs-cd override (the zip has no original-filename override).
+        // protocol re-signed for the plain-HTTP leg, signed rs-cd attachment override (all.zip).
         const string ProtocolLine = "https,http";
         var stringToSign = string.Join('\n', new[]
         {
@@ -388,7 +396,7 @@ public class DownloadAllUrlEndpointTests : IAsyncLifetime
             string.Empty,                           // snapshot time
             string.Empty,                           // encryption scope
             string.Empty,                           // cache control
-            string.Empty,                           // content disposition — no rs-cd override for the zip
+            rscdVal,                                // content disposition — the signed attachment override (FR-003-10)
             string.Empty,                           // content encoding
             string.Empty,                           // content language
             string.Empty                            // content type

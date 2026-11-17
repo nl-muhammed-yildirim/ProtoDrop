@@ -94,7 +94,7 @@ public class BlobSasMinterTest : IDisposable
     }
 
     [Fact]
-    public void RecipientZip_SAS_pins_r_scope_30min_window_and_no_st()
+    public void RecipientZip_SAS_pins_r_scope_30min_window_no_st_and_attachment_rscd()
     {
         var url = _minter.MintRecipientZip(TrnId).ToString();
         var q = Query(url);
@@ -103,7 +103,15 @@ public class BlobSasMinterTest : IDisposable
         Assert.Equal(Now.AddMinutes(30).ToString("yyyy-MM-ddTHH:mm:ssZ"), q["se"]);  // 30min TTL (TA-3.6)
         Assert.False(q.ContainsKey("st"));                   // no st for recipients (TA-3.6)
 
-        assertValidSignature(q, $"/blob/blob.local.test.example/transfers/{TrnId}/all.zip");
+        // FR-003-10 / FR-017-3: the zip SAS signs an explicit attachment disposition named all.zip.
+        Assert.Equal("attachment;filename*=UTF-8''all.zip", q["rscd"]);
+
+        var sst = Sign(
+            permissions: q["sp"], start: q.ContainsKey("st") ? q["st"] : "", expiry: q["se"],
+            path: $"/blob/blob.local.test.example/transfers/{TrnId}/all.zip",
+            ipRange: q.GetValueOrDefault("sip", ""), protocol: "https", resourceType: "b",
+            accountKey: _accountKey, respContentDisposition: q["rscd"]);
+        Assert.Equal(Convert.ToBase64String(sst), q["sig"]);
     }
 
     private void assertValidSignature(Dictionary<string, string> q, string canonicalPath)
