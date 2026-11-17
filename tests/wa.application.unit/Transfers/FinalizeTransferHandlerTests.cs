@@ -424,7 +424,7 @@ public class FinalizeTransferHandlerTests
             ActiveTransfersMax = 20
         };
 
-        public Task<LimitsRecord> Resolve(string planCode, CancellationToken cancellationToken = default) =>
+        public Task<LimitsRecord> Resolve(string? planCode, CancellationToken cancellationToken = default) =>
             Task.FromResult(Record);
     }
 

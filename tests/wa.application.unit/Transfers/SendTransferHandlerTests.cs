@@ -705,7 +705,7 @@ public class SendTransferHandlerTests
             MaxSingleFile = 5_368_709_120     // same as transfer size for all plans
         };
 
-        public Task<LimitsRecord> Resolve(string planCode, CancellationToken cancellationToken = default) =>
+        public Task<LimitsRecord> Resolve(string? planCode, CancellationToken cancellationToken = default) =>
             Task.FromResult(Record);
     }
 

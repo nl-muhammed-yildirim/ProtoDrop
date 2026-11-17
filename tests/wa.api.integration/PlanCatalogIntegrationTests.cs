@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.MsSql;
 using wa.application.Limits;
@@ -62,6 +63,40 @@ public class PlanCatalogIntegrationTests : IAsyncLifetime
 
         Assert.Equal(45, limits.RetentionDays);
         Assert.Equal(150, limits.MaxEmails);
+    }
+
+    [Fact]
+    public async Task SeededProFlag_Edited_ResolvesNewValue_OnlyAfterTtl() // AC-018-2 / US-018-02 AC blocks 1-2 on real SQL.
+    {
+        var proId = Guid.Parse("11111111-0000-4000-8000-000000000002");
+        var pro = await _db.Set<Plan>().AsNoTracking().SingleAsync(p => p.Id == proId);
+        var expected = JsonSerializer.Deserialize<LimitsRecord>(pro.LimitsJson)!.MaxTransferSize;
+
+        var now = DateTimeOffset.UtcNow;
+        var ttl = TimeSpan.FromSeconds(30);
+        await using var readDb = new WaDbContext(_options);
+        var provider = new LimitsProvider(
+            new PlansCache(new PlansStore(readDb), ttl, () => now),
+            new FlagsCache(new FlagsStore(readDb), ttl, () => now));
+
+        var first = await provider.Resolve(pro.Code, CancellationToken.None);
+        Assert.Equal(expected, first.MaxTransferSize);
+
+        await using (var writeDb = new WaDbContext(_options))
+        {
+            var flag = await writeDb.Set<FeatureFlag>().SingleAsync(f => f.Key == "limits." + pro.Code + ".maxTransferSize");
+            flag.Value = "21474836480"; // 20 GB — a test value, not a constant change.
+            flag.UpdatedAtUtc = DateTime.UtcNow;
+            await writeDb.SaveChangesAsync();
+        }
+
+        now += TimeSpan.FromSeconds(29);
+        var within = await provider.Resolve(pro.Code, CancellationToken.None);
+        Assert.Equal(expected, within.MaxTransferSize);
+
+        now += TimeSpan.FromSeconds(2);
+        var after = await provider.Resolve(pro.Code, CancellationToken.None);
+        Assert.Equal(21_474_836_480L, after.MaxTransferSize);
     }
 
     [Fact]

@@ -252,7 +252,7 @@ public class SendTransferFilesGoneTests
             MaxSingleFile = 5_368_709_120
         };
 
-        public Task<LimitsRecord> Resolve(string planCode, CancellationToken cancellationToken = default) =>
+        public Task<LimitsRecord> Resolve(string? planCode, CancellationToken cancellationToken = default) =>
             Task.FromResult(Record);
     }
 

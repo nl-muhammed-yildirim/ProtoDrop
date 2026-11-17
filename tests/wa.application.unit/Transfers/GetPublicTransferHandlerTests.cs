@@ -375,7 +375,7 @@ public class GetPublicTransferHandlerTests
             MaxDownloads = maxDownloads;
         }
 
-        public Task<LimitsRecord> Resolve(string planCode, CancellationToken cancellationToken) =>
+        public Task<LimitsRecord> Resolve(string? planCode, CancellationToken cancellationToken) =>
             Task.FromResult(new LimitsRecord { MaxZipSize = MaxZipSize, MaxDownloads = MaxDownloads });
     }
 
