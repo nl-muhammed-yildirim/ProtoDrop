@@ -48,12 +48,9 @@ public sealed class SendStore : ISendStore
                 "UPDATE [Transfer] SET [SupersededBy] = {0} WHERE [Id] = {1}",
                 [transfer.Id, transfer.SourcedFrom.Value], ct);
 
-            // The raw-SQL UPDATE bypasses the change tracker: if this original row is tracked in the singleton context
-            // (it was loaded by the earlier resend command), detach it so a later SaveChanges can't resurrect the old SupersededBy
-            // (same convention as PublicTransferStore.RecordSingleFileDownloadAsync).
-            var tracked = _db.Set<Transfer>().Local.FirstOrDefault(t => t.Id == transfer.SourcedFrom.Value);
-            if (tracked is not null)
-                _db.Set<Transfer>().Local.Remove(tracked);
+            // The raw-SQL UPDATE bypasses the change tracker: the original was loaded (tracked) by the earlier resend command, so detach it
+            // so a later SaveChanges can't resurrect the old SupersededBy. T-003-10: TransferTrackerExtensions.DetachTransfer, never Local.Remove.
+            _db.DetachTransfer(transfer.SourcedFrom.Value);
         }
 
         // T-010-01: re-send drafts materialized snapshot recipient rows at creation — the send's submitted set replaces them,
