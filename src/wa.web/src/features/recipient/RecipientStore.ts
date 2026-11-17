@@ -377,8 +377,10 @@ export const useRecipientStore = create<RecipientState & RecipientActions>((set,
         const url = DOWNLOAD_ALL_URL_ENDPOINT.replace('{linkId}', linkId)
           + (token !== null ? `?t=${encodeURIComponent(token)}` : '')
         const res = await fetch(url, { signal: controller.signal, headers: { traceparent: getTraceParent() } })
+        if (downloadAllController !== controller) return // reset()/superseded: ignore the response.
         if (res.status === 202) {
           const body = (await res.json().catch(() => null)) as { pollAfterSec?: number } | null
+          if (downloadAllController !== controller) return
           const now = Date.now()
           preparingStartedAt ??= now
           if (now - preparingStartedAt >= ZIP_PREPARE_TIMEOUT_MS) { fail(); return }
@@ -389,6 +391,7 @@ export const useRecipientStore = create<RecipientState & RecipientActions>((set,
         }
         if (!res.ok) {
           const problem = (await res.json().catch(() => null)) as { code?: string; details?: string } | null
+          if (downloadAllController !== controller) return
           const terminal = classifyProblem(problem)
           if (terminal !== null) {
             set({ ...LOADING_SHAPE, status: terminal.status, terminalMessage: terminal.message })
@@ -398,8 +401,11 @@ export const useRecipientStore = create<RecipientState & RecipientActions>((set,
           return
         }
         const body = (await res.json()) as { url: string }
+        if (downloadAllController !== controller) return
         // Same Azurite re-sign + same-tab navigation as per-file (AC-017-2 / EC-017-4 - a navigation, not a popup).
-        window.location.href = await browserDownloadUrl(body.url)
+        const href = await browserDownloadUrl(body.url)
+        if (downloadAllController !== controller) return
+        window.location.href = href
         const { files, downloadsLeft } = get()
         trackClientEvent('download_completed', {
           fileId: null, // TA-7.2: fileId=null for download-all.

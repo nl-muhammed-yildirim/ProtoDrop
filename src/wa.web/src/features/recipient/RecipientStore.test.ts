@@ -238,6 +238,30 @@ describe('RecipientStore downloadAll (T-004-03)', () => {
     expect(useRecipientStore.getState().downloadAllFailed).toBe(false)
   })
 
+  it('reset() between the 202 response and its json() resolving - no state change, no timer, no navigation', async () => {
+    seed()
+    let release: (v: unknown) => void = () => {}
+    const gate = new Promise((res) => { release = res })
+    const calls: string[] = []
+    vi.stubGlobal('fetch', vi.fn((url: string) => {
+      calls.push(url)
+      return Promise.resolve({ status: 202, ok: false, json: () => gate.then(() => ({ pollAfterSec: 2 })) })
+    }))
+    vi.useFakeTimers()
+
+    useRecipientStore.getState().downloadAll('link1')
+    await vi.advanceTimersByTimeAsync(0)
+    useRecipientStore.getState().reset()
+    release(null)
+    await vi.advanceTimersByTimeAsync(30_000)
+
+    expect(calls.length).toBe(1)
+    expect(vi.getTimerCount()).toBe(0)
+    expect(useRecipientStore.getState().downloadAllPhase).toBe('idle')
+    expect(useRecipientStore.getState().downloadAllFailed).toBe(false)
+    expect(assignedHref).toBeNull()
+  })
+
   it('per-file download clears downloadingFileId even with unlimited downloads (downloadsLeft === null)', async () => {
     seed(null)
     stubEndpoint7([() => json(200, { url: SAS })])
