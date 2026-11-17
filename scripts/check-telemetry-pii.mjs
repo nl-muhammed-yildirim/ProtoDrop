@@ -3,7 +3,11 @@
  * T-012-05 (F-TRF-012, US-012-01; EC-012-3 / AC-012-3; TA-9.4 PII policy, TA-10.2 telemetry names): telemetry PII guard.
  *
  * Scans the two telemetry exits for raw email patterns and un-hashed / unmarked PII:
- *   server  — WaTelemetryReporter calls (`_telemetry.X(...)`, `telemetry.X(...)`, `_telemetry?.X(...)`) in src/**\/*.cs
+ *   server  — WaTelemetryReporter calls in src/**\/*.cs, matched by the reporter's PUBLIC METHOD NAMES on ANY receiver
+ *             (`_telemetry.X(..)`, `_reporter.X(..)`, `reporter?.X(..)`, a minimal-API lambda parameter ...). The method list is parsed
+ *             from WaTelemetryReporter.cs at scan time, so a new reporter method is covered automatically. Chosen over receiver-name or
+ *             declared-type matching because it cannot be dodged by renaming the injected field; the price is a possible false positive
+ *             when an unrelated type has a same-named method (none on the tree today — if one appears, handle it narrowly here).
  *   client  — trackClientEvent(name, props) calls in src/wa.web/src/**\/*.{ts,tsx} (props are spread verbatim into App Insights)
  *
  * Rules (all gate-tier; any finding exits 1):
@@ -12,10 +16,13 @@
  *                            secret / sas / sig / signature (after stripping string literals, TelemetryEvents.X members and
  *                            slot-wrapped spans PiiTransforms.FileName(..) / PiiTransforms.IpAddress(..) / FileNameSlot(..) / IpSlot(..)).
  *   R3  template property  — every {placeholder} in a WaTelemetryReporter log template must be in SERVER_PROPS (closed set).
- *   R4  string-slot wrap   — an argument to a STRING_SLOT_METHODS member (TransferPageViewed) must be slot-wrapped.
+ *   R4  string-slot wrap   — an argument to a STRING_SLOT_METHODS member (TransferPageViewed) must be exactly ONE slot-wrapped call
+ *                            (PiiTransforms.FileName(..) / IpAddress(..) / <recv>.FileNameSlot(..) / IpSlot(..)); nothing may remain
+ *                            after the wrapped call is removed (so `PiiTransforms.FileName(x) + request.LinkId` fails).
  *   R5  client props       — trackClientEvent's 2nd argument must be an object literal whose keys are all in CLIENT_PROPS
  *                            and whose value expressions name no PII word (a bare identifier / spread variable hides the keys, so it fails).
- *   R6  bypass             — TelemetryClient / .TrackEvent( / .TrackTrace( in src/**\/*.cs, or the App Insights ingestion host in a
+ *   R6  bypass             — `trackClientEvent as x` imports / `= trackClientEvent` aliases in web files (calls through an alias would escape R5);
+ *                            TelemetryClient / .TrackEvent( / .TrackTrace( in src/**\/*.cs, or the App Insights ingestion host in a
  *                            web file other than core/telemetry/clientTelemetry.ts (AC-056-4: the reporter / trackClientEvent are the single exits).
  *
  * Allowlists are CLOSED sets: adding a telemetry property means editing one list below — that diff is the PR-visible review point (EC-012-3).
@@ -23,8 +30,10 @@
  * Run (repo root):   node scripts/check-telemetry-pii.mjs            scan the tree; exit 0 = PASS, 1 = findings
  *                    node scripts/check-telemetry-pii.mjs selftest   prove every seeded violation is flagged and every clean shape passes
  *
- * Limitation: a paren/quote-aware text scan, not a Roslyn/TS parser (a helper reached through an alias variable escapes R2; R6 + the
- * reflection pin in WaTelemetryReporterTests mitigate). T-069 owns the [Pii] attribute, event-DTO convention tests and general _logger templates.
+ * Limitation: a paren/quote-aware text scan, not a Roslyn/TS parser. Server: a reporter method taken as a delegate / method group
+ * (`var f = reporter.X; f(..)`) or invoked via reflection escapes R1/R2/R4 (R6 + the reflection pin in WaTelemetryReporterTests mitigate).
+ * Client: re-exporting (`export { trackClientEvent as x }`), passing the function as a value (`wrap(trackClientEvent)`), or calling it via
+ * a destructured / namespace alias other than the two shapes R6 flags escapes R5. T-069 owns the [Pii] attribute, event-DTO convention tests and general _logger templates.
  * Node built-ins only (TA-17: no new packages).
  */
 
@@ -48,6 +57,29 @@ const STRING_SLOT_METHODS = new Set(['TransferPageViewed'])
 /** The slot transforms themselves — their argument IS the raw value being hashed. */
 const SLOT_METHODS = new Set(['FileNameSlot', 'IpSlot'])
 const PII_WORDS = new Set(['email', 'mail', 'address', 'name', 'ip', 'password', 'passwd', 'secret', 'sas', 'sig', 'signature'])
+/**
+ * Public instance method names of WaTelemetryReporter, parsed from its source (so new methods are covered automatically).
+ * Cross-checked against STRING_SLOT_METHODS / SLOT_METHODS: a rename there fails loudly instead of silently disarming a rule.
+ */
+function loadReporterMethods() {
+  let src
+  try {
+    src = readFileSync(path.join(ROOT, REPORTER_CS), 'utf8')
+  } catch {
+    console.error(`FAIL — cannot read ${REPORTER_CS}: the guard cannot derive the reporter method list.`)
+    process.exit(1)
+  }
+  const names = new Set()
+  for (const m of src.matchAll(/^[ \t]*public\s+(?!(?:sealed|static|abstract|partial|class|record|struct|interface|const|readonly)\b)[\w<>[\]?.,]+\s+(\w+)\s*[(<]/gm)) names.add(m[1])
+  const missing = [...STRING_SLOT_METHODS, ...SLOT_METHODS].filter((n) => !names.has(n))
+  if (names.size === 0 || missing.length > 0) {
+    console.error(`FAIL — reporter method list is empty or diverges from STRING_SLOT_METHODS/SLOT_METHODS (missing: ${missing.join(', ') || 'all'}) — update ${REPORTER_CS} or this script.`)
+    process.exit(1)
+  }
+  return names
+}
+const REPORTER_METHODS = loadReporterMethods()
+const REPORTER_CALL_RE = new RegExp(`\\.\\s*(${[...REPORTER_METHODS].join('|')})\\s*\\(`, 'g')
 const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -224,7 +256,13 @@ const piiWordsIn = (fragment) => [...new Set(identifierWords(fragment).filter((w
 /** Removes TelemetryEvents.X members and slot-wrapped spans from masked code (they are the sanctioned shapes). */
 function stripSanctioned(code) {
   let s = code.replace(/TelemetryEvents\s*\.\s*\w+/g, ' ')
-  const slot = /(?:PiiTransforms\s*\.\s*(?:FileName|IpAddress)|\bFileNameSlot|\bIpSlot)\s*\(/
+  return stripSlots(s)
+}
+
+/** Removes slot-wrapped calls (with any receiver prefix) from masked code. */
+function stripSlots(code) {
+  let s = code
+  const slot = /(?:[A-Za-z_]\w*\s*\??\.\s*)*(?:PiiTransforms\s*\.\s*(?:FileName|IpAddress)|\bFileNameSlot|\bIpSlot)\s*\(/
   for (;;) {
     const m = slot.exec(s)
     if (!m) break
@@ -251,7 +289,7 @@ function scanCs(file, text) {
   for (const m of code.matchAll(/\bTelemetryClient\b|\.TrackEvent\s*\(|\.TrackTrace\s*\(/g)) {
     findings.push(finding(file, lineOf(text, m.index), 'R6', `bypass of the reporter ('${m[0].trim()}') — telemetry must go through WaTelemetryReporter (AC-056-4)`))
   }
-  for (const m of code.matchAll(/\b_?telemetry\??\.(\w+)\s*\(/g)) {
+  for (const m of code.matchAll(REPORTER_CALL_RE)) {
     const method = m[1]
     const open = m.index + m[0].length - 1
     const line = lineOf(text, m.index)
@@ -265,9 +303,9 @@ function scanCs(file, text) {
     const argCode = code.slice(call.start, call.end)
     if (EMAIL_RE.test(argText)) findings.push(finding(file, line, 'R1', `raw email pattern in ${method}(...) arguments (TA-9.4)`))
     if (STRING_SLOT_METHODS.has(method)) {
-      const a = argText.trim()
-      if (!(a.startsWith('PiiTransforms.') || a.includes('.FileNameSlot(') || a.includes('.IpSlot('))) {
-        findings.push(finding(file, line, 'R4', `${method}(...) argument is not slot-wrapped — hash via PiiTransforms.* / FileNameSlot / IpSlot (TA-9.4)`))
+      const stripped = stripSlots(argCode)
+      if (stripped === argCode || stripped.trim() !== '') {
+        findings.push(finding(file, line, 'R4', `${method}(...) argument is not exactly one slot-wrapped call — hash via PiiTransforms.* / FileNameSlot / IpSlot (TA-9.4)`))
       }
     }
     if (!SLOT_METHODS.has(method)) {
@@ -354,6 +392,9 @@ function scanTs(file, text, opts = {}) {
     findings.push(finding(file, lineOf(text, nc.indexOf(INGESTION_HOST)), 'R6', `App Insights ingestion host outside ${CLIENT_TELEMETRY_TS} — telemetry must go through trackClientEvent (AC-056-4)`))
   }
   if (opts.definition) return { findings, calls }
+  for (const m of code.matchAll(/\btrackClientEvent\s+as\s+\w+|=\s*trackClientEvent\b(?!\s*\()/g)) {
+    findings.push(finding(file, lineOf(text, m.index), 'R6', `alias of trackClientEvent ('${m[0].replace(/\s+/g, ' ')}') — calls through an alias escape R5; call trackClientEvent directly`))
+  }
   for (const m of code.matchAll(/\btrackClientEvent\s*\(/g)) {
     const open = m.index + m[0].length - 1
     const line = lineOf(text, m.index)
@@ -472,12 +513,19 @@ function runSelfTest() {
     ['S7', 'ts', 'R1', "trackClientEvent('upload_failed', { reason: 'a@b.co' })"],
     ['S8', 'ts', 'R5', "trackClientEvent('upload_failed', props)"],
     ['S9', 'cs', 'R6', 'new TelemetryClient().TrackEvent("x");'],
+    ['S10', 'cs', 'R4', '_reporter.TransferPageViewed(request.LinkId);'],
+    ['S11', 'cs', 'R2', 'reporter.StorageBytesActive(owner.Email.Length)'],
+    ['S12', 'cs', 'R4', '_telemetry.TransferPageViewed(PiiTransforms.FileName(x) + request.LinkId)'],
+    ['S13', 'ts', 'R6', "import { trackClientEvent as track } from '../core/telemetry/clientTelemetry'"],
+    ['S14', 'ts', 'R6', 'const track = trackClientEvent'],
   ]
   const clean = [
     ['C1', 'ts', "if (x) {\n  trackClientEvent('upload_failed', { fileId: id, retries: fileAttempts.get(id)?.retries, ...(isBlobUnavailable ? { reason: 'blob_unavailable' } : {}) })\n}"],
     ['C2', 'cs', '_telemetry.TransferPageViewed(PiiTransforms.FileName(request.LinkId));'],
     ['C3', 'cs', '_telemetry?.LogEvent(TelemetryEvents.EmailTemplateFallback);'],
     ['C4', 'ts', "trackClientEvent('download_completed', {\n  fileId: null, // TA-7.2: fileId=null for download-all.\n  bytes: totalBytes,\n  durationMs: Math.round(performance.now() - startedAt),\n})"],
+    ['C6', 'cs', '_reporter.TransferPageViewed(_reporter.FileNameSlot(name));'],
+    ['C7', 'ts', "import { trackClientEvent } from '../core/telemetry/clientTelemetry'"],
     ['C5', 'cs', '_telemetry.UploadCompleted(\n    totalBytes,\n    stopwatch.ElapsedMilliseconds,\n    totalRetries);'],
   ]
   let caught = 0
