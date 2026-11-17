@@ -2,7 +2,7 @@
 
 **Purpose:** Architect reads this instead of exploring from scratch. Coder cites it. Reviewer checks against it.
 **Rule:** any API shape below that changes MUST change here in the same commit; `verify_plan.py` fails on drift between plans and these facts.
-**Last updated:** 2026-11-17 (post F-TRF-017 — Phase 0 doc/code gap sweep: endpoint table, telemetry count, token location)
+**Last updated:** 2026-11-17 (Phase 0 gap sweep: endpoint table, telemetry count, token location; T-014-05 accountLocale key)
 
 ## 1. Closed sets (counts are load-bearing — cite them, don't re-enumerate in plans)
 
@@ -69,6 +69,7 @@ Typography/shape: `--fs-display 40px`, `--fs-h1 28px`, `--fs-body 16px`, `--fs-s
 |---|---|---|
 | Session mirror | `protoDrop.session` | web localStorage |
 | CSRF/idempotency header | `Idempotency-Key` | CORS-allowed header |
+| Account language (AC-014-3) | `protoDrop.accountLocale` — one of the 8 locales; absent = browser → en; survives sign-out; only `core/i18n/init.ts` (`readAccountLocale`/`setAccountLocale`) touches it | web localStorage |
 
 ## 5. Maintenance rules (for the Coder docs step)
 
