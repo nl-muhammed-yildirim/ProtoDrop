@@ -24,11 +24,12 @@ using Serilog.Context;
 using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
-// TA-10.5: console sink locally (App Insights later per environment); Microsoft.* → Warning, app at Information.
+// TA-10.5: console sink locally (App Insights later per environment); Microsoft.* and AspNetCoreRateLimit.* → Warning (TA-9.4: the limiter's blocked-request INF line carries the raw client IP), app at Information.
 builder.Host.UseSerilog((context, cfg) => cfg
     .Enrich.FromLogContext()
     .MinimumLevel.Information()
     .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .MinimumLevel.Override("AspNetCoreRateLimit", LogEventLevel.Warning)
     .WriteTo.Console());
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(PingCommand).Assembly));
 builder.Services.AddSingleton<wa.application.Ports.IDbHealthProbe, WaDbHealthProbe>();
