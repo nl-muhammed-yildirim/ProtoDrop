@@ -47,6 +47,12 @@ namespace wa.infrastructure.Persistence.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(false, "DF_AppUser_Conf");
 
+                    b.Property<string>("OrgLogoBlobPath")
+                        .HasColumnType("VARCHAR(400)");
+
+                    b.Property<string>("OrgName")
+                        .HasColumnType("NVARCHAR(60)");
+
                     b.Property<string>("PasswordHash")
                         .HasColumnType("VARCHAR(256)");
 

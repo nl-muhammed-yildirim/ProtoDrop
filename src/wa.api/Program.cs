@@ -72,6 +72,8 @@ builder.Services.AddSingleton<wa.application.UseCases.Transfers.ITransferStore>(
 builder.Services.AddSingleton<wa.application.UseCases.Transfers.ISendStore>(sp => new wa.infrastructure.Persistence.SendStore(sp.GetRequiredService<WaDbContext>(), sp.GetRequiredService<wa.application.Ports.IBlobStore>()));
 // T-014 (TA-4.2#4): recipient-page handler's DB surface — thin adapter over the adapter-owned WaDbContext.
 builder.Services.AddSingleton<wa.application.UseCases.Transfers.IPublicTransferStore>(sp => new wa.infrastructure.Persistence.PublicTransferStore(sp.GetRequiredService<WaDbContext>()));
+// US-021-01: sender branding read port (org name beside the sender on the recipient page).
+builder.Services.AddSingleton<wa.application.UseCases.Transfers.ISenderBrandingStore>(sp => new wa.infrastructure.Persistence.SenderBrandingStore(sp.GetRequiredService<WaDbContext>()));
 // T-002-02 (TA-4.1.5): generic HTTP idempotency store — used by IdempotencyMiddleware for finalize + send endpoints.
 builder.Services.AddSingleton<IIdempotencyStore>(sp => new wa.infrastructure.Persistence.IdempotencyStore(sp.GetRequiredService<WaDbContext>()));
 // T-011-02 (FR-011-5 / TA-3.2): audit write helper — one AuditLog row + one admin.action domain event per mutation.
@@ -391,7 +393,8 @@ app.MapGet("/api/v1/public/transfers/{linkId}", async (string linkId, HttpReques
         {
             from = result.From, note = result.Note,
             files = result.Files!.Select(f => new { fileId = f.FileId.ToString("n"), name = f.Name, sizeBytes = f.SizeBytes }),
-            hasDownloadAll = result.HasDownloadAll, downloadsLeft = result.DownloadsLeft, passwordRequired = result.PasswordRequired
+            hasDownloadAll = result.HasDownloadAll, downloadsLeft = result.DownloadsLeft, passwordRequired = result.PasswordRequired,
+            orgName = result.OrgName, orgLogoUrl = result.OrgLogoUrl
         }), // TA-4.2#4 exact wire shape — property names pinned at the single construction site (same style as endpoints 1–3)
 
         // D8: status pin = 410 for both terminal expired shapes; the unknown case overrides to 404 below (FR-003-9: same body, different status line only).

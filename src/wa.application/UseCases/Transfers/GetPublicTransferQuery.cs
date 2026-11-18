@@ -28,7 +28,9 @@ public sealed record GetPublicTransferResult(
     bool HasDownloadAll = false,    // Active only
     int? DownloadsLeft = null,      // Active only; null when the cap is ∞
     bool PasswordRequired = false,  // Active only
-    string? SenderEmail = null);    // terminal bodies render it into Problem+JSON details (FR-003-8/9)
+    string? SenderEmail = null,     // terminal bodies render it into Problem+JSON details (FR-003-8/9)
+    string? OrgName = null,         // Active only — sender's org when their plan has Branding (F-PRF-001)
+    string? OrgLogoUrl = null);     // Active only — always null until US-021-04
 
 /// <summary>
 /// T-014 (TA-4.2#4): recipient metadata for GET /api/v1/public/transfers/{linkId}. No auth, no cookie;
@@ -40,6 +42,8 @@ public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransfer
     private readonly ILimitsProvider _limits;
     private readonly WaTelemetryReporter _telemetry;
     private readonly IUnlockTokenMinter _tokens;
+    private readonly ISenderBrandingStore _branding;
+    private readonly IFeaturesProvider _features;
     private readonly ILogger<GetPublicTransferHandler> _logger;
 
     public GetPublicTransferHandler(
@@ -47,12 +51,16 @@ public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransfer
         ILimitsProvider limits,
         WaTelemetryReporter telemetry,
         IUnlockTokenMinter tokens,
+        ISenderBrandingStore branding,
+        IFeaturesProvider features,
         ILogger<GetPublicTransferHandler> logger)
     {
         _store = store;
         _limits = limits;
         _telemetry = telemetry;
         _tokens = tokens;
+        _branding = branding;
+        _features = features;
         _logger = logger;
     }
 
@@ -96,7 +104,25 @@ public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransfer
             HasDownloadAll: transfer.FileCount >= 2 && transfer.TotalBytes <= limits.MaxZipSize,
             // T-007-01: -1 sentinel means infinite cap for THIS transfer (FR-003-5 hides the line).
             DownloadsLeft: transfer.MaxDownloads < 0 ? null : transfer.MaxDownloads - transfer.DownloadsCount,
-            PasswordRequired: passwordRequired);
+            PasswordRequired: passwordRequired,
+            OrgName: await ResolveOrgNameAsync(transfer.OwnerAppUserId, cancellationToken));
+    }
+
+    /// <summary>
+    /// F-PRF-001 EC-021-1/EC-021-5: resolved at render time from the sender's CURRENT profile and plan.
+    /// Guest sends, blank org names and plans without Branding yield null (name-only header).
+    /// </summary>
+    private async Task<string?> ResolveOrgNameAsync(Guid? ownerAppUserId, CancellationToken ct)
+    {
+        if (ownerAppUserId is null)
+            return null;
+
+        var row = await _branding.GetAsync(ownerAppUserId.Value, ct);
+        if (row is null || string.IsNullOrWhiteSpace(row.OrgName))
+            return null;
+
+        var features = await _features.Resolve(row.PlanCode, ct);
+        return features.Branding ? row.OrgName.Trim() : null;
     }
 
     /// <summary>8 chars from the LinkId charset (TA-9.6) — anything else is treated as unknown on purpose.</summary>

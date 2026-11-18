@@ -16,7 +16,8 @@ public class PlanFeaturesConsumerGuardTests
     private static readonly string[] FeaturesProviderAllowList =
     [
         "src/wa.application/Limits/FeaturesProvider.cs", // definition
-        "src/wa.application/Limits/PlanContext.cs", // the single consumer
+        "src/wa.application/Limits/PlanContext.cs", // the single consumer of the viewer's plan
+        "src/wa.application/UseCases/Transfers/GetPublicTransferQuery.cs", // US-021-01: anonymous endpoint, features of the transfer SENDER's plan (no viewer PlanContext exists)
         "src/wa.api/Program.cs" // DI wiring
     ];
 

@@ -44,6 +44,8 @@ interface RecipientPageProps {
 export function RecipientPage({ linkId }: RecipientPageProps) {
   const status = useRecipientStore((s) => s.status)
   const from = useRecipientStore((s) => s.from)
+  const orgName = useRecipientStore((s) => s.orgName)
+  const orgLogoUrl = useRecipientStore((s) => s.orgLogoUrl)
   const note = useRecipientStore((s) => s.note)
   const files = useRecipientStore((s) => s.files)
   const hasDownloadAll = useRecipientStore((s) => s.hasDownloadAll)
@@ -207,7 +209,10 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
     // No note, no file list, no sizes, nothing to enumerate or leak (byte-leak audit in RecipientPage.test.tsx).
     return (
       <section className="rp rp-gate" aria-label={i18n.t('recipient.gate.sectionAria', { name: from })}>
-        <h1 className="rp-heading">{i18n.t('recipient.gate.fromHeading')}{from}</h1>
+        <h1 className="rp-heading">
+          {orgLogoUrl !== null && <img className="rp-org-logo" src={orgLogoUrl} alt="" />}
+          {i18n.t('recipient.gate.fromHeading')}{from}{orgName !== null && ` · ${orgName}`}
+        </h1>
         <form className="rp-password-card" onSubmit={handleSubmit}>
           <label className="rp-password-label" htmlFor="rp-password-input">{i18n.t('recipient.gate.passwordLabel')}</label>
           <div className={`rp-password-row${unlockError ? ' rp-shake' : ''}`}>
@@ -259,7 +264,10 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
     <section className="rp" aria-label={i18n.t('recipient.active.sectionAria', { name: from })} ref={sectionRef} tabIndex={-1}>
       {/* T-016-02: hidden polite live region — downloads-left decrements + growth CTA; visually clipped, no layout impact. */}
       {recipientLive}
-      <h1 className="rp-heading">{i18n.t('recipient.active.fromHeading')}{from}</h1>
+      <h1 className="rp-heading">
+        {orgLogoUrl !== null && <img className="rp-org-logo" src={orgLogoUrl} alt="" />}
+        {i18n.t('recipient.active.fromHeading')}{from}{orgName !== null && ` · ${orgName}`}
+      </h1>
       {/* Note as plain-text blockquote — no markdown (TA-8.2); overflow-wrap handles long unbroken URLs. */}
       {note && note.trim() !== '' && (
         <blockquote className="rp-note">{note}</blockquote>

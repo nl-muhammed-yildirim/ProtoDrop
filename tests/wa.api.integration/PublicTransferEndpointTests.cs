@@ -75,7 +75,7 @@ public class PublicTransferEndpointTests : IAsyncLifetime
         var root = doc.RootElement;
 
         // TA-4.2#4 exact wire shape — property names pinned at the single construction site (endpoints 1–3 style).
-        Assert.Equal(["from", "note", "files", "hasDownloadAll", "downloadsLeft", "passwordRequired"],
+        Assert.Equal(["from", "note", "files", "hasDownloadAll", "downloadsLeft", "passwordRequired", "orgName", "orgLogoUrl"],
             root.EnumerateObject().Select(p => p.Name).ToArray());
 
         Assert.Equal("Alice", root.GetProperty("from").GetString());
@@ -97,6 +97,8 @@ public class PublicTransferEndpointTests : IAsyncLifetime
         Assert.True(root.GetProperty("hasDownloadAll").GetBoolean()); // ≥2 files AND 1500 bytes ≤ the seeded free-plan MaxZipSize (TA-3.4: via ILimitsProvider)
         Assert.Equal(3, root.GetProperty("downloadsLeft").GetInt32()); // 5 - 2 — same column TA-7.2's flip uses
         Assert.False(root.GetProperty("passwordRequired").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("orgName").ValueKind); // guest-owned seed (US-021-01)
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("orgLogoUrl").ValueKind);
 
         // No SAS minted: zero DownloadEvent rows for this transfer and DownloadsCount unchanged (the endpoint never counts).
         Assert.Equal(0, await _db.Set<DownloadEvent>().CountAsync(e => e.TransferId == transferId));
