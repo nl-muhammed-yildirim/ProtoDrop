@@ -14,6 +14,7 @@ export interface FlagRowDto {
   type: 'int' | 'bool'
   planDefault: string | null
   overridden: boolean
+  description: string | null   // US-044-02: seeded one-line description (Features-group tooltip)
 }
 
 // Endpoint 24 GET /api/v1/admin/suppressions — bare array (Program.cs L463–L469). id is a Guid

@@ -367,3 +367,73 @@ describe('AdminFlagsPage (T-011-13 / FR-011-2, FR-011-5)', () => {
     }
   })
 })
+
+// US-044-02 (FR-044-7): Features group — full DTO rows (type/description) so the bool "feature." rows leave the generic table.
+const FEATURE_ROWS = [
+  { key: 'feature.dataExport', value: 'false', updatedAt: '2026-11-01T00:00:00Z', type: 'bool', planDefault: null, overridden: false, description: 'Data export gate (F-XCT-004)' },
+  { key: 'feature.search', value: 'true', updatedAt: '2026-11-01T00:00:00Z', type: 'bool', planDefault: null, overridden: false, description: 'Search global gate (F-XCT-002)' },
+  { key: 'limits.free.maxFiles', value: '100', updatedAt: '2026-11-01T00:00:00Z', type: 'int', planDefault: '100', overridden: false, description: null },
+]
+
+function featuresResponder(req: Request): Response {
+  if (req.method === 'PUT') return new Response(JSON.stringify({ key: 'feature.dataExport', value: 'true' }), { status: 200 })
+  if (req.url.endsWith('/admin/flags')) return new Response(JSON.stringify(FEATURE_ROWS), { status: 200 })
+  return new Response(JSON.stringify([AUDIT_ROW]), { status: 200 })
+}
+
+describe('AdminFlagsPage Features group (US-044-02)', () => {
+  it('FeaturesGroup_RendersSwitchPerFeatureKey_WithDescriptionTooltip', async () => {
+    stubFetch({ calls: [], bodies: [] }, featuresResponder)
+
+    const { host, cleanup } = renderPage('SuperAdmin')
+    try {
+      await flush()
+      const switches = Array.from(host.querySelectorAll('input[role="switch"]')) as HTMLInputElement[]
+      expect(switches.length).toBe(2)
+      const exportSwitch = host.querySelector('input[role="switch"][aria-label="feature.dataExport"]') as HTMLInputElement
+      const searchSwitch = host.querySelector('input[role="switch"][aria-label="feature.search"]') as HTMLInputElement
+      expect(exportSwitch.title).toBe('Data export gate (F-XCT-004)')
+      expect(exportSwitch.checked).toBe(false)
+      expect(searchSwitch.checked).toBe(true)
+      expect(Array.from(host.querySelectorAll('h2')).map((h) => h.textContent)).toContain('Features')
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('FeaturesGroup_ToggleThenSave_PutsRawTrue', async () => {
+    const captured: { calls: string[]; bodies: string[] } = { calls: [], bodies: [] }
+    stubFetch(captured, featuresResponder)
+
+    const { host, cleanup } = renderPage('SuperAdmin')
+    try {
+      await flush()
+      const sw = host.querySelector('input[role="switch"][aria-label="feature.dataExport"]') as HTMLInputElement
+      await act(async () => { sw.click() })
+      const saveBtn = sw.closest('tr')!.querySelector('button') as HTMLButtonElement
+      await act(async () => { saveBtn.click() })
+      await flush()
+
+      const puts = captured.calls.map((c, i) => ({ c, b: captured.bodies[i] })).filter((x) => x.c.endsWith('/admin/flags/feature.dataExport'))
+      expect(puts.length).toBe(1)
+      expect(puts[0].b).toBe('true')
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('FeaturesGroup_Operator_SwitchAndSaveDisabled', async () => {
+    stubFetch({ calls: [], bodies: [] }, featuresResponder)
+
+    const { host, cleanup } = renderPage('Operator')
+    try {
+      await flush()
+      const sw = host.querySelector('input[role="switch"][aria-label="feature.dataExport"]') as HTMLInputElement
+      expect(sw.disabled).toBe(true)
+      const saveBtn = sw.closest('tr')!.querySelector('button') as HTMLButtonElement
+      expect(saveBtn.disabled).toBe(true)
+    } finally {
+      cleanup()
+    }
+  })
+})

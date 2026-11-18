@@ -20,4 +20,12 @@ public class FlagProblemCodesTests
         Assert.Equal(404, ProblemCodes.StatusOf(ProblemCodes.FlagUnknown));
         Assert.Equal("Unknown flag", ProblemCodes.TitleOf(ProblemCodes.FlagUnknown));
     }
+
+    [Fact]
+    public void FeatureDisabled_PinsWireStringStatusAndTitle() // US-044-02 (AC-044-2)
+    {
+        Assert.Equal("FEATURE_DISABLED", ProblemCodes.FeatureDisabled);
+        Assert.Equal(404, ProblemCodes.StatusOf(ProblemCodes.FeatureDisabled));
+        Assert.Equal("Feature disabled", ProblemCodes.TitleOf(ProblemCodes.FeatureDisabled));
+    }
 }

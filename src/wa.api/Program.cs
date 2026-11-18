@@ -9,6 +9,7 @@ using wa.application.Limits;
 using wa.application.Ports;
 using wa.application.UseCases.Admin; // T-011-01: AdminRolePolicy (gate + role field)
 using wa.application.UseCases.Auth;
+using wa.application.UseCases.Features;
 using wa.application.UseCases.Health;
 using wa.application.UseCases.Sample;
 using wa.application.UseCases.Transfers;
@@ -93,7 +94,9 @@ builder.Services.AddSingleton<wa.application.UseCases.Admin.IAdminFlagStore>(sp 
 builder.Services.AddSingleton<wa.application.UseCases.Admin.IAdminSuppressionStore>(sp => new wa.infrastructure.Persistence.AdminSuppressionStore(sp.GetRequiredService<WaDbContext>()));
 // T-011-09 (TA-4.2#25 / US-011-04 happy path 5): audit read surface — last count rows, newest first, over the adapter-owned WaDbContext.
 builder.Services.AddSingleton<wa.application.UseCases.Admin.IAuditReadStore>(sp => new wa.infrastructure.Persistence.AuditReadStore(sp.GetRequiredService<WaDbContext>()));
-builder.Services.AddSingleton<ILimitsProvider>(sp => new LimitsProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
+builder.Services.AddSingleton(sp => new LimitsProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
+builder.Services.AddSingleton<ILimitsProvider>(sp => sp.GetRequiredService<LimitsProvider>());
+builder.Services.AddSingleton<IFlagResolver>(sp => sp.GetRequiredService<LimitsProvider>()); // US-044-02: phase gates (FR-044-3)
 // T-031-05 (US-018-05, TA-3.4): feature toggles — one resolver over the same caches.
 builder.Services.AddSingleton<IFeaturesProvider>(sp => new FeaturesProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
 // US-020-01 (FR-020-1): per-request PlanContext — user→plan-code port (singleton) + scoped accessor bound by PlanContextMiddleware.
@@ -786,7 +789,7 @@ app.MapGet("/api/v1/admin/flags", async (HttpContext ctx, IAppUserStore users, I
 
     var rows = await sender.Send(new GetFlagsQuery(), ct);
     // US-044-01: effective-value view — type, plan default and overridden marker drive the Flags screen Limits group.
-    return Results.Json(rows.Select(f => new { key = f.Key, value = f.Value, updatedAt = f.UpdatedAtUtc, type = f.Type, planDefault = f.PlanDefault, overridden = f.Overridden })); // reads write NO audit row
+    return Results.Json(rows.Select(f => new { key = f.Key, value = f.Value, updatedAt = f.UpdatedAtUtc, type = f.Type, planDefault = f.PlanDefault, overridden = f.Overridden, description = f.Description })); // reads write NO audit row
 });
 
 // T-011-08 (TA-4.2#23 / FR-011-2): set a flag's value — PUT /api/v1/admin/flags/{key} — SuperAdmin-only write.
@@ -1274,6 +1277,10 @@ app.MapGet("/api/v1/billing/plan", async (HttpContext ctx, ISender sender, Cance
         limits = new { maxTransferSize = r.MaxTransferSize, maxSingleFile = r.MaxSingleFile }
     });
 });
+
+// US-044-02 (FR-044-7, AC-044-2): the six phase-gate booleans for the SPA's FeatureGate — anonymous, no PII, no telemetry (TA-10.2).
+app.MapGet("/api/v1/features", async (ISender sender, CancellationToken ct) =>
+    Results.Json(await sender.Send(new GetFeatureGatesQuery(), ct)));
 
 app.Run();
 

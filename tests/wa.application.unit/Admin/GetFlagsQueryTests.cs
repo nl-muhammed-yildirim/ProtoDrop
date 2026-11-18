@@ -104,6 +104,23 @@ public class GetFlagsQueryTests
         Assert.False(view.Overridden);
     }
 
+    // ---- US-044-02: description passes through (Features-group tooltip) ----
+
+    [Fact]
+    public async Task Description_PassesThrough()
+    {
+        _flags.Rows = new List<FeatureFlag>
+        {
+            new() { Key = "feature.search", Value = "false", Description = "Search global gate (F-XCT-002)" },
+            new() { Key = "feature.ads", Value = "false" }
+        };
+
+        var result = await _handler.Handle(new GetFlagsQuery(), CancellationToken.None);
+
+        Assert.Equal("Search global gate (F-XCT-002)", result.Single(v => v.Key == "feature.search").Description);
+        Assert.Null(result.Single(v => v.Key == "feature.ads").Description);
+    }
+
     // ---- Stubs (hand-written, no Moq) ----
 
     private sealed class StubIFlagsStore : IFlagsStore

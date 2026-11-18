@@ -26,6 +26,8 @@ function fieldOf(key: string): string {
  * T-011-13 / US-044-01 (FR-011-2 / FR-011-5 / FR-044-5): admin Flags screen at /admin/flags — endpoints 23 + 25.
  * Limits group: one table per plan for the integer limit rows (type 'int') — effective value (text input,
  * per-key Save), the plan default and an "(overridden)" marker when the value differs from it.
+ * US-044-02 (FR-044-7): Features group — bool rows whose key starts "feature." render as a switch (title = the
+ * seeded description) with the same per-key Save; toggling sets the draft to 'true'/'false'.
  * Every other row stays in the generic key/value editor. Save PUTs the draft as the RAW body string
  * (NOT JSON.stringify'd — the server validates it). res.ok (200 {key,value}) → refetch BOTH /admin/flags and
  * /admin/audit-recent (AC-011-2). 400 FLAG_INVALID → inline per-row role=alert .mf-error; any other failure
@@ -100,7 +102,9 @@ export function AdminFlagsPage({ role }: AdminFlagsPageProps) {
 
   // US-044-01: integer limit rows grouped by plan (key order kept); everything else stays in the generic table.
   const limitRows = rows.filter((r) => r.type === 'int')
-  const otherRows = rows.filter((r) => r.type !== 'int')
+  // US-044-02: phase-gate switches (bool + "feature." prefix) get their own group.
+  const featureRows = rows.filter((r) => r.type === 'bool' && r.key.startsWith('feature.'))
+  const otherRows = rows.filter((r) => r.type !== 'int' && !featureRows.includes(r))
   const limitPlans: string[] = []
   for (const r of limitRows) {
     const plan = planOf(r.key)
@@ -177,6 +181,42 @@ export function AdminFlagsPage({ role }: AdminFlagsPageProps) {
               </tbody>
             </table>
           ))}
+
+          {/* US-044-02 (FR-044-7): Features group — one switch per phase gate, description as tooltip. */}
+          {featureRows.length > 0 && (
+            <>
+              <h2 className="mf-h1">Features</h2>
+              <table className="ad-table" data-group="features">
+                <thead>
+                  <tr>
+                    <th>Feature</th>
+                    <th>Enabled</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {featureRows.map((row) => (
+                    <tr key={row.key}>
+                      <td title={row.description ?? undefined}>{row.key}</td>
+                      <td>
+                        <input
+                          type="checkbox"
+                          role="switch"
+                          aria-label={row.key}
+                          title={row.description ?? undefined}
+                          checked={(drafts[row.key] ?? row.value) === 'true'}
+                          disabled={operator}
+                          onChange={(e) => setDrafts((d) => ({ ...d, [row.key]: e.target.checked ? 'true' : 'false' }))}
+                        />
+                        {rowError(row.key)}
+                      </td>
+                      <td className="ad-row-actions">{saveButton(row.key)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
 
           {/* FR-011-2: key/value editor — the textarea holds the raw string; the preview shows it read-only. */}
           <table className="ad-table">

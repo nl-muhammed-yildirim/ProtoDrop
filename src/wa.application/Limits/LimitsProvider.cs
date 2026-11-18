@@ -17,8 +17,14 @@ public interface ILimitsProvider
     Task<LimitsRecord> Resolve(string? planCode, CancellationToken cancellationToken = default);
 }
 
+/// <summary>FR-044-3: one flag read by key through FlagsCache. Absent row or a value that does not deserialize to T → defaultValue (EC-044-6: fails closed for gates).</summary>
+public interface IFlagResolver
+{
+    Task<T> ResolveFlag<T>(string key, T defaultValue, CancellationToken cancellationToken = default);
+}
+
 /// <inheritdoc/>
-public sealed class LimitsProvider(PlansCache plans, FlagsCache flags) : ILimitsProvider
+public sealed class LimitsProvider(PlansCache plans, FlagsCache flags) : ILimitsProvider, IFlagResolver
 {
     /// <summary>LimitsJson camelCase key → property. Derived from the POCO's [JsonPropertyName] contract (FR-053-1), so no name literals live here; segments with no match are unknown and ignored by limit resolution (EC-053-1).</summary>
     private static readonly Dictionary<string, PropertyInfo> LimitFields = BuildFieldMap();
@@ -39,6 +45,16 @@ public sealed class LimitsProvider(PlansCache plans, FlagsCache flags) : ILimits
             field.SetValue(record, Convert.ChangeType(row.Value, field.PropertyType, CultureInfo.InvariantCulture));
         }
         return record;
+    }
+
+    public async Task<T> ResolveFlag<T>(string key, T defaultValue, CancellationToken cancellationToken = default)
+    {
+        var rows = await flags.GetAllAsync(cancellationToken);
+        var row = rows.FirstOrDefault(r => string.Equals(r.Key, key, StringComparison.Ordinal));
+        if (row is null) return defaultValue; // absent = default, not error (FR-044-3)
+        try { return JsonSerializer.Deserialize<T>(row.Value) is { } value ? value : defaultValue; }
+        catch (JsonException) { return defaultValue; } // garbled → default (closed for gates)
+        catch (NotSupportedException) { return defaultValue; }
     }
 
     private static Dictionary<string, PropertyInfo> BuildFieldMap()

@@ -15,9 +15,10 @@ public sealed record GetFlagsQuery : IRequest<IReadOnlyList<FlagView>>;
 /// <summary>
 /// US-044-01: one flag row as the admin Flags screen shows it. <paramref name="Type"/> is "int" or "bool" (<see cref="FlagValueRules"/>);
 /// <paramref name="PlanDefault"/> is the raw seeded plan value for an integer limit (null otherwise or when the plan is unknown);
-/// <paramref name="Overridden"/> is true when the row value differs from that plan default.
+/// <paramref name="Overridden"/> is true when the row value differs from that plan default;
+/// <paramref name="Description"/> (US-044-02) is the seeded one-line description (tooltip on the Features group), null when none.
 /// </summary>
-public sealed record FlagView(string Key, string Value, DateTime UpdatedAtUtc, string Type, string? PlanDefault, bool Overridden);
+public sealed record FlagView(string Key, string Value, DateTime UpdatedAtUtc, string Type, string? PlanDefault, bool Overridden, string? Description);
 
 /// <summary>
 /// T-011-08 / US-044-01: list all flag rows ordered by Key ascending (no paging). Flag rows come from IFlagsStore;
@@ -58,7 +59,7 @@ public sealed class GetFlagsQueryHandler : IRequestHandler<GetFlagsQuery, IReadO
                     if (doc is not null && doc.RootElement.TryGetProperty(field, out var element))
                         planDefault = element.GetRawText();
                 }
-                result.Add(new FlagView(row.Key, row.Value, row.UpdatedAtUtc, type, planDefault, IsOverridden(row.Value, planDefault)));
+                result.Add(new FlagView(row.Key, row.Value, row.UpdatedAtUtc, type, planDefault, IsOverridden(row.Value, planDefault), row.Description));
             }
         }
         finally
