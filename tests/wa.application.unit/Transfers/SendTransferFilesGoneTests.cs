@@ -242,7 +242,8 @@ public class SendTransferFilesGoneTests
         public Task<MarkDeleteResult?> MarkDeletedAsync(Guid id, Guid ownerId, DateTime deletedAtUtc, CancellationToken ct) => Task.FromResult<MarkDeleteResult?>(null);
     }
 
-    private sealed class StubLimitsProvider : ILimitsProvider
+    // Plays IPlanContextAccessor since US-020-02.
+    private sealed class StubLimitsProvider : IPlanContextAccessor
     {
         public LimitsRecord Record { get; set; } = new()
         {
@@ -252,8 +253,8 @@ public class SendTransferFilesGoneTests
             MaxSingleFile = 5_368_709_120
         };
 
-        public Task<LimitsRecord> Resolve(string? planCode, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Record);
+        public Task<PlanContext> GetAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new PlanContext(ILimitsProvider.GuestPlanCode, Record, new PlanFeatures()));
     }
 
     private sealed class StubEventPublisher : IEventPublisher

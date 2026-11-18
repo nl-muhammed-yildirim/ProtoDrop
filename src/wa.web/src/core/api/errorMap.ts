@@ -31,6 +31,18 @@ export function parseProblem(body: unknown): ProblemError | null {
   }
 }
 
+/** Wire code for the active-transfers cap (409, finalize + send; US-020-02). */
+export const ACTIVE_TRANSFERS_EXCEEDED = 'ACTIVE_TRANSFERS_EXCEEDED'
+
+/**
+ * Pulls the exact numbers out of the server's details text ("You have N active transfers (limit M). Upgrade to keep sending.").
+ * Returns null when the text does not carry them — the UI then falls back to the number-free copy.
+ */
+export function parseActiveTransfersLimit(details: string | undefined): { count: number; limit: number } | null {
+  const m = /(\d+) active transfers \(limit (\d+)\)/.exec(details ?? '')
+  return m ? { count: Number(m[1]), limit: Number(m[2]) } : null
+}
+
 export type ErrorScreenKind =
   | { kind: 'error500' }
   | { kind: 'rateLimited' }
@@ -42,13 +54,14 @@ export type ErrorScreenKind =
 
 /**
  * Map a Problem+JSON code to its screen/state per F-TRF-013-errors.md's UI notes.
- * Exhaustive over all 18 closed-list codes (TA-4.1.3).
+ * Exhaustive over all 20 closed-list codes (TA-4.1.3).
  */
 export function mapProblem(code: string): ErrorScreenKind {
   switch (code) {
     // Inline limit screens (F-TRF-007) — NOT full error pages
     case 'TRANSFER_SIZE_EXCEEDED':
     case 'STORAGE_QUOTA_EXCEEDED':
+    case 'ACTIVE_TRANSFERS_EXCEEDED': // US-020-02 / FR-020-6: paywall copy + Upgrade link (ActiveTransfersLimit)
       return { kind: 'inlineLimit' }
     
     // F-TRF-003 states — the real wire codes for terminal transfer links. Unknown links emit

@@ -7,6 +7,7 @@ import { clearSession, readSession, writeSession } from './core/auth/session'
 import { useSystemTheme } from './core/theme/useSystemTheme'
 import { resolveTheme } from './core/theme/resolveTheme'
 import { useUploadEngine } from './core/upload/UploadEngine'
+import PlanLimitsSync from './core/upload/PlanLimitsSync'
 import { getTraceParent } from './core/traceparent'
 import i18n from './core/i18n/init'
 import DropZone from './features/landing/DropZone'
@@ -16,6 +17,8 @@ import AuthPage from './features/auth/AuthPage'
 import { matchAccountPath } from './features/auth/authRoute'
 import ProfilePage from './features/profile/ProfilePage'
 import { matchProfilePath, PROFILE_PATH } from './features/profile/profileRoute'
+import PlanPage from './features/billing/PlanPage'
+import { matchPlanPath } from './features/billing/planRoute'
 import FilesPage from './features/files/FilesPage'
 import { matchFilesPath } from './features/files/filesRoute'
 import RecipientPage from './features/recipient/RecipientPage'
@@ -44,6 +47,9 @@ export default function App() {
   // T-015-02 (FR-015-4 / AC-015-3): live OS tracking — guests are system by default (FR-015-1); the hook
   // registers its matchMedia listener only while in system mode, so explicit light/dark never follow the OS.
   useSystemTheme(session?.theme ?? 'system')
+
+  // Bumped when the signed-in user's plan limits load, so StagingList (reads getPlanLimits() on render) re-renders.
+  const [, setLimitsVersion] = useState(0)
 
   useEffect(() => {
     const onPop = () => setPathname(window.location.pathname)
@@ -131,6 +137,8 @@ export default function App() {
             <UnsubscribePage token={unsubscribeToken} />
           ) : session && matchProfilePath(pathname) ? (
             <ProfilePage profile={session} onSignedIn={setSession} onThemeChange={handleThemeChange} onDeleteAccount={handleDeleteAccount} />
+          ) : session && matchPlanPath(pathname) ? (
+            <PlanPage />
           ) : session && matchFilesPath(pathname) ? (
             <FilesPage onNewTransfer={goHome} />
           ) : session && resendTransferId !== null ? (
@@ -148,6 +156,8 @@ export default function App() {
           ) : pathname === '/' ? (
             <>
               {/* T-001-10 handoff: once the link is minted, hide the drop zone — LinkScreen (inside StagingList) becomes the only surface. */}
+              {/* Signed-in users pre-check uploads against their own plan; guests keep the Free defaults. Landing-only so other routes make no extra request. */}
+              <PlanLimitsSync signedIn={session !== null} onLoaded={() => setLimitsVersion((v) => v + 1)} />
               {finalized === null && <DropZone toast={deleteToast} />}
               {hasFiles && <StagingList />}
             </>

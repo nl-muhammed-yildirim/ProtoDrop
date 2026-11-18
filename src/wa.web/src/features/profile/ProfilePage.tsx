@@ -7,6 +7,7 @@ import { resolveTheme } from '../../core/theme/resolveTheme'
 import { getTraceParent } from '../../core/traceparent'
 import i18n, { readAccountLocale, setAccountLocale, SUPPORTED_LOCALES } from '../../core/i18n/init'
 import type { SupportedLocale } from '../../core/i18n/init'
+import { PLAN_PATH } from '../billing/planRoute'
 import DangerZone from './DangerZone'
 
 // T-008-06 wire (TA-4.2#12–13), verified against src/wa.api/Program.cs — GET/PATCH /auth/me + logout:
@@ -116,6 +117,7 @@ export function ProfilePage({ profile, onSignedIn, onThemeChange, onDeleteAccoun
       </select>
       {/* Plan line — read-only in MVP (FR-008-4: "Free by default"). planCode comes from the session DTO; no extra fetch. */}
       <p className="pf-plan">{profile.planCode === 'free' ? i18n.t('profile.plan.free') : profile.planCode}</p>
+      <a className="pf-plan-link" href={PLAN_PATH}>{i18n.t('profile.plan.viewPlan')}</a>
       {/* Danger zone divider + slot — US-008-06's Delete account button + GDPR confirm modal (T-008-09 D-1/D-4). */}
       <hr className="pf-divider" />
       <div className="pf-danger-zone" aria-label={i18n.t('profile.dangerZone.ariaLabel')}>

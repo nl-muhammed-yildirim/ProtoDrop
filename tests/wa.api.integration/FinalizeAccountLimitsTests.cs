@@ -119,7 +119,7 @@ public class FinalizeAccountLimitsTests : IAsyncLifetime
     // ---- AC-007-3: active-transfers cap runs on the finalize endpoint when a session cookie is present ----
 
     [Fact]
-    public async Task Finalize_WithSessionCookie_AtActiveTransfersCap_ReturnsRejectionAndNoTransferRow()
+    public async Task Finalize_WithSessionCookie_AtActiveTransfersCap_Returns409ActiveTransfersExceededAndNoTransferRow()
     {
         var ownerId = await SeedOwnerAsync();
 
@@ -130,11 +130,11 @@ public class FinalizeAccountLimitsTests : IAsyncLifetime
         var (draftId, fileId) = await SetupDraftAndStagedBlobAsync("cap.txt");
         using var response = await PostFinalizeAsync(draftId, fileId, "ac73-reject", CookieValueFor(ownerId));
 
-        // Program.cs maps ActiveTransfersExceededException → ProblemCodes.Validation (400 VALIDATION).
-        // Smell noted for FR-056: no dedicated closed code exists — pinning the production mapping as-is.
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        // US-020-02: dedicated closed code (was 400 VALIDATION).
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         using var doc = JsonDocument.Parse(await response.Content.ReadAsByteArrayAsync());
-        Assert.Equal(ProblemCodes.Validation, doc.RootElement.GetProperty("code").GetString());
+        Assert.Equal(ProblemCodes.ActiveTransfersExceeded, doc.RootElement.GetProperty("code").GetString());
+        Assert.Contains("Upgrade to keep sending.", doc.RootElement.GetProperty("details").GetString());
 
         // Count check precedes mutation — only the 20 seeded rows exist.
         Assert.Equal(FreeActiveTransfersMax, await _db.Set<Transfer>().CountAsync());
@@ -155,12 +155,90 @@ public class FinalizeAccountLimitsTests : IAsyncLifetime
         Assert.Equal(FreeActiveTransfersMax + 1, await _db.Set<Transfer>().CountAsync());
     }
 
+    // ---- US-020-02 (FR-020-2): send-time re-check after a downgrade ----
+
+    [Fact]
+    public async Task Send_AfterDowngradeToFree_OverQuota_Blocked_ActiveTransfersUntouched_ReupgradeSucceeds()
+    {
+        var ownerId = await SeedOwnerAsync("pro");
+        for (var i = 0; i < FreeActiveTransfersMax; i++)
+            await SeedActiveTransferRowsAsync(ownerId, [1024L]);
+        var cookie = CookieValueFor(ownerId);
+
+        // Pro cap is far above 20 live rows, so the draft finalizes.
+        var (draftId, fileId) = await SetupDraftAndStagedBlobAsync("downgrade.txt");
+        using var finalize = await PostFinalizeAsync(draftId, fileId, "us2002-fin", cookie);
+        Assert.Equal(HttpStatusCode.Created, finalize.StatusCode);
+        using var finalizeDoc = JsonDocument.Parse(await finalize.Content.ReadAsByteArrayAsync());
+        var transferId = new Guid(finalizeDoc.RootElement.GetProperty("id").GetString()!);
+
+        var seededBefore = await _db.Set<Transfer>().AsNoTracking()
+            .Where(t => t.Status == 1).Select(t => new { t.Id, t.Status, t.ExpiresAtUtc }).ToListAsync();
+        Assert.Equal(FreeActiveTransfersMax, seededBefore.Count);
+
+        await SetUserPlanAsync(ownerId, ILimitsProvider.GuestPlanCode);
+
+        using var blocked = await PostSendAsync(transferId, cookie);
+        Assert.Equal(HttpStatusCode.Conflict, blocked.StatusCode);
+        using var blockedDoc = JsonDocument.Parse(await blocked.Content.ReadAsByteArrayAsync());
+        Assert.Equal(ProblemCodes.ActiveTransfersExceeded, blockedDoc.RootElement.GetProperty("code").GetString());
+        Assert.Contains("(limit 20). Upgrade to keep sending.", blockedDoc.RootElement.GetProperty("details").GetString());
+
+        // The draft stays a draft; existing live transfers are untouched (no retroactive expiry).
+        Assert.Equal(0, (await _db.Set<Transfer>().AsNoTracking().SingleAsync(t => t.Id == transferId)).Status);
+        var seededAfter = await _db.Set<Transfer>().AsNoTracking()
+            .Where(t => t.Status == 1).Select(t => new { t.Id, t.Status, t.ExpiresAtUtc }).ToListAsync();
+        Assert.Equal(seededBefore.OrderBy(t => t.Id), seededAfter.OrderBy(t => t.Id));
+
+        // EC-020-2: re-upgrade applies on the very next request.
+        await SetUserPlanAsync(ownerId, "pro");
+        using var sent = await PostSendAsync(transferId, cookie);
+        Assert.Equal(HttpStatusCode.Created, sent.StatusCode);
+        Assert.Equal(1, (await _db.Set<Transfer>().AsNoTracking().SingleAsync(t => t.Id == transferId)).Status);
+    }
+
+    [Fact]
+    public async Task Send_Guest_UnderSameSeededLoad_Succeeds_SkipsActiveTransfersCheck()
+    {
+        var ownerId = await SeedOwnerAsync();
+        for (var i = 0; i < FreeActiveTransfersMax; i++)
+            await SeedActiveTransferRowsAsync(ownerId, [1024L]);
+
+        var (draftId, fileId) = await SetupDraftAndStagedBlobAsync("guest-send.txt");
+        using var finalize = await PostFinalizeAsync(draftId, fileId, "us2002-guest", null);
+        Assert.Equal(HttpStatusCode.Created, finalize.StatusCode);
+        using var finalizeDoc = JsonDocument.Parse(await finalize.Content.ReadAsByteArrayAsync());
+        var transferId = new Guid(finalizeDoc.RootElement.GetProperty("id").GetString()!);
+
+        using var sent = await PostSendAsync(transferId, null);
+        Assert.Equal(HttpStatusCode.Created, sent.StatusCode);
+    }
+
     // ---- Helpers ----
 
-    /// <summary>Seed an AppUser on the free plan — required because Transfer.OwnerAppUserId has FK_Transfer_Owner.</summary>
-    private async Task<Guid> SeedOwnerAsync()
+    /// <summary>US-020-02: flips the user's plan row (the next request resolves the new plan — the store is uncached).</summary>
+    private async Task SetUserPlanAsync(Guid userId, string planCode)
     {
-        var planId = await _db.Set<Plan>().Where(p => p.Code == ILimitsProvider.GuestPlanCode)
+        var planId = await _db.Set<Plan>().Where(p => p.Code == planCode).Select(p => p.Id).FirstAsync();
+        await _db.Set<AppUser>().Where(u => u.Id == userId)
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.PlanId, planId));
+    }
+
+    private async Task<HttpResponseMessage> PostSendAsync(Guid transferId, string? sessionCookie)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/transfers/{transferId:N}/send")
+        {
+            Content = new StringContent("{\"emails\":[]}", Encoding.UTF8, "application/json")
+        };
+        if (sessionCookie is not null)
+            request.Headers.TryAddWithoutValidation("Cookie", $"{CookieName}={sessionCookie}");
+        return await _client.SendAsync(request);
+    }
+
+    /// <summary>Seed an AppUser on the free plan — required because Transfer.OwnerAppUserId has FK_Transfer_Owner.</summary>
+    private async Task<Guid> SeedOwnerAsync(string planCode = ILimitsProvider.GuestPlanCode)
+    {
+        var planId = await _db.Set<Plan>().Where(p => p.Code == planCode)
             .Select(p => p.Id).FirstAsync();
         var owner = new AppUser
         {

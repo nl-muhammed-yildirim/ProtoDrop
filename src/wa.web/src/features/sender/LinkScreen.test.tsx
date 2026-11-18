@@ -279,7 +279,7 @@ describe('LinkScreen', () => {
 
   // ---- T-002-08: Copy link only + confirmation screen (FR-002-6/7, AC-002-3) ----
 
-  type SendCall = { url: string; method: string; headers: Record<string, string>; body: string }
+  type SendCall = { url: string; method: string; headers: Record<string, string>; body: string; credentials?: RequestCredentials }
 
   // Local copy of the StagingList stub-fetch pattern (same harness rules — no cross-file coupling).
   function stubSendFetch(status: number): SendCall[] {
@@ -290,6 +290,7 @@ describe('LinkScreen', () => {
         calls.push({
           url: String(input),
           method: typeof init?.method === 'string' ? init.method : 'GET',
+          credentials: init?.credentials,
           headers: (init?.headers as Record<string, string>) ?? {},
           body: typeof init?.body === 'string' ? init.body : '',
         })
@@ -342,6 +343,7 @@ describe('LinkScreen', () => {
       expect(calls).toHaveLength(1)
       expect(calls[0].url).toBe('http://localhost:8080/api/v1/transfers/1/send')
       expect(calls[0].method).toBe('POST')
+      expect(calls[0].credentials).toBe('include') // session cookie so the send is attributed to the signed-in user
       expect(calls[0].headers['Idempotency-Key']).toBeTruthy()
       const body = JSON.parse(calls[0].body) as { emails: string[] }
       expect(body.emails).toEqual([])
@@ -460,6 +462,28 @@ describe('LinkScreen', () => {
       const error = host.querySelector('.ls-send-error[role="alert"]') as HTMLElement
       expect(error).not.toBeNull()
       expect(host.innerHTML).not.toContain('Transfer sent.')
+      host.remove()
+    })
+
+    it('FR-020-6: a 409 ACTIVE_TRANSFERS_EXCEEDED shows the exact number + Upgrade link to /account/plan, not the generic failure', async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined)
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, writable: true })
+      vi.stubGlobal('fetch', async () => new Response(JSON.stringify({
+        type: 'about:blank', title: 'Active transfers limit reached', status: 409, code: 'ACTIVE_TRANSFERS_EXCEEDED',
+        details: 'You have 20 active transfers (limit 20). Upgrade to keep sending.',
+      }), { status: 409, headers: { 'Content-Type': 'application/problem+json' } }))
+
+      const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g', transferId: '1' }))
+      await act(async () => {
+        (host.querySelector('.ls-copyonly-btn') as HTMLButtonElement).click()
+      })
+
+      expect(host.innerHTML).toContain('Your link is ready') // form still visible
+      expect(host.querySelector('.ls-send-error')).toBeNull() // no generic "Sending failed"
+      expect(host.querySelector('.atl-msg')!.textContent).toBe('You have 20 active transfers (limit 20). Upgrade to keep sending.')
+      const upgrade = host.querySelector('a.atl-upgrade') as HTMLAnchorElement
+      expect(upgrade.getAttribute('href')).toBe('/account/plan')
+      expect(upgrade.textContent).toBe('Upgrade')
       host.remove()
     })
 

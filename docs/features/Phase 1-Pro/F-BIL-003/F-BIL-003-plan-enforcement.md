@@ -66,7 +66,7 @@ AC-020-5: A guest finalizes a transfer
 
 - `PlanContext` (in `wa.application`): `{ Limits: LimitsRecord, Features: PlanFeatures, PlanCode }`; populated by `PlanContextMiddleware` before MediatR dispatch (thin-endpoint rule, TA-4.2a — commands receive it via `IRequest` metadata / scope service, never query `Plan` themselves).
 - Enforcement codes (closed list, TA-4.1.3): `TRANSFER_SIZE_EXCEEDED`, `STORAGE_QUOTA_EXCEEDED`, `ACTIVE_TRANSFERS_EXCEEDED` (new), `EMAILS_EXCEEDED` (existing behavior, F-TRF-007).
-- Meters: storage from `storage_bytes_active` (TA-10.2) + `SUM(TotalBytes)` scoped query; active transfers = `COUNT(*) WHERE Owner = me AND Status IN (1)`.
+- Meters: storage from `storage_bytes_active` (TA-10.2) + `SUM(TotalBytes)` scoped query; active transfers = `COUNT(*) WHERE Owner = me AND Status IN (1,3)`.
 - Feature read: `PlanContext.Features.scheduling` etc. (F-BIL-001 `FeaturesJson`); the `feature.*` flag keys (TA-13.2) remain for **global** kill-switches only (e.g. `feature.scheduling = false` for everyone).
 
 ## Test plan

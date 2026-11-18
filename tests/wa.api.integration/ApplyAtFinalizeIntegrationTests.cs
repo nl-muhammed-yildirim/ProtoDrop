@@ -23,7 +23,8 @@ public class ApplyAtFinalizeIntegrationTests : IAsyncLifetime
     private DbContextOptions<WaDbContext> _options = null!;
     private WaDbContext _storeDb = null!;
     private WaDbContext _cacheDb = null!;
-    private SendTransferHandler _handler = null!;
+    private LimitsProvider _limits = null!;
+    private FeaturesProvider _features = null!;
     private readonly RecordingPublisher _publisher = new();
 
     public async Task InitializeAsync()
@@ -35,13 +36,21 @@ public class ApplyAtFinalizeIntegrationTests : IAsyncLifetime
         await _storeDb.Database.MigrateAsync();
         _cacheDb = new WaDbContext(_options);
 
-        var limits = new LimitsProvider(
-            new PlansCache(new PlansStore(_cacheDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow),
-            new FlagsCache(new FlagsStore(_cacheDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow));
-        _handler = new SendTransferHandler(
+        var plansCache = new PlansCache(new PlansStore(_cacheDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow);
+        var flagsCache = new FlagsCache(new FlagsStore(_cacheDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow);
+        _limits = new LimitsProvider(plansCache, flagsCache);
+        _features = new FeaturesProvider(plansCache, flagsCache);
+    }
+
+    // US-020-02: one bound accessor per "request" (the real one is scoped + memoized) — a reused handler would pin the first resolution.
+    private SendTransferHandler NewHandler()
+    {
+        var accessor = new PlanContextAccessor(new UserPlanStore(_cacheDb), _limits, _features);
+        accessor.Bind(null); // guest -> Free, as before
+        return new SendTransferHandler(
             new SendStore(_storeDb, new ThrowingBlobStore()),
             new TransferStore(_storeDb),
-            limits,
+            accessor,
             _publisher,
             new WaTelemetryReporter(NullLogger<WaTelemetryReporter>.Instance, Encoding.UTF8.GetBytes("test-key")),
             NullLogger<SendTransferHandler>.Instance,
@@ -64,7 +73,7 @@ public class ApplyAtFinalizeIntegrationTests : IAsyncLifetime
 
         var a = await SeedDraftAsync();
         var sentAt = DateTime.UtcNow;
-        await _handler.Handle(new SendTransferCommand(a, null, null, null, []), CancellationToken.None);
+        await NewHandler().Handle(new SendTransferCommand(a, null, null, null, []), CancellationToken.None);
 
         var aAfterFirst = await ReloadAsync(a);
         Assert.Equal(baseline.MaxDownloads, aAfterFirst.MaxDownloads);
@@ -77,7 +86,7 @@ public class ApplyAtFinalizeIntegrationTests : IAsyncLifetime
 
         var b = await SeedDraftAsync();
         var sentBAt = DateTime.UtcNow;
-        await _handler.Handle(new SendTransferCommand(b, null, null, null, []), CancellationToken.None);
+        await NewHandler().Handle(new SendTransferCommand(b, null, null, null, []), CancellationToken.None);
 
         var bAfter = await ReloadAsync(b);
         Assert.Equal(raisedCap, bAfter.MaxDownloads);

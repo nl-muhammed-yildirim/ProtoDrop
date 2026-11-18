@@ -61,6 +61,8 @@ function stubFetch(
   vi.stubGlobal(
     'fetch',
     async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      // The landing page's background plan-limits load (PlanLimitsSync) is not part of what these tests capture.
+      if (String(input).endsWith('/billing/plan')) return new Response(null, { status: 404 })
       captured.url = typeof input === 'string' ? input : String(input)
       captured.init = init
       const req = new Request(typeof input === 'string' ? input : String(input), { method: init?.method ?? 'GET' })

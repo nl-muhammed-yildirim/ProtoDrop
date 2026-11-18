@@ -35,7 +35,7 @@ And an upgrade CTA (absent for Business)
 ## Edge cases
 
 - Meter staleness: storage from live scoped query (`SUM(TotalBytes)` active), not a cache — a user just under quota sees the real number.
-- Active transfers = `COUNT(*) WHERE Owner=me AND Status=1`.
+- Active transfers = `COUNT(*) WHERE Owner=me AND Status IN (1,3)` (matches send-time enforcement; FR-020-6).
 
 ## UI notes
 
