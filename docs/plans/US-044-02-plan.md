@@ -74,7 +74,7 @@ Dependency rule (TA-0.2 #7): `FeatureGates`/`IFlagResolver`/query in wa.applicat
 
 **`src/wa.domain/Errors/ProblemCodes.cs`** — anchors (current):
 ```csharp
-4  /// The closed TA-4.1.3 machine-code list — exactly these 22 members, no others in MVP ...
+4  /// The closed TA-4.1.3 machine-code list — the closed set grew from 22 to 23 codes in this step, no others in MVP ...
 34     // US-044-01 (AC-044-3, FR-044-5): PUT admin flag for a key that is not seeded — no write, no audit row.
 35     public const string FlagUnknown = "FLAG_UNKNOWN";
 60         [FlagUnknown] = (404, "Unknown flag"), // US-044-01 (AC-044-3): key is not a seeded flag
