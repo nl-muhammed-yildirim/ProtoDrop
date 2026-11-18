@@ -188,6 +188,7 @@
   "billing.plan.namePro": "Pro",
   "billing.plan.nameBusiness": "Business",
   "billing.plan.upgrade": "Upgrade",
+  "billing.plan.manageBilling": "Manage billing",
   "billing.plan.intervalLabel": "Billing period",
   "billing.plan.monthly": "Monthly",
   "billing.plan.annual": "Annual",

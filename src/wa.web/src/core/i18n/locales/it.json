@@ -188,6 +188,7 @@
   "billing.plan.namePro": "Pro",
   "billing.plan.nameBusiness": "Business",
   "billing.plan.upgrade": "Passa a un piano superiore",
+  "billing.plan.manageBilling": "Gestisci fatturazione",
   "billing.plan.intervalLabel": "Periodo di fatturazione",
   "billing.plan.monthly": "Mensile",
   "billing.plan.annual": "Annuale",

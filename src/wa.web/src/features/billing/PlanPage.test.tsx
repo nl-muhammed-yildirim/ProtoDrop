@@ -104,7 +104,7 @@ describe('PlanPage (US-020-03)', () => {
     cleanup()
   })
 
-  it('Business with unlimited active transfers: shows the infinity sign, no Upgrade, no radios', async () => {
+  it('Business with unlimited active transfers: shows the infinity sign, no Upgrade, no Manage billing, no radios', async () => {
     stubFetch(() => json(usage({
       planCode: 'business',
       storage: { usedBytes: 0, allowedBytes: 1024 * GB },
@@ -117,6 +117,7 @@ describe('PlanPage (US-020-03)', () => {
     expect(active.getAttribute('aria-valuetext')).toBe('500 of ∞')
     expect(active.hasAttribute('aria-valuemax')).toBe(false)
     expect(host.querySelector('.bp-upgrade')).toBeNull()
+    expect(host.querySelector('.bp-manage')).toBeNull()
     expect(host.querySelectorAll('input[type="radio"]')).toHaveLength(0)
     cleanup()
   })
@@ -158,20 +159,24 @@ describe('PlanPage (US-020-03)', () => {
     cleanup()
   })
 
-  it('Pro + Upgrade: GET /billing/portal then onRedirect(url); a null url shows the upgrade-failed alert', async () => {
+  it('Pro + Manage billing (no Upgrade): GET /billing/portal then onRedirect(url); a null url shows the upgrade-failed alert', async () => {
     let portalUrl: string | null = 'https://billing.stripe.test/p/1'
     const calls = stubFetch((c) => (c.url.endsWith('/billing/portal') ? json({ url: portalUrl, fallback: portalUrl ? null : 'upgrade' }) : json(usage({ planCode: 'pro' }))))
     const onRedirect = vi.fn()
     const { host, cleanup } = await render(onRedirect)
 
     expect(host.querySelectorAll('input[type="radio"]')).toHaveLength(0)
-    await click(host.querySelector('.bp-upgrade')!)
+    const manage = host.querySelector('.bp-manage')!
+    expect(manage.textContent).toBe('Manage billing')
+    expect(host.textContent).not.toContain('Upgrade')
+    expect(host.querySelectorAll('.bp-upgrade')).toHaveLength(1)
+    await click(manage)
     expect(calls.some((c) => c.url.endsWith('/billing/portal'))).toBe(true)
     expect(onRedirect).toHaveBeenCalledWith('https://billing.stripe.test/p/1')
 
     portalUrl = null
     onRedirect.mockClear()
-    await click(host.querySelector('.bp-upgrade')!)
+    await click(host.querySelector('.bp-manage')!)
     expect(onRedirect).not.toHaveBeenCalled()
     expect(host.querySelector('[role="alert"]')!.textContent).toContain('Could not start the upgrade')
     cleanup()

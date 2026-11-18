@@ -188,6 +188,7 @@
   "billing.plan.namePro": "Pro",
   "billing.plan.nameBusiness": "Business",
   "billing.plan.upgrade": "Upgrade",
+  "billing.plan.manageBilling": "Abrechnung verwalten",
   "billing.plan.intervalLabel": "Abrechnungszeitraum",
   "billing.plan.monthly": "Monatlich",
   "billing.plan.annual": "Jährlich",

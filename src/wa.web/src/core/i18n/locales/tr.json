@@ -188,6 +188,7 @@
   "billing.plan.namePro": "Pro",
   "billing.plan.nameBusiness": "Business",
   "billing.plan.upgrade": "Yükselt",
+  "billing.plan.manageBilling": "Faturalandırmayı yönet",
   "billing.plan.intervalLabel": "Faturalama dönemi",
   "billing.plan.monthly": "Aylık",
   "billing.plan.annual": "Yıllık",

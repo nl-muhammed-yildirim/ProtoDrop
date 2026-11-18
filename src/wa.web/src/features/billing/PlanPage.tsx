@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import i18n from '../../core/i18n/init'
 import { getTraceParent } from '../../core/traceparent'
 import { formatBytes } from '../../core/upload/formatBytes'
-import { meterState, planNameKey, upgradeAction } from './planUsage'
+import { hasManageBilling, meterState, planNameKey, upgradeAction } from './planUsage'
 import type { PlanUsageDto } from './planUsage'
 
 // Fixed-port absolute base, same precedent as ProfilePage ME_BASE (TA-4.2 billing routes).
@@ -51,7 +51,7 @@ function Meter({ label, used, allowed, format, testId }: MeterProps) {
 /**
  * US-020-03 (UI-Reference §5.7): plan screen at /account/plan (signed-in only).
  * Reads GET /billing/plan (live usage vs. PlanContext limits), renders two meters and the Upgrade CTA
- * (Free: Checkout, Pro: Billing Portal, Business: none).
+ * (Free: Upgrade to Checkout, Pro: Manage billing to the Billing Portal, Business: none).
  */
 export function PlanPage({ onRedirect = defaultRedirect }: PlanPageProps) {
   const [usage, setUsage] = useState<PlanUsageDto | null>(null)
@@ -72,9 +72,9 @@ export function PlanPage({ onRedirect = defaultRedirect }: PlanPageProps) {
     return () => { cancelled = true }
   }, [])
 
-  async function upgrade() {
+  async function upgrade(kind: 'checkout' | 'portal') {
     if (!usage) return
-    const action = upgradeAction(usage.planCode)
+    const action = kind === 'checkout' ? upgradeAction(usage.planCode) : hasManageBilling(usage.planCode) ? ({ kind: 'portal' } as const) : null
     if (!action) return
     setUpgrading(true)
     setUpgradeFailed(false)
@@ -125,6 +125,7 @@ export function PlanPage({ onRedirect = defaultRedirect }: PlanPageProps) {
   const active = meterState(usage.activeTransfers.used, usage.activeTransfers.allowed)
   const atLimit = storage.tone !== 'normal' || active.tone !== 'normal'
   const action = upgradeAction(usage.planCode)
+  const manage = hasManageBilling(usage.planCode)
 
   return (
     <div className="bp">
@@ -148,8 +149,13 @@ export function PlanPage({ onRedirect = defaultRedirect }: PlanPageProps) {
           </fieldset>
         )}
         {action && (
-          <button type="button" className={`bp-upgrade${atLimit ? ' bp-upgrade-highlight' : ''}`} disabled={upgrading} onClick={() => void upgrade()}>
+          <button type="button" className={`bp-upgrade${atLimit ? ' bp-upgrade-highlight' : ''}`} disabled={upgrading} onClick={() => void upgrade('checkout')}>
             {i18n.t('billing.plan.upgrade')}
+          </button>
+        )}
+        {manage && (
+          <button type="button" className="bp-upgrade bp-manage" disabled={upgrading} onClick={() => void upgrade('portal')}>
+            {i18n.t('billing.plan.manageBilling')}
           </button>
         )}
         {upgradeFailed && <p role="alert" className="bp-error">{i18n.t('billing.error.upgradeFailed')}</p>}

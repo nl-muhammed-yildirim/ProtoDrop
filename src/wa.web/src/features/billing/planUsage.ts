@@ -25,13 +25,17 @@ export function meterState(used: number, allowed: number | null): MeterState {
   return { unlimited: false, percent, tone }
 }
 
-export type UpgradeAction = { kind: 'checkout'; planCode: 'pro' } | { kind: 'portal' } | null
+export type UpgradeAction = { kind: 'checkout'; planCode: 'pro' } | null
 
-/** Free goes to Checkout, Pro to the Billing Portal (checkout refuses paid users), Business / unknown: no CTA. */
+/** Only Free is offered Upgrade (Checkout); Upgrade is hidden once subscribed (US-019-02). Pro / Business / unknown: null. */
 export function upgradeAction(planCode: string): UpgradeAction {
   if (planCode === 'free') return { kind: 'checkout', planCode: 'pro' }
-  if (planCode === 'pro') return { kind: 'portal' }
   return null
+}
+
+/** Pro gets Manage billing (Billing Portal, US-019-02); Free / Business / unknown: none. */
+export function hasManageBilling(planCode: string): boolean {
+  return planCode === 'pro'
 }
 
 export function planNameKey(planCode: string): 'billing.plan.nameFree' | 'billing.plan.namePro' | 'billing.plan.nameBusiness' | null {
