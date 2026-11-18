@@ -234,6 +234,37 @@ public class FinalizeTransferHandlerTests
     }
 
     [Fact]
+    public async Task Handle_ProPlanContext_100Active_Finalizes()
+    {
+        // FR-020-6: limits come from the plan context (Pro max 200), not a hard-wired Free resolve.
+        var ownerId = Guid.NewGuid();
+        var draftId = Guid.NewGuid();
+        var file1 = new FinalizeFile { FileId = Guid.NewGuid(), Name = "a.txt", SizeBytes = 100, Retries = 0 };
+        _blobStore.Blobs[BlobPaths.StagingFile(draftId, file1.FileId)] = new byte[100];
+        _store.ActiveTransferCount = 100;
+
+        var handler = new FinalizeTransferHandler(
+            _store,
+            _blobStore,
+            new StubLimitsProvider { Record = new LimitsRecord
+            {
+                MaxTransferSize = 5_368_709_120,
+                MaxSingleFile = 5_368_709_120,
+                StorageQuota = 5_368_709_120,
+                ActiveTransfersMax = 200
+            } },
+            new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?> { ["Wa:Url:Public"] = "http://localhost:5173" })
+                .Build(),
+            new WaTelemetryReporter(_logger, Encoding.UTF8.GetBytes("test-key")),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<FinalizeTransferHandler>.Instance);
+
+        var result = await handler.Handle(new FinalizeTransferCommand(draftId, "key-pro", [file1], ownerId), CancellationToken.None);
+
+        Assert.NotNull(result);
+    }
+
+    [Fact]
     public async Task Handle_BlobSizeMismatch_Throws_NamesFile()
     {
         var draftId = Guid.NewGuid();
@@ -414,7 +445,8 @@ public class FinalizeTransferHandlerTests
             Task.FromResult<MarkDeleteResult?>(null); // T-009-04: not exercised by finalize tests — signature-only.
     }
 
-    private sealed class StubLimitsProvider : ILimitsProvider
+    // Plays IPlanContextAccessor since US-020-02.
+    private sealed class StubLimitsProvider : IPlanContextAccessor
     {
         public LimitsRecord Record { get; set; } = new()
         {
@@ -424,8 +456,8 @@ public class FinalizeTransferHandlerTests
             ActiveTransfersMax = 20
         };
 
-        public Task<LimitsRecord> Resolve(string planCode, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Record);
+        public Task<PlanContext> GetAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new PlanContext(ILimitsProvider.GuestPlanCode, Record, new PlanFeatures()));
     }
 
     private sealed class ThrowingTransferStore : ITransferStore

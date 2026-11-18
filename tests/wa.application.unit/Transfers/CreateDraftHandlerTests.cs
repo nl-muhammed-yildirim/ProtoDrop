@@ -119,25 +119,46 @@ public class CreateDraftHandlerTests
         Assert.DoesNotContain(f.Logger.Entries, e => e.RenderedText == TelemetryEvents.UploadStarted);
     }
 
+    [Fact]
+    public async Task Handle_ProUserPlan_UsesProPerTransferLimits() // FR-020-1: limits come from PlanContext, not the guest plan.
+    {
+        const long proMax = FreeMax * 4;
+        var f = CreateFixture(new LimitsRecord { MaxTransferSize = proMax, MaxSingleFile = proMax }, "pro");
+
+        var result = await f.Handler.Handle(new CreateDraftCommand([new CreateDraftFile { Name = "big.bin", SizeBytes = FreeMax + 1 }]), CancellationToken.None); // over Free, within Pro.
+
+        Assert.Single(result.Files);
+    }
+
+    [Fact]
+    public async Task Handle_GuestPlan_StillRejectsOverFreeLimits() // guests resolve to Free through the accessor.
+    {
+        var f = CreateFixture(FreeLimits(), ILimitsProvider.GuestPlanCode);
+
+        await Assert.ThrowsAsync<TransferSizeExceededException>(async () =>
+            await f.Handler.Handle(new CreateDraftCommand([new CreateDraftFile { Name = "big.bin", SizeBytes = FreeMax + 1 }]), CancellationToken.None));
+    }
+
+
     private sealed record Fixture(CreateDraftHandler Handler, StubMinter Minter, RecordingLogger Logger);
 
-    private static Fixture CreateFixture(LimitsRecord limits)
+    private static Fixture CreateFixture(LimitsRecord limits, string planCode = "free")
     {
         var logger = new RecordingLogger();
         var minter = new StubMinter();
         // Real reporter over the recording logger — PII slots + closed-name gate are exercised for real.
         var handler = new CreateDraftHandler(
-            new StubLimitsProvider(limits),
+            new StubLimitsProvider(limits, planCode),
             minter,
             new WaTelemetryReporter(logger, System.Text.Encoding.UTF8.GetBytes("test-key")),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<CreateDraftHandler>.Instance);
         return new Fixture(handler, minter, logger);
     }
 
-    private sealed class StubLimitsProvider(LimitsRecord limits) : ILimitsProvider
+    private sealed class StubLimitsProvider(LimitsRecord limits, string planCode = "free") : IPlanContextAccessor
     {
-        public Task<LimitsRecord> Resolve(string planCode, CancellationToken cancellationToken = default) =>
-            Task.FromResult(limits); // guest always resolves to free here; the handler passes GuestPlanCode.
+        public Task<PlanContext> GetAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new PlanContext(planCode, limits, new PlanFeatures())); // FR-020-1: the accessor resolves guests to Free, signed-in users to their plan.
     }
 
     /// <summary>Deterministic mint — one URL per (draftId,fileId) so distinct-fileId assertions hold without a live account.</summary>

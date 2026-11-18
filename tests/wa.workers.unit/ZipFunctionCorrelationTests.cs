@@ -86,7 +86,7 @@ public class ZipFunctionCorrelationTests
 
     private class StubLimitsProvider : ILimitsProvider
     {
-        public Task<LimitsRecord> Resolve(string planCode, CancellationToken cancellationToken = default) =>
+        public Task<LimitsRecord> Resolve(string? planCode, CancellationToken cancellationToken = default) =>
             Task.FromResult(new LimitsRecord());
     }
 

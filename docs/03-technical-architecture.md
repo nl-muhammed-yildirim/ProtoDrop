@@ -465,7 +465,7 @@ CREATE TABLE dbo.IdempotencyKey (
 ```
 
 Machine `code` values (all of them, no others in MVP):
-`VALIDATION`, `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `TRANSFER_NOT_FINALIZED`, `TRANSFER_SIZE_EXCEEDED`, `STORAGE_QUOTA_EXCEEDED`, `MAX_DOWNLOADS_REACHED`, `WRONG_PASSWORD`, `TRANSFER_EXPIRED`, `TRANSFER_DELETED`, `FILES_GONE`, `IDEMPOTENCY_CONFLICT`, `RATE_LIMITED`, `STRIPE_WEBHOOK_MISMATCH`, `EMAIL_UNSUBSCRIBED`, `INTERNAL`.
+`VALIDATION`, `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `TRANSFER_NOT_FINALIZED`, `TRANSFER_SIZE_EXCEEDED`, `STORAGE_QUOTA_EXCEEDED`, `MAX_DOWNLOADS_REACHED`, `WRONG_PASSWORD`, `TRANSFER_EXPIRED`, `TRANSFER_DELETED`, `FILES_GONE`, `IDEMPOTENCY_CONFLICT`, `RATE_LIMITED`, `STRIPE_WEBHOOK_MISMATCH`, `EMAIL_UNSUBSCRIBED`, `BILLING_UNAVAILABLE`, `LINK_EXPIRED`, `ACTIVE_TRANSFERS_EXCEEDED`, `INTERNAL`.
 
 **TA-4.1.4 Pagination** — cursor: `?cursor={base64(created_at:id)}&limit=25`; response includes `nextCursor` (null when done).
 
@@ -498,6 +498,7 @@ Machine `code` values (all of them, no others in MVP):
 | 17 | `DELETE /api/v1/transfers/{id}` | owner/admin | hard-delete (de-dup blobs) | `transfer_deleted` |
 | 18 | `POST /api/v1/billing/checkout` · `GET /api/v1/billing/portal` | cookie | Stripe flows | `plan.changed` |
 | 19 | `POST /api/v1/billing/webhooks/stripe` | Stripe sig | idempotent mirror | `plan.changed` |
+| 20 | `GET /api/v1/billing/plan` | cookie | plan usage + limits (`GetPlanUsageQuery`, F-BIL-003 US-020-03) | — |
 | 20 | `GET /api/v1/admin/overview` | admin | counts (5-min cached) | — |
 | 21 | `GET /api/v1/admin/transfers?q=&status=&cursor=` · `DELETE .../{id}` | admin | search/kill | `admin.action` |
 | 22 | `GET /api/v1/admin/users?q=&cursor=` · `PATCH .../{id}` | admin | list / set plan | `admin.action` |
@@ -548,6 +549,7 @@ Every endpoint maps to exactly **one MediatR request** in `wa.application/UseCas
 | `/t/{linkId}` | Recipient page | endpoint 4–7 |
 | `/t/{linkId}/sent` | Sender confirmation | in-memory |
 | `/files` | My Files | 14 |
+| `/account/plan` | plan usage meters + upgrade CTA (F-BIL-003 US-020-03) | — |
 | `/account/*` | auth + profile | 8–13 |
 | `/admin/*` | Admin screens | 20–23 |
 | `/404`, `/500` | Error pages | — |
@@ -599,7 +601,8 @@ Producers: `wa-api` via the `IEventPublisher` adapter (in tests: in-memory fake)
 | `download.completed` | transferId | `{ transferId, fileId?, ipHash, country, uaHash }` | API (at SAS mint) |
 | `zip.generated` | transferId | `{ transferId, sizeBytes, durationMs }` | f-zip |
 | `user.created` / `account.deleted` | userId | `{ userId }` | API |
-| `plan.changed` | userId | `{ userId, fromPlan, toPlan, reason }` | Stripe webhook handler |
+| `plan.changed` | userId | `{ userId, fromPlan, toPlan, reason }` | Stripe webhook handler, f-expire grace step |
+| `billing.email_requested` | userId | `{ userId, email, subscriptionId, kind, step }` | f-expire billing sub-steps (F-BIL-002 US-019-04/05; D-3 option A, approved 2026-11-18) |
 | `admin.action` | actor | `{ actor, action, entityType, entityId, details }` | admin endpoints |
 
 ---

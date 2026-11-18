@@ -6,6 +6,7 @@ using wa.application.Events;
 using wa.application.Limits;
 using wa.application.Ports;
 using wa.application.UseCases.Auth;
+using wa.application.UseCases.Billing;
 using wa.application.UseCases.Transfers;
 using wa.infrastructure.Blob;
 using wa.infrastructure.Email;
@@ -80,6 +81,23 @@ public static class WorkerServices
             sp.GetRequiredService<wa.application.Telemetry.WaTelemetryReporter>(),
             sp.GetRequiredService<ILogger<ExpireTransfersHandler>>()));
 
+        // US-019-04 (D-6): billing email sub-step of the f-expire pass — per-step JobRun claims, no window claim.
+        services.AddSingleton<IBillingSequenceStore>(sp => new BillingSequenceStore(
+            sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+        services.AddSingleton<SendBillingEmailsHandler>(sp => new SendBillingEmailsHandler(
+            sp.GetRequiredService<IBillingSequenceStore>(),
+            sp.GetRequiredService<IEventPublisher>(),
+            sp.GetRequiredService<ILogger<SendBillingEmailsHandler>>()));
+
+        // US-019-05 (D-4): billing grace sub-step of the f-expire pass — locked re-check + JobRun claim per grace.
+        services.AddSingleton<IBillingGraceStore>(sp => new BillingGraceStore(
+            sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+        services.AddSingleton<EndBillingGraceHandler>(sp => new EndBillingGraceHandler(
+            sp.GetRequiredService<IBillingGraceStore>(),
+            sp.GetRequiredService<IEventPublisher>(),
+            sp.GetRequiredService<wa.application.Telemetry.WaTelemetryReporter>(),
+            sp.GetRequiredService<ILogger<EndBillingGraceHandler>>()));
+
         // T-005-02: f-delete-transfers job
         services.AddSingleton<IExpiryDeletionStore>(sp => new ExpiryDeletionStore(sp.GetRequiredService<WaDbContext>()));
         services.AddSingleton<DeleteExpiredTransfersHandler>(sp => new DeleteExpiredTransfersHandler(
@@ -135,6 +153,15 @@ public static class WorkerServices
             sp.GetRequiredService<IConfiguration>(),
             sp.GetRequiredService<wa.application.Telemetry.WaTelemetryReporter>(),
             sp.GetRequiredService<ILogger<SendForgotPasswordEmailHandler>>()));
+
+        // US-019-04 (D-7): billing email f-email handler — templates from Emails/templates/billing-payment-failed/.
+        services.AddSingleton<SendBillingEmailHandler>(sp => new SendBillingEmailHandler(
+            sp.GetRequiredService<IEmailSender>(),
+            sp.GetRequiredService<IEventPublisher>(),
+            sp.GetRequiredService<IConfiguration>(),
+            sp.GetRequiredService<wa.application.Telemetry.WaTelemetryReporter>(),
+            sp.GetRequiredService<ILogger<SendBillingEmailHandler>>(),
+            Path.Combine(AppContext.BaseDirectory, "Emails", "templates")));
 
         return services;
     }

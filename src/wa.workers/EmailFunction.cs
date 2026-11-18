@@ -3,6 +3,7 @@ using Azure.Messaging.ServiceBus;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 using wa.application.UseCases.Auth;
+using wa.application.UseCases.Billing;
 using wa.application.UseCases.Transfers;
 using wa.domain;
 using wa.domain.Correlation;
@@ -16,6 +17,7 @@ namespace wa.workers;
 /// T-008-05 (D-3): MagicLinkRequested now forks on the payload's purpose field — purpose=2 routes to the new
 /// SendForgotPasswordEmailHandler, everything else to SendMagicLinkEmailHandler. The switch is annotated
 /// IEmailEventHandler? (shared interface in wa.application), which also fixes the pre-existing CS8506 build defect.
+/// US-019-04 (FR-019-7): BillingEmailRequested → SendBillingEmailHandler (billing_payment_failed, steps 1..3).
 /// </summary>
 public class EmailFunction
 {
@@ -25,14 +27,17 @@ public class EmailFunction
     private readonly SendNotificationEmailsHandler _notificationHandler;
     private readonly SendMagicLinkEmailHandler _magicLinkHandler;
     private readonly SendForgotPasswordEmailHandler _forgotPasswordHandler;
+    private readonly SendBillingEmailHandler _billingHandler;
     private readonly ILogger<EmailFunction> _logger;
 
     public EmailFunction(
         SendNotificationEmailsHandler notificationHandler,
         SendMagicLinkEmailHandler magicLinkHandler,
         SendForgotPasswordEmailHandler forgotPasswordHandler,
+        SendBillingEmailHandler billingHandler,
         ILogger<EmailFunction> logger)
     {
+        _billingHandler = billingHandler;
         _notificationHandler = notificationHandler;
         _magicLinkHandler = magicLinkHandler;
         _forgotPasswordHandler = forgotPasswordHandler;
@@ -63,6 +68,7 @@ public class EmailFunction
         {
             EventType.TransferCreated => _notificationHandler,
             EventType.MagicLinkRequested => IsForgotPasswordPayload(envelope) ? _forgotPasswordHandler : _magicLinkHandler,
+            EventType.BillingEmailRequested => _billingHandler,
             _ => null
         };
 

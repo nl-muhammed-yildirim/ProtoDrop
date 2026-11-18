@@ -46,7 +46,7 @@ public sealed class FinalizeTransferHandler : IRequestHandler<FinalizeTransferCo
 {
     private readonly ITransferStore _store;
     private readonly IBlobStore _blobStore;
-    private readonly ILimitsProvider _limits;
+    private readonly IPlanContextAccessor _planContext;
     private readonly string _publicUrl;
     private readonly WaTelemetryReporter _telemetry;
     private readonly ILogger<FinalizeTransferHandler> _logger;
@@ -54,14 +54,14 @@ public sealed class FinalizeTransferHandler : IRequestHandler<FinalizeTransferCo
     public FinalizeTransferHandler(
         ITransferStore store,
         IBlobStore blobStore,
-        ILimitsProvider limits,
+        IPlanContextAccessor planContext,
         IConfiguration configuration,
         WaTelemetryReporter telemetry,
         ILogger<FinalizeTransferHandler> logger)
     {
         _store = store;
         _blobStore = blobStore;
-        _limits = limits;
+        _planContext = planContext;
         _publicUrl = configuration["Wa:Url:Public"] ?? "http://localhost:5173";
         _telemetry = telemetry;
         _logger = logger;
@@ -95,12 +95,12 @@ public sealed class FinalizeTransferHandler : IRequestHandler<FinalizeTransferCo
         var totalBytes = request.Files.Sum(f => f.SizeBytes);
         var totalRetries = request.Files.Sum(f => f.Retries);
 
-        // T-007-03: account-level checks (guests skip — EC-007-3).
+        // T-007-03: account-level checks (guests skip — EC-007-3 / FR-020-4).
         // T-007-05: activeBytes is the quota law's read and the meter's source — same value, no second query.
         long? activeBytes = null;
         if (request.OwnerAppUserId is not null)
         {
-            var limits = await _limits.Resolve(ILimitsProvider.GuestPlanCode, cancellationToken);
+            var limits = (await _planContext.GetAsync(cancellationToken)).Limits; // US-020-02 (FR-020-2): the session user's current plan
 
             activeBytes = await _store.GetActiveStorageBytesAsync(request.OwnerAppUserId.Value, cancellationToken);
             if (activeBytes.Value + totalBytes > limits.StorageQuota)
@@ -226,14 +226,14 @@ public sealed class StorageQuotaExceededException : Exception
     }
 }
 
-/// <summary>Thrown when the account has reached ACTIVE_TRANSFERS_MAX.</summary>
+/// <summary>Thrown when the account has reached ACTIVE_TRANSFERS_MAX (finalize + send, US-020-02).</summary>
 public sealed class ActiveTransfersExceededException : Exception
 {
     public int CurrentCount { get; }
     public int MaxActiveTransfers { get; }
 
     internal ActiveTransfersExceededException(int currentCount, int maxActiveTransfers)
-        : base($"You have {currentCount} active transfers (limit {maxActiveTransfers}).")
+        : base($"You have {currentCount} active transfers (limit {maxActiveTransfers}). Upgrade to keep sending.")
     {
         CurrentCount = currentCount;
         MaxActiveTransfers = maxActiveTransfers;

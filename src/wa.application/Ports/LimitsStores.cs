@@ -2,7 +2,7 @@ using wa.domain;
 
 namespace wa.application.Ports;
 
-/// <summary>Typed failure for a plan code with no seeded row — maps to 404 <c>PLAN_UNKNOWN</c> at the API layer (AC-053-4). Never null or an empty record.</summary>
+/// <summary>Typed failure for a plan code with no seeded row — surfaces as 500 INTERNAL until the EC-018-3 Problem code is decided (AC-053-4). Never null or an empty record.</summary>
 public sealed class PlanUnknownException : Exception
 {
     public PlanUnknownException(string planCode)
@@ -20,6 +20,13 @@ public interface IPlansStore
 
     /// <summary>T-008-02: resolve a plan by its Id for LoginResult.PlanCode. Returns the row or null — never throws.</summary>
     Task<Plan?> GetByIdAsync(Guid planId, CancellationToken cancellationToken);
+}
+
+/// <summary>US-020-01 (FR-020-1): resolves a user's plan code for PlanContext. Includes soft-deleted users (EC-020-3: last-known plan); null = no user row.</summary>
+public interface IUserPlanStore
+{
+    /// <summary>Returns the code of the plan the user row points at (soft-deleted users included), or null when no such user row exists.</summary>
+    Task<string?> GetPlanCodeAsync(Guid userId, CancellationToken cancellationToken);
 }
 
 /// <summary>Reads flag rows. Limit resolution consumes the raw rows — key filtering and override layering live in T-053-04.</summary>

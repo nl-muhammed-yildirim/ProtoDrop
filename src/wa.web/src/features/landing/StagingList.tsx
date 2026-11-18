@@ -8,6 +8,8 @@ import { useUploadEngine, stagedHandles, type Draft } from '../../core/upload/Up
 import { getTraceParent } from '../../core/traceparent'
 import { formatBytes } from '../../core/upload/formatBytes'
 import { checkLimits, getPlanLimits, limitMessage } from '../../core/upload/planLimits'
+import { ACTIVE_TRANSFERS_EXCEEDED, parseProblem } from '../../core/api/errorMap'
+import ActiveTransfersLimit from '../sender/ActiveTransfersLimit'
 import LinkScreen from '../sender/LinkScreen'
 import { buildFinalizePayload, finalizeKey, type MintedFile } from './finalize'
 import { useFinalize } from './finalizeState'
@@ -89,6 +91,7 @@ export function StagingList() {
   const removeFile = useUploadEngine((s) => s.remove)
   const retryFile = useUploadEngine((s) => s.retry)
   const [sending, setSending] = useState(false) // double-click guard — start() itself serializes files (TA-8.3).
+  const [activeLimit, setActiveLimit] = useState<{ details?: string } | null>(null) // US-020-02: ACTIVE_TRANSFERS_EXCEEDED paywall (finalize 409)
   // T-001-10 handoff: shared store so App can hide the DropZone once LinkScreen is showing (see finalizeState.ts).
   const finalized = useFinalize((s) => s.finalized)
   const setFinalized = useFinalize((s) => s.setFinalized)
@@ -138,6 +141,7 @@ export function StagingList() {
     if (sending || finalized !== null) return
     setSending(true)
     setFinalizeError(false)
+    setActiveLimit(null)
     try {
       const rows = files.map((f) => ({
         name: f.name,
@@ -146,6 +150,7 @@ export function StagingList() {
       }))
       const res = await fetch(DRAFT_ENDPOINT, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json', traceparent: getTraceParent() },
         body: JSON.stringify({ files: rows }),
       })
@@ -165,10 +170,16 @@ export function StagingList() {
       if (!allDone) return
       const finRes = await fetch(FINALIZE_ENDPOINT.replace('{draftId}', draft.draftId), {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'Idempotency-Key': finalizeKey(draft.draftId), traceparent: getTraceParent() },
         body: JSON.stringify(buildFinalizePayload(minted)),
       })
-      if (!finRes.ok) { setFinalizeError(true); return } // inline error below — the blobs are staged; retry re-finalizes (EC-002-1).
+      if (!finRes.ok) {
+        const problem = parseProblem(await finRes.json().catch(() => null))
+        if (problem?.code === ACTIVE_TRANSFERS_EXCEEDED) { setActiveLimit({ details: problem.details }); return } // FR-020-6: exact number + Upgrade CTA, no pointless retry
+        setFinalizeError(true)
+        return
+      } // inline error below — the blobs are staged; retry re-finalizes (EC-002-1).
       const result = (await finRes.json()) as FinalizeResult
       setFinalized(result)
     } finally {
@@ -252,6 +263,7 @@ export function StagingList() {
           {message}
         </p>
       )}
+      {activeLimit && <ActiveTransfersLimit details={activeLimit.details} />}
       <div className="sl-footer">
         {/* T-017-01 (FR-017-5): inside the footer so the overall line sits directly above Send. (one element, two positions). */}
         {/* Overall line (FR-001-5): combined bytes uploaded / total, recomputed on every store transition. */}

@@ -1,0 +1,6 @@
+Hi,
+
+Your 14-day grace period has ended and your account is back on ProtoDrop Free.
+
+Your files and live transfers stay as they are. You can upgrade again any time:
+{{CtaUrl}}

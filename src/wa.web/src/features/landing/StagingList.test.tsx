@@ -282,4 +282,45 @@ describe('StagingList', () => {
       expect(after).toContain('>100%<')
     })
   })
+
+  describe('send flow sends the session cookie (plan limits follow the signed-in user)', () => {
+    it('draft and finalize POSTs carry credentials: "include"; the blob upload does not go through fetch with credentials', async () => {
+      stage('a.bin', 3)
+      const seen: Array<{ url: string; method: string; credentials?: RequestCredentials }> = []
+      vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+        const url = String(input)
+        seen.push({ url, method: init?.method ?? 'GET', credentials: init?.credentials })
+        const body = url.endsWith('/finalize')
+          ? { id: 't1', linkId: 'Ab3dEf5g', status: 'Draft', expiresAt: '2026-01-01T00:00:00Z', totalBytes: 3, files: [] }
+          : makeDraft(['http://127.0.0.1:10000/devstoreaccount1/staging/x?st=2026-01-01T00:00:00Z&se=2026-01-02T00:00:00Z'])
+        return new Response(JSON.stringify(body), { status: url.endsWith('/finalize') ? 200 : 201, headers: { 'Content-Type': 'application/json' } })
+      })
+      // Skip the real blob PUT: mark every staged file done so send() proceeds to finalize.
+      const realStart = useUploadEngine.getState().start
+      useUploadEngine.setState({
+        start: async () => {
+          useUploadEngine.setState((s) => ({ files: s.files.map((f) => ({ ...f, status: 'done' as const })) }))
+        },
+      })
+      try {
+        const host = document.createElement('div')
+        document.body.appendChild(host)
+        const root = createRoot(host)
+        act(() => { void root.render(createElement(StagingList)) })
+        const send = host.querySelector('.sl-send') as HTMLButtonElement
+        await act(async () => { send.click() })
+        await act(async () => { await new Promise((r) => setTimeout(r, 0)) })
+
+        const draft = seen.find((c) => c.url.endsWith('/api/v1/transfers/draft'))
+        const fin = seen.find((c) => c.url.endsWith('/finalize'))
+        expect(draft?.method).toBe('POST')
+        expect(draft?.credentials).toBe('include')
+        expect(fin?.method).toBe('POST')
+        expect(fin?.credentials).toBe('include')
+        host.remove()
+      } finally {
+        useUploadEngine.setState({ start: realStart })
+      }
+    })
+  })
 })

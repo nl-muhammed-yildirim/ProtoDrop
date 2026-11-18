@@ -28,18 +28,18 @@ public sealed record DraftFile(Guid FileId, Uri UploadUrl);
 public sealed record CreateDraftResult(Guid DraftId, int ExpiresInSec, IReadOnlyList<DraftFile> Files);
 
 /// <summary>
-/// TA-4.2a — the only business logic behind POST /api/v1/transfers/draft: resolve guest limits (never literals), check the whole selection against MAX_TRANSFER_SIZE and per-file MAX_SINGLE_FILE, mint one staging SAS per file, emit upload_started once. Returns null when oversized — the endpoint throws BusinessException(ProblemCodes.TransferSizeExceeded) from there; no new tables/migrations (T-001-05).
+/// TA-4.2a — the only business logic behind POST /api/v1/transfers/draft: resolve the request's plan limits via PlanContext (never literals), check the whole selection against MAX_TRANSFER_SIZE and per-file MAX_SINGLE_FILE, mint one staging SAS per file, emit upload_started once. Returns null when oversized — the endpoint throws BusinessException(ProblemCodes.TransferSizeExceeded) from there; no new tables/migrations (T-001-05).
 /// </summary>
 public sealed class CreateDraftHandler : IRequestHandler<CreateDraftCommand, CreateDraftResult>
 {
-    private readonly ILimitsProvider _limits;
+    private readonly IPlanContextAccessor _planContext;
     private readonly IBlobSasMinter _minter;
     private readonly WaTelemetryReporter _telemetry;
     private readonly ILogger<CreateDraftHandler> _logger;
 
-    public CreateDraftHandler(ILimitsProvider limits, IBlobSasMinter minter, WaTelemetryReporter telemetry, ILogger<CreateDraftHandler> logger)
+    public CreateDraftHandler(IPlanContextAccessor planContext, IBlobSasMinter minter, WaTelemetryReporter telemetry, ILogger<CreateDraftHandler> logger)
     {
-        _limits = limits;
+        _planContext = planContext;
         _minter = minter;
         _telemetry = telemetry;
         _logger = logger;
@@ -47,7 +47,7 @@ public sealed class CreateDraftHandler : IRequestHandler<CreateDraftCommand, Cre
 
     public async Task<CreateDraftResult> Handle(CreateDraftCommand request, CancellationToken cancellationToken)
     {
-        var free = await _limits.Resolve(ILimitsProvider.GuestPlanCode, cancellationToken); // DB failure / unknown plan propagate (AC-053-4, EC-053-3).
+        var free = (await _planContext.GetAsync(cancellationToken)).Limits; // FR-020-1: the session's plan (guests resolve to Free via the accessor); DB failure / unknown plan propagate (AC-053-4, EC-053-3).
 
         long totalBytes = 0;
         foreach (var file in request.Files)

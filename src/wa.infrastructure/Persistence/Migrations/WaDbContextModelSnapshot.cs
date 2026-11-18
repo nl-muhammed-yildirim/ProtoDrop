@@ -810,6 +810,10 @@ namespace wa.infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("VARCHAR(64)");
 
+                    b.Property<string>("PriceJson")
+                        .IsRequired()
+                        .HasColumnType("NVARCHAR(MAX)");
+
                     b.Property<int>("SortOrder")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
@@ -832,6 +836,7 @@ namespace wa.infrastructure.Persistence.Migrations
                             FeaturesJson = "{\"ads\":false,\"scheduling\":false,\"analytics\":false,\"branding\":false,\"sso_scim\":false}",
                             LimitsJson = "{\"maxTransferSize\":5368709120,\"maxSingleFile\":5368709120,\"maxZipSize\":4294967296,\"retentionDays\":7,\"graceDays\":3,\"maxDownloads\":100,\"maxEmails\":20,\"storageQuota\":5368709120,\"activeTransfersMax\":20}",
                             Name = "Free",
+                            PriceJson = "{\"currency\":\"USD\",\"monthly\":{\"amount\":0,\"stripePriceId\":null},\"annual\":{\"amount\":0,\"stripePriceId\":null},\"perSeatMonthly\":null}",
                             SortOrder = 1
                         },
                         new
@@ -841,6 +846,7 @@ namespace wa.infrastructure.Persistence.Migrations
                             FeaturesJson = "{\"ads\":false,\"scheduling\":true,\"analytics\":true,\"branding\":true,\"sso_scim\":false}",
                             LimitsJson = "{\"maxTransferSize\":10737418240,\"maxSingleFile\":10737418240,\"maxZipSize\":9223372036854775807,\"retentionDays\":30,\"graceDays\":3,\"maxDownloads\":1000,\"maxEmails\":100,\"storageQuota\":107374182400,\"activeTransfersMax\":200}",
                             Name = "Pro",
+                            PriceJson = "{\"currency\":\"USD\",\"monthly\":{\"amount\":900,\"stripePriceId\":null},\"annual\":{\"amount\":9000,\"stripePriceId\":null},\"perSeatMonthly\":null}",
                             SortOrder = 2
                         },
                         new
@@ -850,6 +856,7 @@ namespace wa.infrastructure.Persistence.Migrations
                             FeaturesJson = "{\"ads\":false,\"scheduling\":true,\"analytics\":true,\"branding\":true,\"sso_scim\":true}",
                             LimitsJson = "{\"maxTransferSize\":107374182400,\"maxSingleFile\":107374182400,\"maxZipSize\":9223372036854775807,\"retentionDays\":90,\"graceDays\":3,\"maxDownloads\":-1,\"maxEmails\":500,\"storageQuota\":1099511627776,\"activeTransfersMax\":-1}",
                             Name = "Business",
+                            PriceJson = "{\"currency\":\"USD\",\"monthly\":{\"amount\":1900,\"stripePriceId\":null},\"annual\":{\"amount\":19000,\"stripePriceId\":null},\"perSeatMonthly\":1900}",
                             SortOrder = 3
                         });
                 });

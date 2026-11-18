@@ -8,6 +8,7 @@ using wa.application.Telemetry;
 using wa.application.UseCases.Auth;
 using wa.domain;
 using wa.domain.Correlation;
+using wa.domain.Transfers;
 
 namespace wa.application.UseCases.Transfers;
 
@@ -63,12 +64,13 @@ public sealed record FileItemRow(Guid Id, Guid BlobRefId, string OriginalName, l
 /// T-002-04 (TA-4.2#3) — the only business logic behind POST /api/v1/transfers/{id}/send:
 /// activate a Draft transfer (Status 0→1), store normalized EmailRecipient rows, emit transfer.created via outbox.
 /// Returns null when the transfer is not found — the endpoint throws BusinessException(ProblemCodes.NotFound).
+/// US-020-02: limits from IPlanContextAccessor; account active-transfers re-check.
 /// </summary>
 public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, SendTransferResult?>
 {
     private readonly ISendStore _store;
     private readonly ITransferStore _transferStore;
-    private readonly ILimitsProvider _limits;
+    private readonly IPlanContextAccessor _planContext;
     private readonly IEventPublisher _eventPublisher;
     private readonly WaTelemetryReporter _telemetry;
     private readonly ILogger<SendTransferHandler> _logger;
@@ -77,7 +79,7 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
     public SendTransferHandler(
         ISendStore store,
         ITransferStore transferStore,
-        ILimitsProvider limits,
+        IPlanContextAccessor planContext,
         IEventPublisher eventPublisher,
         WaTelemetryReporter telemetry,
         ILogger<SendTransferHandler> logger,
@@ -85,7 +87,7 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
     {
         _store = store;
         _transferStore = transferStore;
-        _limits = limits;
+        _planContext = planContext;
         _eventPublisher = eventPublisher;
         _telemetry = telemetry;
         _logger = logger;
@@ -103,13 +105,22 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
         if (transfer.Status != 0)
             throw new InvalidOperationException($"Transfer {transfer.Id} already sent (status={transfer.Status}).");
 
-        // 3. Resolve plan limits — never a literal (TA-3.4).
-        var limits = await _limits.Resolve(ILimitsProvider.GuestPlanCode, cancellationToken);
+        // 3. Limits of the session user's current plan at send time — never a literal (TA-3.4, FR-020-2).
+        var limits = (await _planContext.GetAsync(cancellationToken)).Limits;
 
         // 3b. T-007-04 / AC-007-1: send-time re-check — a flag may have changed since finalize; checks precede mutation.
         //     Strict > : exactly-at-limit passes (inclusive cap, boundary pinned in unit tests).
         if (transfer.TotalBytes > limits.MaxTransferSize)
             throw new TransferSizeExceededException(transfer.TotalBytes, limits.MaxTransferSize, 0, limits.MaxSingleFile);
+
+        // 3c. US-020-02 (FR-020-2, AC-020-1/2): account-only active-transfers re-check — guests skip (FR-020-4).
+        //     Checks precede mutation; existing active transfers are never touched (they finish their natural life).
+        if (request.OwnerAppUserId is { } owner && !limits.IsActiveTransfersMaxInfinite())
+        {
+            var activeCount = await _transferStore.GetActiveTransferCountAsync(owner, cancellationToken);
+            if (activeCount >= limits.ActiveTransfersMax)
+                throw new ActiveTransfersExceededException(activeCount, limits.ActiveTransfersMax);
+        }
 
         // 4. Parse recipients: split on [\r\n,;\s]+, trim, drop empties, validate per-address, lowercase, dedupe, cap.
         var addresses = new List<string>();
@@ -130,10 +141,10 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
         if (addresses.Count > limits.MaxEmails)
             throw new TransferValidationException($"Maximum {limits.MaxEmails} recipients allowed.");
 
-        // 5. Activate the transfer: Status=1, expiry from RETENTION_DAYS, sender defaults.
+        // 5. Stamp send-time limits once (FR-018-4: retention + download cap; live rows never re-resolve), then activate.
         var now = DateTime.UtcNow;
+        SendTimeLimits.Stamp(transfer, limits, now);
         transfer.Status = 1;
-        transfer.ExpiresAtUtc = now.AddDays(limits.RetentionDays);
 
         // T-008-08 (FR-008-7): send-time attribution — the session user id IS the owner (guest → null).
         // Unconditional overwrite is deliberate: a guest-created draft sent while signed in becomes attributed,

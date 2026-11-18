@@ -276,7 +276,7 @@ public class ResendTransferHandlerTests
             Task.FromResult<MarkDeleteResult?>(null);
     }
 
-    private sealed class StubLimitsProvider : ILimitsProvider
+    private sealed class StubLimitsProvider : IPlanContextAccessor
     {
         // Free values from the Part 2 frozen table — same convention as SendTransferHandlerTests.
         public LimitsRecord Record { get; set; } = new()
@@ -287,7 +287,7 @@ public class ResendTransferHandlerTests
             MaxSingleFile = 5_368_709_120
         };
 
-        public Task<LimitsRecord> Resolve(string planCode, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Record);
+        public Task<PlanContext> GetAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new PlanContext(ILimitsProvider.GuestPlanCode, Record, new PlanFeatures())); // Plays IPlanContextAccessor since FR-020-6.
     }
 }

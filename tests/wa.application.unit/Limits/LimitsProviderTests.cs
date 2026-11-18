@@ -1,3 +1,4 @@
+using System.Text.Json;
 using wa.application.Limits;
 using wa.application.Ports;
 using wa.domain;
@@ -189,6 +190,71 @@ public class LimitsProviderTests
         // Now the cache should refetch and see the new value.
         var third = await provider.Resolve("free", CancellationToken.None);
         Assert.Equal(200, third.MaxDownloads); // TTL expired — new value picked up.
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Resolve_NullOrBlankPlanCode_ReturnsDefaultPlanRecord(string? planCode) // F-BIL-001 tech note: Resolve(null | free) → Free record; US-018-02 guest → free.
+    {
+        var provider = CreateProvider();
+
+        var limits = await provider.Resolve(planCode, CancellationToken.None);
+        var free = await provider.Resolve(Plan.DefaultCode, CancellationToken.None);
+
+        Assert.Equal(5_368_709_120L, limits.MaxTransferSize);
+        Assert.Equal(7, limits.RetentionDays);
+        Assert.Equal(free.MaxTransferSize, limits.MaxTransferSize);
+        Assert.Equal(free.RetentionDays, limits.RetentionDays);
+    }
+
+    [Fact]
+    public async Task Resolve_ProPlan_MaxTransferSize_EqualsProLimitsJsonValue() // US-018-02 AC block 1: the number comes from the row.
+    {
+        var provider = CreateProvider();
+
+        var pro = await provider.Resolve("pro", CancellationToken.None);
+
+        Assert.Equal(JsonSerializer.Deserialize<LimitsRecord>(ProLimitsJson)!.MaxTransferSize, pro.MaxTransferSize);
+    }
+
+    [Fact]
+    public async Task Resolve_ProFlagOverride_MaxTransferSize_VisibleOnlyAfterTtl() // AC-018-2 / US-018-02 AC block 2: edit visible only after expiry.
+    {
+        var clock = new FakeClock(DateTimeOffset.UtcNow);
+        var flagStore = new StubFlagsStore(new[] { Flag("limits.pro.maxTransferSize", "10737418240") });
+        var provider = new LimitsProvider(
+            new PlansCache(new StubPlansStore(), Ttl, () => clock.Now),
+            new FlagsCache(flagStore, Ttl, () => clock.Now));
+
+        var first = await provider.Resolve("pro", CancellationToken.None);
+        Assert.Equal(10_737_418_240L, first.MaxTransferSize);
+
+        flagStore.Rows = new[] { Flag("limits.pro.maxTransferSize", "21474836480") };
+
+        clock.Advance(TimeSpan.FromSeconds(29));
+        var within = await provider.Resolve("pro", CancellationToken.None);
+        Assert.Equal(10_737_418_240L, within.MaxTransferSize); // still cached at +29 s.
+
+        clock.Advance(Ttl - TimeSpan.FromSeconds(29) + TimeSpan.FromSeconds(1));
+        var after = await provider.Resolve("pro", CancellationToken.None);
+        Assert.Equal(21_474_836_480L, after.MaxTransferSize);
+    }
+
+    [Fact]
+    public async Task Resolve_FlagOverrideMinusOne_ResolvesAsInfinite() // US-018-02 edge: -1 encodes ∞, handled in the resolver output.
+    {
+        var provider = CreateProvider(rows: new[]
+        {
+            Flag("limits.pro.maxDownloads", "-1"),
+            Flag("limits.pro.activeTransfersMax", "-1"),
+        });
+
+        var pro = await provider.Resolve("pro", CancellationToken.None);
+
+        Assert.True(pro.IsMaxDownloadsInfinite());
+        Assert.True(pro.IsActiveTransfersMaxInfinite());
     }
 
     // ── builders ──────────────────────────────────────────────────────────────

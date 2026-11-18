@@ -78,6 +78,11 @@ public class SignupEndpointTests : IAsyncLifetime
         var row = await _db.Set<AppUser>().FirstOrDefaultAsync(u => u.Email == Email.ToLowerInvariant());
         Assert.NotNull(row);
         Assert.NotEmpty(row!.PasswordHash); // PBKDF2 hashed (TA-9.1) — never the raw password
+
+        // AC-018-1: a new AppUser starts on the seeded default (Free) plan.
+        var defaultPlan = await _db.Set<Plan>().SingleAsync(p => p.Code == Plan.DefaultCode);
+        Assert.Equal(defaultPlan.Id, row.PlanId);
+        Assert.Equal(Guid.Parse("11111111-0000-4000-8000-000000000001"), defaultPlan.Id);
     }
 
     // ---- EC-008-1/4: same email, different case → signs into the same row; no duplicate ----

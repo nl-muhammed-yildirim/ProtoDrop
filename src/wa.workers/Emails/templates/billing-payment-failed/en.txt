@@ -1,0 +1,10 @@
+Hi,
+
+We couldn't charge your card for ProtoDrop Pro. This is reminder {{Step}} of 3.
+
+Please update your payment method so your subscription stays active:
+{{CtaUrl}}
+
+If the payment still fails after the last reminder, your subscription pauses.
+
+If you have already fixed this, you can ignore this email.

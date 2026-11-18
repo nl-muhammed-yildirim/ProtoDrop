@@ -70,7 +70,7 @@ public sealed class RedeemMagicLinkHandler : IRequestHandler<RedeemMagicLinkComm
         if (existingUser is null)
         {
             // FR-008-3: sign-up is sign-in — create the AppUser on redeem.
-            var freePlan = await _plans.GetAsync("free", cancellationToken);
+            var freePlan = await _plans.GetAsync(Plan.DefaultCode, cancellationToken);
             user = new AppUser
             {
                 Id = Guid.NewGuid(),
