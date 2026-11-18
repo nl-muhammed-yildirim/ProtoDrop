@@ -161,6 +161,7 @@
   "profile.delete.button": "Eliminar cuenta",
   "profile.delete.title": "¿Eliminar tu cuenta?",
   "profile.delete.gdprCopy": "Tu cuenta y perfil se eliminan. Tus transferencias activas siguen funcionando y muestran 'De: {{name}}' en lugar de tu correo.",
+  "profile.delete.telemetryNote": "Tus datos de telemetría se anonimizan en las 24 horas siguientes a la eliminación.",
   "profile.error.deleteAccountFailed": "No se pudo eliminar la cuenta. Inténtalo de nuevo.",
   "profile.delete.cancel": "Cancelar",
   "profile.delete.deleting": "Eliminando…",

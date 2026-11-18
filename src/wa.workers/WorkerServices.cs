@@ -8,11 +8,13 @@ using wa.application.Ports;
 using wa.application.UseCases.Auth;
 using wa.application.UseCases.Billing;
 using wa.application.UseCases.DataExport;
+using wa.application.UseCases.Gdpr;
 using wa.application.UseCases.Transfers;
 using wa.infrastructure.Blob;
 using wa.infrastructure.Email;
 using wa.infrastructure.Events;
 using wa.infrastructure.Persistence;
+using wa.infrastructure.Telemetry;
 
 namespace wa.workers;
 
@@ -121,6 +123,14 @@ public static class WorkerServices
             sp.GetRequiredService<IDataExportJobStore>(),
             sp.GetRequiredService<IBlobStore>(),
             sp.GetRequiredService<ILogger<BuildDataExportsHandler>>()));
+
+        // US-047-02 (FR-047-5): f-gdpr-sweep — nightly, idempotent per userId; option-A eraser (contract by construction, DECISION 2026-11-18).
+        services.AddSingleton<IGdprSweepStore>(sp => new GdprSweepStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+        services.AddSingleton<ITelemetryEraser, ClosedSetTelemetryEraser>();
+        services.AddSingleton<SweepErasedTelemetryHandler>(sp => new SweepErasedTelemetryHandler(
+            sp.GetRequiredService<IGdprSweepStore>(),
+            sp.GetRequiredService<ITelemetryEraser>(),
+            sp.GetRequiredService<ILogger<SweepErasedTelemetryHandler>>()));
 
         // T-006-01: f-email consumer
         services.AddSingleton<EventDeduplicator>(sp => new EventDeduplicator(() => DateTimeOffset.UtcNow));

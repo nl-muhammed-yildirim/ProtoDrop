@@ -364,6 +364,26 @@ describe('ProfilePage (T-008-07)', () => {
     host.remove()
   })
 
+  it('US-047-02 (FR-047-7): the delete modal also tells the user their telemetry is anonymized within 24 hours', async () => {
+    writeSession({ ...BASE_PROFILE, displayName: 'Ada Lovelace' })
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    act(() => {
+      void root.render(createElement(App))
+    })
+    await act(async () => { navigateToProfile() })
+
+    const deleteBtn = host.querySelector('.pf-delete-btn') as HTMLButtonElement
+    act(() => { deleteBtn.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+
+    const copies = host.querySelectorAll('.pf-modal-copy')
+    expect(copies).toHaveLength(2)
+    expect(copies[1].textContent).toBe('Your telemetry data is anonymized within 24 hours of deletion.')
+    root.unmount()
+    host.remove()
+  })
+
   describe('US-047-01: My data section behind feature.dataExport', () => {
     it('gate on: the My data section is rendered', async () => {
       featuresBody = { 'feature.dataExport': true }

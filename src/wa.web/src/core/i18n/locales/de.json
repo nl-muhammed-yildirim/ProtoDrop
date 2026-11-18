@@ -161,6 +161,7 @@
   "profile.delete.button": "Konto löschen",
   "profile.delete.title": "Dein Konto löschen?",
   "profile.delete.gdprCopy": "Dein Konto und dein Profil werden gelöscht. Deine aktiven Transfers funktionieren weiter und zeigen 'Von: {{name}}' statt deiner E-Mail.",
+  "profile.delete.telemetryNote": "Deine Telemetriedaten werden innerhalb von 24 Stunden nach der Löschung anonymisiert.",
   "profile.error.deleteAccountFailed": "Das Konto konnte nicht gelöscht werden. Bitte versuche es erneut.",
   "profile.delete.cancel": "Abbrechen",
   "profile.delete.deleting": "Löscht…",

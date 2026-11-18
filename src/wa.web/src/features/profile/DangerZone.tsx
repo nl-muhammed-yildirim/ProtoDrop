@@ -14,7 +14,8 @@ interface DangerZoneProps {
  * T-008-09 (FR-008-8, UI-Reference §5.5 danger zone): red-tinted Delete account button + GDPR
  * confirm modal in the profile's reserved slot. No request is sent until Confirm — Cancel just
  * closes (exit check d). On 2xx fires onDeleteAccount exactly once; on failure keeps the modal
- * open with an inline alert so the user can retry or cancel.
+ * open with an inline alert so the user can retry or cancel. US-047-02 (FR-047-7): the modal also
+ * states that telemetry data is anonymized within 24 hours of deletion.
  */
 export function DangerZone({ profile, onDeleteAccount }: DangerZoneProps) {
   const [open, setOpen] = useState(false)
@@ -61,7 +62,9 @@ export function DangerZone({ profile, onDeleteAccount }: DangerZoneProps) {
             <p className="pf-modal-copy">
               {i18n.t('profile.delete.gdprCopy', { name: profile.displayName })}
             </p>
-            {error && <p role="alert" className="pf-modal-error">{error}</p>}
+            {/* US-047-02 (FR-047-7): the only user-visible GDPR line this feature adds. */}
+            <p className="pf-modal-copy">{i18n.t('profile.delete.telemetryNote')}</p>
+            {error &&<p role="alert" className="pf-modal-error">{error}</p>}
             <div className="pf-modal-actions">
               <button type="button" className="pf-modal-cancel" disabled={deleting} onClick={() => void close()}>{i18n.t('profile.delete.cancel')}</button>
               <button type="button" className="pf-modal-confirm" autoFocus disabled={deleting} onClick={() => void confirm()} aria-busy={deleting}>

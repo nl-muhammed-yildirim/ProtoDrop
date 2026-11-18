@@ -341,6 +341,30 @@ namespace wa.infrastructure.Persistence.Migrations
                     b.ToTable("EmailSuppression", (string)null);
                 });
 
+            modelBuilder.Entity("wa.domain.Erasure", b =>
+                {
+                    b.Property<Guid>("AppUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("DeletedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ReHomedTransferCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("SweptAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("AppUserId")
+                        .HasName("PK_Erasure");
+
+                    b.HasIndex("DeletedAtUtc")
+                        .HasDatabaseName("IX_Erasure_Pending")
+                        .HasFilter("[SweptAtUtc] IS NULL");
+
+                    b.ToTable("Erasure", (string)null);
+                });
+
             modelBuilder.Entity("wa.domain.FeatureFlag", b =>
                 {
                     b.Property<string>("Key")

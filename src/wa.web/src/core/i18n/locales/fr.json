@@ -161,6 +161,7 @@
   "profile.delete.button": "Supprimer le compte",
   "profile.delete.title": "Supprimer votre compte ?",
   "profile.delete.gdprCopy": "Votre compte et votre profil sont supprimés. Vos transferts actifs continuent de fonctionner et affichent 'De : {{name}}' au lieu de votre e-mail.",
+  "profile.delete.telemetryNote": "Vos données de télémétrie sont anonymisées dans les 24 heures suivant la suppression.",
   "profile.error.deleteAccountFailed": "Le compte n'a pas pu être supprimé. Veuillez réessayer.",
   "profile.delete.cancel": "Annuler",
   "profile.delete.deleting": "Suppression…",

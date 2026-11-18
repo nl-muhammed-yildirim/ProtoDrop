@@ -161,6 +161,7 @@
   "profile.delete.button": "Delete account",
   "profile.delete.title": "Delete your account?",
   "profile.delete.gdprCopy": "Your account and profile are deleted. Your active transfers keep working and show 'From: {{name}}' without your email.",
+  "profile.delete.telemetryNote": "Your telemetry data is anonymized within 24 hours of deletion.",
   "profile.error.deleteAccountFailed": "Could not delete your account. Please try again.",
   "profile.delete.cancel": "Cancel",
   "profile.delete.deleting": "Deleting…",

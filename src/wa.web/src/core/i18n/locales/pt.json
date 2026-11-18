@@ -161,6 +161,7 @@
   "profile.delete.button": "Excluir conta",
   "profile.delete.title": "Excluir sua conta?",
   "profile.delete.gdprCopy": "Sua conta e perfil são excluídos. Suas transferências ativas continuam funcionando e mostram 'De: {{name}}' em vez do seu e-mail.",
+  "profile.delete.telemetryNote": "Seus dados de telemetria são anonimizados em até 24 horas após a exclusão.",
   "profile.error.deleteAccountFailed": "Não foi possível excluir a conta. Tente novamente.",
   "profile.delete.cancel": "Cancelar",
   "profile.delete.deleting": "Excluindo…",

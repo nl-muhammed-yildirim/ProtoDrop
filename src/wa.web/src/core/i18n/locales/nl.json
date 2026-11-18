@@ -161,6 +161,7 @@
   "profile.delete.button": "Account verwijderen",
   "profile.delete.title": "Account verwijderen?",
   "profile.delete.gdprCopy": "Je account en profiel worden verwijderd. Je actieve overdrachten blijven werken en tonen 'Van: {{name}}' in plaats van je e-mail.",
+  "profile.delete.telemetryNote": "Je telemetriegegevens worden binnen 24 uur na verwijdering geanonimiseerd.",
   "profile.error.deleteAccountFailed": "Het account kon niet worden verwijderd. Probeer het opnieuw.",
   "profile.delete.cancel": "Annuleren",
   "profile.delete.deleting": "Verwijderen…",

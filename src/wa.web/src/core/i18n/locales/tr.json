@@ -161,6 +161,7 @@
   "profile.delete.button": "Hesabı sil",
   "profile.delete.title": "Hesabını sil?",
   "profile.delete.gdprCopy": "Hesabın ve profilin silinir. Aktif aktarımların çalışmaya devam eder ve e-postan yerine 'Gönderen: {{name}}' gösterilir.",
+  "profile.delete.telemetryNote": "Telemetri verilerin, silme işleminden sonraki 24 saat içinde anonimleştirilir.",
   "profile.error.deleteAccountFailed": "Hesap silinemedi. Lütfen tekrar deneyin.",
   "profile.delete.cancel": "İptal",
   "profile.delete.deleting": "Siliniyor…",
