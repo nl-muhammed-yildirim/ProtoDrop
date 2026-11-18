@@ -46,7 +46,13 @@ public class BuildDataExportsHandlerTests
             Uploads.Add(path);
             return Task.CompletedTask;
         }
-        public Task DeleteAsync(string path, CancellationToken cancellationToken = default) { Deletes.Add(path); return Task.CompletedTask; }
+        public string? ThrowOnDeletePath { get; set; }
+        public Task DeleteAsync(string path, CancellationToken cancellationToken = default)
+        {
+            if (path == ThrowOnDeletePath) throw new IOException("blob delete down");
+            Deletes.Add(path);
+            return Task.CompletedTask;
+        }
         public Task<Stream> DownloadAsync(string path, CancellationToken cancellationToken = default) => Task.FromResult(Stream.Null);
         public Task CopyAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<long> GetSizeAsync(string path, CancellationToken cancellationToken = default) => Task.FromResult(0L);
@@ -122,6 +128,41 @@ public class BuildDataExportsHandlerTests
         await new BuildDataExportsHandler(store, blobs, new CapturingLogger<BuildDataExportsHandler>()).RunAsync(Now, default);
         Assert.Equal(["exports/u/e.zip"], blobs.Deletes);
         Assert.Equal([id], store.Deleted);
+    }
+
+    [Fact]
+    public async Task PurgeBlobDeleteThrows_RowKept_WarningLogged_OthersPurged() // US-047-04 D2
+    {
+        var store = new StubJobStore();
+        var first = Guid.NewGuid();
+        var second = Guid.NewGuid();
+        store.Purgeable.Add(new PurgeableExport(first, "exports/u/first.zip"));
+        store.Purgeable.Add(new PurgeableExport(second, "exports/u/second.zip"));
+        var blobs = new CapturingBlobStore { ThrowOnDeletePath = "exports/u/first.zip" };
+        var log = new CapturingLogger<BuildDataExportsHandler>();
+
+        await new BuildDataExportsHandler(store, blobs, log).RunAsync(Now, default);
+
+        Assert.Equal([second], store.Deleted);
+        Assert.Contains(log.Entries, e => e.Level == LogLevel.Warning);
+        Assert.True(log.Mentions(first.ToString()));
+        Assert.True(store.Completed);
+    }
+
+    [Fact]
+    public async Task PurgeBlobDeleteThrows_BuildLoopStillRuns() // EC-047-2
+    {
+        var store = new StubJobStore { Snapshot = Snap() };
+        store.Purgeable.Add(new PurgeableExport(Guid.NewGuid(), "exports/u/bad.zip"));
+        var row = Row();
+        store.Processing.Add(row);
+        var blobs = new CapturingBlobStore { ThrowOnDeletePath = "exports/u/bad.zip" };
+
+        var n = await new BuildDataExportsHandler(store, blobs, new CapturingLogger<BuildDataExportsHandler>()).RunAsync(Now, default);
+
+        Assert.Equal(1, n);
+        Assert.Equal([row.Id], store.Ready.Select(r => r.Id));
+        Assert.Empty(store.Deleted);
     }
 
     [Theory]

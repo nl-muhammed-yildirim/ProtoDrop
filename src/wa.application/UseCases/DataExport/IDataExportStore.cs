@@ -33,7 +33,7 @@ public interface IDataExportJobStore
     /// <summary>Processing → Failed (EC-047-2).</summary>
     Task MarkFailedAsync(Guid id, CancellationToken ct);
 
-    /// <summary>Ready rows with ReadyAtUtc before the cutoff (7-day retention purge).</summary>
+    /// <summary>Ready rows with ReadyAtUtc before the cutoff (7-day retention purge), plus ready rows whose owner is no longer a live account (soft-deleted or missing) — their zips must not outlive the deletion (US-047-04).</summary>
     Task<IReadOnlyList<PurgeableExport>> GetPurgeableAsync(DateTime readyBeforeUtc, int batchSize, CancellationToken ct);
 
     /// <summary>Deletes the row.</summary>

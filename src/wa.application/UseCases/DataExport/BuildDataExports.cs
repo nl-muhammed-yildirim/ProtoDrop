@@ -6,7 +6,7 @@ namespace wa.application.UseCases.DataExport;
 
 /// <summary>
 /// US-047-01 (FR-047-1/2/8, TA-6.1/6.2): f-data-export timer handler. Claims a 5-min JobRun window, purges ready exports
-/// past retention, then builds every processing export into exports/{userId}/{exportId}.zip. No events, no telemetry (FR-047-8).
+/// past retention (ready zips of deleted accounts are purged on the next pass), then builds every processing export into exports/{userId}/{exportId}.zip. No events, no telemetry (FR-047-8).
 /// The feature flag is deliberately not checked: the gate stops creation, not completion (FR-047-4).
 /// </summary>
 public sealed class BuildDataExportsHandler
@@ -79,6 +79,8 @@ public sealed class BuildDataExportsHandler
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger.LogWarning(ex, "f-data-export: blob delete failed for export {ExportId}", item.Id);
+                // keep the row: next pass retries (DeleteIfExists is idempotent), so a zip never outlives its row
+                continue;
             }
             await _store.DeleteAsync(item.Id, ct);
         }

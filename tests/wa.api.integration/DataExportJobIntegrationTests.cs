@@ -87,6 +87,19 @@ public class DataExportJobIntegrationTests : IAsyncLifetime
         return await fresh.Set<DataExport>().AsNoTracking().FirstAsync(e => e.Id == id);
     }
 
+    /// <summary>The real delete path both DELETE /auth/me and admin force-delete use (soft delete + Erasure marker).</summary>
+    private async Task DeleteUserAsync(Guid id)
+    {
+        await using var ctx = new WaDbContext(_options);
+        Assert.True(await new AppUserStore(ctx).SoftDeleteWithReHomeAsync(id, DateTime.UtcNow, CancellationToken.None));
+    }
+
+    private async Task<bool> RowExistsAsync(Guid id)
+    {
+        await using var fresh = new WaDbContext(_options);
+        return await fresh.Set<DataExport>().AnyAsync(e => e.Id == id);
+    }
+
     private static Dictionary<string, JsonElement> ReadZip(byte[] bytes)
     {
         using var zip = new ZipArchive(new MemoryStream(bytes), ZipArchiveMode.Read);
@@ -213,6 +226,102 @@ public class DataExportJobIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task DeletedUser_FreshReadyExport_BlobAndRowPurgedNextRun() // US-047-04 D1
+    {
+        var path = BlobPaths.DataExportZip(_userId, Guid.NewGuid());
+        var ready = await AddExportAsync(_userId, DataExportState.Ready, DateTime.UtcNow.AddHours(-1), path);
+        var blobs = new MemoryBlobStore();
+        blobs.Blobs[path] = [1, 2, 3];
+        await DeleteUserAsync(_userId);
+
+        await Handler(blobs).RunAsync(DateTime.UtcNow, CancellationToken.None);
+
+        Assert.DoesNotContain(path, blobs.Blobs.Keys);
+        Assert.False(await RowExistsAsync(ready.Id));
+    }
+
+    [Fact]
+    public async Task LiveUser_FreshReadyExport_NotPurged()
+    {
+        var path = BlobPaths.DataExportZip(_userId, Guid.NewGuid());
+        var ready = await AddExportAsync(_userId, DataExportState.Ready, DateTime.UtcNow.AddHours(-1), path);
+        var blobs = new MemoryBlobStore();
+        blobs.Blobs[path] = [1, 2, 3];
+
+        await Handler(blobs).RunAsync(DateTime.UtcNow, CancellationToken.None);
+
+        Assert.Contains(path, blobs.Blobs.Keys);
+        Assert.True(await RowExistsAsync(ready.Id));
+    }
+
+    [Fact]
+    public async Task DeletedUser_ProcessingExport_FailsCleanly_NoZip_ErasureOnce() // EC-047-3
+    {
+        var export = await AddExportAsync(_userId);
+        await DeleteUserAsync(_userId);
+        var blobs = new MemoryBlobStore();
+        var now = DateTime.UtcNow;
+
+        await Handler(blobs).RunAsync(now, CancellationToken.None);
+        await Handler(blobs).RunAsync(now.AddMinutes(5), CancellationToken.None);
+
+        Assert.Equal(DataExportState.Failed, (await ReloadAsync(export.Id)).State);
+        Assert.Empty(blobs.Blobs);
+        await using var fresh = new WaDbContext(_options);
+        Assert.Equal(1, await fresh.Set<Erasure>().CountAsync(e => e.AppUserId == _userId));
+    }
+
+    [Fact]
+    public async Task ReadyLandedAfterDelete_PurgedNextRun() // snapshot-before-delete race
+    {
+        await DeleteUserAsync(_userId);
+        var path = BlobPaths.DataExportZip(_userId, Guid.NewGuid());
+        var ready = await AddExportAsync(_userId, DataExportState.Ready, DateTime.UtcNow, path);
+        var blobs = new MemoryBlobStore();
+        blobs.Blobs[path] = [9];
+
+        await Handler(blobs).RunAsync(DateTime.UtcNow, CancellationToken.None);
+
+        Assert.DoesNotContain(path, blobs.Blobs.Keys);
+        Assert.False(await RowExistsAsync(ready.Id));
+    }
+
+    [Fact]
+    public async Task MarkReady_OnPurgedOrFailedRow_NoResurrection()
+    {
+        var purgedId = Guid.NewGuid();
+        await Store().MarkReadyAsync(purgedId, "exports/x/y.zip", DateTime.UtcNow, CancellationToken.None);
+        Assert.False(await RowExistsAsync(purgedId));
+
+        var failed = await AddExportAsync(_userId, DataExportState.Failed);
+        await Store().MarkReadyAsync(failed.Id, "exports/x/z.zip", DateTime.UtcNow, CancellationToken.None);
+
+        var row = await ReloadAsync(failed.Id);
+        Assert.Equal(DataExportState.Failed, row.State);
+        Assert.Null(row.BlobPath);
+    }
+
+    [Fact]
+    public async Task BlobDeleteFails_RowKept_PurgedOnRetry() // EC-047-2
+    {
+        var path = BlobPaths.DataExportZip(_userId, Guid.NewGuid());
+        var ready = await AddExportAsync(_userId, DataExportState.Ready, DateTime.UtcNow.AddHours(-1), path);
+        var blobs = new MemoryBlobStore { FailDelete = true };
+        blobs.Blobs[path] = [1];
+        await DeleteUserAsync(_userId);
+        var now = DateTime.UtcNow;
+
+        await Handler(blobs).RunAsync(now, CancellationToken.None);
+        Assert.True(await RowExistsAsync(ready.Id));
+        Assert.Contains(path, blobs.Blobs.Keys);
+
+        blobs.FailDelete = false;
+        await Handler(blobs).RunAsync(now.AddMinutes(5), CancellationToken.None);
+        Assert.False(await RowExistsAsync(ready.Id));
+        Assert.DoesNotContain(path, blobs.Blobs.Keys);
+    }
+
+    [Fact]
     public async Task SecondRunSameWindow_ClaimLost()
     {
         var blobs = new MemoryBlobStore();
@@ -242,6 +351,7 @@ public class DataExportJobIntegrationTests : IAsyncLifetime
     {
         public Dictionary<string, byte[]> Blobs { get; } = [];
         public bool FailUpload { get; set; }
+        public bool FailDelete { get; set; }
 
         public async Task UploadAsync(string path, Stream content, CancellationToken cancellationToken = default)
         {
@@ -250,7 +360,12 @@ public class DataExportJobIntegrationTests : IAsyncLifetime
             await content.CopyToAsync(ms, cancellationToken);
             Blobs[path] = ms.ToArray();
         }
-        public Task DeleteAsync(string path, CancellationToken cancellationToken = default) { Blobs.Remove(path); return Task.CompletedTask; }
+        public Task DeleteAsync(string path, CancellationToken cancellationToken = default)
+        {
+            if (FailDelete) throw new IOException("blob delete down");
+            Blobs.Remove(path);
+            return Task.CompletedTask;
+        }
         public Task<Stream> DownloadAsync(string path, CancellationToken cancellationToken = default) => Task.FromResult<Stream>(new MemoryStream(Blobs[path]));
         public Task CopyAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<long> GetSizeAsync(string path, CancellationToken cancellationToken = default) => Task.FromResult((long)Blobs[path].Length);

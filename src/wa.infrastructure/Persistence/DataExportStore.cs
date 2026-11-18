@@ -177,7 +177,9 @@ public sealed class DataExportJobStore : IDataExportJobStore
     {
         await using var db = await _factory.CreateDbContextAsync(ct);
         var rows = await db.Set<DataExport>().AsNoTracking()
-            .Where(e => e.State == DataExportState.Ready && e.ReadyAtUtc < readyBeforeUtc && e.BlobPath != null)
+            .Where(e => e.State == DataExportState.Ready && e.BlobPath != null
+                && (e.ReadyAtUtc < readyBeforeUtc
+                    || !db.Set<AppUser>().Any(u => u.Id == e.AppUserId && u.DeletedAtUtc == null)))
             .OrderBy(e => e.ReadyAtUtc)
             .Take(batchSize)
             .Select(e => new { e.Id, e.BlobPath })
