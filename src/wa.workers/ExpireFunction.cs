@@ -17,17 +17,20 @@ public class ExpireFunction
 {
     private readonly ExpireTransfersHandler _handler;
     private readonly SendBillingEmailsHandler _billingEmails;
+    private readonly EndBillingGraceHandler _billingGrace;
     private readonly ILogger<ExpireFunction> _logger;
     private readonly IConfiguration _config;
 
     public ExpireFunction(
         ExpireTransfersHandler handler,
         SendBillingEmailsHandler billingEmails,
+        EndBillingGraceHandler billingGrace,
         ILogger<ExpireFunction> logger,
         IConfiguration config)
     {
         _handler = handler;
         _billingEmails = billingEmails;
+        _billingGrace = billingGrace;
         _logger = logger;
         _config = config;
     }
@@ -50,6 +53,10 @@ public class ExpireFunction
             // US-019-04 (D-6): billing email sub-step; each send is gated by its own JobRun step claim.
             var billingCount = await _billingEmails.RunAsync(now, context.CancellationToken);
             _logger.LogInformation("f-expire billing emails: {Count} queued", billingCount);
+
+            // US-019-05 (D-4): end expired billing grace periods (downgrade to Free), after the email step.
+            var graceCount = await _billingGrace.RunAsync(now, context.CancellationToken);
+            _logger.LogInformation("f-expire billing grace: {Count} downgraded", graceCount);
         }
         catch (Exception ex)
         {

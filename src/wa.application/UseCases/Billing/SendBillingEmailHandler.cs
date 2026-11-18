@@ -29,6 +29,9 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
     private readonly WaTelemetryReporter _telemetry;
     private readonly ILogger<SendBillingEmailHandler> _logger;
     private readonly (string Html, string Txt) _templates;
+    private readonly (string Html, string Txt) _graceTemplates;
+
+    private const string GraceEndedSubject = "You're back on ProtoDrop Free";
 
     public SendBillingEmailHandler(
         IEmailSender emailSender,
@@ -44,15 +47,21 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
         _telemetry = telemetry;
         _logger = logger;
 
-        var basePath = Path.Combine(templateRoot, "billing-payment-failed");
+        _templates = LoadTemplates(templateRoot, "billing-payment-failed");
+        _graceTemplates = LoadTemplates(templateRoot, "billing-grace-ended"); // US-019-05 (D-5)
+    }
+
+    private static (string Html, string Txt) LoadTemplates(string templateRoot, string folder)
+    {
+        var basePath = Path.Combine(templateRoot, folder);
         var htmlPath = Path.Combine(basePath, "en.html");
         var txtPath = Path.Combine(basePath, "en.txt");
         if (File.Exists(htmlPath) && File.Exists(txtPath))
-            _templates = (File.ReadAllText(htmlPath), File.ReadAllText(txtPath));
-        else
-            throw new InvalidOperationException(
-                $"Billing email templates not found. Expected: {htmlPath} and {txtPath}. " +
-                "Verify the workers csproj Content Include for Emails\\templates\\**\\*.");
+            return (File.ReadAllText(htmlPath), File.ReadAllText(txtPath));
+
+        throw new InvalidOperationException(
+            $"Billing email templates not found. Expected: {htmlPath} and {txtPath}. " +
+            "Verify the workers csproj Content Include for Emails\\templates\\**\\*.");
     }
 
     public async Task HandleAsync(EventEnvelope envelope, int attempt, int maxDeliveryCount, CancellationToken ct)
@@ -71,28 +80,40 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
 
         var kind = root.TryGetProperty("kind", out var kindEl) && kindEl.ValueKind == JsonValueKind.String
             ? kindEl.GetString() : null;
-        if (kind != BillingEmailSchedule.Kind)
+        var step = 1;
+        string subject;
+        (string Html, string Txt) templates;
+        if (kind == BillingEmailSchedule.Kind)
+        {
+            if (!root.TryGetProperty("step", out var stepEl) || stepEl.ValueKind != JsonValueKind.Number
+                || !stepEl.TryGetInt32(out step) || step < 1 || step > BillingEmailSchedule.StepCount)
+            {
+                _logger.LogWarning("f-email: missing or invalid step in billing payload");
+                return;
+            }
+            subject = Subjects[step - 1];
+            templates = _templates;
+        }
+        else if (kind == BillingGrace.GraceEndedKind)
+        {
+            subject = GraceEndedSubject;
+            templates = _graceTemplates;
+        }
+        else
         {
             _logger.LogWarning("f-email: unknown billing email kind {Kind}", kind);
             return;
         }
 
-        if (!root.TryGetProperty("step", out var stepEl) || stepEl.ValueKind != JsonValueKind.Number
-            || !stepEl.TryGetInt32(out var step) || step < 1 || step > BillingEmailSchedule.StepCount)
-        {
-            _logger.LogWarning("f-email: missing or invalid step in billing payload");
-            return;
-        }
-
         var publicOrigin = _config["Wa:Url:Public"] ?? "http://localhost:5173";
         var ctaUrl = $"{publicOrigin}/account";
-        var htmlBody = Render(_templates.Html, step, ctaUrl);
-        var textBody = Render(_templates.Txt, step, ctaUrl);
+        var htmlBody = Render(templates.Html, step, ctaUrl);
+        var textBody = Render(templates.Txt, step, ctaUrl);
 
         try
         {
             var fromAddress = _config["Wa:Email:FromAddress"] ?? "no-reply@protodrop.com"; // D-04
-            var message = new EmailMessage(email, Subjects[step - 1], htmlBody, textBody, fromAddress, null);
+            var message = new EmailMessage(email, subject, htmlBody, textBody, fromAddress, null);
             await _emailSender.SendAsync(message, ct);
 
             await _eventPublisher.PublishAsync(new EventEnvelope
@@ -103,7 +124,7 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
                 OccurredAtUtc = DateTime.UtcNow,
                 CorrelationId = envelope.CorrelationId,
                 PartitionKey = email,
-                Payload = new { to = email, attempt, kind = BillingEmailSchedule.Kind, step }
+                Payload = new { to = email, attempt, kind, step }
             }, ct);
 
             _telemetry.LogEvent(TelemetryEvents.EmailSent);
@@ -123,7 +144,7 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
                     OccurredAtUtc = DateTime.UtcNow,
                     CorrelationId = envelope.CorrelationId,
                     PartitionKey = email,
-                    Payload = new { to = email, attempt = maxDeliveryCount, reason = ex.GetType().Name, kind = BillingEmailSchedule.Kind, step }
+                    Payload = new { to = email, attempt = maxDeliveryCount, reason = ex.GetType().Name, kind, step }
                 }, ct);
                 _telemetry.LogEvent(TelemetryEvents.DlqCount);
                 _telemetry.EmailFailures1h();

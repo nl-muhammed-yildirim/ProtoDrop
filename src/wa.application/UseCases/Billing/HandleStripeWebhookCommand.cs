@@ -35,6 +35,7 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
 {
     private const string SubscriptionCreated = "customer.subscription.created";
     private const string SubscriptionUpdated = "customer.subscription.updated";
+    private const string SubscriptionPaused = "customer.subscription.paused"; // US-019-05 (FR-019-2): pause starts the 14-day grace
 
     private const string InvoicePaymentFailed = "invoice.payment_failed";
     private const string InvoicePaid = "invoice.paid";
@@ -84,7 +85,7 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
             if (type == InvoicePaymentFailed || type == InvoicePaid)
                 return await HandleInvoiceAsync(type, eventId, obj, ct);
 
-            if (type != SubscriptionCreated && type != SubscriptionUpdated)
+            if (type != SubscriptionCreated && type != SubscriptionUpdated && type != SubscriptionPaused)
             {
                 // AC-019-4: unknown type → 200 + log line, no mirror change, no StripeEvent row. Stripe ids only (TA-9.4).
                 _logger.LogInformation("Stripe webhook event ignored: {StripeEventId} {StripeEventType}", eventId, type);
@@ -243,7 +244,7 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
             case "unpaid":
                 return (await _plans.GetAsync(Plan.DefaultCode, ct)).Id;
             default:
-                return null; // incomplete / paused: mirror only (paused + grace belong to US-019-05)
+                return null; // incomplete: mirror only; paused: mirror + grace (StripeBillingStore), plan kept
         }
     }
 

@@ -60,6 +60,7 @@ public sealed class StripeBillingStore : IStripeBillingStore
         }
 
         var subscription = await db.Set<Subscription>().FirstOrDefaultAsync(s => s.StripeSubId == change.StripeSubId, ct);
+        var previousStatus = subscription?.Status; // null for a new row (US-019-05 grace transition)
         var userId = subscription?.AppUserId ?? change.MetadataUserId;
         var user = userId is null
             ? null
@@ -92,7 +93,7 @@ public sealed class StripeBillingStore : IStripeBillingStore
         subscription.Status = change.Status;
         subscription.CurrentPeriodEndUtc = change.CurrentPeriodEndUtc;
         subscription.UpdatedAtUtc = nowUtc;
-        // GraceEndsAtUtc untouched (US-019-05).
+        subscription.GraceEndsAtUtc = BillingGrace.NextGraceEndsAt(previousStatus, subscription.GraceEndsAtUtc, change.Status, nowUtc);
 
         if (targetPlanId.HasValue)
             user.PlanId = toPlan.Id;

@@ -127,6 +127,24 @@ public class HandleStripeWebhookHandlerTests
     }
 
     [Fact]
+    public async Task SubscriptionPaused_Applied_KeepsPlan_NoEnvelope_NoPlanChangedTelemetry()
+    {
+        // US-019-05 (FR-019-2, story Gherkin "during grace I am still on Pro"): paused is mirrored, plan kept, no plan.changed.
+        var rig = new Rig();
+        rig.Store.Result = new StripeApplyResult(StripeApplyOutcome.Applied, UserId, ProId, ProId, "pro", "pro");
+
+        var outcome = await rig.Handler().Handle(
+            new HandleStripeWebhookCommand(Event("customer.subscription.paused", "paused", id: "evt_pause")), default);
+
+        Assert.Equal(StripeWebhookOutcome.Applied, outcome);
+        Assert.Equal(1, rig.Store.ApplyCalls);
+        Assert.Null(rig.Store.CapturedTargetPlanId);
+        Assert.Equal("paused", rig.Store.CapturedChange!.Status);
+        Assert.Empty(rig.Events.Published);
+        Assert.False(rig.TelemetryLog.Mentions(TelemetryEvents.PlanChanged));
+    }
+
+    [Fact]
     public async Task UnmappedPrice_ActiveStatus_ThrowsRetryable_StoreApplyNotCalled()
     {
         var rig = new Rig();

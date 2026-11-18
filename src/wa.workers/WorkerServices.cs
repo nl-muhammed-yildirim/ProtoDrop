@@ -89,6 +89,15 @@ public static class WorkerServices
             sp.GetRequiredService<IEventPublisher>(),
             sp.GetRequiredService<ILogger<SendBillingEmailsHandler>>()));
 
+        // US-019-05 (D-4): billing grace sub-step of the f-expire pass — locked re-check + JobRun claim per grace.
+        services.AddSingleton<IBillingGraceStore>(sp => new BillingGraceStore(
+            sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+        services.AddSingleton<EndBillingGraceHandler>(sp => new EndBillingGraceHandler(
+            sp.GetRequiredService<IBillingGraceStore>(),
+            sp.GetRequiredService<IEventPublisher>(),
+            sp.GetRequiredService<wa.application.Telemetry.WaTelemetryReporter>(),
+            sp.GetRequiredService<ILogger<EndBillingGraceHandler>>()));
+
         // T-005-02: f-delete-transfers job
         services.AddSingleton<IExpiryDeletionStore>(sp => new ExpiryDeletionStore(sp.GetRequiredService<WaDbContext>()));
         services.AddSingleton<DeleteExpiredTransfersHandler>(sp => new DeleteExpiredTransfersHandler(

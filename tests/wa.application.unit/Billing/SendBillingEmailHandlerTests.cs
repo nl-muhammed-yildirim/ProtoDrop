@@ -19,6 +19,11 @@ public class SendBillingEmailHandlerTests : IDisposable
         Directory.CreateDirectory(dir);
         File.WriteAllText(Path.Combine(dir, "en.html"), "<p>Reminder {{Step}} of 3</p><a href=\"{{CtaUrl}}\">Update</a>");
         File.WriteAllText(Path.Combine(dir, "en.txt"), "Reminder {{Step}} of 3: {{CtaUrl}}");
+
+        var graceDir = Path.Combine(_root, "billing-grace-ended");
+        Directory.CreateDirectory(graceDir);
+        File.WriteAllText(Path.Combine(graceDir, "en.html"), "<p>Back on Free</p><a href=\"{{CtaUrl}}\">Plans</a>");
+        File.WriteAllText(Path.Combine(graceDir, "en.txt"), "Back on Free: {{CtaUrl}}");
     }
 
     public void Dispose()
@@ -146,6 +151,60 @@ public class SendBillingEmailHandlerTests : IDisposable
     {
         var rig = new Rig();
         Assert.Throws<InvalidOperationException>(() => rig.Handler(Path.Combine(_root, "nope")));
+    }
+
+    [Fact]
+    public void MissingGraceTemplates_CtorThrows()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "wa-billing-tpl-" + Guid.NewGuid().ToString("n"));
+        try
+        {
+            var dir = Path.Combine(root, "billing-payment-failed");
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "en.html"), "x");
+            File.WriteAllText(Path.Combine(dir, "en.txt"), "x");
+
+            var rig = new Rig();
+            Assert.Throws<InvalidOperationException>(() => rig.Handler(root));
+        }
+        finally
+        {
+            try { Directory.Delete(root, true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public async Task GraceEnded_Sends_FreeSubject_AndCtaUrl_AndEmailSentWithKind()
+    {
+        var rig = new Rig();
+        await rig.Handler(_root).HandleAsync(Envelope(kind: "billing_grace_ended"), 1, 5, default);
+
+        var sent = Assert.Single(rig.Sender.Sent);
+        Assert.Equal(Email, sent.To);
+        Assert.Equal("You're back on ProtoDrop Free", sent.Subject);
+        Assert.Contains("Back on Free", sent.HtmlBody);
+        Assert.Contains("https://app.example.com/account", sent.HtmlBody);
+        Assert.Contains("https://app.example.com/account", sent.TextBody);
+
+        var env = Assert.Single(rig.Events.Published);
+        Assert.Equal(EventType.EmailSent, env.Type);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(env.Payload));
+        Assert.Equal("billing_grace_ended", doc.RootElement.GetProperty("kind").GetString());
+    }
+
+    [Fact]
+    public async Task GraceEnded_SenderThrows_AtLastAttempt_EmitsEmailFailedWithKind_ThenRethrows()
+    {
+        var rig = new Rig();
+        rig.Sender.ThrowOnSend = new InvalidOperationException("outage");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            rig.Handler(_root).HandleAsync(Envelope(kind: "billing_grace_ended"), 5, 5, default));
+
+        var env = Assert.Single(rig.Events.Published);
+        Assert.Equal(EventType.EmailFailed, env.Type);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(env.Payload));
+        Assert.Equal("billing_grace_ended", doc.RootElement.GetProperty("kind").GetString());
     }
 
     private sealed class StubEmailSender : IEmailSender
