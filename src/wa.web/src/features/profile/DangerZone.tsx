@@ -64,7 +64,7 @@ export function DangerZone({ profile, onDeleteAccount }: DangerZoneProps) {
             </p>
             {/* US-047-02 (FR-047-7): the only user-visible GDPR line this feature adds. */}
             <p className="pf-modal-copy">{i18n.t('profile.delete.telemetryNote')}</p>
-            {error &&<p role="alert" className="pf-modal-error">{error}</p>}
+            {error && <p role="alert" className="pf-modal-error">{error}</p>}
             <div className="pf-modal-actions">
               <button type="button" className="pf-modal-cancel" disabled={deleting} onClick={() => void close()}>{i18n.t('profile.delete.cancel')}</button>
               <button type="button" className="pf-modal-confirm" autoFocus disabled={deleting} onClick={() => void confirm()} aria-busy={deleting}>

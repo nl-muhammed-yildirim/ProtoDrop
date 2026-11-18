@@ -52,11 +52,22 @@ export function DataExportSection() {
     return () => { alive.current = false }
   }, [refresh])
 
-  // While processing: re-read on a setTimeout chain; cleared on unmount and on leaving 'processing'.
+  // While processing: self-rescheduling setTimeout chain (a GET that still says 'processing' leaves state unchanged, so an
+  // effect keyed on status alone would fire only once). Cleared on unmount and on leaving 'processing'.
   useEffect(() => {
     if (status !== 'processing') return
-    const timer = setTimeout(() => { void refresh() }, EXPORT_POLL_MS)
-    return () => clearTimeout(timer)
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const schedule = () => {
+      timer = setTimeout(() => {
+        void refresh().then(() => { if (!cancelled) schedule() })
+      }, EXPORT_POLL_MS)
+    }
+    schedule()
+    return () => {
+      cancelled = true
+      if (timer !== undefined) clearTimeout(timer)
+    }
   }, [status, refresh])
 
   async function requestExport() {

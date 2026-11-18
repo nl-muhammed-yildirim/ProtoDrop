@@ -65,6 +65,13 @@ describe('erasuresData (US-047-03)', () => {
     expect(lines[1]).toContain(",'=x@y.z,")
   })
 
+  it('toCsv_FormulaGuard_NeutralizesLeadingTabAndCr', () => {
+    const tab = toCsv([row({ email: '\t=x' })]).split('\r\n')
+    expect(tab[1]).toContain(",'\t=x,")
+    const cr = toCsv([row({ email: '\rx' })])
+    expect(cr).toContain(`,"'\rx",`)
+  })
+
   it('toCsv_NullEmail_IsEmptyCell', () => {
     const lines = toCsv([row({ email: null, reHomedTransferCount: 0 })]).split('\r\n')
     expect(lines[1]).toBe(`${'a'.repeat(32)},,2026-11-18T10:00:00Z,0,pending,`)

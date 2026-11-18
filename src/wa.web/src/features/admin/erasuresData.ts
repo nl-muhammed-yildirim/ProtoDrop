@@ -43,11 +43,11 @@ export function isLagging(row: Pick<ErasureRowDto, 'sweepStatus' | 'deletedAtUtc
   return nowMs - deletedMs > ERASURE_LAG_MS
 }
 
-// RFC 4180 quoting plus a formula-injection guard (cells starting with = + - @ get a leading apostrophe).
+// RFC 4180 quoting plus a formula-injection guard (cells starting with = + - @ TAB or CR get a leading apostrophe, per OWASP).
 function csvCell(value: string | number | null): string {
   if (value === null) return ''
   let s = String(value)
-  if (/^[=+\-@]/.test(s)) s = `'${s}`
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 

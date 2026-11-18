@@ -195,6 +195,24 @@ public class DataExportJobIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ReadyPurged_OlderFailedRow_DoesNotSurfaceAsLatest() // review m4
+    {
+        var failed = await AddExportAsync(_userId, DataExportState.Failed);
+        failed.CreatedAtUtc = DateTime.UtcNow.AddDays(-10);
+        var path = BlobPaths.DataExportZip(_userId, Guid.NewGuid());
+        var ready = await AddExportAsync(_userId, DataExportState.Ready, DateTime.UtcNow.AddDays(-8), path);
+        ready.CreatedAtUtc = DateTime.UtcNow.AddDays(-9);
+        await _db.SaveChangesAsync();
+        var blobs = new MemoryBlobStore();
+        blobs.Blobs[path] = [1];
+
+        await Handler(blobs).RunAsync(DateTime.UtcNow, CancellationToken.None);
+
+        var latest = await new DataExportStore(new WaDbContextFactory(_options)).GetLatestAsync(_userId, CancellationToken.None);
+        Assert.Null(latest);
+    }
+
+    [Fact]
     public async Task SecondRunSameWindow_ClaimLost()
     {
         var blobs = new MemoryBlobStore();

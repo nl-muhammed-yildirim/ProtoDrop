@@ -100,6 +100,26 @@ describe('DataExportSection (US-047-01)', () => {
     unmount()
   })
 
+  it('keeps polling while still processing: processing -> processing -> ready across two ticks', async () => {
+    vi.useFakeTimers()
+    responses = [processing, processing, json(200, { state: 'ready', downloadUrl: 'https://blob.test/e.zip?sig=x' })]
+    const { host, unmount } = mount()
+    await flush()
+    expect(calls).toHaveLength(1)
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(EXPORT_POLL_MS) })
+    expect(calls).toHaveLength(2)
+    expect(host.textContent).toContain('Preparing your export…')
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(EXPORT_POLL_MS) })
+    expect(calls).toHaveLength(3)
+    expect(host.querySelector('a.pf-plan-link')).not.toBeNull()
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(EXPORT_POLL_MS * 3) })
+    expect(calls).toHaveLength(3) // stopped once ready
+    unmount()
+  })
+
   it('409 shows the in-flight message and the preparing state', async () => {
     responses = [noContent, json(409, { code: 'EXPORT_IN_FLIGHT' })]
     const { host, unmount } = mount()

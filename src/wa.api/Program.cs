@@ -717,10 +717,10 @@ app.MapGet("/api/v1/admin/erasures", async (HttpContext ctx, HttpRequest request
             {
                 userId = r.UserId.ToString("n"),
                 email = r.Email,
-                deletedAtUtc = r.DeletedAtUtc,
+                deletedAtUtc = AsUtc(r.DeletedAtUtc),
                 reHomedTransferCount = r.ReHomedTransferCount,
                 sweepStatus = r.SweepStatus,
-                sweptAtUtc = r.SweptAtUtc
+                sweptAtUtc = r.SweptAtUtc is { } swept ? AsUtc(swept) : (DateTime?)null
             }),
             nextCursor = result.NextCursor
         });
@@ -1253,12 +1253,15 @@ app.MapGet("/api/v1/auth/me/export", async (HttpContext ctx, ISender sender, Can
     return view is null ? Results.NoContent() : Results.Json(ToExportBody(view), statusCode: 200);
 });
 
+// EF reads datetime2 back as Kind=Unspecified (no trailing Z → browsers parse as local time); US-047 wire timestamps are UTC by contract.
+static DateTime AsUtc(DateTime value) => DateTime.SpecifyKind(value, DateTimeKind.Utc);
+
 static Dictionary<string, object?> ToExportBody(wa.application.UseCases.DataExport.DataExportView view)
 {
-    var body = new Dictionary<string, object?> { ["state"] = view.State, ["createdAtUtc"] = view.CreatedAtUtc };
+    var body = new Dictionary<string, object?> { ["state"] = view.State, ["createdAtUtc"] = AsUtc(view.CreatedAtUtc) };
     if (view.State == "ready")
     {
-        body["readyAtUtc"] = view.ReadyAtUtc;
+        body["readyAtUtc"] = view.ReadyAtUtc is { } readyAt ? AsUtc(readyAt) : null;
         body["downloadUrl"] = view.DownloadUrl?.ToString();
     }
     return body;

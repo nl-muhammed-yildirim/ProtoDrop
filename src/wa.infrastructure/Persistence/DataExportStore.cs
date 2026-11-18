@@ -148,6 +148,21 @@ public sealed class DataExportJobStore : IDataExportJobStore
                 .SetProperty(e => e.State, DataExportState.Ready)
                 .SetProperty(e => e.BlobPath, blobPath)
                 .SetProperty(e => e.ReadyAtUtc, readyAtUtc), ct);
+        // A newer success supersedes older failures, so a later purge of this row can never resurface a stale "failed".
+        await PruneOlderFailedAsync(db, id, ct);
+    }
+
+    private static async Task PruneOlderFailedAsync(WaDbContext db, Guid id, CancellationToken ct)
+    {
+        var anchor = await db.Set<DataExport>().AsNoTracking()
+            .Where(e => e.Id == id)
+            .Select(e => new { e.AppUserId, e.CreatedAtUtc })
+            .FirstOrDefaultAsync(ct);
+        if (anchor is null)
+            return;
+        await db.Set<DataExport>()
+            .Where(e => e.AppUserId == anchor.AppUserId && e.State == DataExportState.Failed && e.CreatedAtUtc < anchor.CreatedAtUtc)
+            .ExecuteDeleteAsync(ct);
     }
 
     public async Task MarkFailedAsync(Guid id, CancellationToken ct)
@@ -173,6 +188,7 @@ public sealed class DataExportJobStore : IDataExportJobStore
     public async Task DeleteAsync(Guid id, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);
+        await PruneOlderFailedAsync(db, id, ct); // covers ready rows that predate the MarkReady prune
         await db.Set<DataExport>().Where(e => e.Id == id).ExecuteDeleteAsync(ct);
     }
 }

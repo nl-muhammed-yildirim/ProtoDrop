@@ -99,6 +99,7 @@ public class AdminErasuresEndpointTests : IAsyncLifetime
         Assert.Equal("dana@x.com", item.GetProperty("email").GetString());
         Assert.Equal("pending", item.GetProperty("sweepStatus").GetString());
         Assert.Equal(JsonValueKind.Null, item.GetProperty("sweptAtUtc").ValueKind);
+        Assert.EndsWith("Z", item.GetProperty("deletedAtUtc").GetString()); // review m2: UTC kind so browsers do not parse as local time
     }
 
     [Fact]
