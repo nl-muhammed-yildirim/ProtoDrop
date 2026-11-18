@@ -250,6 +250,65 @@ public class StripeWebhookEndpointTests : IAsyncLifetime
         await AssertNothingWrittenAsync();
     }
 
+    // ---- US-019-07 (EC-019-4): applied state is Stripe current state, not the payload ----
+
+    private static StripeSubscriptionSnapshot Active() => new("sub_1", "active", "cus_1", ProPriceId, null, null);
+
+    [Fact]
+    public async Task Ec0194_LateCreatedIncomplete_AfterActive_MirrorStaysActive()
+    {
+        using (var updated = await PostSignedAsync(Body("evt_u1", "customer.subscription.updated", "active", _userId)))
+            Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
+
+        _factory.Source.Override = Active;
+        using (var late = await PostSignedAsync(Body("evt_late", "customer.subscription.created", "incomplete", _userId)))
+            Assert.Equal(HttpStatusCode.OK, late.StatusCode);
+
+        Assert.Equal("active", (await _db.Set<Subscription>().AsNoTracking().SingleAsync()).Status);
+        Assert.Equal(_proId, (await _db.Set<AppUser>().AsNoTracking().SingleAsync(u => u.Id == _userId)).PlanId);
+        Assert.Equal(2, await _db.Set<StripeEvent>().CountAsync());
+    }
+
+    [Fact]
+    public async Task Ec0194_StaleUpdatedPaused_FetchedActive_NoGrace()
+    {
+        using (var created = await PostSignedAsync(Body("evt_c1", "customer.subscription.created", "active", _userId)))
+            Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+
+        _factory.Source.Override = Active;
+        using (var stale = await PostSignedAsync(Body("evt_stale", "customer.subscription.updated", "paused", _userId)))
+            Assert.Equal(HttpStatusCode.OK, stale.StatusCode);
+
+        var sub = await _db.Set<Subscription>().AsNoTracking().SingleAsync();
+        Assert.Equal("active", sub.Status);
+        Assert.Null(sub.GraceEndsAtUtc);
+    }
+
+    [Fact]
+    public async Task Ec0194_Fetch404_AppliesCanceled_Free()
+    {
+        using (var created = await PostSignedAsync(Body("evt_c2", "customer.subscription.created", "active", _userId)))
+            Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+
+        _factory.Source.Override = () => null;
+        using (var gone = await PostSignedAsync(Body("evt_gone", "customer.subscription.updated", "active", _userId)))
+            Assert.Equal(HttpStatusCode.OK, gone.StatusCode);
+
+        Assert.Equal("canceled", (await _db.Set<Subscription>().AsNoTracking().SingleAsync()).Status);
+        Assert.Equal(_freeId, (await _db.Set<AppUser>().AsNoTracking().SingleAsync(u => u.Id == _userId)).PlanId);
+    }
+
+    [Fact]
+    public async Task Ec0194_FetchFails_Returns500_NoStripeEventRow()
+    {
+        _factory.Source.Override = () => throw new BillingUnavailableException("boom");
+        using var response = await PostSignedAsync(Body("evt_fail", "customer.subscription.created", "active", _userId));
+
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        Assert.Contains("INTERNAL", await response.Content.ReadAsStringAsync());
+        await AssertNothingWrittenAsync();
+    }
+
     // ---- helpers ----
 
     private async Task AssertNothingWrittenAsync()
@@ -293,6 +352,7 @@ public class StripeWebhookEndpointTests : IAsyncLifetime
 
     private Task<HttpResponseMessage> PostSignedAsync(string body)
     {
+        _factory.Source.EchoFrom(body);
         var request = new HttpRequestMessage(HttpMethod.Post, Path)
         {
             Content = new StringContent(body, Encoding.UTF8, "application/json")
@@ -304,6 +364,7 @@ public class StripeWebhookEndpointTests : IAsyncLifetime
     private sealed class TestFactory : WebApplicationFactory<Program>
     {
         public InMemoryEventPublisher Publisher { get; } = new();
+        public FakeSubscriptionSource Source { get; } = new();
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -311,10 +372,30 @@ public class StripeWebhookEndpointTests : IAsyncLifetime
             {
                 services.RemoveAll<IEventPublisher>();
                 services.AddSingleton<IEventPublisher>(Publisher);
+                services.RemoveAll<IStripeSubscriptionSource>();
+                services.AddSingleton<IStripeSubscriptionSource>(Source);
                 services.RemoveAll<ILogger<HandleStripeWebhookHandler>>();
                 services.AddSingleton<ILogger<HandleStripeWebhookHandler>>(_ => new HandlerLogCapture());
             });
         }
+    }
+
+    /// <summary>Fake Stripe re-fetch (never real Stripe): echoes the posted event data.object unless a test overrides it.</summary>
+    private sealed class FakeSubscriptionSource : IStripeSubscriptionSource
+    {
+        private StripeSubscriptionSnapshot? _echo;
+
+        /// <summary>When set, replaces the echo (return null = Stripe 404; may throw).</summary>
+        public Func<StripeSubscriptionSnapshot?>? Override { get; set; }
+
+        public void EchoFrom(string body)
+        {
+            using var doc = JsonDocument.Parse(body);
+            _echo = StripeSubscriptionSnapshot.FromJson(doc.RootElement.GetProperty("data").GetProperty("object"));
+        }
+
+        public Task<StripeSubscriptionSnapshot?> GetSubscriptionAsync(string subscriptionId, CancellationToken ct) =>
+            Task.FromResult(Override is not null ? Override() : _echo);
     }
 
     private sealed class HandlerLogCapture : ILogger<HandleStripeWebhookHandler>

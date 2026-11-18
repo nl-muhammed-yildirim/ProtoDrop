@@ -40,12 +40,15 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
 
     private const string SubscriptionDeleted = "customer.subscription.deleted"; // subscription ended (status canceled) → Free
 
-    private const string InvoicePaymentFailed = "invoice.payment_failed";
+    private const string CanceledStatus = "canceled";
+
+    private const string InvoicePaymentFailed ="invoice.payment_failed";
     private const string InvoicePaid = "invoice.paid";
 
     private readonly IStripeBillingStore _store;
     private readonly IBillingSequenceStore _sequence;
     private readonly IPlansStore _plans;
+    private readonly IStripeSubscriptionSource _source;
     private readonly IEventPublisher _events;
     private readonly WaTelemetryReporter _telemetry;
     private readonly ILogger<HandleStripeWebhookHandler> _logger;
@@ -54,10 +57,12 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
         IStripeBillingStore store,
         IBillingSequenceStore sequence,
         IPlansStore plans,
+        IStripeSubscriptionSource source,
         IEventPublisher events,
         WaTelemetryReporter telemetry,
         ILogger<HandleStripeWebhookHandler> logger)
     {
+        _source = source ?? throw new ArgumentNullException(nameof(source));
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _sequence = sequence ?? throw new ArgumentNullException(nameof(sequence));
         _plans = plans ?? throw new ArgumentNullException(nameof(plans));
@@ -101,27 +106,30 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
             if (string.IsNullOrEmpty(subId) || string.IsNullOrEmpty(status))
                 throw StripeWebhookException.ForMalformed();
 
-            JsonElement? firstItem = null;
-            if (obj.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Object
-                && items.TryGetProperty("data", out var itemData) && itemData.ValueKind == JsonValueKind.Array
-                && itemData.GetArrayLength() > 0)
-                firstItem = itemData[0];
+            var eventState = StripeSubscriptionSnapshot.FromJson(obj)!; // non-null: id + status checked above
 
-            string? priceId = null;
-            if (firstItem is { ValueKind: JsonValueKind.Object } item
-                && item.TryGetProperty("price", out var price) && price.ValueKind == JsonValueKind.Object)
-                priceId = GetString(price, "id");
+            // EC-019-4 (FR-019-4, TA-7.5 "Stripe is truth"): apply Stripe's CURRENT state, never the (possibly stale) payload.
+            // Fetched before the DB transaction so no lock is held during HTTP.
+            StripeSubscriptionSnapshot? fetched;
+            try
+            {
+                fetched = await _source.GetSubscriptionAsync(subId, ct);
+            }
+            catch (BillingUnavailableException)
+            {
+                throw StripeWebhookException.ForRetryable(
+                    $"Stripe event {eventId} (subscription {subId}): re-fetch from Stripe failed; awaiting redelivery.");
+            }
 
-            var periodEnd = ReadUnix(obj, "current_period_end")
-                ?? (firstItem is { ValueKind: JsonValueKind.Object } item2 ? ReadUnix(item2, "current_period_end") : null);
+            if (fetched is null)
+                _logger.LogInformation("Stripe subscription not found on re-fetch, applying canceled: {StripeEventId} {StripeSubId}", eventId, subId);
 
-            Guid? metadataUserId = null;
-            if (obj.TryGetProperty("metadata", out var metadata) && metadata.ValueKind == JsonValueKind.Object
-                && Guid.TryParse(GetString(metadata, "userId"), out var parsed))
-                metadataUserId = parsed;
-
+            var state = fetched ?? eventState with { Status = CanceledStatus };
             var change = new StripeSubscriptionChange(
-                eventId, type, subId, GetString(obj, "customer"), status, priceId, periodEnd, metadataUserId);
+                eventId, type, subId,
+                state.CustomerId ?? eventState.CustomerId,
+                state.Status, state.PriceId, state.CurrentPeriodEndUtc,
+                state.MetadataUserId ?? eventState.MetadataUserId);
 
             // D-4: status → target plan.
             var targetPlanId = await ResolveTargetPlanAsync(change, ct);
@@ -254,11 +262,6 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
 
     private static string? GetString(JsonElement element, string name) =>
         element.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
-
-    private static DateTime? ReadUnix(JsonElement element, string name) =>
-        element.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var s)
-            ? DateTimeOffset.FromUnixTimeSeconds(s).UtcDateTime
-            : null;
 
     /// <summary>Mirrors AdminDeleteTransferHandler.GetCorrelationGuid verbatim.</summary>
     private static Guid GetCorrelationGuid()

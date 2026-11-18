@@ -143,4 +143,59 @@ public class StripeCheckoutGatewayTests
         await Assert.ThrowsAsync<BillingUnavailableException>(() => Make(handler, " ").CreatePortalSessionAsync("cus_1", "https://app/return", default));
         Assert.Null(handler.Seen);
     }
+
+    // ---- US-019-07 (EC-019-4): GET subscription ----
+
+    [Fact]
+    public async Task GetSubscription_Success_GetsAndParsesSnapshot()
+    {
+        var handler = new FakeHandler
+        {
+            Respond = _ => Json(HttpStatusCode.OK,
+                "{\"id\":\"sub_1\",\"customer\":\"cus_1\",\"status\":\"active\",\"metadata\":{\"userId\":\"" + UserId + "\"},"
+                + "\"items\":{\"data\":[{\"price\":{\"id\":\"price_pro\"},\"current_period_end\":1900000000}]}}")
+        };
+
+        var snap = await Make(handler).GetSubscriptionAsync("sub_1", default);
+
+        Assert.Equal(HttpMethod.Get, handler.Seen!.Method);
+        Assert.Equal("/v1/subscriptions/sub_1", handler.Seen.RequestUri!.AbsolutePath);
+        Assert.Equal("Bearer", handler.Seen.Headers.Authorization!.Scheme);
+        Assert.Equal("sk_test_x", handler.Seen.Headers.Authorization.Parameter);
+        Assert.NotNull(snap);
+        Assert.Equal("active", snap!.Status);
+        Assert.Equal("cus_1", snap.CustomerId);
+        Assert.Equal("price_pro", snap.PriceId);
+        Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(1900000000).UtcDateTime, snap.CurrentPeriodEndUtc);
+        Assert.Equal(UserId, snap.MetadataUserId);
+    }
+
+    [Fact]
+    public async Task GetSubscription_404_ReturnsNull()
+    {
+        var handler = new FakeHandler { Respond = _ => Json(HttpStatusCode.NotFound, "{\"error\":{}}") };
+        Assert.Null(await Make(handler).GetSubscriptionAsync("sub_1", default));
+    }
+
+    [Fact]
+    public async Task GetSubscription_500_BillingUnavailable()
+    {
+        var handler = new FakeHandler { Respond = _ => Json(HttpStatusCode.InternalServerError, "{\"error\":{}}") };
+        await Assert.ThrowsAsync<BillingUnavailableException>(() => Make(handler).GetSubscriptionAsync("sub_1", default));
+    }
+
+    [Fact]
+    public async Task GetSubscription_BlankSecret_BillingUnavailable_NoHttpCall()
+    {
+        var handler = new FakeHandler();
+        await Assert.ThrowsAsync<BillingUnavailableException>(() => Make(handler, null).GetSubscriptionAsync("sub_1", default));
+        Assert.Null(handler.Seen);
+    }
+
+    [Fact]
+    public async Task GetSubscription_InvalidJson_BillingUnavailable()
+    {
+        var handler = new FakeHandler { Respond = _ => Json(HttpStatusCode.OK, "not json") };
+        await Assert.ThrowsAsync<BillingUnavailableException>(() => Make(handler).GetSubscriptionAsync("sub_1", default));
+    }
 }

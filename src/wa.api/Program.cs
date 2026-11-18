@@ -144,10 +144,13 @@ builder.Services.AddSingleton<wa.application.UseCases.Billing.IStripeBillingStor
 builder.Services.AddSingleton<wa.application.UseCases.Billing.IBillingSequenceStore>(sp => new wa.infrastructure.Persistence.BillingSequenceStore(
     sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
 // US-019-01 (D-1): Stripe Checkout over plain HttpClient (no Stripe package). 10 s mirrors TA-4.1.7's external-call timeout.
-builder.Services.AddSingleton<wa.application.UseCases.Billing.IStripeCheckoutGateway>(sp => new wa.infrastructure.Billing.StripeCheckoutGateway(
+builder.Services.AddSingleton(sp => new wa.infrastructure.Billing.StripeCheckoutGateway(
     new HttpClient { BaseAddress = new Uri("https://api.stripe.com/"), Timeout = TimeSpan.FromSeconds(10) },
     builder.Configuration["Wa:Stripe:SecretKey"],
     sp.GetRequiredService<ILogger<wa.infrastructure.Billing.StripeCheckoutGateway>>()));
+builder.Services.AddSingleton<wa.application.UseCases.Billing.IStripeCheckoutGateway>(sp => sp.GetRequiredService<wa.infrastructure.Billing.StripeCheckoutGateway>());
+// US-019-07 (EC-019-4): webhook re-fetch of the subscription — same adapter, same key.
+builder.Services.AddSingleton<wa.application.UseCases.Billing.IStripeSubscriptionSource>(sp => sp.GetRequiredService<wa.infrastructure.Billing.StripeCheckoutGateway>());
 var app = builder.Build();
 
 // T-011-01 (TA-9.2 / FR-011-1): role is derived PER REQUEST from the two config lists — same cookie, role flips when a list changes (EC-011-3).

@@ -22,6 +22,7 @@ public class HandleStripeWebhookHandlerTests
         public RecordingPublisher Events { get; } = new();
         public CapturingLogger<WaTelemetryReporter> TelemetryLog { get; } = new();
         public CapturingLogger<HandleStripeWebhookHandler> HandlerLog { get; } = new();
+        public StubSubscriptionSource Source { get; } = new();
 
         public Rig()
         {
@@ -31,7 +32,14 @@ public class HandleStripeWebhookHandlerTests
         }
 
         public HandleStripeWebhookHandler Handler() =>
-            new(Store, Sequence, Plans, Events, new WaTelemetryReporter(TelemetryLog, [1, 2, 3]), HandlerLog);
+            new(Store, Sequence, Plans, Source, Events, new WaTelemetryReporter(TelemetryLog, [1, 2, 3]), HandlerLog);
+
+        /// <summary>Sends the payload; unless a test pinned Snapshot/NotFound/Throw, Stripe "echoes" the event's own data.object.</summary>
+        public Task<StripeWebhookOutcome> Send(string payload)
+        {
+            Source.EchoFrom(payload);
+            return Handler().Handle(new HandleStripeWebhookCommand(payload), default);
+        }
     }
 
     private static string Event(string type, string status = "active", string id = "evt_1", string price = "price_pro",
@@ -47,7 +55,7 @@ public class HandleStripeWebhookHandlerTests
     public async Task UnknownType_IsIgnored_NoStoreCall_NoEvent_LogsIds()
     {
         var rig = new Rig();
-        var outcome = await rig.Handler().Handle(new HandleStripeWebhookCommand(Event("customer.created", id: "evt_unk")), default);
+        var outcome = await rig.Send(Event("customer.created", id: "evt_unk"));
 
         Assert.Equal(StripeWebhookOutcome.Ignored, outcome);
         Assert.Equal(0, rig.Store.ApplyCalls);
@@ -61,7 +69,7 @@ public class HandleStripeWebhookHandlerTests
         var rig = new Rig();
         rig.Store.Result = StripeApplyResult.Of(StripeApplyOutcome.Duplicate);
 
-        var outcome = await rig.Handler().Handle(new HandleStripeWebhookCommand(Event("customer.subscription.updated")), default);
+        var outcome = await rig.Send(Event("customer.subscription.updated"));
 
         Assert.Equal(StripeWebhookOutcome.Duplicate, outcome);
         Assert.Empty(rig.Events.Published);
@@ -72,7 +80,7 @@ public class HandleStripeWebhookHandlerTests
     public async Task FreeToPro_PublishesOnePlanChanged_AndTelemetry()
     {
         var rig = new Rig();
-        var outcome = await rig.Handler().Handle(new HandleStripeWebhookCommand(Event("customer.subscription.updated")), default);
+        var outcome = await rig.Send(Event("customer.subscription.updated"));
 
         Assert.Equal(StripeWebhookOutcome.Applied, outcome);
         var env = Assert.Single(rig.Events.Published);
@@ -93,7 +101,7 @@ public class HandleStripeWebhookHandlerTests
         var rig = new Rig();
         rig.Store.Result = new StripeApplyResult(StripeApplyOutcome.Applied, UserId, ProId, ProId, "pro", "pro");
 
-        var outcome = await rig.Handler().Handle(new HandleStripeWebhookCommand(Event("customer.subscription.updated")), default);
+        var outcome = await rig.Send(Event("customer.subscription.updated"));
 
         Assert.Equal(StripeWebhookOutcome.Applied, outcome);
         Assert.Empty(rig.Events.Published);
@@ -109,7 +117,7 @@ public class HandleStripeWebhookHandlerTests
     public async Task Status_MapsToTargetPlan(string status, bool expectPricePlan)
     {
         var rig = new Rig();
-        await rig.Handler().Handle(new HandleStripeWebhookCommand(Event("customer.subscription.updated", status)), default);
+        await rig.Send(Event("customer.subscription.updated", status));
 
         Assert.Equal(expectPricePlan ? ProId : FreeId, rig.Store.CapturedTargetPlanId);
     }
@@ -120,7 +128,7 @@ public class HandleStripeWebhookHandlerTests
     public async Task Status_IncompleteOrPaused_NoPlanChange(string status)
     {
         var rig = new Rig();
-        await rig.Handler().Handle(new HandleStripeWebhookCommand(Event("customer.subscription.updated", status)), default);
+        await rig.Send(Event("customer.subscription.updated", status));
 
         Assert.Equal(1, rig.Store.ApplyCalls);
         Assert.Null(rig.Store.CapturedTargetPlanId);
@@ -133,8 +141,7 @@ public class HandleStripeWebhookHandlerTests
         var rig = new Rig();
         rig.Store.Result = new StripeApplyResult(StripeApplyOutcome.Applied, UserId, ProId, ProId, "pro", "pro");
 
-        var outcome = await rig.Handler().Handle(
-            new HandleStripeWebhookCommand(Event("customer.subscription.paused", "paused", id: "evt_pause")), default);
+        var outcome = await rig.Send(Event("customer.subscription.paused", "paused", id: "evt_pause"));
 
         Assert.Equal(StripeWebhookOutcome.Applied, outcome);
         Assert.Equal(1, rig.Store.ApplyCalls);
@@ -150,8 +157,7 @@ public class HandleStripeWebhookHandlerTests
         var rig = new Rig();
         rig.Store.Result = new StripeApplyResult(StripeApplyOutcome.Applied, UserId, ProId, ProId, "pro", "pro");
 
-        var outcome = await rig.Handler().Handle(
-            new HandleStripeWebhookCommand(Event("customer.subscription.resumed", "active", id: "evt_resume")), default);
+        var outcome = await rig.Send(Event("customer.subscription.resumed", "active", id: "evt_resume"));
 
         Assert.Equal(StripeWebhookOutcome.Applied, outcome);
         Assert.Equal(1, rig.Store.ApplyCalls);
@@ -166,8 +172,7 @@ public class HandleStripeWebhookHandlerTests
     {
         var rig = new Rig();
 
-        var outcome = await rig.Handler().Handle(
-            new HandleStripeWebhookCommand(Event("customer.subscription.resumed", "active", id: "evt_resume")), default);
+        var outcome = await rig.Send(Event("customer.subscription.resumed", "active", id: "evt_resume"));
 
         Assert.Equal(StripeWebhookOutcome.Applied, outcome);
         var env = Assert.Single(rig.Events.Published);
@@ -185,8 +190,7 @@ public class HandleStripeWebhookHandlerTests
         var rig = new Rig();
         rig.Store.Result = StripeApplyResult.Of(StripeApplyOutcome.Duplicate);
 
-        var outcome = await rig.Handler().Handle(
-            new HandleStripeWebhookCommand(Event("customer.subscription.resumed", "active", id: "evt_resume")), default);
+        var outcome = await rig.Send(Event("customer.subscription.resumed", "active", id: "evt_resume"));
 
         Assert.Equal(StripeWebhookOutcome.Duplicate, outcome);
         Assert.Empty(rig.Events.Published);
@@ -198,8 +202,7 @@ public class HandleStripeWebhookHandlerTests
         var rig = new Rig();
         rig.Store.Result = new StripeApplyResult(StripeApplyOutcome.Applied, UserId, ProId, FreeId, "pro", Plan.DefaultCode);
 
-        var outcome = await rig.Handler().Handle(
-            new HandleStripeWebhookCommand(Event("customer.subscription.deleted", "canceled", id: "evt_del")), default);
+        var outcome = await rig.Send(Event("customer.subscription.deleted", "canceled", id: "evt_del"));
 
         Assert.Equal(StripeWebhookOutcome.Applied, outcome);
         Assert.Equal(1, rig.Store.ApplyCalls);
@@ -220,8 +223,7 @@ public class HandleStripeWebhookHandlerTests
         var rig = new Rig();
         rig.Store.Result = StripeApplyResult.Of(StripeApplyOutcome.Duplicate);
 
-        var outcome = await rig.Handler().Handle(
-            new HandleStripeWebhookCommand(Event("customer.subscription.deleted", "canceled", id: "evt_del")), default);
+        var outcome = await rig.Send(Event("customer.subscription.deleted", "canceled", id: "evt_del"));
 
         Assert.Equal(StripeWebhookOutcome.Duplicate, outcome);
         Assert.Empty(rig.Events.Published);
@@ -235,7 +237,7 @@ public class HandleStripeWebhookHandlerTests
         rig.Store.PricePlan = null;
 
         var ex = await Assert.ThrowsAsync<StripeWebhookException>(() =>
-            rig.Handler().Handle(new HandleStripeWebhookCommand(Event("customer.subscription.resumed", "active")), default));
+            rig.Send(Event("customer.subscription.resumed", "active")));
 
         Assert.True(ex.Retryable);
         Assert.Equal(0, rig.Store.ApplyCalls);
@@ -248,7 +250,7 @@ public class HandleStripeWebhookHandlerTests
         rig.Store.PricePlan = null;
 
         var ex = await Assert.ThrowsAsync<StripeWebhookException>(() =>
-            rig.Handler().Handle(new HandleStripeWebhookCommand(Event("customer.subscription.created")), default));
+            rig.Send(Event("customer.subscription.created")));
 
         Assert.True(ex.Retryable);
         Assert.Equal(0, rig.Store.ApplyCalls);
@@ -261,7 +263,7 @@ public class HandleStripeWebhookHandlerTests
         rig.Store.Result = StripeApplyResult.Of(StripeApplyOutcome.UserUnresolved);
 
         var ex = await Assert.ThrowsAsync<StripeWebhookException>(() =>
-            rig.Handler().Handle(new HandleStripeWebhookCommand(Event("customer.subscription.created")), default));
+            rig.Send(Event("customer.subscription.created")));
 
         Assert.True(ex.Retryable);
     }
@@ -275,7 +277,7 @@ public class HandleStripeWebhookHandlerTests
     {
         var rig = new Rig();
         var ex = await Assert.ThrowsAsync<StripeWebhookException>(() =>
-            rig.Handler().Handle(new HandleStripeWebhookCommand(payload), default));
+            rig.Send(payload));
 
         Assert.False(ex.Retryable);
     }
@@ -284,7 +286,7 @@ public class HandleStripeWebhookHandlerTests
     public async Task CurrentPeriodEnd_ReadFromTopLevel()
     {
         var rig = new Rig();
-        await rig.Handler().Handle(new HandleStripeWebhookCommand(Event("customer.subscription.updated", topLevelPeriod: true, itemPeriod: true)), default);
+        await rig.Send(Event("customer.subscription.updated", topLevelPeriod: true, itemPeriod: true));
 
         Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(1800000000).UtcDateTime, rig.Store.CapturedChange!.CurrentPeriodEndUtc);
     }
@@ -293,7 +295,7 @@ public class HandleStripeWebhookHandlerTests
     public async Task CurrentPeriodEnd_FallsBackToItem()
     {
         var rig = new Rig();
-        await rig.Handler().Handle(new HandleStripeWebhookCommand(Event("customer.subscription.updated", topLevelPeriod: false, itemPeriod: true)), default);
+        await rig.Send(Event("customer.subscription.updated", topLevelPeriod: false, itemPeriod: true));
 
         Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(1900000000).UtcDateTime, rig.Store.CapturedChange!.CurrentPeriodEndUtc);
     }
@@ -302,7 +304,7 @@ public class HandleStripeWebhookHandlerTests
     public async Task Mapping_CarriesIdsAndMetadataUser()
     {
         var rig = new Rig();
-        await rig.Handler().Handle(new HandleStripeWebhookCommand(Event("customer.subscription.created", userId: UserId.ToString())), default);
+        await rig.Send(Event("customer.subscription.created", userId: UserId.ToString()));
 
         var c = rig.Store.CapturedChange!;
         Assert.Equal("evt_1", c.StripeEventId);
@@ -310,6 +312,75 @@ public class HandleStripeWebhookHandlerTests
         Assert.Equal("cus_1", c.StripeCustomerId);
         Assert.Equal("price_pro", c.PriceId);
         Assert.Equal(UserId, c.MetadataUserId);
+    }
+
+    // ---- US-019-07 (EC-019-4): re-fetch from Stripe ----
+
+    [Fact]
+    public async Task Ec0194_LateCreatedIncomplete_FetchedActive_AppliesActive_TargetsPro()
+    {
+        var rig = new Rig();
+        rig.Source.Snapshot = new StripeSubscriptionSnapshot("sub_1", "active", "cus_1", "price_pro", null, null);
+
+        await rig.Send(Event("customer.subscription.created", "incomplete"));
+
+        Assert.Equal("active", rig.Store.CapturedChange!.Status);
+        Assert.Equal(ProId, rig.Store.CapturedTargetPlanId);
+        Assert.Equal("sub_1", rig.Source.LastId);
+    }
+
+    [Fact]
+    public async Task Ec0194_StalePaused_FetchedActive_AppliesActive_ReasonIsEventType()
+    {
+        var rig = new Rig();
+        rig.Source.Snapshot = new StripeSubscriptionSnapshot("sub_1", "active", "cus_1", "price_pro", null, null);
+
+        await rig.Send(Event("customer.subscription.paused", "paused"));
+
+        Assert.Equal("active", rig.Store.CapturedChange!.Status);
+        Assert.Equal("customer.subscription.paused", rig.Store.CapturedChange.EventType);
+        var env = Assert.Single(rig.Events.Published);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(env.Payload));
+        Assert.Equal("customer.subscription.paused", doc.RootElement.GetProperty("reason").GetString());
+    }
+
+    [Fact]
+    public async Task Ec0194_Fetch404_AppliesCanceled_TargetsFree()
+    {
+        var rig = new Rig();
+        rig.Source.NotFound = true;
+
+        await rig.Send(Event("customer.subscription.updated", "active", id: "evt_404", userId: UserId.ToString()));
+
+        var c = rig.Store.CapturedChange!;
+        Assert.Equal("canceled", c.Status);
+        Assert.Equal(FreeId, rig.Store.CapturedTargetPlanId);
+        Assert.Equal("cus_1", c.StripeCustomerId);
+        Assert.Equal(UserId, c.MetadataUserId);
+        Assert.Contains(rig.HandlerLog.Entries, e => e.Message.Contains("evt_404") && e.Message.Contains("sub_1"));
+    }
+
+    [Fact]
+    public async Task Ec0194_FetchFails_ThrowsRetryable_StoreNotCalled()
+    {
+        var rig = new Rig();
+        rig.Source.Throw = new BillingUnavailableException("boom");
+
+        var ex = await Assert.ThrowsAsync<StripeWebhookException>(() => rig.Send(Event("customer.subscription.updated")));
+
+        Assert.True(ex.Retryable);
+        Assert.Equal(0, rig.Store.ApplyCalls);
+    }
+
+    [Fact]
+    public async Task UnknownType_And_Invoice_NeverFetch()
+    {
+        var rig = new Rig();
+        await rig.Send(Event("customer.created"));
+        await rig.Send(Invoice("invoice.paid"));
+        await rig.Send(Invoice("invoice.payment_failed"));
+
+        Assert.Equal(0, rig.Source.Calls);
     }
 
     // ---- US-019-04: invoice.payment_failed / invoice.paid ----
@@ -495,6 +566,39 @@ public class HandleStripeWebhookHandlerTests
             CapturedChange = change;
             CapturedTargetPlanId = targetPlanId;
             return Task.FromResult(Result);
+        }
+    }
+
+    private sealed class StubSubscriptionSource : IStripeSubscriptionSource
+    {
+        public StripeSubscriptionSnapshot? Snapshot { get; set; }
+        public bool NotFound { get; set; }
+        public Exception? Throw { get; set; }
+        public int Calls { get; private set; }
+        public string? LastId { get; private set; }
+        private StripeSubscriptionSnapshot? _echo;
+
+        public void EchoFrom(string payload)
+        {
+            _echo = null;
+            try
+            {
+                using var doc = JsonDocument.Parse(payload);
+                if (doc.RootElement.ValueKind == JsonValueKind.Object
+                    && doc.RootElement.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object
+                    && data.TryGetProperty("object", out var obj))
+                    _echo = StripeSubscriptionSnapshot.FromJson(obj);
+            }
+            catch (JsonException) { }
+        }
+
+        public Task<StripeSubscriptionSnapshot?> GetSubscriptionAsync(string subscriptionId, CancellationToken ct)
+        {
+            Calls++;
+            LastId = subscriptionId;
+            if (Throw is not null) throw Throw;
+            if (NotFound) return Task.FromResult<StripeSubscriptionSnapshot?>(null);
+            return Task.FromResult(Snapshot ?? _echo);
         }
     }
 
