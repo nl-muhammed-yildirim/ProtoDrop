@@ -9,6 +9,7 @@ using wa.application.Limits;
 using wa.application.Ports;
 using wa.application.UseCases.Admin; // T-011-01: AdminRolePolicy (gate + role field)
 using wa.application.UseCases.Auth;
+using wa.application.UseCases.Features;
 using wa.application.UseCases.Health;
 using wa.application.UseCases.Sample;
 using wa.application.UseCases.Transfers;
@@ -93,7 +94,11 @@ builder.Services.AddSingleton<wa.application.UseCases.Admin.IAdminFlagStore>(sp 
 builder.Services.AddSingleton<wa.application.UseCases.Admin.IAdminSuppressionStore>(sp => new wa.infrastructure.Persistence.AdminSuppressionStore(sp.GetRequiredService<WaDbContext>()));
 // T-011-09 (TA-4.2#25 / US-011-04 happy path 5): audit read surface — last count rows, newest first, over the adapter-owned WaDbContext.
 builder.Services.AddSingleton<wa.application.UseCases.Admin.IAuditReadStore>(sp => new wa.infrastructure.Persistence.AuditReadStore(sp.GetRequiredService<WaDbContext>()));
-builder.Services.AddSingleton<ILimitsProvider>(sp => new LimitsProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
+// US-047-03 (FR-047-6): erasure report read — fresh context per call (DataExportStore precedent).
+builder.Services.AddSingleton<wa.application.UseCases.Admin.IErasureReportStore>(sp => new wa.infrastructure.Persistence.ErasureReportStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+builder.Services.AddSingleton(sp => new LimitsProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
+builder.Services.AddSingleton<ILimitsProvider>(sp => sp.GetRequiredService<LimitsProvider>());
+builder.Services.AddSingleton<IFlagResolver>(sp => sp.GetRequiredService<LimitsProvider>()); // US-044-02: phase gates (FR-044-3)
 // T-031-05 (US-018-05, TA-3.4): feature toggles — one resolver over the same caches.
 builder.Services.AddSingleton<IFeaturesProvider>(sp => new FeaturesProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
 // US-020-01 (FR-020-1): per-request PlanContext — user→plan-code port (singleton) + scoped accessor bound by PlanContextMiddleware.
@@ -101,7 +106,10 @@ builder.Services.AddSingleton<IUserPlanStore>(sp => new wa.infrastructure.Persis
 builder.Services.AddScoped<PlanContextAccessor>();
 builder.Services.AddScoped<IPlanContextAccessor>(sp => sp.GetRequiredService<PlanContextAccessor>());
 // TA-3.6 — minting is pure HMAC (no network at request time); §5.2 account values already read above (T-055-02).
-builder.Services.AddSingleton<IBlobSasMinter>(new DraftBlobSasMinter(new Uri(blobAccountUrl!), blobAccountKey!));
+var sasMinter = new DraftBlobSasMinter(new Uri(blobAccountUrl!), blobAccountKey!);
+builder.Services.AddSingleton<IBlobSasMinter>(sasMinter);
+builder.Services.AddSingleton<IExportSasMinter>(sasMinter); // US-047-01: export download SAS (TA-3.6)
+builder.Services.AddSingleton<wa.application.UseCases.DataExport.IDataExportStore>(sp => new wa.infrastructure.Persistence.DataExportStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
 // TA-9.5 second line (T-056-03): AspNetCoreRateLimit frozen at 5.0.0, in-memory store — per-instance state is correct at M0 scale; a distributed store would be an ADR change.
 builder.Services.AddMemoryCache(); // the package's MemoryCache* stores need IMemoryCache, which this app does not register by default (DI validation caught it)
 builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>(); // v5.0.0 leaves this to the caller — AsyncKeyLockProcessingStrategy requires it and AddInMemoryRateLimiting registers no implementation
@@ -168,8 +176,8 @@ foreach (var part in builder.Configuration["Wa:OperatorEmails"]?.Split(',', Stri
 
 // T-011-01 gate helper — the contract endpoints 20–23 call as their routes land (T-011-03…T-011-09). Session read → 401 UNAUTHENTICATED inline
 // (same idiom as /auth/me L578); unknown email OR not in Wa:AdminEmails → FORBIDDEN; SuperAdmin-only route with an Operator role → same FORBIDDEN.
-// No audit row for a rejected gate — the suppression DELETE emits TelemetryEvents.AdminAction AFTER the gate passes (T-006-03).
-async Task RequireAdminAsync(HttpContext ctx, IAppUserStore users, bool superadminOnly, CancellationToken ct)
+// Returns the role (US-047-03 email reveal). No audit row for a rejected gate — the suppression DELETE emits TelemetryEvents.AdminAction AFTER the gate passes (T-006-03).
+async Task<AdminRole> RequireAdminAsync(HttpContext ctx, IAppUserStore users, bool superadminOnly, CancellationToken ct)
 {
     if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
         throw new BusinessException(ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated));
@@ -178,6 +186,7 @@ async Task RequireAdminAsync(HttpContext ctx, IAppUserStore users, bool superadm
     var role = user?.Email is { } email ? AdminRolePolicy.Resolve(email.ToLowerInvariant(), adminEmails, operatorEmails) : null;
     if (role is null || (superadminOnly && role != AdminRole.SuperAdmin))
         throw new BusinessException(ProblemCodes.Forbidden, ProblemCodes.TitleOf(ProblemCodes.Forbidden));
+    return role.Value;
 }
 
 // TA-4.1.6 (T-056-03): allow-list CORS only — configured origins via Wa:Cors:AllowedOrigins, no wildcard, preflight cached 1 h.
@@ -690,6 +699,38 @@ app.MapGet("/api/v1/admin/users", async (HttpContext ctx, HttpRequest request, I
     }
 });
 
+// US-047-03 (FR-047-6, TA-4.1.4): erasure report — both roles read; email revealed to SuperAdmin (DPO) only, masked for Operator (TA-9.4).
+app.MapGet("/api/v1/admin/erasures", async (HttpContext ctx, HttpRequest request, IAppUserStore users, ISender sender, CancellationToken ct) =>
+{
+    var role = await RequireAdminAsync(ctx, users, superadminOnly: false, ct);
+    var pageSize = wa.application.UseCases.Admin.ErasureReportPolicy.PageSize;
+    var limitParam = request.Query["limit"].FirstOrDefault() ?? pageSize.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    if (!int.TryParse(limitParam, out var limit) || limit <= 0 || limit > pageSize)
+        throw new BusinessException(ProblemCodes.Validation, $"limit must be a positive integer at most {pageSize}.");
+    try
+    {
+        var result = await sender.Send(new wa.application.UseCases.Admin.GetErasuresQuery(
+            request.Query["cursor"].FirstOrDefault(), limit, RevealEmail: role == AdminRole.SuperAdmin), ct);
+        return Results.Json(new
+        {
+            items = result.Items.Select(r => new
+            {
+                userId = r.UserId.ToString("n"),
+                email = r.Email,
+                deletedAtUtc = AsUtc(r.DeletedAtUtc),
+                reHomedTransferCount = r.ReHomedTransferCount,
+                sweepStatus = r.SweepStatus,
+                sweptAtUtc = r.SweptAtUtc is { } swept ? AsUtc(swept) : (DateTime?)null
+            }),
+            nextCursor = result.NextCursor
+        });
+    }
+    catch (wa.domain.Transfers.CursorFormatException ex)
+    {
+        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+    }
+});
+
 // T-011-05 (TA-4.2#21 / FR-011-4): admin force-delete — DELETE /api/v1/admin/transfers/{id} — SuperAdmin-only write.
 // Reuses T-009-04's delete semantics verbatim with reason "admin" — row marked Deleted (soft, Status=4), transfer.deleted
 // emitted once { transferId, reason:"admin" }, RefCount decremented per BlobRef, sole-ref blob gets PhysicallyDeletedAtUtc = now+24h.
@@ -785,7 +826,8 @@ app.MapGet("/api/v1/admin/flags", async (HttpContext ctx, IAppUserStore users, I
     await RequireAdminAsync(ctx, users, superadminOnly: false, ct);
 
     var rows = await sender.Send(new GetFlagsQuery(), ct);
-    return Results.Json(rows.Select(f => new { key = f.Key, value = f.Value })); // reads write NO audit row
+    // US-044-01: effective-value view — type, plan default and overridden marker drive the Flags screen Limits group.
+    return Results.Json(rows.Select(f => new { key = f.Key, value = f.Value, updatedAt = f.UpdatedAtUtc, type = f.Type, planDefault = f.PlanDefault, overridden = f.Overridden, description = f.Description })); // reads write NO audit row
 });
 
 // T-011-08 (TA-4.2#23 / FR-011-2): set a flag's value — PUT /api/v1/admin/flags/{key} — SuperAdmin-only write.
@@ -811,12 +853,12 @@ app.MapPut("/api/v1/admin/flags/{key}", async (string key, HttpContext ctx, Http
                 await auditWriter.WriteAsync(user.Email, "flag.set", "flag", key, new { oldValue = result.OldValue, newValue = result.NewValue }, ct);
         }
 
-        // FR-011-2: 204 No Content — no body (same as endpoint 22 at Program.cs L645).
-        return Results.NoContent();
+        // US-044-01 (FR-044-5): 200 with the new value ({key,value}).
+        return Results.Json(new { key = result.Key, value = result.NewValue });
     }
     catch (SetFlagException ex)
     {
-        // T-011-08 (Decision): bad JSON → 400 VALIDATION "Invalid JSON"; unknown key → 404 NOT_FOUND.
+        // US-044-01 (AC-044-3): unknown key → 404 FLAG_UNKNOWN (checked first); invalid typed value → 400 FLAG_INVALID.
         throw new BusinessException(ex.Code, ex.Message, ex);
     }
 });
@@ -1180,6 +1222,51 @@ app.MapDelete("/api/v1/auth/me", async (HttpContext ctx, ISender sender, Cancell
     }
 });
 
+// US-047-01 (FR-047-1/2/4): POST /api/v1/auth/me/export — request a GDPR data export (gated by feature.dataExport); 202 + processing view.
+app.MapPost("/api/v1/auth/me/export", async (HttpContext ctx, ISender sender, CancellationToken ct) =>
+{
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+
+    try
+    {
+        var view = await sender.Send(new wa.application.UseCases.DataExport.ExportMyDataCommand(userId), ct);
+        return Results.Json(ToExportBody(view), statusCode: 202);
+    }
+    catch (wa.application.UseCases.DataExport.DataExportInFlightException)
+    {
+        throw new BusinessException(ProblemCodes.ExportInFlight, "Your export is already preparing.");
+    }
+    catch (MeProfileException ex) when (ex.Message == ProblemCodes.TitleOf(ProblemCodes.NotFound))
+    {
+        return Results.Json(ProblemWriter.Build(404, ProblemCodes.NotFound, ProblemCodes.TitleOf(ProblemCodes.NotFound)), statusCode: 404);
+    }
+}).RequireFeature(FeatureGates.DataExport);
+
+// US-047-01 (FR-047-2/4): GET /api/v1/auth/me/export — latest export state (+ fresh 24 h downloadUrl when ready). NOT gated: in-flight jobs still complete and stay downloadable.
+app.MapGet("/api/v1/auth/me/export", async (HttpContext ctx, ISender sender, CancellationToken ct) =>
+{
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+
+    var view = await sender.Send(new wa.application.UseCases.DataExport.GetDataExportQuery(userId), ct);
+    return view is null ? Results.NoContent() : Results.Json(ToExportBody(view), statusCode: 200);
+});
+
+// EF reads datetime2 back as Kind=Unspecified (no trailing Z → browsers parse as local time); US-047 wire timestamps are UTC by contract.
+static DateTime AsUtc(DateTime value) => DateTime.SpecifyKind(value, DateTimeKind.Utc);
+
+static Dictionary<string, object?> ToExportBody(wa.application.UseCases.DataExport.DataExportView view)
+{
+    var body = new Dictionary<string, object?> { ["state"] = view.State, ["createdAtUtc"] = AsUtc(view.CreatedAtUtc) };
+    if (view.State == "ready")
+    {
+        body["readyAtUtc"] = view.ReadyAtUtc is { } readyAt ? AsUtc(readyAt) : null;
+        body["downloadUrl"] = view.DownloadUrl?.ToString();
+    }
+    return body;
+}
+
 // US-019-03 (TA-4.2#19 / FR-019-5): POST /api/v1/billing/webhooks/stripe — Stripe-Signature is the auth (no session gate).
 app.MapPost("/api/v1/billing/webhooks/stripe", async (HttpRequest request, ISender sender, CancellationToken ct) =>
 {
@@ -1273,6 +1360,10 @@ app.MapGet("/api/v1/billing/plan", async (HttpContext ctx, ISender sender, Cance
         limits = new { maxTransferSize = r.MaxTransferSize, maxSingleFile = r.MaxSingleFile }
     });
 });
+
+// US-044-02 (FR-044-7, AC-044-2): the six phase-gate booleans for the SPA's FeatureGate — anonymous, no PII, no telemetry (TA-10.2).
+app.MapGet("/api/v1/features", async (ISender sender, CancellationToken ct) =>
+    Results.Json(await sender.Send(new GetFeatureGatesQuery(), ct)));
 
 app.Run();
 

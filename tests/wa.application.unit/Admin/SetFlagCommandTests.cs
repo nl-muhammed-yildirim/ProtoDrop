@@ -1,93 +1,160 @@
+using wa.application.Ports;
 using wa.application.UseCases.Admin;
 using wa.domain;
 using wa.domain.Errors;
 
 namespace wa.application.unit.Admin;
 
-// T-011-08 (TA-4.2#23 / FR-011-2): PUT /api/v1/admin/flags/{key} — SuperAdmin-only flag value write.
-// The handler's contract: validate JSON FIRST (no DB call on bad JSON), then upsert via IAdminFlagStore,
-// capturing the old value pre-write so the endpoint can audit {old,new} (FR-011-5).
+// T-011-08 / US-044-01 (TA-4.2#23, FR-044-5): PUT /api/v1/admin/flags/{key} — SuperAdmin-only typed flag write.
+// Contract: trim → unknown key (FLAG_UNKNOWN) → typed validation (FLAG_INVALID) → upsert via IAdminFlagStore,
+// capturing the old value pre-write so the endpoint can audit {old,new} (FR-044-6).
 public class SetFlagCommandTests
 {
+    private const string LimitKey = "limits.free.maxTransferSize";
+
     private readonly StubIAdminFlagStore _flags;
+    private readonly StubIFlagsStore _store;
     private readonly SetFlagCommandHandler _handler;
 
     public SetFlagCommandTests()
     {
         _flags = new StubIAdminFlagStore();
-        _handler = new SetFlagCommandHandler(_flags);
+        _store = new StubIFlagsStore
+        {
+            Rows =
+            {
+                new FeatureFlag { Key = LimitKey, Value = "5368709120" },
+                new FeatureFlag { Key = "limits.free.maxDownloads", Value = "10" },
+                new FeatureFlag { Key = "feature.ads", Value = "false" }
+            }
+        };
+        _handler = new SetFlagCommandHandler(_flags, _store);
     }
 
-    // ---- Exit check: bad JSON → ForInvalidJson (Code VALIDATION), store NOT called (EC-011-4) ----
+    // ---- AC-044-3 (a): unknown key → FLAG_UNKNOWN, store NOT written ----
 
     [Fact]
-    public async Task BadJson_Throws_ForInvalidJson_StoreNotCalled()
+    public async Task UnknownKey_Throws_FlagUnknown_UpsertNotCalled()
     {
         var ex = await Assert.ThrowsAsync<SetFlagException>(async () =>
-            await _handler.Handle(new SetFlagCommand("limits.free.maxTransferSize", "{not json"), CancellationToken.None));
+            await _handler.Handle(new SetFlagCommand("limits.free.nonexistent", "123"), CancellationToken.None));
 
-        // EC-011-4: old value stays live — the store was NOT called (validation happens before any DB call).
-        Assert.Equal(ProblemCodes.Validation, ex.Code);
-        Assert.Equal("Invalid JSON", ex.Message);
+        Assert.Equal(ProblemCodes.FlagUnknown, ex.Code);
         Assert.Equal(0, _flags.UpsertCallCount);
     }
 
-    // ---- Exit check: unknown key → ForNotFound (Code NOT_FOUND) ----
+    // ---- Order: unknown is checked before the type, regardless of body ----
 
     [Fact]
-    public async Task UnknownKey_Throws_ForNotFound()
+    public async Task UnknownKey_WithBadValue_Throws_FlagUnknown()
     {
-        _flags.OldRow = null; // no row for that key
-
         var ex = await Assert.ThrowsAsync<SetFlagException>(async () =>
-            await _handler.Handle(new SetFlagCommand("no.such.key", "123"), CancellationToken.None));
+            await _handler.Handle(new SetFlagCommand("limits.free.nonexistent", "abc"), CancellationToken.None));
 
-        Assert.Equal(ProblemCodes.NotFound, ex.Code);
-        Assert.Equal(1, _flags.UpsertCallCount); // the store WAS called — the key resolved to no row
+        Assert.Equal(ProblemCodes.FlagUnknown, ex.Code);
+        Assert.Equal(0, _flags.UpsertCallCount);
     }
 
-    // ---- Exit check: happy path — UpsertAsync captured with (key, newValue, nowUtc); result carries old + new ----
+    // ---- AC-044-3 (b) / EC-044-1: non-numeric limit → FLAG_INVALID, no write ----
+
+    [Theory]
+    [InlineData("abc")]
+    [InlineData("\"abc\"")]
+    public async Task NonNumericLimit_Throws_FlagInvalid_UpsertNotCalled(string value)
+    {
+        var ex = await Assert.ThrowsAsync<SetFlagException>(async () =>
+            await _handler.Handle(new SetFlagCommand(LimitKey, value), CancellationToken.None));
+
+        Assert.Equal(ProblemCodes.FlagInvalid, ex.Code);
+        Assert.Equal(0, _flags.UpsertCallCount);
+    }
+
+    // ---- EC-044-5: zero / negative limits rejected ----
+
+    [Theory]
+    [InlineData("-1")]
+    [InlineData("0")]
+    public async Task NonPositiveLimit_Throws_FlagInvalid(string value)
+    {
+        var ex = await Assert.ThrowsAsync<SetFlagException>(async () =>
+            await _handler.Handle(new SetFlagCommand(LimitKey, value), CancellationToken.None));
+
+        Assert.Equal(ProblemCodes.FlagInvalid, ex.Code);
+        Assert.Equal(0, _flags.UpsertCallCount);
+    }
+
+    // ---- Happy path: Upsert captured (key, value, now); result carries old + new ----
 
     [Fact]
     public async Task Success_ReturnsOldAndNew()
     {
         const string oldValue = "5368709120";
         const string newValue = "10737418240";
-        _flags.OldRow = new FeatureFlag { Key = "limits.free.maxTransferSize", Value = oldValue };
+        _flags.OldRow = new FeatureFlag { Key = LimitKey, Value = oldValue };
 
         var beforeUtc = DateTime.UtcNow;
-        var result = await _handler.Handle(new SetFlagCommand("limits.free.maxTransferSize", newValue), CancellationToken.None);
+        var result = await _handler.Handle(new SetFlagCommand(LimitKey, newValue), CancellationToken.None);
         var afterUtc = DateTime.UtcNow;
 
-        // The store was called with (key, newValue, nowUtc).
         Assert.Equal(1, _flags.UpsertCallCount);
-        Assert.Equal("limits.free.maxTransferSize", _flags.CapturedKey);
+        Assert.Equal(LimitKey, _flags.CapturedKey);
         Assert.Equal(newValue, _flags.CapturedValue);
         Assert.InRange(_flags.CapturedUpdatedAtUtc, beforeUtc, afterUtc);
 
-        // Result carries old + new values (the endpoint audits {old,new} from this).
-        Assert.Equal("limits.free.maxTransferSize", result.Key);
+        Assert.Equal(LimitKey, result.Key);
         Assert.Equal(oldValue, result.OldValue);
         Assert.Equal(newValue, result.NewValue);
     }
 
-    // ---- Exit check: old value is read from the pre-update row (audit {old,new} depends on it; EC-011-1) ----
+    // ---- Value is trimmed before validation and storage ----
 
     [Fact]
-    public async Task Success_ReadsOldBeforeWrite()
+    public async Task Value_IsTrimmedBeforeStore()
     {
-        const string oldValue = "5368709120";
-        const string newValue = "10737418240";
-        _flags.OldRow = new FeatureFlag { Key = "limits.free.maxTransferSize", Value = oldValue };
+        _flags.OldRow = new FeatureFlag { Key = LimitKey, Value = "5368709120" };
 
-        var result = await _handler.Handle(new SetFlagCommand("limits.free.maxTransferSize", newValue), CancellationToken.None);
+        var result = await _handler.Handle(new SetFlagCommand(LimitKey, " 10737418240\n"), CancellationToken.None);
 
-        // OldValue is the pre-update value — NOT the incoming value.
-        Assert.Equal(oldValue, result.OldValue);
-        Assert.NotEqual(result.NewValue, result.OldValue); // old and new are distinct
+        Assert.Equal("10737418240", _flags.CapturedValue);
+        Assert.Equal("10737418240", result.NewValue);
     }
 
-    // ---- Stubs (hand-written, no Moq — mirrors SetUserPlanCommandTests style) ----
+    // ---- Boolean key accepts true/false ----
+
+    [Fact]
+    public async Task BooleanKey_AcceptsTrue()
+    {
+        _flags.OldRow = new FeatureFlag { Key = "feature.ads", Value = "false" };
+
+        var result = await _handler.Handle(new SetFlagCommand("feature.ads", "true"), CancellationToken.None);
+
+        Assert.Equal("true", result.NewValue);
+        Assert.Equal("false", result.OldValue);
+    }
+
+    // ---- Race: row removed between the existence check and the write → FLAG_UNKNOWN ----
+
+    [Fact]
+    public async Task UpsertReturnsNull_Throws_FlagUnknown()
+    {
+        _flags.OldRow = null;
+
+        var ex = await Assert.ThrowsAsync<SetFlagException>(async () =>
+            await _handler.Handle(new SetFlagCommand(LimitKey, "10737418240"), CancellationToken.None));
+
+        Assert.Equal(ProblemCodes.FlagUnknown, ex.Code);
+        Assert.Equal(1, _flags.UpsertCallCount);
+    }
+
+    // ---- Stubs (hand-written, no Moq) ----
+
+    private sealed class StubIFlagsStore : IFlagsStore
+    {
+        public List<FeatureFlag> Rows { get; } = new();
+
+        public Task<IReadOnlyList<FeatureFlag>> GetAllAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<FeatureFlag>>(Rows);
+    }
 
     private sealed class StubIAdminFlagStore : IAdminFlagStore
     {

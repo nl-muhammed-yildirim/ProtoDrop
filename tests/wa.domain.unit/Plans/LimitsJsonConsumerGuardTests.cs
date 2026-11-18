@@ -10,6 +10,7 @@ public class LimitsJsonConsumerGuardTests
     private static readonly string[] AllowList =
     [
         "src/wa.application/Limits/LimitsProvider.cs", // the resolver
+        "src/wa.application/UseCases/Admin/GetFlagsQuery.cs", // US-044-01: admin Flags view shows each limit's plan seed default (read through PlansCache)
         "src/wa.domain/PlanDefinition.cs", // validate-then-write (EC-018-2)
         "src/wa.infrastructure/Persistence/EntityConfigurations/PlanConfiguration.cs" // column mapping + seed
     ];

@@ -16,3 +16,9 @@ public interface IBlobSasMinter
     /// <summary>T-004-01: mints a 30-minute read SAS for the whole-transfer zip (transfers container, permissions r).</summary>
     Uri MintRecipientZip(string transferId);
 }
+
+/// <summary>US-047-01 (FR-047-2, TA-3.6): 24 h read SAS on one data-export zip (exports container, permissions r, attachment).</summary>
+public interface IExportSasMinter
+{
+    Uri MintExportDownload(Guid userId, Guid exportId);
+}

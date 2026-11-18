@@ -7,8 +7,8 @@ using wa.application.Blob;
 namespace wa.infrastructure.Blob;
 
 /// <summary>
-/// TA-3.5 — one-time-at-startup blob bootstrap: creates the two containers
-/// (<c>staging</c>, <c>transfers</c>) on ONE storage account, then applies the
+/// TA-3.5 — one-time-at-startup blob bootstrap: creates the three containers
+/// (<c>staging</c>, <c>transfers</c>, <c>exports</c>) on ONE storage account, then applies the
 /// lifecycle/retention bits the frozen <c>Azure.Storage.Blobs</c> 12.29.2 SDK
 /// can express and logs the rest ("apply what the backend supports; don't
 /// stall" — AGENT.md, T-055-02 "create them if missing in local setup").
@@ -44,7 +44,7 @@ public sealed class BlobContainerBootstrap : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         // Ensure both TA-3.5 containers exist (idempotent).
-        foreach (var name in new[] { BlobPaths.StagingContainer, BlobPaths.TransfersContainer })
+        foreach (var name in new[] { BlobPaths.StagingContainer, BlobPaths.TransfersContainer, BlobPaths.ExportsContainer })
         {
             try
             {
@@ -78,6 +78,6 @@ public sealed class BlobContainerBootstrap : BackgroundService
 
         // Not expressible in Azure.Storage.Blobs 12.29.2 (no container lifecycle API, no versioning toggle): log, don't stall.
         _logger.LogInformation(
-            "Blob lifecycle (TA-3.5, 12.29.2 not expressible): staging/* 24 h, transfers/* 30 d, transfers versioning OFF, GRS (prod)");
+            "Blob lifecycle (TA-3.5, 12.29.2 not expressible): staging/* 24 h, transfers/* 30 d, exports/* 7 d (f-data-export purge is primary), transfers versioning OFF, GRS (prod)");
     }
 }

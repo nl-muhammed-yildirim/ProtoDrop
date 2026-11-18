@@ -1,0 +1,60 @@
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using wa.application.UseCases.Gdpr;
+using wa.domain.Correlation;
+
+namespace wa.workers;
+
+/// <summary>
+/// US-047-02 (FR-047-5/8, TA-6.2): f-gdpr-sweep Azure Function — nightly 02:00 UTC, concurrency 1.
+/// Claims its window via JobRun (TA-6.1); sweeps Erasure markers older than 24 h. The signed HTTP trigger lets E2E/QA run a pass on demand.
+/// </summary>
+public class GdprSweepFunction
+{
+    private readonly SweepErasedTelemetryHandler _handler;
+    private readonly ILogger<GdprSweepFunction> _logger;
+    private readonly IConfiguration _config;
+
+    public GdprSweepFunction(SweepErasedTelemetryHandler handler, ILogger<GdprSweepFunction> logger, IConfiguration config)
+    {
+        _handler = handler;
+        _logger = logger;
+        _config = config;
+    }
+
+    [Function("GdprSweep")]
+    public async Task Run(
+        FunctionContext context,
+        [TimerTrigger("0 0 2 * * *")] TimerTriggerAttribute trigger)
+    {
+        // Timer-triggered — no inbound header, so always generate a fresh valid traceparent (EC-056-1).
+        var tp = W3CTraceParser.New();
+        using var scope = _logger.BeginScope(new Dictionary<string, object?> { ["CorrelationId"] = tp.CorrelationId, ["TraceParent"] = tp.ToHeader() });
+
+        try
+        {
+            var count = await _handler.RunAsync(DateTime.UtcNow, context.CancellationToken);
+            _logger.LogInformation("f-gdpr-sweep completed: {Count} markers swept", count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "f-gdpr-sweep failed");
+            throw; // JobRun claim prevents double-processing on retry.
+        }
+    }
+
+    /// <summary>HTTP trigger for E2E manual invocation (outside the 02:00 timer).</summary>
+    [Function("GdprSweepHttp")]
+    public async Task<HttpResponseData> RunHttp(
+        FunctionContext context,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "jobs/gdpr-sweep")] HttpRequestData req)
+    {
+        if (!JobAuth.Verify(_config, req))
+            return JobAuth.CreateProblem(req, 401, "Unauthenticated", "Invalid or missing signature.");
+
+        var count = await _handler.RunAsync(DateTime.UtcNow, context.CancellationToken);
+        return JobAuth.CreateSuccess(req, new { swept = count });
+    }
+}

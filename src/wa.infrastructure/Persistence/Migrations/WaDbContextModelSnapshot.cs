@@ -177,6 +177,44 @@ namespace wa.infrastructure.Persistence.Migrations
                     b.ToTable("BlobRef", (string)null);
                 });
 
+            modelBuilder.Entity("wa.domain.DataExport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AppUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BlobPath")
+                        .HasColumnType("VARCHAR(400)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ReadyAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<byte>("State")
+                        .HasColumnType("TINYINT");
+
+                    b.HasKey("Id")
+                        .HasName("PK_DataExport");
+
+                    b.HasIndex("AppUserId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_DataExport_InFlight")
+                        .HasFilter("[State] = 0");
+
+                    b.HasIndex("AppUserId", "CreatedAtUtc")
+                        .HasDatabaseName("IX_DataExport_User");
+
+                    b.HasIndex("State", "CreatedAtUtc")
+                        .HasDatabaseName("IX_DataExport_Scan");
+
+                    b.ToTable("DataExport", (string)null);
+                });
+
             modelBuilder.Entity("wa.domain.DomainEvent", b =>
                 {
                     b.Property<Guid>("EventId")
@@ -301,6 +339,30 @@ namespace wa.infrastructure.Persistence.Migrations
                         .HasFilter("[SenderEmail] IS NOT NULL");
 
                     b.ToTable("EmailSuppression", (string)null);
+                });
+
+            modelBuilder.Entity("wa.domain.Erasure", b =>
+                {
+                    b.Property<Guid>("AppUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("DeletedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ReHomedTransferCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("SweptAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("AppUserId")
+                        .HasName("PK_Erasure");
+
+                    b.HasIndex("DeletedAtUtc")
+                        .HasDatabaseName("IX_Erasure_Pending")
+                        .HasFilter("[SweptAtUtc] IS NULL");
+
+                    b.ToTable("Erasure", (string)null);
                 });
 
             modelBuilder.Entity("wa.domain.FeatureFlag", b =>

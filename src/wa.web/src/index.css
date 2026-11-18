@@ -1401,6 +1401,15 @@ main:has(.sl) .dz {
   border-bottom: 1px solid var(--border);
 }
 
+/* US-047-03: pending erasure older than 2 days — warning accent on the row (no new token). */
+.ad-row-lagging td:first-child {
+  box-shadow: inset 3px 0 0 var(--warning);
+}
+
+.ad-row-lagging td {
+  color: var(--warning);
+}
+
 .ad-linkid {
   font-family: monospace;
 }
