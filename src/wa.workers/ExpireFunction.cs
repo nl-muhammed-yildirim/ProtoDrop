@@ -2,6 +2,7 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using wa.application.UseCases.Billing;
 using wa.application.UseCases.Transfers;
 using wa.domain.Correlation;
 
@@ -15,12 +16,18 @@ namespace wa.workers;
 public class ExpireFunction
 {
     private readonly ExpireTransfersHandler _handler;
+    private readonly SendBillingEmailsHandler _billingEmails;
     private readonly ILogger<ExpireFunction> _logger;
     private readonly IConfiguration _config;
 
-    public ExpireFunction(ExpireTransfersHandler handler, ILogger<ExpireFunction> logger, IConfiguration config)
+    public ExpireFunction(
+        ExpireTransfersHandler handler,
+        SendBillingEmailsHandler billingEmails,
+        ILogger<ExpireFunction> logger,
+        IConfiguration config)
     {
         _handler = handler;
+        _billingEmails = billingEmails;
         _logger = logger;
         _config = config;
     }
@@ -39,6 +46,10 @@ public class ExpireFunction
         {
             var count = await _handler.RunAsync(now, context.CancellationToken);
             _logger.LogInformation("f-expire completed: {Count} transfers expired", count);
+
+            // US-019-04 (D-6): billing email sub-step; each send is gated by its own JobRun step claim.
+            var billingCount = await _billingEmails.RunAsync(now, context.CancellationToken);
+            _logger.LogInformation("f-expire billing emails: {Count} queued", billingCount);
         }
         catch (Exception ex)
         {

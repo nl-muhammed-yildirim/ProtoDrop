@@ -36,7 +36,11 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
     private const string SubscriptionCreated = "customer.subscription.created";
     private const string SubscriptionUpdated = "customer.subscription.updated";
 
+    private const string InvoicePaymentFailed = "invoice.payment_failed";
+    private const string InvoicePaid = "invoice.paid";
+
     private readonly IStripeBillingStore _store;
+    private readonly IBillingSequenceStore _sequence;
     private readonly IPlansStore _plans;
     private readonly IEventPublisher _events;
     private readonly WaTelemetryReporter _telemetry;
@@ -44,12 +48,14 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
 
     public HandleStripeWebhookHandler(
         IStripeBillingStore store,
+        IBillingSequenceStore sequence,
         IPlansStore plans,
         IEventPublisher events,
         WaTelemetryReporter telemetry,
         ILogger<HandleStripeWebhookHandler> logger)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
+        _sequence = sequence ?? throw new ArgumentNullException(nameof(sequence));
         _plans = plans ?? throw new ArgumentNullException(nameof(plans));
         _events = events ?? throw new ArgumentNullException(nameof(events));
         _telemetry = telemetry ?? throw new ArgumentNullException(nameof(telemetry));
@@ -74,6 +80,9 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
                 || !root.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Object
                 || !data.TryGetProperty("object", out var obj) || obj.ValueKind != JsonValueKind.Object)
                 throw StripeWebhookException.ForMalformed();
+
+            if (type == InvoicePaymentFailed || type == InvoicePaid)
+                return await HandleInvoiceAsync(type, eventId, obj, ct);
 
             if (type != SubscriptionCreated && type != SubscriptionUpdated)
             {
@@ -146,6 +155,73 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
 
             return StripeWebhookOutcome.Applied;
         }
+    }
+
+    /// <summary>US-019-04 (D-4): invoice.payment_failed starts the 0/3/7 d email sequence; invoice.paid cancels the remaining emails.</summary>
+    private async Task<StripeWebhookOutcome> HandleInvoiceAsync(string type, string eventId, JsonElement invoice, CancellationToken ct)
+    {
+        var invoiceId = GetString(invoice, "id");
+        if (string.IsNullOrEmpty(invoiceId))
+            throw StripeWebhookException.ForMalformed();
+
+        // Newer Stripe API versions moved the subscription under parent.subscription_details.
+        var subId = GetString(invoice, "subscription");
+        if (string.IsNullOrEmpty(subId)
+            && invoice.TryGetProperty("parent", out var parent) && parent.ValueKind == JsonValueKind.Object
+            && parent.TryGetProperty("subscription_details", out var details) && details.ValueKind == JsonValueKind.Object)
+            subId = GetString(details, "subscription");
+
+        if (string.IsNullOrEmpty(subId))
+        {
+            // One-off invoice, not a subscription invoice.
+            _logger.LogInformation(
+                "Stripe webhook event ignored (no subscription): {StripeEventId} {StripeEventType} {StripeInvoiceId}",
+                eventId, type, invoiceId);
+            return StripeWebhookOutcome.Ignored;
+        }
+
+        if (type == InvoicePaid)
+        {
+            var paid = await _sequence.CancelSequenceAsync(eventId, subId, DateTime.UtcNow, ct);
+            switch (paid)
+            {
+                case InvoicePaidOutcome.DuplicateEvent:
+                    return StripeWebhookOutcome.Duplicate;
+                case InvoicePaidOutcome.Conflict:
+                    throw StripeWebhookException.ForRetryable(
+                        $"Stripe event {eventId} (subscription {subId}) raced the billing email pass; awaiting redelivery.");
+                default:
+                    return StripeWebhookOutcome.Applied;
+            }
+        }
+
+        var now = DateTime.UtcNow;
+        var result = await _sequence.StartPaymentFailedAsync(eventId, invoiceId, subId, now, ct);
+        switch (result.Outcome)
+        {
+            case PaymentFailedOutcome.DuplicateEvent:
+            case PaymentFailedOutcome.DuplicateInvoice:
+                return StripeWebhookOutcome.Duplicate;
+            case PaymentFailedOutcome.Ineligible:
+                // EC-019-2: canceled / incomplete / unpaid / paused subscriptions get no sequence. Stripe ids only (TA-9.4).
+                _logger.LogInformation(
+                    "Stripe invoice.payment_failed ignored (subscription not eligible): {StripeEventId} {StripeInvoiceId} {StripeSubId}",
+                    eventId, invoiceId, subId);
+                return StripeWebhookOutcome.Ignored;
+            case PaymentFailedOutcome.SubscriptionUnresolved:
+                throw StripeWebhookException.ForRetryable(
+                    $"Stripe event {eventId} (subscription {subId}) did not resolve to a subscription; awaiting redelivery.");
+        }
+
+        if (result.Email is not null)
+        {
+            var envelope = BillingEmailSchedule.BuildEnvelope(
+                result.UserId, result.Email, result.SubscriptionId, 1, now, GetCorrelationGuid());
+            await _events.PublishAsync(envelope, ct);
+            _logger.LogInformation(
+                "Billing email queued: subscription {SubscriptionId} step {Step}", result.SubscriptionId, 1);
+        }
+        return StripeWebhookOutcome.Applied;
     }
 
     private async Task<Guid?> ResolveTargetPlanAsync(StripeSubscriptionChange change, CancellationToken ct)

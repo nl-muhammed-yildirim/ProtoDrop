@@ -17,6 +17,7 @@ public class HandleStripeWebhookHandlerTests
     private sealed class Rig
     {
         public StubBillingStore Store { get; } = new();
+        public StubSequenceStore Sequence { get; } = new();
         public StubPlansStore Plans { get; } = new();
         public RecordingPublisher Events { get; } = new();
         public CapturingLogger<WaTelemetryReporter> TelemetryLog { get; } = new();
@@ -30,7 +31,7 @@ public class HandleStripeWebhookHandlerTests
         }
 
         public HandleStripeWebhookHandler Handler() =>
-            new(Store, Plans, Events, new WaTelemetryReporter(TelemetryLog, [1, 2, 3]), HandlerLog);
+            new(Store, Sequence, Plans, Events, new WaTelemetryReporter(TelemetryLog, [1, 2, 3]), HandlerLog);
     }
 
     private static string Event(string type, string status = "active", string id = "evt_1", string price = "price_pro",
@@ -196,6 +197,169 @@ public class HandleStripeWebhookHandlerTests
         Assert.Equal(UserId, c.MetadataUserId);
     }
 
+    // ---- US-019-04: invoice.payment_failed / invoice.paid ----
+
+    private const string StubEmail = "payer@example.com";
+
+    private static string Invoice(string type, string id = "evt_inv", string invoiceId = "in_1", string? sub = "sub_1", string? parentSub = null)
+    {
+        var subJson = sub is null ? "" : $",\"subscription\":\"{sub}\"";
+        var parentJson = parentSub is null ? "" : $",\"parent\":{{\"subscription_details\":{{\"subscription\":\"{parentSub}\"}}}}";
+        return $"{{\"id\":\"{id}\",\"type\":\"{type}\",\"data\":{{\"object\":{{\"id\":\"{invoiceId}\"{subJson}{parentJson}}}}}}}";
+    }
+
+    [Fact]
+    public async Task PaymentFailed_Started_Applied_PublishesStep1Envelope()
+    {
+        var rig = new Rig();
+        var subGuid = Guid.NewGuid();
+        rig.Sequence.StartResult = new PaymentFailedResult(PaymentFailedOutcome.Started, subGuid, UserId, StubEmail);
+
+        var outcome = await rig.Handler().Handle(new HandleStripeWebhookCommand(Invoice("invoice.payment_failed")), default);
+
+        Assert.Equal(StripeWebhookOutcome.Applied, outcome);
+        Assert.Equal(("evt_inv", "in_1", "sub_1"), rig.Sequence.StartArgs);
+        var env = Assert.Single(rig.Events.Published);
+        Assert.Equal(EventType.BillingEmailRequested, env.Type);
+        Assert.Equal(UserId.ToString("n"), env.PartitionKey);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(env.Payload));
+        Assert.Equal(1, doc.RootElement.GetProperty("step").GetInt32());
+        Assert.Equal(StubEmail, doc.RootElement.GetProperty("email").GetString());
+        Assert.Equal(subGuid, doc.RootElement.GetProperty("subscriptionId").GetGuid());
+        Assert.Equal("billing_payment_failed", doc.RootElement.GetProperty("kind").GetString());
+        Assert.False(rig.HandlerLog.Mentions(StubEmail)); // TA-9.4
+    }
+
+    [Theory]
+    [InlineData(PaymentFailedOutcome.DuplicateEvent)]
+    [InlineData(PaymentFailedOutcome.DuplicateInvoice)]
+    public async Task PaymentFailed_Duplicate_ReturnsDuplicate_NoEnvelope(PaymentFailedOutcome outcomeIn)
+    {
+        var rig = new Rig();
+        rig.Sequence.StartResult = new PaymentFailedResult(outcomeIn);
+
+        var outcome = await rig.Handler().Handle(new HandleStripeWebhookCommand(Invoice("invoice.payment_failed")), default);
+
+        Assert.Equal(StripeWebhookOutcome.Duplicate, outcome);
+        Assert.Empty(rig.Events.Published);
+    }
+
+    [Fact]
+    public async Task PaymentFailed_Ineligible_Ignored_NoEnvelope_LogsIds()
+    {
+        var rig = new Rig();
+        rig.Sequence.StartResult = new PaymentFailedResult(PaymentFailedOutcome.Ineligible);
+
+        var outcome = await rig.Handler().Handle(new HandleStripeWebhookCommand(Invoice("invoice.payment_failed")), default);
+
+        Assert.Equal(StripeWebhookOutcome.Ignored, outcome);
+        Assert.Empty(rig.Events.Published);
+        Assert.Contains(rig.HandlerLog.Entries, e => e.Message.Contains("evt_inv") && e.Message.Contains("in_1") && e.Message.Contains("sub_1"));
+    }
+
+    [Fact]
+    public async Task PaymentFailed_SubscriptionUnresolved_ThrowsRetryable()
+    {
+        var rig = new Rig();
+        rig.Sequence.StartResult = new PaymentFailedResult(PaymentFailedOutcome.SubscriptionUnresolved);
+
+        var ex = await Assert.ThrowsAsync<StripeWebhookException>(() =>
+            rig.Handler().Handle(new HandleStripeWebhookCommand(Invoice("invoice.payment_failed")), default));
+
+        Assert.True(ex.Retryable);
+    }
+
+    [Fact]
+    public async Task PaymentFailed_Started_NullEmail_AppliedWithoutEnvelope()
+    {
+        var rig = new Rig();
+        rig.Sequence.StartResult = new PaymentFailedResult(PaymentFailedOutcome.Started, Guid.NewGuid(), UserId, null);
+
+        var outcome = await rig.Handler().Handle(new HandleStripeWebhookCommand(Invoice("invoice.payment_failed")), default);
+
+        Assert.Equal(StripeWebhookOutcome.Applied, outcome);
+        Assert.Empty(rig.Events.Published);
+    }
+
+    [Fact]
+    public async Task PaymentFailed_SubscriptionReadFromParentDetails_WhenTopLevelAbsent()
+    {
+        var rig = new Rig();
+        await rig.Handler().Handle(new HandleStripeWebhookCommand(Invoice("invoice.payment_failed", sub: null, parentSub: "sub_parent")), default);
+
+        Assert.Equal("sub_parent", rig.Sequence.StartArgs!.Value.SubId);
+    }
+
+    [Theory]
+    [InlineData("invoice.payment_failed")]
+    [InlineData("invoice.paid")]
+    public async Task Invoice_WithoutSubscription_Ignored_StoreNeverCalled(string type)
+    {
+        var rig = new Rig();
+        var outcome = await rig.Handler().Handle(new HandleStripeWebhookCommand(Invoice(type, sub: null)), default);
+
+        Assert.Equal(StripeWebhookOutcome.Ignored, outcome);
+        Assert.Null(rig.Sequence.StartArgs);
+        Assert.Null(rig.Sequence.CancelArgs);
+    }
+
+    [Fact]
+    public async Task InvoicePaid_CancelsSequence_Applied_NoEnvelope()
+    {
+        var rig = new Rig();
+        var outcome = await rig.Handler().Handle(new HandleStripeWebhookCommand(Invoice("invoice.paid", id: "evt_paid")), default);
+
+        Assert.Equal(StripeWebhookOutcome.Applied, outcome);
+        Assert.Equal(("evt_paid", "sub_1"), rig.Sequence.CancelArgs);
+        Assert.Empty(rig.Events.Published);
+    }
+
+    [Fact]
+    public async Task InvoicePaid_NoSequence_Applied()
+    {
+        var rig = new Rig();
+        rig.Sequence.CancelResult = InvoicePaidOutcome.NoSequence;
+
+        var outcome = await rig.Handler().Handle(new HandleStripeWebhookCommand(Invoice("invoice.paid")), default);
+
+        Assert.Equal(StripeWebhookOutcome.Applied, outcome);
+    }
+
+    [Fact]
+    public async Task InvoicePaid_DuplicateEvent_ReturnsDuplicate()
+    {
+        var rig = new Rig();
+        rig.Sequence.CancelResult = InvoicePaidOutcome.DuplicateEvent;
+
+        var outcome = await rig.Handler().Handle(new HandleStripeWebhookCommand(Invoice("invoice.paid")), default);
+
+        Assert.Equal(StripeWebhookOutcome.Duplicate, outcome);
+    }
+
+    [Fact]
+    public async Task InvoicePaid_Conflict_ThrowsRetryable()
+    {
+        var rig = new Rig();
+        rig.Sequence.CancelResult = InvoicePaidOutcome.Conflict;
+
+        var ex = await Assert.ThrowsAsync<StripeWebhookException>(() =>
+            rig.Handler().Handle(new HandleStripeWebhookCommand(Invoice("invoice.paid")), default));
+
+        Assert.True(ex.Retryable);
+    }
+
+    [Fact]
+    public async Task Invoice_MissingInvoiceId_ThrowsMalformed()
+    {
+        var rig = new Rig();
+        var payload = "{\"id\":\"evt_x\",\"type\":\"invoice.paid\",\"data\":{\"object\":{\"subscription\":\"sub_1\"}}}";
+
+        var ex = await Assert.ThrowsAsync<StripeWebhookException>(() =>
+            rig.Handler().Handle(new HandleStripeWebhookCommand(payload), default));
+
+        Assert.False(ex.Retryable);
+    }
+
     // ---- Stubs (hand-rolled, no Moq) ----
 
     private sealed class StubBillingStore : IStripeBillingStore
@@ -217,6 +381,33 @@ public class HandleStripeWebhookHandlerTests
             CapturedTargetPlanId = targetPlanId;
             return Task.FromResult(Result);
         }
+    }
+
+    private sealed class StubSequenceStore : IBillingSequenceStore
+    {
+        public PaymentFailedResult StartResult { get; set; } =
+            new(PaymentFailedOutcome.Started, Guid.NewGuid(), UserId, "payer@example.com");
+        public InvoicePaidOutcome CancelResult { get; set; } = InvoicePaidOutcome.Cancelled;
+        public (string EventId, string InvoiceId, string SubId)? StartArgs { get; private set; }
+        public (string EventId, string SubId)? CancelArgs { get; private set; }
+
+        public Task<PaymentFailedResult> StartPaymentFailedAsync(string eventId, string invoiceId, string stripeSubId, DateTime nowUtc, CancellationToken ct)
+        {
+            StartArgs = (eventId, invoiceId, stripeSubId);
+            return Task.FromResult(StartResult);
+        }
+
+        public Task<InvoicePaidOutcome> CancelSequenceAsync(string eventId, string stripeSubId, DateTime nowUtc, CancellationToken ct)
+        {
+            CancelArgs = (eventId, stripeSubId);
+            return Task.FromResult(CancelResult);
+        }
+
+        public Task<IReadOnlyList<BillingSequenceRow>> GetOpenSequencesAsync(CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<BillingSequenceRow>>([]);
+
+        public Task<bool> TryClaimStepAsync(Guid subscriptionId, int step, DateTime anchorUtc, DateTime nowUtc, CancellationToken ct) =>
+            Task.FromResult(true);
     }
 
     private sealed class StubPlansStore : IPlansStore

@@ -140,6 +140,9 @@ builder.Services.AddSingleton<wa.infrastructure.Persistence.UnsubscribeService>(
 // US-019-03 (D-3): webhook dedup + mirror store — factory-based (fresh context per call; concurrent deliveries never share a context).
 builder.Services.AddSingleton<wa.application.UseCases.Billing.IStripeBillingStore>(sp => new wa.infrastructure.Persistence.StripeBillingStore(
     sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+// US-019-04 (D-5): payment-failed email sequence ledger (StripeEvent + JobRun rows, no migration).
+builder.Services.AddSingleton<wa.application.UseCases.Billing.IBillingSequenceStore>(sp => new wa.infrastructure.Persistence.BillingSequenceStore(
+    sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
 // US-019-01 (D-1): Stripe Checkout over plain HttpClient (no Stripe package). 10 s mirrors TA-4.1.7's external-call timeout.
 builder.Services.AddSingleton<wa.application.UseCases.Billing.IStripeCheckoutGateway>(sp => new wa.infrastructure.Billing.StripeCheckoutGateway(
     new HttpClient { BaseAddress = new Uri("https://api.stripe.com/"), Timeout = TimeSpan.FromSeconds(10) },
