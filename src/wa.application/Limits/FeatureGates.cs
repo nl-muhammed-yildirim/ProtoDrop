@@ -6,15 +6,12 @@ namespace wa.application.Limits;
 /// </summary>
 public static class FeatureGates
 {
-    // TA-13.2 gate prefix; keys are built from it so each full key spelling lives only in the seed (FeaturesJsonConsumerGuardTests, FeatureGateKeyLiteralGuardTests).
-    private const string Prefix = "feature.";
-
-    public const string Search = Prefix + "search";
-    public const string DataExport = Prefix + "dataExport";
-    public const string EmailSettings = Prefix + "emailSettings";
-    public const string Ads = Prefix + "ads";
-    public const string Scheduling = Prefix + "scheduling";
-    public const string Analytics = Prefix + "analytics";
+    public const string Search = "feature.search";
+    public const string DataExport = "feature.dataExport";
+    public const string EmailSettings = "feature.emailSettings";
+    public const string Ads = "feature.ads";
+    public const string Scheduling = "feature.scheduling";
+    public const string Analytics = "feature.analytics";
 
     /// <summary>All six gates, in the story's order.</summary>
     public static readonly IReadOnlyList<string> All = [Search, DataExport, EmailSettings, Ads, Scheduling, Analytics];

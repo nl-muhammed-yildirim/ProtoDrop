@@ -332,6 +332,12 @@ describe('AdminFlagsPage (T-011-13 / FR-011-2, FR-011-5)', () => {
       await flush()
 
       const input = host.querySelector(`input[aria-label="${LIMIT_KEY}"]`) as HTMLInputElement
+      await act(async () => {
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set as (v: string) => void
+        setter.call(input, 'abc')
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+      expect(input.value).toBe('abc')
       const row = input.closest('tr') as HTMLElement
       await act(async () => {
         ;(row.querySelector('button') as HTMLButtonElement).dispatchEvent(new MouseEvent('click', { bubbles: true }))

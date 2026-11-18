@@ -87,6 +87,11 @@ export function AdminFlagsPage({ role }: AdminFlagsPageProps) {
       })
       if (res.status === 400) {
         setSaveError({ key, message: INVALID_COPY })   // EC-044-1 — the old value stays live.
+        setDrafts((d) => {
+          const rest = { ...d }   // drop the rejected draft so the field shows the live value again.
+          delete rest[key]
+          return rest
+        })
         return
       }
       if (!res.ok) throw new Error('Could not save the flag. Please try again.')
