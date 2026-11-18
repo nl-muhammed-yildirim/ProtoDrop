@@ -114,6 +114,29 @@ public class BlobSasMinterTest : IDisposable
         Assert.Equal(Convert.ToBase64String(sst), q["sig"]);
     }
 
+    [Fact]
+    public void Export_SAS_pins_r_scope_24h_window_no_st_and_attachment_rscd()
+    {
+        var userId = Guid.Parse("3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f");
+        var exportId = Guid.Parse("4d5e6f7a-8b9c-0d1e-2f3a-4b5c6d7e8f90");
+        var url = _minter.MintExportDownload(userId, exportId).ToString();
+        var q = Query(url);
+        Assert.Equal("r", q["sp"]);
+        Assert.Equal("2024", q["sv"]);
+        Assert.Equal(Now.AddHours(24).ToString("yyyy-MM-ddTHH:mm:ssZ"), q["se"]);   // US-047-01: 24 h TTL
+        Assert.False(q.ContainsKey("st"));
+        Assert.Equal("attachment;filename*=UTF-8''my-data.zip", q["rscd"]);
+
+        var path = $"exports/{userId:N}/{exportId:N}.zip";
+        Assert.Contains("/" + path + "?", url);
+        var sst = Sign(
+            permissions: q["sp"], start: "", expiry: q["se"],
+            path: $"/blob/blob.local.test.example/{path}",
+            ipRange: q.GetValueOrDefault("sip", ""), protocol: "https", resourceType: "b",
+            accountKey: _accountKey, respContentDisposition: q["rscd"]);
+        Assert.Equal(Convert.ToBase64String(sst), q["sig"]);
+    }
+
     private void assertValidSignature(Dictionary<string, string> q, string canonicalPath)
     {
         var sst = Sign(

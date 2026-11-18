@@ -8,6 +8,7 @@ import ProfilePage from './ProfilePage'
 import App from '../../App'
 import type { StoredProfile } from '../../core/auth/session'
 import { clearSession, readSession, writeSession } from '../../core/auth/session'
+import { resetFeatureGates } from '../../core/features/featureGates'
 import i18n from '../../core/i18n/init'
 // T-015-02 (FR-015-4): jsdom has no window.matchMedia — changeTheme's resolved-set path needs a controllable stub.
 import type { MatchMediaStub } from '../../test/matchMediaStub'
@@ -53,6 +54,9 @@ function renderProfilePage(
   return { host, cleanup: () => { root.unmount(); host.remove() } }
 }
 
+// US-047-01: body served for GET /api/v1/features — all gates off unless a test turns one on.
+let featuresBody: Record<string, boolean> = {}
+
 // Mirror AuthPage.test.tsx: hand-stub fetch with a capture closure (no extra packages).
 function stubFetch(
   captured: { url?: string; init?: RequestInit },
@@ -63,6 +67,8 @@ function stubFetch(
     async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
       // The landing page's background plan-limits load (PlanLimitsSync) is not part of what these tests capture.
       if (String(input).endsWith('/billing/plan')) return new Response(null, { status: 404 })
+      // US-047-01: FeatureGate's mount read of the phase gates must not overwrite what these tests capture.
+      if (String(input).endsWith('/api/v1/features')) return new Response(JSON.stringify(featuresBody), { status: 200 })
       captured.url = typeof input === 'string' ? input : String(input)
       captured.init = init
       const req = new Request(typeof input === 'string' ? input : String(input), { method: init?.method ?? 'GET' })
@@ -91,9 +97,12 @@ beforeEach(() => {
   installLocalStorageShim()
   mqStub = installMatchMediaStub(false)   // initial OS preference: light (matches=false).
   clearSession()
+  featuresBody = {}
+  resetFeatureGates()
 })
 
 afterEach(() => {
+  resetFeatureGates()
   vi.useRealTimers()
   vi.unstubAllGlobals()
   document.documentElement.removeAttribute('data-theme')   // shared jsdom element — keep tests hermetic.
@@ -353,6 +362,46 @@ describe('ProfilePage (T-008-07)', () => {
       .toBe("Your account and profile are deleted. Your active transfers keep working and show 'From: Ada Lovelace' without your email.")
     root.unmount()
     host.remove()
+  })
+
+  it('US-047-02 (FR-047-7): the delete modal also tells the user their telemetry is anonymized within 24 hours', async () => {
+    writeSession({ ...BASE_PROFILE, displayName: 'Ada Lovelace' })
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    act(() => {
+      void root.render(createElement(App))
+    })
+    await act(async () => { navigateToProfile() })
+
+    const deleteBtn = host.querySelector('.pf-delete-btn') as HTMLButtonElement
+    act(() => { deleteBtn.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+
+    const copies = host.querySelectorAll('.pf-modal-copy')
+    expect(copies).toHaveLength(2)
+    expect(copies[1].textContent).toBe('Your telemetry data is anonymized within 24 hours of deletion.')
+    root.unmount()
+    host.remove()
+  })
+
+  describe('US-047-01: My data section behind feature.dataExport', () => {
+    it('gate on: the My data section is rendered', async () => {
+      featuresBody = { 'feature.dataExport': true }
+      stubFetch({}, () => Promise.resolve(new Response(null, { status: 204 })))
+      const { host, cleanup } = renderProfilePage(BASE_PROFILE)
+      await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() })
+      expect(host.querySelector('.pf-export')).not.toBeNull()
+      expect(host.textContent).toContain('My data')
+      cleanup()
+    })
+
+    it('gate off (default): the My data section is absent', async () => {
+      stubFetch({}, () => Promise.resolve(new Response(null, { status: 204 })))
+      const { host, cleanup } = renderProfilePage(BASE_PROFILE)
+      await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() })
+      expect(host.querySelector('.pf-export')).toBeNull()
+      cleanup()
+    })
   })
 
   describe('T-015-02 (F-TRF-015): theme select + live system OS tracking', () => {

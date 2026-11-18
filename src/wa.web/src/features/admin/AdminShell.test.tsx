@@ -258,7 +258,7 @@ describe('AdminShell (T-011-10)', () => {
     }
   })
 
-  it('LeftNav_HasAllFiveItems_InOrder', async () => {
+  it('LeftNav_HasAllSixItems_InOrder', async () => {
     const captured: { calls: string[] } = { calls: [] }
     stubFetch(
       captured,
@@ -271,7 +271,7 @@ describe('AdminShell (T-011-10)', () => {
       await flush()
 
       const items = Array.from(host.querySelectorAll('.ad-nav-item')).map((el) => el.textContent?.trim())
-      expect(items).toEqual(['Overview', 'Transfers', 'Users', 'Flags', 'Suppressions'])
+      expect(items).toEqual(['Overview', 'Transfers', 'Users', 'Flags', 'Suppressions', 'Erasures'])
     } finally {
       cleanup()
     }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  ADMIN_ERASURES_PATH,
   ADMIN_FLAGS_PATH,
   ADMIN_NAV_ITEMS,
   ADMIN_OVERVIEW_PATH,
@@ -15,11 +16,12 @@ describe('matchAdminPath (T-011-10)', () => {
     expect(matchAdminPath(ADMIN_OVERVIEW_PATH)).toBe('overview')
   })
 
-  it('matchAdminPath_ReturnsEachScreen_ForAllFivePaths', () => {
+  it('matchAdminPath_ReturnsEachScreen_ForAllSixPaths', () => {
     expect(matchAdminPath(ADMIN_TRANSFERS_PATH)).toBe('transfers')
     expect(matchAdminPath(ADMIN_USERS_PATH)).toBe('users')
     expect(matchAdminPath(ADMIN_FLAGS_PATH)).toBe('flags')
     expect(matchAdminPath(ADMIN_SUPPRESSIONS_PATH)).toBe('suppressions')
+    expect(matchAdminPath(ADMIN_ERASURES_PATH)).toBe('erasures')
   })
 
   it('matchAdminPath_ReturnsNull_ForBareAdminPath', () => {
@@ -33,13 +35,14 @@ describe('matchAdminPath (T-011-10)', () => {
     expect(matchAdminPath('/t/abc12345')).toBeNull()
   })
 
-  it('ADMIN_NAV_ITEMS_HasAllFiveItems_InOrder', () => {
+  it('ADMIN_NAV_ITEMS_HasAllSixItems_InOrder', () => {
     expect(ADMIN_NAV_ITEMS.map((i) => i.label)).toEqual([
       'Overview',
       'Transfers',
       'Users',
       'Flags',
       'Suppressions',
+      'Erasures',
     ])
   })
 })

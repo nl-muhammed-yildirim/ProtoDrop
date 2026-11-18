@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 
+import AdminErasuresPage from './AdminErasuresPage'
 import AdminFlagsPage from './AdminFlagsPage'
 import AdminOverviewPage from './AdminOverviewPage'
 import AdminSuppressionsPage from './AdminSuppressionsPage'
@@ -23,7 +24,7 @@ type RoleState =
   | { kind: 'forbidden' }       // problem code FORBIDDEN — non-admin
 
 /**
- * T-011-10 (FR-011-2): admin layout — left nav with all five items + role badge from /auth/me.
+ * T-011-10 (FR-011-2): admin layout — left nav with all six items + role badge from /auth/me.
  * Role comes ONLY from GET /auth/me (T-011-01 gate) — the client session has NO role field.
  * Non-admins hitting /admin/* land on "Not an admin" instead of breaking the account fallback chain.
  */
@@ -118,6 +119,8 @@ export function AdminShell({ screen }: AdminShellProps) {
           <AdminFlagsPage role={roleState.role} />
         ) : screen === 'suppressions' ? (
           <AdminSuppressionsPage role={roleState.role} />
+        ) : screen === 'erasures' ? (
+          <AdminErasuresPage />
         ) : (
           <div className="ad-placeholder">
             <h1 className="mf-h1">{ADMIN_NAV_ITEMS.find((i) => i.label === screenLabel(screen))?.label ?? screen} — coming soon</h1>
@@ -134,6 +137,7 @@ function screenLabel(screen: AdminScreen): string {
     case 'users': return 'Users'
     case 'flags': return 'Flags'
     case 'suppressions': return 'Suppressions'
+    case 'erasures': return 'Erasures'
     default: return 'Overview'
   }
 }

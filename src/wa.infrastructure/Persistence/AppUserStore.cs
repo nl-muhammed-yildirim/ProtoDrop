@@ -53,7 +53,7 @@ public sealed class AppUserStore : IAppUserStore
         _db.Entry(user).State = EntityState.Detached; // same reason as CreateAsync
     }
 
-    /// <summary>T-008-06 / FR-008-8: soft-delete + transfer re-home in ONE transaction (mirrors ExpiryDeletionStore's idiom).</summary>
+    /// <summary>T-008-06 / FR-008-8: soft-delete + transfer re-home in ONE transaction (mirrors ExpiryDeletionStore's idiom); US-047-02 adds the pending Erasure marker to the same transaction.</summary>
     public async Task<bool> SoftDeleteWithReHomeAsync(Guid userId, DateTime deletedAtUtc, CancellationToken ct)
     {
         // Mirror ExpiryDeletionStore.DeleteTransfersAsync's idiom EXACTLY: await using tx, CommitAsync at the end — no try/catch.
@@ -67,9 +67,19 @@ public sealed class AppUserStore : IAppUserStore
         // 2. Re-home owned transfers: Status IN (0,1,3) — drafts/active/download-limit go anonymous; expired (2) rows
         //    die via the f-delete-transfers job anyway (Status values verified verbatim in Transfer.cs). SenderName is
         //    a snapshot column — never touched here (FR-002-4).
-        await _db.Set<Transfer>()
+        var reHomed = await _db.Set<Transfer>()
             .Where(t => t.OwnerAppUserId == userId && t.Status != 2)
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.OwnerAppUserId, (Guid?)null), ct);
+
+        // 3. US-047-02 (FR-047-5): erasure marker, keyed on the userId — never the email (EC-047-5). Raw SQL bypasses the
+        //    singleton change tracker (ExpiryStore idiom); the guard keeps the first deletion's row in a concurrent-DELETE race (EC-047-3).
+        if (updatedUsers > 0)
+        {
+            await _db.Database.ExecuteSqlRawAsync(
+                "IF NOT EXISTS (SELECT 1 FROM [Erasure] WHERE [AppUserId] = {0}) " +
+                "INSERT INTO [Erasure] ([AppUserId], [DeletedAtUtc], [ReHomedTransferCount]) VALUES ({0}, {1}, {2})",
+                [userId, deletedAtUtc, reHomed], ct);
+        }
 
         await tx.CommitAsync(ct);
         return updatedUsers > 0; // false only in the race where a concurrent DELETE already committed — handler maps to the same not-found shape

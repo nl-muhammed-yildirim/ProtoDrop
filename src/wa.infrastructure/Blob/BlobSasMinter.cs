@@ -19,6 +19,7 @@ namespace wa.infrastructure.Blob;
 /// <item>draft upload (per staged file) — permissions <c>cwr</c>, 2 h</item>
 /// <item>recipient single file — permissions <c>r</c>, 30 min</item>
 /// <item>recipient zip — permissions <c>r</c>, 30 min</item>
+/// <item>data export zip (<c>exports</c> container) — permissions <c>r</c>, 24 h</item>
 /// </list>
 /// The frozen <c>Azure.Storage.Blobs</c> 12.29.2 <see cref="BlobSasBuilder"/>
 /// stamps its internal build date into the string-to-sign, so we take the SDK's
@@ -41,6 +42,9 @@ public sealed class BlobSasMinter
 
     /// <summary>TA-3.6 recipient single-file/zip TTL: 30 min (constant, not a local setting).</summary>
     internal static readonly TimeSpan RecipientTtl = TimeSpan.FromMinutes(30);
+
+    /// <summary>US-047-01 data-export download TTL: 24 h (D-22 default, constant not a local setting).</summary>
+    internal static readonly TimeSpan ExportTtl = TimeSpan.FromHours(24);
 
     private readonly Uri _accountUrl;
     private readonly string _keyBase64;
@@ -102,6 +106,17 @@ public sealed class BlobSasMinter
             expiresOn: _now().Add(RecipientTtl),
             startsOn: null,
             respContentDisposition: ZipContentDisposition);
+
+    private const string ExportContentDisposition = "attachment;filename*=UTF-8''my-data.zip";
+
+    /// <summary>US-047-01 (TA-3.6 export row): <c>exports</c> container, permissions <c>r</c>, 24 h, no start bound, attachment my-data.zip.</summary>
+    public Uri MintExportDownload(Guid userId, Guid exportId)
+        => Mint(
+            BlobPaths.DataExportZip(userId, exportId),
+            permissions: "r",
+            expiresOn: _now().Add(ExportTtl),
+            startsOn: null,
+            respContentDisposition: ExportContentDisposition);
 
     private Uri Mint(
         string path, string permissions, DateTimeOffset expiresOn, DateTimeOffset? startsOn, string? respContentDisposition)

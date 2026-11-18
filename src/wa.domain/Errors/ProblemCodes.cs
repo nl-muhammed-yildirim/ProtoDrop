@@ -1,7 +1,7 @@
 namespace wa.domain.Errors;
 
 /// <summary>
-/// The closed TA-4.1.3 machine-code list — exactly these 23 members, no others in MVP (golden rule: adding one later is an architecture change).
+/// The closed TA-4.1.3 machine-code list — exactly these 24 members, no others in MVP (golden rule: adding one later is an architecture change).
 /// Canonical status + title are pinned here so the wire shape never depends on caller text; at M0 only NOT_FOUND, INTERNAL and RATE_LIMITED are exercised.
 /// </summary>
 public static class ProblemCodes
@@ -35,6 +35,8 @@ public static class ProblemCodes
     public const string FlagUnknown = "FLAG_UNKNOWN";
     // US-044-02 (AC-044-2, FR-044-7): a phase-gated endpoint whose feature.* flag is off (or absent) answers 404, handler never runs.
     public const string FeatureDisabled = "FEATURE_DISABLED";
+    // US-047-01 (FR-047-1, EC-047-6): a second POST /auth/me/export while one is processing.
+    public const string ExportInFlight = "EXPORT_IN_FLIGHT";
     public const string Internal = "INTERNAL";
 
     private static readonly Dictionary<string, (int Status, string Title)> Table = new(StringComparer.Ordinal)
@@ -61,6 +63,7 @@ public static class ProblemCodes
         [FlagInvalid] = (400, "Invalid flag value"), // US-044-01 (AC-044-3): typed validation failed (EC-044-1, EC-044-5)
         [FlagUnknown] = (404, "Unknown flag"), // US-044-01 (AC-044-3): key is not a seeded flag
         [FeatureDisabled] = (404, "Feature disabled"), // US-044-02 (AC-044-2): phase gate off → indistinguishable from an absent route
+        [ExportInFlight] = (409, "Export already in progress"), // US-047-01 (EC-047-6): one processing export per user
         [Internal] = (500, "Internal server error") // /health's component-unreachable variant writes an explicit 503 through the same writer
     };
 
