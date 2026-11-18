@@ -30,7 +30,7 @@ Colors: `--bg #FFFFFF`, `--bg-subtle #F5F6F8`, `--bg-elevated #FFFFFF`, `--fg #1
 Typography/shape: `--fs-display 40px`, `--fs-h1 28px`, `--fs-body 16px`, `--fs-small 14px`,
 `--fs-tiny 12px`, `--radius-sm 6px`, `--radius-md 10px`, `--radius-lg 16px`.
 
-## 2. API surface (`src/wa.api/Program.cs`) — **39 route+method mappings** (end of Phase 0 = 36; +3 F-BIL-002: checkout, portal, Stripe webhook; 38 always-on + 1 Development-only)
+## 2. API surface (`src/wa.api/Program.cs`) — **40 route+method mappings** (end of Phase 0 = 36; +3 F-BIL-002: checkout, portal, Stripe webhook; +1 F-BIL-003 US-020-03: `GET /billing/plan`; 39 always-on + 1 Development-only)
 
 | Area | Route | Method |
 |---|---|---|
