@@ -94,6 +94,8 @@ builder.Services.AddSingleton<wa.application.UseCases.Admin.IAdminFlagStore>(sp 
 builder.Services.AddSingleton<wa.application.UseCases.Admin.IAdminSuppressionStore>(sp => new wa.infrastructure.Persistence.AdminSuppressionStore(sp.GetRequiredService<WaDbContext>()));
 // T-011-09 (TA-4.2#25 / US-011-04 happy path 5): audit read surface — last count rows, newest first, over the adapter-owned WaDbContext.
 builder.Services.AddSingleton<wa.application.UseCases.Admin.IAuditReadStore>(sp => new wa.infrastructure.Persistence.AuditReadStore(sp.GetRequiredService<WaDbContext>()));
+// US-047-03 (FR-047-6): erasure report read — fresh context per call (DataExportStore precedent).
+builder.Services.AddSingleton<wa.application.UseCases.Admin.IErasureReportStore>(sp => new wa.infrastructure.Persistence.ErasureReportStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
 builder.Services.AddSingleton(sp => new LimitsProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
 builder.Services.AddSingleton<ILimitsProvider>(sp => sp.GetRequiredService<LimitsProvider>());
 builder.Services.AddSingleton<IFlagResolver>(sp => sp.GetRequiredService<LimitsProvider>()); // US-044-02: phase gates (FR-044-3)
@@ -174,8 +176,8 @@ foreach (var part in builder.Configuration["Wa:OperatorEmails"]?.Split(',', Stri
 
 // T-011-01 gate helper — the contract endpoints 20–23 call as their routes land (T-011-03…T-011-09). Session read → 401 UNAUTHENTICATED inline
 // (same idiom as /auth/me L578); unknown email OR not in Wa:AdminEmails → FORBIDDEN; SuperAdmin-only route with an Operator role → same FORBIDDEN.
-// No audit row for a rejected gate — the suppression DELETE emits TelemetryEvents.AdminAction AFTER the gate passes (T-006-03).
-async Task RequireAdminAsync(HttpContext ctx, IAppUserStore users, bool superadminOnly, CancellationToken ct)
+// Returns the role (US-047-03 email reveal). No audit row for a rejected gate — the suppression DELETE emits TelemetryEvents.AdminAction AFTER the gate passes (T-006-03).
+async Task<AdminRole> RequireAdminAsync(HttpContext ctx, IAppUserStore users, bool superadminOnly, CancellationToken ct)
 {
     if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
         throw new BusinessException(ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated));
@@ -184,6 +186,7 @@ async Task RequireAdminAsync(HttpContext ctx, IAppUserStore users, bool superadm
     var role = user?.Email is { } email ? AdminRolePolicy.Resolve(email.ToLowerInvariant(), adminEmails, operatorEmails) : null;
     if (role is null || (superadminOnly && role != AdminRole.SuperAdmin))
         throw new BusinessException(ProblemCodes.Forbidden, ProblemCodes.TitleOf(ProblemCodes.Forbidden));
+    return role.Value;
 }
 
 // TA-4.1.6 (T-056-03): allow-list CORS only — configured origins via Wa:Cors:AllowedOrigins, no wildcard, preflight cached 1 h.
@@ -692,6 +695,38 @@ app.MapGet("/api/v1/admin/users", async (HttpContext ctx, HttpRequest request, I
     catch (wa.domain.Transfers.CursorFormatException ex)
     {
         // TA-4.1.4: malformed cursor → 400 VALIDATION (existing closed-list member) — same as Program.cs L538-542.
+        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+    }
+});
+
+// US-047-03 (FR-047-6, TA-4.1.4): erasure report — both roles read; email revealed to SuperAdmin (DPO) only, masked for Operator (TA-9.4).
+app.MapGet("/api/v1/admin/erasures", async (HttpContext ctx, HttpRequest request, IAppUserStore users, ISender sender, CancellationToken ct) =>
+{
+    var role = await RequireAdminAsync(ctx, users, superadminOnly: false, ct);
+    var pageSize = wa.application.UseCases.Admin.ErasureReportPolicy.PageSize;
+    var limitParam = request.Query["limit"].FirstOrDefault() ?? pageSize.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    if (!int.TryParse(limitParam, out var limit) || limit <= 0 || limit > pageSize)
+        throw new BusinessException(ProblemCodes.Validation, $"limit must be a positive integer at most {pageSize}.");
+    try
+    {
+        var result = await sender.Send(new wa.application.UseCases.Admin.GetErasuresQuery(
+            request.Query["cursor"].FirstOrDefault(), limit, RevealEmail: role == AdminRole.SuperAdmin), ct);
+        return Results.Json(new
+        {
+            items = result.Items.Select(r => new
+            {
+                userId = r.UserId.ToString("n"),
+                email = r.Email,
+                deletedAtUtc = r.DeletedAtUtc,
+                reHomedTransferCount = r.ReHomedTransferCount,
+                sweepStatus = r.SweepStatus,
+                sweptAtUtc = r.SweptAtUtc
+            }),
+            nextCursor = result.NextCursor
+        });
+    }
+    catch (wa.domain.Transfers.CursorFormatException ex)
+    {
         throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
     }
 });

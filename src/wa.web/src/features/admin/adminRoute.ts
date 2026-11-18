@@ -2,7 +2,7 @@
  * T-011-10 (UI-Reference §5.6): pure /admin/* path matcher — App reads
  * window.location.pathname and passes the matched sub-screen by prop, so AdminShell stays free of
  * any window dependency (same convention as filesRoute.ts). Exact match only: '/admin' alone → null;
- * the five admin screens own their exact paths. No window access — App.test.tsx must stay hermetic.
+ * the six admin screens own their exact paths. No window access — App.test.tsx must stay hermetic.
  */
 
 export const ADMIN_OVERVIEW_PATH = '/admin/overview'
@@ -10,8 +10,9 @@ export const ADMIN_TRANSFERS_PATH = '/admin/transfers'
 export const ADMIN_USERS_PATH = '/admin/users'
 export const ADMIN_FLAGS_PATH = '/admin/flags'
 export const ADMIN_SUPPRESSIONS_PATH = '/admin/suppressions'
+export const ADMIN_ERASURES_PATH = '/admin/erasures'
 
-export type AdminScreen = 'overview' | 'transfers' | 'users' | 'flags' | 'suppressions'
+export type AdminScreen = 'overview' | 'transfers' | 'users' | 'flags' | 'suppressions' | 'erasures'
 
 // §5.6 order — left nav renders these in this exact sequence.
 export const ADMIN_NAV_ITEMS: { label: string; path: string }[] = [
@@ -20,6 +21,7 @@ export const ADMIN_NAV_ITEMS: { label: string; path: string }[] = [
   { label: 'Users', path: ADMIN_USERS_PATH },
   { label: 'Flags', path: ADMIN_FLAGS_PATH },
   { label: 'Suppressions', path: ADMIN_SUPPRESSIONS_PATH },
+  { label: 'Erasures', path: ADMIN_ERASURES_PATH },
 ]
 
 export function matchAdminPath(pathname: string): AdminScreen | null {
@@ -29,6 +31,7 @@ export function matchAdminPath(pathname: string): AdminScreen | null {
     case ADMIN_USERS_PATH: return 'users'
     case ADMIN_FLAGS_PATH: return 'flags'
     case ADMIN_SUPPRESSIONS_PATH: return 'suppressions'
+    case ADMIN_ERASURES_PATH: return 'erasures'
     default: return null
   }
 }
