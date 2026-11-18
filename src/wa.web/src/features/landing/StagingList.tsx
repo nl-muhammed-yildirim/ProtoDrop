@@ -150,6 +150,7 @@ export function StagingList() {
       }))
       const res = await fetch(DRAFT_ENDPOINT, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json', traceparent: getTraceParent() },
         body: JSON.stringify({ files: rows }),
       })
@@ -169,6 +170,7 @@ export function StagingList() {
       if (!allDone) return
       const finRes = await fetch(FINALIZE_ENDPOINT.replace('{draftId}', draft.draftId), {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'Idempotency-Key': finalizeKey(draft.draftId), traceparent: getTraceParent() },
         body: JSON.stringify(buildFinalizePayload(minted)),
       })

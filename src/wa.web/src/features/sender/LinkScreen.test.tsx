@@ -279,7 +279,7 @@ describe('LinkScreen', () => {
 
   // ---- T-002-08: Copy link only + confirmation screen (FR-002-6/7, AC-002-3) ----
 
-  type SendCall = { url: string; method: string; headers: Record<string, string>; body: string }
+  type SendCall = { url: string; method: string; headers: Record<string, string>; body: string; credentials?: RequestCredentials }
 
   // Local copy of the StagingList stub-fetch pattern (same harness rules — no cross-file coupling).
   function stubSendFetch(status: number): SendCall[] {
@@ -290,6 +290,7 @@ describe('LinkScreen', () => {
         calls.push({
           url: String(input),
           method: typeof init?.method === 'string' ? init.method : 'GET',
+          credentials: init?.credentials,
           headers: (init?.headers as Record<string, string>) ?? {},
           body: typeof init?.body === 'string' ? init.body : '',
         })
@@ -342,6 +343,7 @@ describe('LinkScreen', () => {
       expect(calls).toHaveLength(1)
       expect(calls[0].url).toBe('http://localhost:8080/api/v1/transfers/1/send')
       expect(calls[0].method).toBe('POST')
+      expect(calls[0].credentials).toBe('include') // session cookie so the send is attributed to the signed-in user
       expect(calls[0].headers['Idempotency-Key']).toBeTruthy()
       const body = JSON.parse(calls[0].body) as { emails: string[] }
       expect(body.emails).toEqual([])

@@ -183,6 +183,7 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
       try {
         res = await fetch(SEND_ENDPOINT.replace('{id}', transferId), {
           method: 'POST',
+          credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
             'Idempotency-Key': crypto.randomUUID(),
