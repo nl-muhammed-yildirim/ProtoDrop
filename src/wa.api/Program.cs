@@ -137,6 +137,20 @@ builder.Services.AddSingleton<wa.infrastructure.Persistence.UnsubscribeService>(
     sp.GetRequiredService<WaDbContext>(),
     System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Wa:Jwt:Secret"]!),
     sp.GetRequiredService<ILogger<wa.infrastructure.Persistence.UnsubscribeService>>()));
+// US-019-03 (D-3): webhook dedup + mirror store — factory-based (fresh context per call; concurrent deliveries never share a context).
+builder.Services.AddSingleton<wa.application.UseCases.Billing.IStripeBillingStore>(sp => new wa.infrastructure.Persistence.StripeBillingStore(
+    sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+// US-019-04 (D-5): payment-failed email sequence ledger (StripeEvent + JobRun rows, no migration).
+builder.Services.AddSingleton<wa.application.UseCases.Billing.IBillingSequenceStore>(sp => new wa.infrastructure.Persistence.BillingSequenceStore(
+    sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+// US-019-01 (D-1): Stripe Checkout over plain HttpClient (no Stripe package). 10 s mirrors TA-4.1.7's external-call timeout.
+builder.Services.AddSingleton(sp => new wa.infrastructure.Billing.StripeCheckoutGateway(
+    new HttpClient { BaseAddress = new Uri("https://api.stripe.com/"), Timeout = TimeSpan.FromSeconds(10) },
+    builder.Configuration["Wa:Stripe:SecretKey"],
+    sp.GetRequiredService<ILogger<wa.infrastructure.Billing.StripeCheckoutGateway>>()));
+builder.Services.AddSingleton<wa.application.UseCases.Billing.IStripeCheckoutGateway>(sp => sp.GetRequiredService<wa.infrastructure.Billing.StripeCheckoutGateway>());
+// US-019-07 (EC-019-4): webhook re-fetch of the subscription — same adapter, same key.
+builder.Services.AddSingleton<wa.application.UseCases.Billing.IStripeSubscriptionSource>(sp => sp.GetRequiredService<wa.infrastructure.Billing.StripeCheckoutGateway>());
 var app = builder.Build();
 
 // T-011-01 (TA-9.2 / FR-011-1): role is derived PER REQUEST from the two config lists — same cookie, role flips when a list changes (EC-011-3).
@@ -1152,6 +1166,84 @@ app.MapDelete("/api/v1/auth/me", async (HttpContext ctx, ISender sender, Cancell
     {
         // Same as GET — valid cookie, no row → 404 NOT_FOUND.
         return Results.Json(ProblemWriter.Build(404, ProblemCodes.NotFound, ProblemCodes.TitleOf(ProblemCodes.NotFound)), statusCode: 404);
+    }
+});
+
+// US-019-03 (TA-4.2#19 / FR-019-5): POST /api/v1/billing/webhooks/stripe — Stripe-Signature is the auth (no session gate).
+app.MapPost("/api/v1/billing/webhooks/stripe", async (HttpRequest request, ISender sender, CancellationToken ct) =>
+{
+    string payload;
+    using (var reader = new StreamReader(request.Body, System.Text.Encoding.UTF8))
+        payload = await reader.ReadToEndAsync(ct);
+
+    var secret = builder.Configuration["Wa:Stripe:WebhookSecret"];
+    if (!wa.application.UseCases.Billing.StripeWebhookSignature.IsValid(
+            request.Headers["Stripe-Signature"].ToString(), payload, secret, DateTimeOffset.UtcNow))
+        throw new BusinessException(ProblemCodes.StripeWebhookMismatch, "Stripe signature verification failed.");
+
+    try
+    {
+        await sender.Send(new wa.application.UseCases.Billing.HandleStripeWebhookCommand(payload), ct);
+    }
+    catch (wa.application.UseCases.Billing.StripeWebhookException ex) when (!ex.Retryable)
+    {
+        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+    }
+    // Retryable StripeWebhookException → GlobalErrorMiddleware → 500 INTERNAL → Stripe redelivers (EC-019-1).
+
+    return Results.Ok();
+});
+
+// US-019-01 (TA-4.2#18 / FR-019-1): POST /api/v1/billing/checkout — cookie auth; returns the Stripe-hosted Checkout URL. Persists nothing.
+app.MapPost("/api/v1/billing/checkout", async (wa.application.UseCases.Billing.CheckoutRequest req, HttpContext ctx, ISender sender, CancellationToken ct) =>
+{
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+
+    if (string.IsNullOrWhiteSpace(req?.PlanCode))
+        throw new BusinessException(ProblemCodes.Validation, "planCode is required.");
+
+    BillingInterval interval;
+    if (req.Interval is null || string.Equals(req.Interval, "monthly", StringComparison.OrdinalIgnoreCase))
+        interval = BillingInterval.Monthly;
+    else if (string.Equals(req.Interval, "annual", StringComparison.OrdinalIgnoreCase))
+        interval = BillingInterval.Annual;
+    else
+        throw new BusinessException(ProblemCodes.Validation, "interval must be 'monthly' or 'annual'.");
+
+    try
+    {
+        var session = await sender.Send(
+            new wa.application.UseCases.Billing.CreateCheckoutSessionCommand(userId, req.PlanCode.Trim(), interval), ct);
+        return Results.Ok(new { url = session.Url, sessionId = session.SessionId });
+    }
+    catch (wa.application.UseCases.Billing.CheckoutException ex)
+    {
+        var code = ex.Code == wa.application.UseCases.Billing.CheckoutException.FailureCode.NotFound
+            ? ProblemCodes.NotFound
+            : ProblemCodes.Validation;
+        throw new BusinessException(code, ex.Message, ex);
+    }
+    catch (wa.application.UseCases.Billing.BillingUnavailableException ex)
+    {
+        throw new BusinessException(ProblemCodes.BillingUnavailable, "Billing is temporarily unavailable — please try again.", ex);
+    }
+});
+
+// US-019-02 (TA-4.2#18): GET /api/v1/billing/portal — cookie auth; Stripe Billing Portal URL for the user's customer, or the upgrade fallback. Persists nothing.
+app.MapGet("/api/v1/billing/portal", async (HttpContext ctx, ISender sender, CancellationToken ct) =>
+{
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+
+    try
+    {
+        var result = await sender.Send(new wa.application.UseCases.Billing.GetPortalSessionQuery(userId), ct);
+        return Results.Ok(new { url = result.Url, fallback = result.Url is null ? "upgrade" : (string?)null });
+    }
+    catch (wa.application.UseCases.Billing.BillingUnavailableException ex)
+    {
+        throw new BusinessException(ProblemCodes.BillingUnavailable, "Billing is temporarily unavailable — please try again.", ex);
     }
 });
 

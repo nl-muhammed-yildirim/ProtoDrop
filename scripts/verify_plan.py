@@ -116,9 +116,12 @@ def main() -> int:
             errors += 1; fail(f"{path}: plan says MODIFY but file does not exist")
 
     # -- 2. cited paths + line refs ---------------------------------------------
+    create_rows = {f for f, a in files_for_coder(plan) if a == "CREATE"}  # documented: CREATE exempt for existence
     for base, line in cited_paths(plan):
         p = REPO / base
         if not p.is_file():
+            if base in create_rows:
+                continue
             if base.startswith(("src/", "tests/")):
                 errors += 1; fail(f"cited path missing (stale — drift?): {base}")
             else:
