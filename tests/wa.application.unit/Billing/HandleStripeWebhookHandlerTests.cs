@@ -193,6 +193,42 @@ public class HandleStripeWebhookHandlerTests
     }
 
     [Fact]
+    public async Task SubscriptionDeleted_ProUser_TargetsFree_PublishesPlanChanged_WithEventTypeReason()
+    {
+        var rig = new Rig();
+        rig.Store.Result = new StripeApplyResult(StripeApplyOutcome.Applied, UserId, ProId, FreeId, "pro", Plan.DefaultCode);
+
+        var outcome = await rig.Handler().Handle(
+            new HandleStripeWebhookCommand(Event("customer.subscription.deleted", "canceled", id: "evt_del")), default);
+
+        Assert.Equal(StripeWebhookOutcome.Applied, outcome);
+        Assert.Equal(1, rig.Store.ApplyCalls);
+        Assert.Equal(FreeId, rig.Store.CapturedTargetPlanId);
+        Assert.Equal("customer.subscription.deleted", rig.Store.CapturedChange!.EventType);
+        var env = Assert.Single(rig.Events.Published);
+        Assert.Equal(EventType.PlanChanged, env.Type);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(env.Payload));
+        Assert.Equal("pro", doc.RootElement.GetProperty("fromPlan").GetString());
+        Assert.Equal("free", doc.RootElement.GetProperty("toPlan").GetString());
+        Assert.Equal("customer.subscription.deleted", doc.RootElement.GetProperty("reason").GetString());
+        Assert.True(rig.TelemetryLog.Mentions(TelemetryEvents.PlanChanged));
+    }
+
+    [Fact]
+    public async Task SubscriptionDeleted_Duplicate_ReturnsDuplicate_NoEvent()
+    {
+        var rig = new Rig();
+        rig.Store.Result = StripeApplyResult.Of(StripeApplyOutcome.Duplicate);
+
+        var outcome = await rig.Handler().Handle(
+            new HandleStripeWebhookCommand(Event("customer.subscription.deleted", "canceled", id: "evt_del")), default);
+
+        Assert.Equal(StripeWebhookOutcome.Duplicate, outcome);
+        Assert.Empty(rig.Events.Published);
+        Assert.False(rig.TelemetryLog.Mentions(TelemetryEvents.PlanChanged));
+    }
+
+    [Fact]
     public async Task SubscriptionResumed_UnmappedPrice_ThrowsRetryable()
     {
         var rig = new Rig();

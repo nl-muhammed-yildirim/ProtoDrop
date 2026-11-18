@@ -149,6 +149,47 @@ public class StripeWebhookEndpointTests : IAsyncLifetime
         Assert.Equal(1, PlanChangedCount());
     }
 
+    // ---- subscription.deleted: subscription ended → Free ----
+
+    [Fact]
+    public async Task SignedSubscriptionDeleted_ProUser_DowngradesToFree_MirrorCanceled()
+    {
+        using (var created = await PostSignedAsync(Body("evt_pro", "customer.subscription.created", "active", _userId)))
+            Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+        Assert.Equal(_proId, (await _db.Set<AppUser>().AsNoTracking().SingleAsync(u => u.Id == _userId)).PlanId);
+
+        using (var deleted = await PostSignedAsync(Body("evt_del", "customer.subscription.deleted", "canceled", _userId)))
+            Assert.Equal(HttpStatusCode.OK, deleted.StatusCode);
+
+        Assert.Equal(_freeId, (await _db.Set<AppUser>().AsNoTracking().SingleAsync(u => u.Id == _userId)).PlanId);
+        var sub = await _db.Set<Subscription>().AsNoTracking().SingleAsync();
+        Assert.Equal("canceled", sub.Status);
+        Assert.Equal(2, await _db.Set<StripeEvent>().CountAsync());
+        Assert.True(await _db.Set<StripeEvent>().AnyAsync(e => e.StripeEventId == "evt_del"));
+        Assert.Equal(2, PlanChangedCount());
+    }
+
+    // ---- concurrent created + updated for the SAME new subscription (HOLDLOCK + unique-violation retry) ----
+
+    [Fact]
+    public async Task CreatedAndUpdatedConcurrently_NewSubscription_BothReturn200_OneRow()
+    {
+        var created = Body("evt_c", "customer.subscription.created", "active", _userId);
+        var updated = Body("evt_u", "customer.subscription.updated", "active", _userId);
+
+        var responses = await Task.WhenAll(PostSignedAsync(created), PostSignedAsync(updated));
+        foreach (var r in responses)
+        {
+            Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+            r.Dispose();
+        }
+
+        Assert.Equal(1, await _db.Set<Subscription>().CountAsync());
+        Assert.Equal(2, await _db.Set<StripeEvent>().CountAsync());
+        Assert.Equal(_proId, (await _db.Set<AppUser>().AsNoTracking().SingleAsync(u => u.Id == _userId)).PlanId);
+        Assert.Equal(1, PlanChangedCount());
+    }
+
     // ---- AC-019-4: unknown type ----
 
     [Fact]

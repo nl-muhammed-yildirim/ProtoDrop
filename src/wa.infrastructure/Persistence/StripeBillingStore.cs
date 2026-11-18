@@ -43,6 +43,25 @@ public sealed class StripeBillingStore : IStripeBillingStore
     public async Task<StripeApplyResult> ApplySubscriptionAsync(
         StripeSubscriptionChange change, Guid? targetPlanId, DateTime nowUtc, CancellationToken ct)
     {
+        try
+        {
+            return await ApplyOnceAsync(change, targetPlanId, nowUtc, ct);
+        }
+        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+        {
+            // Two deliveries for a brand-new subscription (created + updated) both saw no row and both inserted; the loser hit
+            // UQ_Sub_Stripe and its transaction (incl. its StripeEvent row) was rolled back. Retry ONCE: the winner's row is now
+            // committed, so the re-read under the lock takes the update path. A second violation propagates → 500 → Stripe redelivers.
+            return await ApplyOnceAsync(change, targetPlanId, nowUtc, ct);
+        }
+    }
+
+    private static bool IsUniqueViolation(DbUpdateException ex) =>
+        ex.InnerException is SqlException { Number: 2601 or 2627 };
+
+    private async Task<StripeApplyResult> ApplyOnceAsync(
+        StripeSubscriptionChange change, Guid? targetPlanId, DateTime nowUtc, CancellationToken ct)
+    {
         await using var db = await _factory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
 
@@ -60,8 +79,9 @@ public sealed class StripeBillingStore : IStripeBillingStore
         }
 
         // US-019-06 (D-3, EC-019-3): same UPDLOCK the grace timer takes, so a resume racing the timer is serialized.
+        // HOLDLOCK adds a key-range lock on UQ_Sub_Stripe so a MISSING row is locked too (concurrent created + updated for a new subscription).
         var subscription = await db.Set<Subscription>()
-            .FromSqlRaw("SELECT * FROM [Subscription] WITH (UPDLOCK, ROWLOCK) WHERE [StripeSubId] = {0}", change.StripeSubId)
+            .FromSqlRaw("SELECT * FROM [Subscription] WITH (UPDLOCK, ROWLOCK, HOLDLOCK) WHERE [StripeSubId] = {0}", change.StripeSubId)
             .FirstOrDefaultAsync(ct);
         var previousStatus = subscription?.Status; // null for a new row (US-019-05 grace transition)
         var userId = subscription?.AppUserId ?? change.MetadataUserId;

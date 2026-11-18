@@ -38,6 +38,8 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
     private const string SubscriptionPaused = "customer.subscription.paused"; // US-019-05 (FR-019-2): pause starts the 14-day grace
     private const string SubscriptionResumed = "customer.subscription.resumed"; // US-019-06 (FR-019-2, EC-019-3)
 
+    private const string SubscriptionDeleted = "customer.subscription.deleted"; // subscription ended (status canceled) → Free
+
     private const string InvoicePaymentFailed = "invoice.payment_failed";
     private const string InvoicePaid = "invoice.paid";
 
@@ -87,7 +89,7 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
                 return await HandleInvoiceAsync(type, eventId, obj, ct);
 
             if (type != SubscriptionCreated && type != SubscriptionUpdated && type != SubscriptionPaused
-                && type != SubscriptionResumed)
+                && type != SubscriptionResumed && type != SubscriptionDeleted)
             {
                 // AC-019-4: unknown type → 200 + log line, no mirror change, no StripeEvent row. Stripe ids only (TA-9.4).
                 _logger.LogInformation("Stripe webhook event ignored: {StripeEventId} {StripeEventType}", eventId, type);
