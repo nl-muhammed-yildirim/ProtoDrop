@@ -96,6 +96,10 @@ builder.Services.AddSingleton<wa.application.UseCases.Admin.IAuditReadStore>(sp 
 builder.Services.AddSingleton<ILimitsProvider>(sp => new LimitsProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
 // T-031-05 (US-018-05, TA-3.4): feature toggles — one resolver over the same caches.
 builder.Services.AddSingleton<IFeaturesProvider>(sp => new FeaturesProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
+// US-020-01 (FR-020-1): per-request PlanContext — user→plan-code port (singleton) + scoped accessor bound by PlanContextMiddleware.
+builder.Services.AddSingleton<IUserPlanStore>(sp => new wa.infrastructure.Persistence.UserPlanStore(sp.GetRequiredService<WaDbContext>()));
+builder.Services.AddScoped<PlanContextAccessor>();
+builder.Services.AddScoped<IPlanContextAccessor>(sp => sp.GetRequiredService<PlanContextAccessor>());
 // TA-3.6 — minting is pure HMAC (no network at request time); §5.2 account values already read above (T-055-02).
 builder.Services.AddSingleton<IBlobSasMinter>(new DraftBlobSasMinter(new Uri(blobAccountUrl!), blobAccountKey!));
 // TA-9.5 second line (T-056-03): AspNetCoreRateLimit frozen at 5.0.0, in-memory store — per-instance state is correct at M0 scale; a distributed store would be an ADR change.
@@ -185,6 +189,7 @@ app.UseIpRateLimiting();
 app.UseMiddleware<IdempotencyMiddleware>();
 app.UseMiddleware<SessionMiddleware>(); // TA-9.1: reads wa.session cookie → sets HttpContext.Items['wa.session.userId']; refreshes < 15 d remaining (FR-008-2)
 app.UseMiddleware<GlobalErrorMiddleware>(); // FR-056-3: every failure → TA-4.1.3 Problem+JSON (business codes keep their status, others 500 INTERNAL)
+app.UseMiddleware<PlanContextMiddleware>(); // FR-020-1 / US-020-01: binds session user → PlanContext (guest → Free); resolution happens on first read
 app.UseSerilogRequestLogging(options => options.GetMessageTemplateProperties = LogRoute.RequestLogProperties); // per-request INF line (Microsoft.* request logging is suppressed to Warning); TA-9.4: RequestPath = route template (/unsubscribe/{token}), never the raw path
 app.MapGet("/", () => "Hello World!");
 app.MapGet("/health", async (ISender sender, CancellationToken ct) =>
