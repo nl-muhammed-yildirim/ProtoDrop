@@ -200,6 +200,17 @@
   "billing.error.loadFailed": "Impossibile caricare il tuo piano.",
   "billing.error.upgradeFailed": "Impossibile avviare l'upgrade. Riprova.",
   "profile.plan.viewPlan": "Vedi piano",
+  "profile.export.heading": "I miei dati",
+  "profile.export.helper": "Include il tuo profilo e la cronologia dei trasferimenti — non i file stessi.",
+  "profile.export.button": "Esporta i miei dati",
+  "profile.export.retry": "Riprova",
+  "profile.export.preparing": "Preparazione dell’esportazione…",
+  "profile.export.ready": "Pronto — scarica",
+  "profile.export.download": "Scarica",
+  "profile.export.validity": "Il link resta valido per 24 ore.",
+  "profile.export.inFlight": "L’esportazione è già in preparazione.",
+  "profile.export.failed": "L’esportazione non è riuscita.",
+  "profile.export.error": "Impossibile richiedere l’esportazione. Riprova.",
   "limit.activeTransfers.exact": "Hai {{count}} trasferimenti attivi (limite {{limit}}). Passa a un piano superiore per continuare a inviare.",
   "limit.activeTransfers.generic": "Hai raggiunto il limite di trasferimenti attivi. Passa a un piano superiore per continuare a inviare."
 }

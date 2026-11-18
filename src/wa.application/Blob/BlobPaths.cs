@@ -13,6 +13,9 @@ public static class BlobPaths
     /// <summary>Transfers container name (TA-3.5).</summary>
     public const string TransfersContainer = "transfers";
 
+    /// <summary>Exports container name (US-047-01, TA-3.5 data-export row).</summary>
+    public const string ExportsContainer = "exports";
+
     /// <summary>
     /// TA-3.5 staging row: a file staged against a draft — the browser uploads here as block blobs before finalize creates the transfer. Lifetime: 24 h lifecycle (safety net). The only path exercised at M0 (AC-055-3).
     /// </summary>
@@ -30,4 +33,10 @@ public static class BlobPaths
     /// </summary>
     public static string TransferZip(Guid transferId)
         => $"transfers/{transferId:N}/all.zip";
+
+    /// <summary>
+    /// TA-3.5 data-export row (US-047-01): the GDPR export zip built by f-data-export. Lifetime: 7 days, purged by the same job.
+    /// </summary>
+    public static string DataExportZip(Guid userId, Guid exportId)
+        => $"exports/{userId:N}/{exportId:N}.zip";
 }

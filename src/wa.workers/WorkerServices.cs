@@ -7,6 +7,7 @@ using wa.application.Limits;
 using wa.application.Ports;
 using wa.application.UseCases.Auth;
 using wa.application.UseCases.Billing;
+using wa.application.UseCases.DataExport;
 using wa.application.UseCases.Transfers;
 using wa.infrastructure.Blob;
 using wa.infrastructure.Email;
@@ -113,6 +114,13 @@ public static class WorkerServices
             sp.GetRequiredService<IBlobDeletionStore>(),
             sp.GetRequiredService<IBlobStore>(),
             sp.GetRequiredService<ILogger<DeleteOrphanBlobsHandler>>()));
+
+        // US-047-01 (FR-047-1/2): f-data-export builder — JobRun window claim, purge then build; no events (FR-047-8).
+        services.AddSingleton<IDataExportJobStore>(sp => new DataExportJobStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+        services.AddSingleton<BuildDataExportsHandler>(sp => new BuildDataExportsHandler(
+            sp.GetRequiredService<IDataExportJobStore>(),
+            sp.GetRequiredService<IBlobStore>(),
+            sp.GetRequiredService<ILogger<BuildDataExportsHandler>>()));
 
         // T-006-01: f-email consumer
         services.AddSingleton<EventDeduplicator>(sp => new EventDeduplicator(() => DateTimeOffset.UtcNow));

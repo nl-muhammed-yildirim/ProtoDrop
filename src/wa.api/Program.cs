@@ -104,7 +104,10 @@ builder.Services.AddSingleton<IUserPlanStore>(sp => new wa.infrastructure.Persis
 builder.Services.AddScoped<PlanContextAccessor>();
 builder.Services.AddScoped<IPlanContextAccessor>(sp => sp.GetRequiredService<PlanContextAccessor>());
 // TA-3.6 — minting is pure HMAC (no network at request time); §5.2 account values already read above (T-055-02).
-builder.Services.AddSingleton<IBlobSasMinter>(new DraftBlobSasMinter(new Uri(blobAccountUrl!), blobAccountKey!));
+var sasMinter = new DraftBlobSasMinter(new Uri(blobAccountUrl!), blobAccountKey!);
+builder.Services.AddSingleton<IBlobSasMinter>(sasMinter);
+builder.Services.AddSingleton<IExportSasMinter>(sasMinter); // US-047-01: export download SAS (TA-3.6)
+builder.Services.AddSingleton<wa.application.UseCases.DataExport.IDataExportStore>(sp => new wa.infrastructure.Persistence.DataExportStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
 // TA-9.5 second line (T-056-03): AspNetCoreRateLimit frozen at 5.0.0, in-memory store — per-instance state is correct at M0 scale; a distributed store would be an ADR change.
 builder.Services.AddMemoryCache(); // the package's MemoryCache* stores need IMemoryCache, which this app does not register by default (DI validation caught it)
 builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>(); // v5.0.0 leaves this to the caller — AsyncKeyLockProcessingStrategy requires it and AddInMemoryRateLimiting registers no implementation
@@ -1183,6 +1186,48 @@ app.MapDelete("/api/v1/auth/me", async (HttpContext ctx, ISender sender, Cancell
         return Results.Json(ProblemWriter.Build(404, ProblemCodes.NotFound, ProblemCodes.TitleOf(ProblemCodes.NotFound)), statusCode: 404);
     }
 });
+
+// US-047-01 (FR-047-1/2/4): POST /api/v1/auth/me/export — request a GDPR data export (gated by feature.dataExport); 202 + processing view.
+app.MapPost("/api/v1/auth/me/export", async (HttpContext ctx, ISender sender, CancellationToken ct) =>
+{
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+
+    try
+    {
+        var view = await sender.Send(new wa.application.UseCases.DataExport.ExportMyDataCommand(userId), ct);
+        return Results.Json(ToExportBody(view), statusCode: 202);
+    }
+    catch (wa.application.UseCases.DataExport.DataExportInFlightException)
+    {
+        throw new BusinessException(ProblemCodes.ExportInFlight, "Your export is already preparing.");
+    }
+    catch (MeProfileException ex) when (ex.Message == ProblemCodes.TitleOf(ProblemCodes.NotFound))
+    {
+        return Results.Json(ProblemWriter.Build(404, ProblemCodes.NotFound, ProblemCodes.TitleOf(ProblemCodes.NotFound)), statusCode: 404);
+    }
+}).RequireFeature(FeatureGates.DataExport);
+
+// US-047-01 (FR-047-2/4): GET /api/v1/auth/me/export — latest export state (+ fresh 24 h downloadUrl when ready). NOT gated: in-flight jobs still complete and stay downloadable.
+app.MapGet("/api/v1/auth/me/export", async (HttpContext ctx, ISender sender, CancellationToken ct) =>
+{
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+
+    var view = await sender.Send(new wa.application.UseCases.DataExport.GetDataExportQuery(userId), ct);
+    return view is null ? Results.NoContent() : Results.Json(ToExportBody(view), statusCode: 200);
+});
+
+static Dictionary<string, object?> ToExportBody(wa.application.UseCases.DataExport.DataExportView view)
+{
+    var body = new Dictionary<string, object?> { ["state"] = view.State, ["createdAtUtc"] = view.CreatedAtUtc };
+    if (view.State == "ready")
+    {
+        body["readyAtUtc"] = view.ReadyAtUtc;
+        body["downloadUrl"] = view.DownloadUrl?.ToString();
+    }
+    return body;
+}
 
 // US-019-03 (TA-4.2#19 / FR-019-5): POST /api/v1/billing/webhooks/stripe — Stripe-Signature is the auth (no session gate).
 app.MapPost("/api/v1/billing/webhooks/stripe", async (HttpRequest request, ISender sender, CancellationToken ct) =>

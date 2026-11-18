@@ -200,6 +200,17 @@
   "billing.error.loadFailed": "Impossible de charger votre forfait.",
   "billing.error.upgradeFailed": "Impossible de lancer la mise à niveau. Veuillez réessayer.",
   "profile.plan.viewPlan": "Voir le forfait",
+  "profile.export.heading": "Mes données",
+  "profile.export.helper": "Comprend votre profil et l’historique de vos transferts — pas les fichiers eux-mêmes.",
+  "profile.export.button": "Exporter mes données",
+  "profile.export.retry": "Réessayer",
+  "profile.export.preparing": "Préparation de votre export…",
+  "profile.export.ready": "Prêt — télécharger",
+  "profile.export.download": "Télécharger",
+  "profile.export.validity": "Le lien reste valide 24 heures.",
+  "profile.export.inFlight": "Votre export est déjà en cours de préparation.",
+  "profile.export.failed": "Votre export a échoué.",
+  "profile.export.error": "Impossible de demander votre export. Réessayez.",
   "limit.activeTransfers.exact": "Vous avez {{count}} transferts actifs (limite {{limit}}). Passez à un forfait supérieur pour continuer à envoyer.",
   "limit.activeTransfers.generic": "Vous avez atteint la limite de transferts actifs. Passez à un forfait supérieur pour continuer à envoyer."
 }

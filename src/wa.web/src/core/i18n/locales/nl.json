@@ -200,6 +200,17 @@
   "billing.error.loadFailed": "Je abonnement kon niet worden geladen.",
   "billing.error.upgradeFailed": "De upgrade kon niet worden gestart. Probeer het opnieuw.",
   "profile.plan.viewPlan": "Abonnement bekijken",
+  "profile.export.heading": "Mijn gegevens",
+  "profile.export.helper": "Bevat je profiel en overdrachtsgeschiedenis — niet de bestanden zelf.",
+  "profile.export.button": "Mijn gegevens exporteren",
+  "profile.export.retry": "Opnieuw proberen",
+  "profile.export.preparing": "Je export wordt voorbereid…",
+  "profile.export.ready": "Klaar — downloaden",
+  "profile.export.download": "Downloaden",
+  "profile.export.validity": "De link blijft 24 uur geldig.",
+  "profile.export.inFlight": "Je export wordt al voorbereid.",
+  "profile.export.failed": "Je export is mislukt.",
+  "profile.export.error": "Je export kon niet worden aangevraagd. Probeer het opnieuw.",
   "limit.activeTransfers.exact": "Je hebt {{count}} actieve overdrachten (limiet {{limit}}). Upgrade om te blijven versturen.",
   "limit.activeTransfers.generic": "Je hebt de limiet voor actieve overdrachten bereikt. Upgrade om te blijven versturen."
 }

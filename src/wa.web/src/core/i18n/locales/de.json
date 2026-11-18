@@ -200,6 +200,17 @@
   "billing.error.loadFailed": "Ihr Tarif konnte nicht geladen werden.",
   "billing.error.upgradeFailed": "Das Upgrade konnte nicht gestartet werden. Bitte erneut versuchen.",
   "profile.plan.viewPlan": "Tarif ansehen",
+  "profile.export.heading": "Meine Daten",
+  "profile.export.helper": "Enthält dein Profil und deinen Übertragungsverlauf — nicht die Dateien selbst.",
+  "profile.export.button": "Meine Daten exportieren",
+  "profile.export.retry": "Erneut versuchen",
+  "profile.export.preparing": "Dein Export wird vorbereitet…",
+  "profile.export.ready": "Bereit — herunterladen",
+  "profile.export.download": "Herunterladen",
+  "profile.export.validity": "Der Link bleibt 24 Stunden gültig.",
+  "profile.export.inFlight": "Dein Export wird bereits vorbereitet.",
+  "profile.export.failed": "Dein Export ist fehlgeschlagen.",
+  "profile.export.error": "Dein Export konnte nicht angefordert werden. Versuche es erneut.",
   "limit.activeTransfers.exact": "Sie haben {{count}} aktive Übertragungen (Limit {{limit}}). Upgraden Sie, um weiter zu senden.",
   "limit.activeTransfers.generic": "Sie haben das Limit für aktive Übertragungen erreicht. Upgraden Sie, um weiter zu senden."
 }

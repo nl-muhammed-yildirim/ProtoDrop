@@ -200,6 +200,17 @@
   "billing.error.loadFailed": "Planınız yüklenemedi.",
   "billing.error.upgradeFailed": "Yükseltme başlatılamadı. Lütfen tekrar deneyin.",
   "profile.plan.viewPlan": "Planı görüntüle",
+  "profile.export.heading": "Verilerim",
+  "profile.export.helper": "Profilinizi ve aktarım geçmişinizi içerir — dosyaların kendisini değil.",
+  "profile.export.button": "Verilerimi dışa aktar",
+  "profile.export.retry": "Tekrar dene",
+  "profile.export.preparing": "Dışa aktarımınız hazırlanıyor…",
+  "profile.export.ready": "Hazır — indir",
+  "profile.export.download": "İndir",
+  "profile.export.validity": "Bağlantı 24 saat geçerli kalır.",
+  "profile.export.inFlight": "Dışa aktarımınız zaten hazırlanıyor.",
+  "profile.export.failed": "Dışa aktarımınız başarısız oldu.",
+  "profile.export.error": "Dışa aktarım istenemedi. Tekrar deneyin.",
   "limit.activeTransfers.exact": "{{count}} etkin aktarımınız var (sınır {{limit}}). Göndermeye devam etmek için yükseltin.",
   "limit.activeTransfers.generic": "Etkin aktarım sınırına ulaştınız. Göndermeye devam etmek için yükseltin."
 }

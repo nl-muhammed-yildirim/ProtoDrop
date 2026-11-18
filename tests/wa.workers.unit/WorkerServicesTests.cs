@@ -60,6 +60,14 @@ public class WorkerServicesTests
     }
 
     [Fact]
+    public void DataExportHandler_Resolves() // US-047-01: f-data-export builder is composed
+    {
+        using var sp = Build(InMemory(BaseSettings()));
+
+        Assert.NotNull(sp.GetRequiredService<wa.application.UseCases.DataExport.BuildDataExportsHandler>());
+    }
+
+    [Fact]
     public void LinuxDoubleUnderscoreEnvVars_AreRead()
     {
         var vars = new Dictionary<string, string>

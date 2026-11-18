@@ -200,6 +200,17 @@
   "billing.error.loadFailed": "Could not load your plan.",
   "billing.error.upgradeFailed": "Could not start the upgrade. Please try again.",
   "profile.plan.viewPlan": "View plan",
+  "profile.export.heading": "My data",
+  "profile.export.helper": "Includes your profile and transfer history — not the files themselves.",
+  "profile.export.button": "Export my data",
+  "profile.export.retry": "Try again",
+  "profile.export.preparing": "Preparing your export…",
+  "profile.export.ready": "Ready — download",
+  "profile.export.download": "Download",
+  "profile.export.validity": "The link stays valid for 24 hours.",
+  "profile.export.inFlight": "Your export is already preparing.",
+  "profile.export.failed": "Your export failed.",
+  "profile.export.error": "Could not request your export. Try again.",
   "limit.activeTransfers.exact": "You have {{count}} active transfers (limit {{limit}}). Upgrade to keep sending.",
   "limit.activeTransfers.generic": "You've reached your active transfers limit. Upgrade to keep sending."
 }

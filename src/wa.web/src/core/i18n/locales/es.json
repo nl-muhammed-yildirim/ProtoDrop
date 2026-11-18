@@ -200,6 +200,17 @@
   "billing.error.loadFailed": "No se pudo cargar tu plan.",
   "billing.error.upgradeFailed": "No se pudo iniciar la mejora. Inténtalo de nuevo.",
   "profile.plan.viewPlan": "Ver plan",
+  "profile.export.heading": "Mis datos",
+  "profile.export.helper": "Incluye tu perfil y el historial de transferencias, no los archivos en sí.",
+  "profile.export.button": "Exportar mis datos",
+  "profile.export.retry": "Reintentar",
+  "profile.export.preparing": "Preparando tu exportación…",
+  "profile.export.ready": "Listo — descargar",
+  "profile.export.download": "Descargar",
+  "profile.export.validity": "El enlace es válido durante 24 horas.",
+  "profile.export.inFlight": "Tu exportación ya se está preparando.",
+  "profile.export.failed": "Tu exportación ha fallado.",
+  "profile.export.error": "No se pudo solicitar tu exportación. Inténtalo de nuevo.",
   "limit.activeTransfers.exact": "Tienes {{count}} transferencias activas (límite {{limit}}). Mejora tu plan para seguir enviando.",
   "limit.activeTransfers.generic": "Has alcanzado el límite de transferencias activas. Mejora tu plan para seguir enviando."
 }
