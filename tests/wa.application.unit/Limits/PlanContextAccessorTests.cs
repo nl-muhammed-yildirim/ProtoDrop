@@ -96,6 +96,55 @@ public class PlanContextAccessorTests
     }
 
     [Fact]
+    public async Task Free_GatedFeaturesUnavailable_EvenWithGlobalGatesOn() // US-020-04 story AC 1
+    {
+        var userId = Guid.NewGuid();
+        var (accessor, _, _) = Create(users => users.Codes[userId] = "free", AllGatesOn());
+        accessor.Bind(userId);
+
+        var features = (await accessor.GetAsync()).Features;
+
+        Assert.False(features.Scheduling);
+        Assert.False(features.Branding);
+        Assert.False(features.Analytics);
+        Assert.False(features.Ads);
+    }
+
+    [Fact]
+    public async Task Pro_GatedFeaturesAvailable_WhenGlobalGatesOn() // Pro row is ad-free (F-PRF-004)
+    {
+        var userId = Guid.NewGuid();
+        var (accessor, _, _) = Create(users => users.Codes[userId] = "pro", AllGatesOn());
+        accessor.Bind(userId);
+
+        var features = (await accessor.GetAsync()).Features;
+
+        Assert.True(features.Scheduling);
+        Assert.True(features.Branding);
+        Assert.True(features.Analytics);
+        Assert.False(features.Ads);
+    }
+
+    [Fact]
+    public async Task Upgrade_NextRequestSeesProFeatures() // US-020-04 story AC 2: user→plan read is uncached, so the next request sees the new plan.
+    {
+        var userId = Guid.NewGuid();
+        var store = new FakeUserPlanStore();
+        store.Codes[userId] = "free";
+        var flags = AllGatesOn();
+
+        var (first, _, _) = Create(flags: flags, sharedUsers: store);
+        first.Bind(userId);
+        Assert.False((await first.GetAsync()).Features.Scheduling);
+
+        store.Codes[userId] = "pro";
+
+        var (second, _, _) = Create(flags: flags, sharedUsers: store);
+        second.Bind(userId);
+        Assert.True((await second.GetAsync()).Features.Scheduling);
+    }
+
+    [Fact]
     public async Task SecondRead_SameInstance_StoreHitOnce()
     {
         var userId = Guid.NewGuid();
@@ -142,10 +191,13 @@ public class PlanContextAccessorTests
 
     // ── builders ──────────────────────────────────────────────────────────────
 
+    private static List<FeatureFlag> AllGatesOn() =>
+        FeaturesProvider.GlobalGateKeys.Select(k => new FeatureFlag { Key = k, Value = "true" }).ToList();
+
     private static (PlanContextAccessor Accessor, FakeUserPlanStore Users, ILimitsProvider Limits) Create(
-        Action<FakeUserPlanStore>? seed = null, IReadOnlyList<FeatureFlag>? flags = null)
+        Action<FakeUserPlanStore>? seed = null, IReadOnlyList<FeatureFlag>? flags = null, FakeUserPlanStore? sharedUsers = null)
     {
-        var users = new FakeUserPlanStore();
+        var users = sharedUsers ?? new FakeUserPlanStore();
         seed?.Invoke(users);
         var now = DateTimeOffset.UtcNow;
         var plans = new PlansCache(new StubPlansStore(), Ttl, () => now);
