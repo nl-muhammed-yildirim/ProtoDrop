@@ -140,12 +140,65 @@ public class BillingGraceIntegrationTests : IAsyncLifetime
         await PauseAsync("evt_pause", P);
 
         await _stripe.ApplySubscriptionAsync(
-            Change("evt_active", "customer.subscription.updated", "active"), _proId, P.AddDays(5), default);
+            Change("evt_active", "customer.subscription.resumed", "active"), _proId, P.AddDays(5), default);
+
+        var sub = await SubAsync();
+        Assert.Equal("active", sub.Status);
+        Assert.Null(sub.GraceEndsAtUtc);
 
         Assert.Equal(0, await _gracePass.RunAsync(P.AddDays(14), default));
         Assert.Equal(_proId, await UserPlanIdAsync());
         Assert.Equal(0, GraceEndedEmailCount());
         Assert.Equal(0, PlanChangedGraceCount());
+    }
+
+    [Fact]
+    public async Task Us01906_ResumeAfterDowngrade_RestoresPro_NoSecondDowngrade()
+    {
+        await PauseAsync("evt_pause", P);
+        Assert.Equal(1, await _gracePass.RunAsync(P.AddDays(14), default));
+        Assert.Equal(_freeId, await UserPlanIdAsync());
+
+        var result = await _stripe.ApplySubscriptionAsync(
+            Change("evt_resume", "customer.subscription.resumed", "active"), _proId, P.AddDays(15), default);
+
+        Assert.Equal(StripeApplyOutcome.Applied, result.Outcome);
+        Assert.Equal("free", result.FromPlanCode);
+        Assert.Equal("pro", result.ToPlanCode);
+        Assert.Equal(_proId, await UserPlanIdAsync());
+        Assert.Null((await SubAsync()).GraceEndsAtUtc);
+
+        Assert.Equal(0, await _gracePass.RunAsync(P.AddDays(30), default));
+        Assert.Equal(_proId, await UserPlanIdAsync());
+        Assert.Equal(1, GraceEndedEmailCount());
+    }
+
+    [Fact]
+    public async Task Us01906_DuplicateResumed_IsDuplicate_NoChange()
+    {
+        await PauseAsync("evt_pause", P);
+
+        var first = await _stripe.ApplySubscriptionAsync(
+            Change("evt_resume", "customer.subscription.resumed", "active"), _proId, P.AddDays(2), default);
+        var replay = await _stripe.ApplySubscriptionAsync(
+            Change("evt_resume", "customer.subscription.resumed", "active"), _proId, P.AddDays(3), default);
+
+        Assert.Equal(StripeApplyOutcome.Applied, first.Outcome);
+        Assert.Equal(StripeApplyOutcome.Duplicate, replay.Outcome);
+        Assert.Null((await SubAsync()).GraceEndsAtUtc);
+        Assert.Equal(_proId, await UserPlanIdAsync());
+    }
+
+    [Fact]
+    public async Task Us01906_ResumeWithoutPause_AlreadyPro_NoOp()
+    {
+        var result = await _stripe.ApplySubscriptionAsync(
+            Change("evt_resume", "customer.subscription.resumed", "active"), _proId, P, default);
+
+        Assert.Equal(StripeApplyOutcome.Applied, result.Outcome);
+        Assert.Equal(_proId, result.FromPlanId);
+        Assert.Equal(_proId, result.ToPlanId);
+        Assert.Null((await SubAsync()).GraceEndsAtUtc);
     }
 
     [Fact]

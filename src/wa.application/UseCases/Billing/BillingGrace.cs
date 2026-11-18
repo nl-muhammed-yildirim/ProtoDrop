@@ -16,14 +16,18 @@ public static class BillingGrace
     public const string PausedStatus = "paused";
     public const string GraceEndedReason = "grace_ended";
 
+    /// <summary>US-019-06 (FR-019-8): plan.changed reason when customer.subscription.resumed changes the plan.</summary>
+    public const string ResumedReason = "resumed";
+
     /// <summary>
     /// The grace end after a status change. A pause starts grace (now + 14 d) unless the row was already paused with a
-    /// grace set (a replayed or second paused/updated event never extends it). Any other status leaves it unchanged (clearing is US-019-06).
+    /// grace set (a replayed or second paused/updated event never extends it). Any other status clears it
+    /// (US-019-06: grace only has meaning while paused, so resumed/updated(active) in either order clears it).
     /// </summary>
     public static DateTime? NextGraceEndsAt(string? previousStatus, DateTime? currentGraceEndsAtUtc, string newStatus, DateTime nowUtc)
     {
         if (newStatus != PausedStatus)
-            return currentGraceEndsAtUtc;
+            return null;
 
         if (previousStatus == PausedStatus && currentGraceEndsAtUtc is not null)
             return currentGraceEndsAtUtc;

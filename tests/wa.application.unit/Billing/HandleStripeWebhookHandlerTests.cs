@@ -145,6 +145,67 @@ public class HandleStripeWebhookHandlerTests
     }
 
     [Fact]
+    public async Task SubscriptionResumed_InGrace_AlreadyPro_Applied_NoPlanChanged()
+    {
+        var rig = new Rig();
+        rig.Store.Result = new StripeApplyResult(StripeApplyOutcome.Applied, UserId, ProId, ProId, "pro", "pro");
+
+        var outcome = await rig.Handler().Handle(
+            new HandleStripeWebhookCommand(Event("customer.subscription.resumed", "active", id: "evt_resume")), default);
+
+        Assert.Equal(StripeWebhookOutcome.Applied, outcome);
+        Assert.Equal(1, rig.Store.ApplyCalls);
+        Assert.Equal(ProId, rig.Store.CapturedTargetPlanId);
+        Assert.Equal("customer.subscription.resumed", rig.Store.CapturedChange!.EventType);
+        Assert.Empty(rig.Events.Published);
+        Assert.False(rig.TelemetryLog.Mentions(TelemetryEvents.PlanChanged));
+    }
+
+    [Fact]
+    public async Task SubscriptionResumed_AfterDowngrade_PublishesPlanChanged_ReasonResumed()
+    {
+        var rig = new Rig();
+
+        var outcome = await rig.Handler().Handle(
+            new HandleStripeWebhookCommand(Event("customer.subscription.resumed", "active", id: "evt_resume")), default);
+
+        Assert.Equal(StripeWebhookOutcome.Applied, outcome);
+        var env = Assert.Single(rig.Events.Published);
+        Assert.Equal(EventType.PlanChanged, env.Type);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(env.Payload));
+        Assert.Equal("resumed", doc.RootElement.GetProperty("reason").GetString());
+        Assert.Equal("free", doc.RootElement.GetProperty("fromPlan").GetString());
+        Assert.Equal("pro", doc.RootElement.GetProperty("toPlan").GetString());
+        Assert.True(rig.TelemetryLog.Mentions(TelemetryEvents.PlanChanged));
+    }
+
+    [Fact]
+    public async Task SubscriptionResumed_Duplicate_ReturnsDuplicate_NoEvent()
+    {
+        var rig = new Rig();
+        rig.Store.Result = StripeApplyResult.Of(StripeApplyOutcome.Duplicate);
+
+        var outcome = await rig.Handler().Handle(
+            new HandleStripeWebhookCommand(Event("customer.subscription.resumed", "active", id: "evt_resume")), default);
+
+        Assert.Equal(StripeWebhookOutcome.Duplicate, outcome);
+        Assert.Empty(rig.Events.Published);
+    }
+
+    [Fact]
+    public async Task SubscriptionResumed_UnmappedPrice_ThrowsRetryable()
+    {
+        var rig = new Rig();
+        rig.Store.PricePlan = null;
+
+        var ex = await Assert.ThrowsAsync<StripeWebhookException>(() =>
+            rig.Handler().Handle(new HandleStripeWebhookCommand(Event("customer.subscription.resumed", "active")), default));
+
+        Assert.True(ex.Retryable);
+        Assert.Equal(0, rig.Store.ApplyCalls);
+    }
+
+    [Fact]
     public async Task UnmappedPrice_ActiveStatus_ThrowsRetryable_StoreApplyNotCalled()
     {
         var rig = new Rig();

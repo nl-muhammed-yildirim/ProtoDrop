@@ -32,12 +32,24 @@ public class BillingGraceTests
     public void Pause_WhenAlreadyPausedWithoutGrace_StartsGrace() =>
         Assert.Equal(T + BillingGrace.Duration, BillingGrace.NextGraceEndsAt("paused", null, "paused", T));
 
-    [Fact]
-    public void NonPausedStatus_LeavesGraceUnchanged()
+    [Theory]
+    [InlineData("active")]
+    [InlineData("trialing")]
+    [InlineData("past_due")]
+    [InlineData("canceled")]
+    public void NonPausedStatus_ClearsGrace(string status)
     {
         var g = T.AddDays(14);
-        Assert.Equal(g, BillingGrace.NextGraceEndsAt("paused", g, "active", T.AddDays(5)));
-        Assert.Null(BillingGrace.NextGraceEndsAt("active", null, "canceled", T));
+        Assert.Null(BillingGrace.NextGraceEndsAt("paused", g, status, T.AddDays(5)));
+        Assert.Null(BillingGrace.NextGraceEndsAt("active", null, status, T));
+    }
+
+    [Fact]
+    public void IsExpired_AfterResume_False()
+    {
+        var g = T.AddDays(14);
+        var next = BillingGrace.NextGraceEndsAt("paused", g, "active", T.AddDays(5));
+        Assert.False(BillingGrace.IsExpired("active", next, g.AddDays(1)));
     }
 
     [Fact]

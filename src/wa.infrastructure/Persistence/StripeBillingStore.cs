@@ -59,7 +59,10 @@ public sealed class StripeBillingStore : IStripeBillingStore
             return StripeApplyResult.Of(StripeApplyOutcome.Duplicate);
         }
 
-        var subscription = await db.Set<Subscription>().FirstOrDefaultAsync(s => s.StripeSubId == change.StripeSubId, ct);
+        // US-019-06 (D-3, EC-019-3): same UPDLOCK the grace timer takes, so a resume racing the timer is serialized.
+        var subscription = await db.Set<Subscription>()
+            .FromSqlRaw("SELECT * FROM [Subscription] WITH (UPDLOCK, ROWLOCK) WHERE [StripeSubId] = {0}", change.StripeSubId)
+            .FirstOrDefaultAsync(ct);
         var previousStatus = subscription?.Status; // null for a new row (US-019-05 grace transition)
         var userId = subscription?.AppUserId ?? change.MetadataUserId;
         var user = userId is null

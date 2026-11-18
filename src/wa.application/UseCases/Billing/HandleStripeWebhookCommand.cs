@@ -36,6 +36,7 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
     private const string SubscriptionCreated = "customer.subscription.created";
     private const string SubscriptionUpdated = "customer.subscription.updated";
     private const string SubscriptionPaused = "customer.subscription.paused"; // US-019-05 (FR-019-2): pause starts the 14-day grace
+    private const string SubscriptionResumed = "customer.subscription.resumed"; // US-019-06 (FR-019-2, EC-019-3)
 
     private const string InvoicePaymentFailed = "invoice.payment_failed";
     private const string InvoicePaid = "invoice.paid";
@@ -85,7 +86,8 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
             if (type == InvoicePaymentFailed || type == InvoicePaid)
                 return await HandleInvoiceAsync(type, eventId, obj, ct);
 
-            if (type != SubscriptionCreated && type != SubscriptionUpdated && type != SubscriptionPaused)
+            if (type != SubscriptionCreated && type != SubscriptionUpdated && type != SubscriptionPaused
+                && type != SubscriptionResumed)
             {
                 // AC-019-4: unknown type → 200 + log line, no mirror change, no StripeEvent row. Stripe ids only (TA-9.4).
                 _logger.LogInformation("Stripe webhook event ignored: {StripeEventId} {StripeEventType}", eventId, type);
@@ -147,7 +149,7 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
                         userId = result.UserId,
                         fromPlan = result.FromPlanCode,
                         toPlan = result.ToPlanCode,
-                        reason = type
+                        reason = type == SubscriptionResumed ? BillingGrace.ResumedReason : type
                     }
                 };
                 await _events.PublishAsync(envelope, ct);
@@ -244,7 +246,7 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
             case "unpaid":
                 return (await _plans.GetAsync(Plan.DefaultCode, ct)).Id;
             default:
-                return null; // incomplete: mirror only; paused: mirror + grace (StripeBillingStore), plan kept
+                return null; // incomplete: mirror only (resumed arrives as active above); paused: mirror + grace (StripeBillingStore), plan kept
         }
     }
 
