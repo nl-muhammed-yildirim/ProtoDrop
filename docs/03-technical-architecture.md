@@ -465,7 +465,7 @@ CREATE TABLE dbo.IdempotencyKey (
 ```
 
 Machine `code` values (all of them, no others in MVP):
-`VALIDATION`, `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `TRANSFER_NOT_FINALIZED`, `TRANSFER_SIZE_EXCEEDED`, `STORAGE_QUOTA_EXCEEDED`, `MAX_DOWNLOADS_REACHED`, `WRONG_PASSWORD`, `TRANSFER_EXPIRED`, `TRANSFER_DELETED`, `FILES_GONE`, `IDEMPOTENCY_CONFLICT`, `RATE_LIMITED`, `STRIPE_WEBHOOK_MISMATCH`, `EMAIL_UNSUBSCRIBED`, `INTERNAL`.
+`VALIDATION`, `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `TRANSFER_NOT_FINALIZED`, `TRANSFER_SIZE_EXCEEDED`, `STORAGE_QUOTA_EXCEEDED`, `MAX_DOWNLOADS_REACHED`, `WRONG_PASSWORD`, `TRANSFER_EXPIRED`, `TRANSFER_DELETED`, `FILES_GONE`, `IDEMPOTENCY_CONFLICT`, `RATE_LIMITED`, `STRIPE_WEBHOOK_MISMATCH`, `EMAIL_UNSUBSCRIBED`, `BILLING_UNAVAILABLE`, `INTERNAL`.
 
 **TA-4.1.4 Pagination** — cursor: `?cursor={base64(created_at:id)}&limit=25`; response includes `nextCursor` (null when done).
 
@@ -599,7 +599,8 @@ Producers: `wa-api` via the `IEventPublisher` adapter (in tests: in-memory fake)
 | `download.completed` | transferId | `{ transferId, fileId?, ipHash, country, uaHash }` | API (at SAS mint) |
 | `zip.generated` | transferId | `{ transferId, sizeBytes, durationMs }` | f-zip |
 | `user.created` / `account.deleted` | userId | `{ userId }` | API |
-| `plan.changed` | userId | `{ userId, fromPlan, toPlan, reason }` | Stripe webhook handler |
+| `plan.changed` | userId | `{ userId, fromPlan, toPlan, reason }` | Stripe webhook handler, f-expire grace step |
+| `billing.email_requested` | userId | `{ userId, email, subscriptionId, kind, step }` | f-expire billing sub-steps (F-BIL-002 US-019-04/05; D-3 option A, approved 2026-11-18) |
 | `admin.action` | actor | `{ actor, action, entityType, entityId, details }` | admin endpoints |
 
 ---

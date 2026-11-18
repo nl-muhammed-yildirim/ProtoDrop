@@ -6,7 +6,7 @@
 
 ## 1. Closed sets (counts are load-bearing — cite them, don't re-enumerate in plans)
 
-### ProblemCodes (`src/wa.domain/Errors/ProblemCodes.cs`) — **18 members**
+### ProblemCodes (`src/wa.domain/Errors/ProblemCodes.cs`) — **19 members**
 `VALIDATION`, `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `TRANSFER_NOT_FINALIZED`,
 `TRANSFER_SIZE_EXCEEDED`, `STORAGE_QUOTA_EXCEEDED`, `MAX_DOWNLOADS_REACHED`, `WRONG_PASSWORD`,
 `TRANSFER_EXPIRED`, `TRANSFER_DELETED`, `FILES_GONE`, `IDEMPOTENCY_CONFLICT`, `RATE_LIMITED`,
@@ -30,7 +30,7 @@ Colors: `--bg #FFFFFF`, `--bg-subtle #F5F6F8`, `--bg-elevated #FFFFFF`, `--fg #1
 Typography/shape: `--fs-display 40px`, `--fs-h1 28px`, `--fs-body 16px`, `--fs-small 14px`,
 `--fs-tiny 12px`, `--radius-sm 6px`, `--radius-md 10px`, `--radius-lg 16px`.
 
-## 2. API surface (`src/wa.api/Program.cs`) — **36 route+method mappings** (end of Phase 0; 35 always-on + 1 Development-only)
+## 2. API surface (`src/wa.api/Program.cs`) — **39 route+method mappings** (end of Phase 0 = 36; +3 F-BIL-002: checkout, portal, Stripe webhook; 38 always-on + 1 Development-only)
 
 | Area | Route | Method |
 |---|---|---|
