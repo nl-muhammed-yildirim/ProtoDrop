@@ -1,7 +1,7 @@
 namespace wa.domain.Errors;
 
 /// <summary>
-/// The closed TA-4.1.3 machine-code list — exactly these 19 members, no others in MVP (golden rule: adding one later is an architecture change).
+/// The closed TA-4.1.3 machine-code list — exactly these 20 members, no others in MVP (golden rule: adding one later is an architecture change).
 /// Canonical status + title are pinned here so the wire shape never depends on caller text; at M0 only NOT_FOUND, INTERNAL and RATE_LIMITED are exercised.
 /// </summary>
 public static class ProblemCodes
@@ -27,6 +27,8 @@ public static class ProblemCodes
     public const string LinkExpired = "LINK_EXPIRED";
     // US-019-01 (AC-019-5): Stripe API unreachable / not wired at checkout creation — retryable, nothing persisted.
     public const string BillingUnavailable = "BILLING_UNAVAILABLE";
+    // US-020-02 (FR-020-2): account is at ACTIVE_TRANSFERS_MAX on finalize/send — a paywall signal, distinct from VALIDATION.
+    public const string ActiveTransfersExceeded = "ACTIVE_TRANSFERS_EXCEEDED";
     public const string Internal = "INTERNAL";
 
     private static readonly Dictionary<string, (int Status, string Title)> Table = new(StringComparer.Ordinal)
@@ -49,6 +51,7 @@ public static class ProblemCodes
         [EmailUnsubscribed] = (409, "Email unsubscribed"),
         [LinkExpired] = (410, "This link has expired"), // T-008-04 (EC-008-3): single-use token expired/redeemed/unknown — identical state for all three
         [BillingUnavailable] = (503, "Billing unavailable"), // US-019-01 (AC-019-5): upstream Stripe dependency unavailable, retryable
+        [ActiveTransfersExceeded] = (409, "Active transfers limit reached"), // US-020-02 (FR-020-2): valid request, account state conflicts
         [Internal] = (500, "Internal server error") // /health's component-unreachable variant writes an explicit 503 through the same writer
     };
 

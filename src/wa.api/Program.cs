@@ -277,7 +277,8 @@ app.MapPost("/api/v1/transfers/draft/{draftId}/finalize", async (Guid draftId, H
     }
     catch (ActiveTransfersExceededException ex) when (ex is not null)
     {
-        throw new BusinessException(ProblemCodes.Validation, ex.Message);
+        // US-020-02 (FR-020-2): dedicated closed code, was VALIDATION.
+        throw new BusinessException(ProblemCodes.ActiveTransfersExceeded, ex.Message);
     }
     catch (BlobSizeMismatchException ex) when (ex is not null)
     {
@@ -313,6 +314,11 @@ app.MapPost("/api/v1/transfers/{id}/send", async (Guid id, HttpContext httpConte
     {
         // T-007-04 / AC-007-1: send-time size re-check violation — same closed-code mapping as the draft endpoint (TA-4.2a).
         throw new BusinessException(ProblemCodes.TransferSizeExceeded, ex.Message);
+    }
+    catch (ActiveTransfersExceededException ex)
+    {
+        // US-020-02 (FR-020-2): send-time active-transfers re-check (downgraded / at-cap account).
+        throw new BusinessException(ProblemCodes.ActiveTransfersExceeded, ex.Message);
     }
     catch (wa.application.UseCases.Transfers.TransferValidationException vex)
     {

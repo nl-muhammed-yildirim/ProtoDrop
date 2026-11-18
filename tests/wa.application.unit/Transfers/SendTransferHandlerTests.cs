@@ -721,6 +721,95 @@ public class SendTransferHandlerTests
         Assert.Equal(owner, _store.Transfer.OwnerAppUserId);
     }
 
+    // ---- US-020-02 (FR-020-2): send-time active-transfers re-check ----
+
+    private static LimitsRecord RecordWithActiveMax(int activeTransfersMax) => new()
+    {
+        MaxEmails = 20,
+        RetentionDays = 30,
+        MaxTransferSize = 5_368_709_120,
+        MaxSingleFile = 5_368_709_120,
+        ActiveTransfersMax = activeTransfersMax
+    };
+
+    [Fact]
+    public async Task Handle_OwnerAtActiveTransfersMax_Throws_NamesLimitAndUpgrade_NoMutation()
+    {
+        // AC-020-1: the (max+1)th live transfer is the one refused; checks precede mutation.
+        var transferId = Guid.NewGuid();
+        var owner = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+        _meterStore.ActiveTransferCount = 20;
+
+        var ex = await Assert.ThrowsAsync<ActiveTransfersExceededException>(() =>
+            _handler.Handle(new SendTransferCommand(transferId, null, null, null, ["a@x.com"], null, owner), CancellationToken.None));
+
+        Assert.Equal(20, ex.CurrentCount);
+        Assert.Equal(20, ex.MaxActiveTransfers);
+        Assert.Contains("(limit 20). Upgrade to keep sending.", ex.Message);
+        Assert.Equal(0, _store.Transfer!.Status);
+        Assert.Empty(_eventPublisher.Published);
+        Assert.Empty(_store.Recipients);
+    }
+
+    [Fact]
+    public async Task Handle_OwnerOverQuotaAfterDowngrade_100Active_Blocked()
+    {
+        // AC-020-2: downgraded to Free with 100 live transfers — new send blocked, nothing else touched.
+        var transferId = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+        _meterStore.ActiveTransferCount = 100;
+
+        var ex = await Assert.ThrowsAsync<ActiveTransfersExceededException>(() =>
+            _handler.Handle(new SendTransferCommand(transferId, null, null, null, [], null, Guid.NewGuid()), CancellationToken.None));
+
+        Assert.Equal(100, ex.CurrentCount);
+        Assert.Equal(20, ex.MaxActiveTransfers);
+    }
+
+    [Fact]
+    public async Task Handle_OwnerUnderProLimit_100Active_Sends()
+    {
+        // EC-020-2 / story AC 2: re-upgraded (Pro max 200) — the same 100 live transfers no longer block.
+        var handler = NewHandler(new StubLimitsProvider { Record = RecordWithActiveMax(200) });
+        var transferId = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+        _meterStore.ActiveTransferCount = 100;
+
+        var result = await handler.Handle(new SendTransferCommand(transferId, null, null, null, [], null, Guid.NewGuid()), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(1, result!.Status);
+    }
+
+    [Fact]
+    public async Task Handle_InfiniteActiveTransfersMax_SkipsCount()
+    {
+        var handler = NewHandler(new StubLimitsProvider { Record = RecordWithActiveMax(-1) });
+        var transferId = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+        _meterStore.ActiveTransferCount = 10_000;
+
+        var result = await handler.Handle(new SendTransferCommand(transferId, null, null, null, [], null, Guid.NewGuid()), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(1, result!.Status);
+    }
+
+    [Fact]
+    public async Task Handle_Guest_SkipsActiveTransfersCheck()
+    {
+        // FR-020-4 / AC-020-5: guests never hit account-level limits.
+        var transferId = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+        _meterStore.ActiveTransferCount = 100;
+
+        var result = await _handler.Handle(new SendTransferCommand(transferId, null, null, null, []), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(1, result!.Status);
+    }
+
     // ---- Stubs ----
 
     private sealed class StubSendStore : ISendStore
@@ -754,7 +843,8 @@ public class SendTransferHandlerTests
         }
     }
 
-    private sealed class StubLimitsProvider : ILimitsProvider
+    // Plays IPlanContextAccessor since US-020-02.
+    private sealed class StubLimitsProvider : IPlanContextAccessor
     {
         // T-007-04: Free values from the Part 2 frozen table — MaxTransferSize/MaxSingleFile must be set
         // (the new send-time re-check trips on 0 in every happy-path test). Tests may override per-scenario.
@@ -763,11 +853,12 @@ public class SendTransferHandlerTests
             MaxEmails = 20,
             RetentionDays = 30,
             MaxTransferSize = 5_368_709_120, // 5 GB (Free) — same literal FinalizeTransferHandlerTests pins for the same reason.
-            MaxSingleFile = 5_368_709_120     // same as transfer size for all plans
+            MaxSingleFile = 5_368_709_120,    // same as transfer size for all plans
+            ActiveTransfersMax = 20           // US-020-02: Free value (Part 2) — 0 would trip the owned-send active-transfers check
         };
 
-        public Task<LimitsRecord> Resolve(string? planCode, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Record);
+        public Task<PlanContext> GetAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new PlanContext(ILimitsProvider.GuestPlanCode, Record, new PlanFeatures()));
     }
 
     private sealed class StubEventPublisher : IEventPublisher
@@ -804,8 +895,11 @@ public class SendTransferHandlerTests
             return Task.FromResult(ActiveStorageBytes);
         }
 
+        /// <summary>US-020-02: what the account active-transfers COUNT returns — set per scenario.</summary>
+        public int ActiveTransferCount { get; set; } = 0;
+
         public Task<int> GetActiveTransferCountAsync(Guid ownerId, CancellationToken ct) =>
-            Task.FromResult(0);
+            Task.FromResult(ActiveTransferCount);
 
         public Task<(List<MyTransferRow> Items, string? NextCursor)> ListByOwnerAsync(Guid ownerId, DateTime? afterUtc, Guid? afterIdExcluded, int limit, IReadOnlyCollection<byte>? statuses, CancellationToken ct) =>
             Task.FromResult<(List<MyTransferRow>, string?)>(([], null)); // T-009-01: not exercised by send tests — empty page (T-009-02: signature-only).
