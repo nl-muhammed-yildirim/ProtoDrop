@@ -17,7 +17,8 @@ public class FeaturesJsonConsumerGuardTests
 
     private static readonly string[] GateKeyAllowList =
     [
-        "src/wa.infrastructure/Persistence/EntityConfigurations/FeatureFlagConfiguration.cs" // the seed
+        "src/wa.infrastructure/Persistence/EntityConfigurations/FeatureFlagConfiguration.cs", // the seed
+        "src/wa.application/Limits/FeatureGates.cs" // US-044-02 phase gates: same seeded rows, absent = off (F-XCT-001)
     ];
 
     [Fact]

@@ -1,7 +1,7 @@
 namespace wa.domain.Errors;
 
 /// <summary>
-/// The closed TA-4.1.3 machine-code list — exactly these 20 members, no others in MVP (golden rule: adding one later is an architecture change).
+/// The closed TA-4.1.3 machine-code list — exactly these 23 members, no others in MVP (golden rule: adding one later is an architecture change).
 /// Canonical status + title are pinned here so the wire shape never depends on caller text; at M0 only NOT_FOUND, INTERNAL and RATE_LIMITED are exercised.
 /// </summary>
 public static class ProblemCodes
@@ -29,6 +29,12 @@ public static class ProblemCodes
     public const string BillingUnavailable = "BILLING_UNAVAILABLE";
     // US-020-02 (FR-020-2): account is at ACTIVE_TRANSFERS_MAX on finalize/send — a paywall signal, distinct from VALIDATION.
     public const string ActiveTransfersExceeded = "ACTIVE_TRANSFERS_EXCEEDED";
+    // US-044-01 (AC-044-3, FR-044-5): PUT admin flag with a value that is not valid for the key's type — old value stays live.
+    public const string FlagInvalid = "FLAG_INVALID";
+    // US-044-01 (AC-044-3, FR-044-5): PUT admin flag for a key that is not seeded — no write, no audit row.
+    public const string FlagUnknown = "FLAG_UNKNOWN";
+    // US-044-02 (AC-044-2, FR-044-7): a phase-gated endpoint whose feature.* flag is off (or absent) answers 404, handler never runs.
+    public const string FeatureDisabled = "FEATURE_DISABLED";
     public const string Internal = "INTERNAL";
 
     private static readonly Dictionary<string, (int Status, string Title)> Table = new(StringComparer.Ordinal)
@@ -52,6 +58,9 @@ public static class ProblemCodes
         [LinkExpired] = (410, "This link has expired"), // T-008-04 (EC-008-3): single-use token expired/redeemed/unknown — identical state for all three
         [BillingUnavailable] = (503, "Billing unavailable"), // US-019-01 (AC-019-5): upstream Stripe dependency unavailable, retryable
         [ActiveTransfersExceeded] = (409, "Active transfers limit reached"), // US-020-02 (FR-020-2): valid request, account state conflicts
+        [FlagInvalid] = (400, "Invalid flag value"), // US-044-01 (AC-044-3): typed validation failed (EC-044-1, EC-044-5)
+        [FlagUnknown] = (404, "Unknown flag"), // US-044-01 (AC-044-3): key is not a seeded flag
+        [FeatureDisabled] = (404, "Feature disabled"), // US-044-02 (AC-044-2): phase gate off → indistinguishable from an absent route
         [Internal] = (500, "Internal server error") // /health's component-unreachable variant writes an explicit 503 through the same writer
     };
 
