@@ -178,7 +178,7 @@ describe('AdminFlagsPage (T-011-13 / FR-011-2, FR-011-5)', () => {
       })
 
       const alertEl = host.querySelector('[role="alert"]') as HTMLElement
-      expect(alertEl.textContent).toBe('Invalid JSON')   // EC-011-4 inline copy.
+      expect(alertEl.textContent).toBe('Invalid value (400 FLAG_INVALID) — the previous value stays live.')   // EC-044-1 inline copy.
       const textarea = host.querySelector('textarea.ad-filter-input') as HTMLTextAreaElement
       expect(textarea.value).toBe(FLAG_VALUE)            // the old value stays live in the field.
     } finally {
@@ -251,6 +251,98 @@ describe('AdminFlagsPage (T-011-13 / FR-011-2, FR-011-5)', () => {
         expect(btn.disabled).toBe(true)   // Operator → disabled.
         expect(btn.getAttribute('title')).toBe('SuperAdmin only')   // tooltip is set.
       }
+    } finally {
+      cleanup()
+    }
+  })
+
+  // US-044-01 (FR-044-5 / AC-044-1 UI): Limits group — full DTO rows with type / planDefault / overridden.
+  const LIMIT_KEY = 'limits.free.maxTransferSize'
+  const LIMIT_ROWS = [
+    { key: 'limits.free.maxDownloads', value: '10', updatedAt: '2026-11-01T00:00:00Z', type: 'int', planDefault: '10', overridden: false },
+    { key: LIMIT_KEY, value: '10737418240', updatedAt: '2026-11-01T00:00:00Z', type: 'int', planDefault: '5368709120', overridden: true },
+  ]
+
+  function limitsResponder(req: Request, putStatus = 200): Response {
+    if (req.method === 'PUT') return new Response(putStatus === 200 ? JSON.stringify({ key: LIMIT_KEY, value: '1' }) : null, { status: putStatus })
+    if (req.url.endsWith('/admin/flags')) return new Response(JSON.stringify(LIMIT_ROWS), { status: 200 })
+    return new Response(JSON.stringify([AUDIT_ROW]), { status: 200 })
+  }
+
+  it('LimitsGroup_RendersPerPlanTables_WithOverriddenMarker — one overridden row shows the marker and the plan default', async () => {
+    const captured: { calls: string[]; bodies: string[] } = { calls: [], bodies: [] }
+    stubFetch(captured, (req) => limitsResponder(req))
+
+    const { host, cleanup } = renderPage('SuperAdmin')
+    try {
+      await flush()
+
+      expect(host.querySelector('h2')?.textContent).toBe('Limits')
+      const freeTable = host.querySelector('table[data-plan="free"]') as HTMLElement
+      expect(freeTable.querySelector('caption')?.textContent).toBe('free')
+      const text = freeTable.textContent ?? ''
+      expect(text.match(/\(overridden\)/g)?.length).toBe(1)   // exactly one overridden row.
+      expect(text).toContain('5368709120')                    // plan default column shows the seed.
+      const input = host.querySelector(`input[aria-label="${LIMIT_KEY}"]`) as HTMLInputElement
+      expect(input.value).toBe('10737418240')
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('LimitsGroup_Save_PutsOnlyThatKey — edit one input, Save → one PUT with the raw draft', async () => {
+    const captured: { calls: string[]; bodies: string[] } = { calls: [], bodies: [] }
+    stubFetch(captured, (req) => limitsResponder(req))
+
+    const { host, cleanup } = renderPage('SuperAdmin')
+    try {
+      await flush()
+
+      const input = host.querySelector(`input[aria-label="${LIMIT_KEY}"]`) as HTMLInputElement
+      await act(async () => {
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set as (v: string) => void
+        setter.call(input, '12345')
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+      const row = input.closest('tr') as HTMLElement
+      const saveBtn = row.querySelector('button') as HTMLButtonElement
+      await act(async () => {
+        saveBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      const putIndexes = captured.calls
+        .map((c, i) => (c.includes('/admin/flags/') ? i : -1))
+        .filter((i) => i >= 0)
+      expect(putIndexes.length).toBe(1)
+      expect(captured.calls[putIndexes[0]].endsWith(`/admin/flags/${LIMIT_KEY}`)).toBe(true)
+      expect(captured.bodies[putIndexes[0]]).toBe('12345')
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('LimitsGroup_400_ShowsFlagInvalidInlineInRow_ValueStaysLive — error renders in that row only', async () => {
+    const captured: { calls: string[]; bodies: string[] } = { calls: [], bodies: [] }
+    stubFetch(captured, (req) => limitsResponder(req, 400))
+
+    const { host, cleanup } = renderPage('SuperAdmin')
+    try {
+      await flush()
+
+      const input = host.querySelector(`input[aria-label="${LIMIT_KEY}"]`) as HTMLInputElement
+      const row = input.closest('tr') as HTMLElement
+      await act(async () => {
+        ;(row.querySelector('button') as HTMLButtonElement).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      const alertEl = row.querySelector('[role="alert"]') as HTMLElement
+      expect(alertEl.textContent).toBe('Invalid value (400 FLAG_INVALID) — the previous value stays live.')
+      expect(host.querySelectorAll('[role="alert"]').length).toBe(1)   // only that row.
+      expect((host.querySelector(`input[aria-label="${LIMIT_KEY}"]`) as HTMLInputElement).value).toBe('10737418240')
     } finally {
       cleanup()
     }

@@ -5,9 +5,15 @@ import { formatDate, formatTime } from '../../core/i18n/format'
 
 // Endpoint 23 GET /api/v1/admin/flags — bare JSON array, ordered by key ascending, 52 fixed rows,
 // NO paging (Program.cs L708–L715). Reads write no audit row (AC-011-3).
+// US-044-01: effective-value view — type ('int' limit / 'bool'), the plan's seeded default for an
+// integer limit (null otherwise) and whether the live value differs from it.
 export interface FlagRowDto {
   key: string
   value: string
+  updatedAt: string
+  type: 'int' | 'bool'
+  planDefault: string | null
+  overridden: boolean
 }
 
 // Endpoint 24 GET /api/v1/admin/suppressions — bare array (Program.cs L463–L469). id is a Guid

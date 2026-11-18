@@ -785,7 +785,8 @@ app.MapGet("/api/v1/admin/flags", async (HttpContext ctx, IAppUserStore users, I
     await RequireAdminAsync(ctx, users, superadminOnly: false, ct);
 
     var rows = await sender.Send(new GetFlagsQuery(), ct);
-    return Results.Json(rows.Select(f => new { key = f.Key, value = f.Value })); // reads write NO audit row
+    // US-044-01: effective-value view — type, plan default and overridden marker drive the Flags screen Limits group.
+    return Results.Json(rows.Select(f => new { key = f.Key, value = f.Value, updatedAt = f.UpdatedAtUtc, type = f.Type, planDefault = f.PlanDefault, overridden = f.Overridden })); // reads write NO audit row
 });
 
 // T-011-08 (TA-4.2#23 / FR-011-2): set a flag's value — PUT /api/v1/admin/flags/{key} — SuperAdmin-only write.
@@ -811,12 +812,12 @@ app.MapPut("/api/v1/admin/flags/{key}", async (string key, HttpContext ctx, Http
                 await auditWriter.WriteAsync(user.Email, "flag.set", "flag", key, new { oldValue = result.OldValue, newValue = result.NewValue }, ct);
         }
 
-        // FR-011-2: 204 No Content — no body (same as endpoint 22 at Program.cs L645).
-        return Results.NoContent();
+        // US-044-01 (FR-044-5): 200 with the new value ({key,value}).
+        return Results.Json(new { key = result.Key, value = result.NewValue });
     }
     catch (SetFlagException ex)
     {
-        // T-011-08 (Decision): bad JSON → 400 VALIDATION "Invalid JSON"; unknown key → 404 NOT_FOUND.
+        // US-044-01 (AC-044-3): unknown key → 404 FLAG_UNKNOWN (checked first); invalid typed value → 400 FLAG_INVALID.
         throw new BusinessException(ex.Code, ex.Message, ex);
     }
 });
