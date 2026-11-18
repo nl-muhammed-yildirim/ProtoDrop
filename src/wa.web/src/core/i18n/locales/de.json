@@ -198,5 +198,7 @@
   "billing.meter.unlimited": "∞",
   "billing.error.loadFailed": "Ihr Tarif konnte nicht geladen werden.",
   "billing.error.upgradeFailed": "Das Upgrade konnte nicht gestartet werden. Bitte erneut versuchen.",
-  "profile.plan.viewPlan": "Tarif ansehen"
+  "profile.plan.viewPlan": "Tarif ansehen",
+  "limit.activeTransfers.exact": "Sie haben {{count}} aktive Übertragungen (Limit {{limit}}). Upgraden Sie, um weiter zu senden.",
+  "limit.activeTransfers.generic": "Sie haben das Limit für aktive Übertragungen erreicht. Upgraden Sie, um weiter zu senden."
 }

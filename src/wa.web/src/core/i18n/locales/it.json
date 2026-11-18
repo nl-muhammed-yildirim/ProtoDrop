@@ -198,5 +198,7 @@
   "billing.meter.unlimited": "∞",
   "billing.error.loadFailed": "Impossibile caricare il tuo piano.",
   "billing.error.upgradeFailed": "Impossibile avviare l'upgrade. Riprova.",
-  "profile.plan.viewPlan": "Vedi piano"
+  "profile.plan.viewPlan": "Vedi piano",
+  "limit.activeTransfers.exact": "Hai {{count}} trasferimenti attivi (limite {{limit}}). Passa a un piano superiore per continuare a inviare.",
+  "limit.activeTransfers.generic": "Hai raggiunto il limite di trasferimenti attivi. Passa a un piano superiore per continuare a inviare."
 }

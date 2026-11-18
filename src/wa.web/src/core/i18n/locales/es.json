@@ -198,5 +198,7 @@
   "billing.meter.unlimited": "∞",
   "billing.error.loadFailed": "No se pudo cargar tu plan.",
   "billing.error.upgradeFailed": "No se pudo iniciar la mejora. Inténtalo de nuevo.",
-  "profile.plan.viewPlan": "Ver plan"
+  "profile.plan.viewPlan": "Ver plan",
+  "limit.activeTransfers.exact": "Tienes {{count}} transferencias activas (límite {{limit}}). Mejora tu plan para seguir enviando.",
+  "limit.activeTransfers.generic": "Has alcanzado el límite de transferencias activas. Mejora tu plan para seguir enviando."
 }

@@ -1,9 +1,9 @@
-// T-013-02 (FR-013-6): mapProblem is exhaustive over all 18 closed-list codes; unknown code → error500.
+// T-013-02 (FR-013-6): mapProblem is exhaustive over all 20 closed-list codes; unknown code → error500.
 import { describe, expect, it } from 'vitest'
 
-import { mapProblem } from '../../core/api/errorMap'
+import { mapProblem, parseActiveTransfersLimit } from '../../core/api/errorMap'
 
-// The exact 18-member closed set (src/wa.domain/Errors/ProblemCodes.cs).
+// The exact 20-member closed set (src/wa.domain/Errors/ProblemCodes.cs).
 const ALL_CODES = [
   'VALIDATION',
   'UNAUTHENTICATED',
@@ -22,13 +22,16 @@ const ALL_CODES = [
   'STRIPE_WEBHOOK_MISMATCH',
   'EMAIL_UNSUBSCRIBED',
   'LINK_EXPIRED',
+  'BILLING_UNAVAILABLE',
+  'ACTIVE_TRANSFERS_EXCEEDED',
   'INTERNAL',
 ] as const
 
-describe('mapProblem — exhaustive over the 18 closed-list codes (TA-4.1.3)', () => {
+describe('mapProblem — exhaustive over the 20 closed-list codes (TA-4.1.3)', () => {
   it.each([
     ['TRANSFER_SIZE_EXCEEDED', { kind: 'inlineLimit' }],
     ['STORAGE_QUOTA_EXCEEDED', { kind: 'inlineLimit' }],
+    ['ACTIVE_TRANSFERS_EXCEEDED', { kind: 'inlineLimit' }], // FR-020-6: paywall copy, not the 500 screen
     // Program.cs L367-368: PublicTransferState.NotFound emits TRANSFER_EXPIRED (404) — no separate
     // TRANSFER_NOT_FOUND on the wire; the 404 link state is 'expired'.
     ['TRANSFER_EXPIRED', { kind: 'ftrf003State', which: 'expired' }],
@@ -56,16 +59,27 @@ describe('mapProblem — exhaustive over the 18 closed-list codes (TA-4.1.3)', (
     expect(mapProblem(code)).toEqual({ kind: 'error500' })
   })
 
-  it('covers all 18 closed-list codes exactly once', () => {
-    expect(ALL_CODES).toHaveLength(18)
-    // 8 dedicated mappings + 10 error500 fallbacks = 18.
-    const dedicated = ['TRANSFER_SIZE_EXCEEDED', 'STORAGE_QUOTA_EXCEEDED', 'TRANSFER_EXPIRED', 'TRANSFER_DELETED', 'WRONG_PASSWORD', 'MAX_DOWNLOADS_REACHED', 'FILES_GONE', 'RATE_LIMITED']
+  it('covers all 20 closed-list codes exactly once', () => {
+    expect(ALL_CODES).toHaveLength(20)
+    // 9 dedicated mappings + 11 error500 fallbacks = 20.
+    const dedicated = ['TRANSFER_SIZE_EXCEEDED', 'STORAGE_QUOTA_EXCEEDED', 'ACTIVE_TRANSFERS_EXCEEDED', 'TRANSFER_EXPIRED', 'TRANSFER_DELETED', 'WRONG_PASSWORD', 'MAX_DOWNLOADS_REACHED', 'FILES_GONE', 'RATE_LIMITED']
     const fallback = ALL_CODES.filter((c) => !dedicated.includes(c))
-    expect(fallback).toHaveLength(10)
+    expect(fallback).toHaveLength(11)
   })
 
   it('unknown/missing code falls back to error500', () => {
     expect(mapProblem('TOTALLY_UNKNOWN_CODE')).toEqual({ kind: 'error500' })
     expect(mapProblem('')).toEqual({ kind: 'error500' })
+  })
+})
+
+describe('parseActiveTransfersLimit (FR-020-6)', () => {
+  it('extracts the exact count and limit from the server details text', () => {
+    expect(parseActiveTransfersLimit('You have 20 active transfers (limit 20). Upgrade to keep sending.')).toEqual({ count: 20, limit: 20 })
+  })
+
+  it('returns null when the text carries no numbers', () => {
+    expect(parseActiveTransfersLimit(undefined)).toBeNull()
+    expect(parseActiveTransfersLimit('Something else')).toBeNull()
   })
 })

@@ -198,5 +198,7 @@
   "billing.meter.unlimited": "∞",
   "billing.error.loadFailed": "Planınız yüklenemedi.",
   "billing.error.upgradeFailed": "Yükseltme başlatılamadı. Lütfen tekrar deneyin.",
-  "profile.plan.viewPlan": "Planı görüntüle"
+  "profile.plan.viewPlan": "Planı görüntüle",
+  "limit.activeTransfers.exact": "{{count}} etkin aktarımınız var (sınır {{limit}}). Göndermeye devam etmek için yükseltin.",
+  "limit.activeTransfers.generic": "Etkin aktarım sınırına ulaştınız. Göndermeye devam etmek için yükseltin."
 }

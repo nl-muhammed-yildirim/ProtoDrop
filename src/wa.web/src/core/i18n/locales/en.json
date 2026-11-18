@@ -198,5 +198,7 @@
   "billing.meter.unlimited": "∞",
   "billing.error.loadFailed": "Could not load your plan.",
   "billing.error.upgradeFailed": "Could not start the upgrade. Please try again.",
-  "profile.plan.viewPlan": "View plan"
+  "profile.plan.viewPlan": "View plan",
+  "limit.activeTransfers.exact": "You have {{count}} active transfers (limit {{limit}}). Upgrade to keep sending.",
+  "limit.activeTransfers.generic": "You've reached your active transfers limit. Upgrade to keep sending."
 }

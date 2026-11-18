@@ -29,7 +29,7 @@ public interface IUserPlanStore
     Task<string?> GetPlanCodeAsync(Guid userId, CancellationToken cancellationToken);
 }
 
-/// <summary>Reads flag rows.Limit resolution consumes the raw rows — key filtering and override layering live in T-053-04.</summary>
+/// <summary>Reads flag rows. Limit resolution consumes the raw rows — key filtering and override layering live in T-053-04.</summary>
 public interface IFlagsStore
 {
     /// <summary>Returns all seeded FeatureFlag rows (keys + string values, unfiltered).</summary>

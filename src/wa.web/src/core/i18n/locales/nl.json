@@ -198,5 +198,7 @@
   "billing.meter.unlimited": "∞",
   "billing.error.loadFailed": "Je abonnement kon niet worden geladen.",
   "billing.error.upgradeFailed": "De upgrade kon niet worden gestart. Probeer het opnieuw.",
-  "profile.plan.viewPlan": "Abonnement bekijken"
+  "profile.plan.viewPlan": "Abonnement bekijken",
+  "limit.activeTransfers.exact": "Je hebt {{count}} actieve overdrachten (limiet {{limit}}). Upgrade om te blijven versturen.",
+  "limit.activeTransfers.generic": "Je hebt de limiet voor actieve overdrachten bereikt. Upgrade om te blijven versturen."
 }

@@ -4,6 +4,8 @@ import { useUploadEngine } from '../../core/upload/UploadEngine'
 import { getTraceParent } from '../../core/traceparent'
 import { MAX_EMAILS, parseRecipients, validateAddress } from './recipients'
 import i18n from '../../core/i18n/init'
+import { ACTIVE_TRANSFERS_EXCEEDED, parseProblem } from '../../core/api/errorMap'
+import ActiveTransfersLimit from './ActiveTransfersLimit'
 
 interface LinkScreenProps {
   linkId: string
@@ -74,6 +76,7 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
   const [sendState, setSendState] = useState<SendPhase>('form')
   const [sending, setSending] = useState(false) // double-click guard — endpoint 3 is idempotent per key anyway (TA-4.1.5).
   const [sendError, setSendError] = useState<string | null>(null)
+  const [activeLimit, setActiveLimit] = useState<{ details?: string } | null>(null) // US-020-02: ACTIVE_TRANSFERS_EXCEEDED paywall
 
   // T-016-04 (D-3): sent-phase swap focus — the form's focused button unmounts with it; land on the sent-state Copy.
   useEffect(() => { if (sendState === 'sent') sentCopyBtnRef.current?.focus() }, [sendState])
@@ -174,6 +177,7 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
   const sendTransfer = async (emails: string[]): Promise<boolean> => {
     setSending(true)
     setSendError(null)
+    setActiveLimit(null)
     try {
       let res: Response
       try {
@@ -199,6 +203,11 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
         return false
       }
       if (!res.ok) {
+        const problem = parseProblem(await res.json().catch(() => null))
+        if (problem?.code === ACTIVE_TRANSFERS_EXCEEDED) {
+          setActiveLimit({ details: problem.details }) // FR-020-6: exact number + Upgrade CTA instead of the generic failure
+          return false
+        }
         setSendError('Sending failed. Please try again.')
         return false
       }
@@ -380,6 +389,7 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
             {sendError && (
               <p className="ls-send-error" role="alert">{sendError}</p>
             )}
+            {activeLimit && <ActiveTransfersLimit details={activeLimit.details} />}
           </>
         )}
       </div>

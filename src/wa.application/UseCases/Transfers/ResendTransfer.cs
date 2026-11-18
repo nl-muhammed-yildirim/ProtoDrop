@@ -34,16 +34,16 @@ public sealed class ResendTransferHandler : IRequestHandler<ResendTransferComman
 {
     private readonly ISendStore _store;
     private readonly ITransferStore _transferStore;
-    private readonly ILimitsProvider _limits;
+    private readonly IPlanContextAccessor _planContext;
 
     public ResendTransferHandler(
         ISendStore store,
         ITransferStore transferStore,
-        ILimitsProvider limits)
+        IPlanContextAccessor planContext)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _transferStore = transferStore ?? throw new ArgumentNullException(nameof(transferStore));
-        _limits = limits ?? throw new ArgumentNullException(nameof(limits));
+        _planContext = planContext ?? throw new ArgumentNullException(nameof(planContext));
     }
 
     public async Task<ResendTransferResult?> Handle(ResendTransferCommand request, CancellationToken cancellationToken)
@@ -74,7 +74,7 @@ public sealed class ResendTransferHandler : IRequestHandler<ResendTransferComman
         }
 
         // Resolve plan limits — never a literal (TA-3.4).
-        var limits = await _limits.Resolve(ILimitsProvider.GuestPlanCode, cancellationToken);
+        var limits = (await _planContext.GetAsync(cancellationToken)).Limits; // FR-020-6: the session user's current plan
 
         var now = DateTime.UtcNow;
         var transferId = Guid.NewGuid();

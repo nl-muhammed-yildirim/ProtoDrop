@@ -198,5 +198,7 @@
   "billing.meter.unlimited": "∞",
   "billing.error.loadFailed": "Impossible de charger votre forfait.",
   "billing.error.upgradeFailed": "Impossible de lancer la mise à niveau. Veuillez réessayer.",
-  "profile.plan.viewPlan": "Voir le forfait"
+  "profile.plan.viewPlan": "Voir le forfait",
+  "limit.activeTransfers.exact": "Vous avez {{count}} transferts actifs (limite {{limit}}). Passez à un forfait supérieur pour continuer à envoyer.",
+  "limit.activeTransfers.generic": "Vous avez atteint la limite de transferts actifs. Passez à un forfait supérieur pour continuer à envoyer."
 }
