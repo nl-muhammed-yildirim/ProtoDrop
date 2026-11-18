@@ -7,6 +7,8 @@ export interface PlanUsageDto {
   planCode: string
   storage: { usedBytes: number; allowedBytes: number }
   activeTransfers: { used: number; allowed: number | null }
+  /** Per-upload caps from PlanContext.Limits (bytes); the upload pre-check source. */
+  limits?: { maxTransferSize: number; maxSingleFile: number }
 }
 
 export interface MeterState {

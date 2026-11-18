@@ -90,6 +90,8 @@ public class PlanUsageEndpointTests : IAsyncLifetime
         Assert.Equal(limits.StorageQuota, root.GetProperty("storage").GetProperty("allowedBytes").GetInt64());
         Assert.Equal(3, root.GetProperty("activeTransfers").GetProperty("used").GetInt32());
         Assert.Equal(limits.ActiveTransfersMax, root.GetProperty("activeTransfers").GetProperty("allowed").GetInt32());
+        Assert.Equal(5368709120L, root.GetProperty("limits").GetProperty("maxTransferSize").GetInt64());
+        Assert.Equal(5368709120L, root.GetProperty("limits").GetProperty("maxSingleFile").GetInt64());
     }
 
     [Fact]
@@ -130,6 +132,8 @@ public class PlanUsageEndpointTests : IAsyncLifetime
         Assert.Equal("pro", doc2.RootElement.GetProperty("planCode").GetString());
         Assert.Equal(proLimits.StorageQuota, doc2.RootElement.GetProperty("storage").GetProperty("allowedBytes").GetInt64());
         Assert.Equal(proLimits.ActiveTransfersMax, doc2.RootElement.GetProperty("activeTransfers").GetProperty("allowed").GetInt32());
+        Assert.Equal(10737418240L, doc2.RootElement.GetProperty("limits").GetProperty("maxTransferSize").GetInt64());
+        Assert.Equal(10737418240L, doc2.RootElement.GetProperty("limits").GetProperty("maxSingleFile").GetInt64());
     }
 
     // ---- Helpers ----

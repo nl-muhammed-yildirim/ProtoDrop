@@ -1269,7 +1269,8 @@ app.MapGet("/api/v1/billing/plan", async (HttpContext ctx, ISender sender, Cance
     {
         planCode = r.PlanCode,
         storage = new { usedBytes = r.StorageUsedBytes, allowedBytes = r.StorageAllowedBytes },
-        activeTransfers = new { used = r.ActiveTransfersUsed, allowed = r.ActiveTransfersAllowed }
+        activeTransfers = new { used = r.ActiveTransfersUsed, allowed = r.ActiveTransfersAllowed },
+        limits = new { maxTransferSize = r.MaxTransferSize, maxSingleFile = r.MaxSingleFile }
     });
 });
 

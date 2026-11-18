@@ -10,8 +10,8 @@ public class GetPlanUsageHandlerTests
 {
     private static readonly Guid UserId = Guid.NewGuid();
 
-    private static LimitsRecord Limits(long storageQuota, int activeMax) =>
-        new() { StorageQuota = storageQuota, ActiveTransfersMax = activeMax };
+    private static LimitsRecord Limits(long storageQuota, int activeMax, long maxTransfer = 5368709120L, long maxFile = 5368709120L) =>
+        new() { StorageQuota = storageQuota, ActiveTransfersMax = activeMax, MaxTransferSize = maxTransfer, MaxSingleFile = maxFile };
 
     [Fact]
     public async Task Handle_FreeContext_MapsLimitsAndLiveUsage()
@@ -28,6 +28,20 @@ public class GetPlanUsageHandlerTests
         Assert.Equal(20, r.ActiveTransfersAllowed);
         Assert.Equal(UserId, store.BytesOwner);
         Assert.Equal(UserId, store.CountOwner);
+        Assert.Equal(5368709120L, r.MaxTransferSize);
+        Assert.Equal(5368709120L, r.MaxSingleFile);
+    }
+
+    [Fact]
+    public async Task Handle_ProContext_MapsPerUploadLimitsFromPlanContext()
+    {
+        var store = new StubTransferStore();
+        var handler = new GetPlanUsageHandler(new StubPlanContext("pro", Limits(107374182400L, 100, 10737418240L, 10737418240L)), store);
+
+        var r = await handler.Handle(new GetPlanUsageQuery(UserId), default);
+
+        Assert.Equal(10737418240L, r.MaxTransferSize);
+        Assert.Equal(10737418240L, r.MaxSingleFile);
     }
 
     [Fact]
