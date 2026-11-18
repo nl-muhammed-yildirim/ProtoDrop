@@ -181,5 +181,22 @@
   "auth.linkSent.sectionAria": "Lien envoyé",
   "auth.page.ariaLabel": "Connexion",
   "plural.test.files_one": "{{count}} fichier",
-  "plural.test.files_other": "{{count}} fichiers"
+  "plural.test.files_other": "{{count}} fichiers",
+  "billing.plan.heading": "Votre forfait",
+  "billing.plan.current": "Forfait actuel : {{name}}",
+  "billing.plan.nameFree": "Gratuit",
+  "billing.plan.namePro": "Pro",
+  "billing.plan.nameBusiness": "Business",
+  "billing.plan.upgrade": "Passer au forfait supérieur",
+  "billing.plan.intervalLabel": "Période de facturation",
+  "billing.plan.monthly": "Mensuel",
+  "billing.plan.annual": "Annuel",
+  "billing.plan.atLimit": "Vous avez atteint une limite de votre forfait. Passez au forfait supérieur pour continuer à envoyer.",
+  "billing.meter.storage": "Stockage",
+  "billing.meter.activeTransfers": "Transferts actifs",
+  "billing.meter.usedOf": "{{used}} sur {{allowed}}",
+  "billing.meter.unlimited": "∞",
+  "billing.error.loadFailed": "Impossible de charger votre forfait.",
+  "billing.error.upgradeFailed": "Impossible de lancer la mise à niveau. Veuillez réessayer.",
+  "profile.plan.viewPlan": "Voir le forfait"
 }

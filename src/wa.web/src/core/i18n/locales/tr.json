@@ -181,5 +181,22 @@
   "auth.linkSent.sectionAria": "Başlantı gönderildi",
   "auth.page.ariaLabel": "Giriş",
   "plural.test.files_one": "{{count}} dosya",
-  "plural.test.files_other": "{{count}} dosya"
+  "plural.test.files_other": "{{count}} dosya",
+  "billing.plan.heading": "Planınız",
+  "billing.plan.current": "Mevcut plan: {{name}}",
+  "billing.plan.nameFree": "Ücretsiz",
+  "billing.plan.namePro": "Pro",
+  "billing.plan.nameBusiness": "Business",
+  "billing.plan.upgrade": "Yükselt",
+  "billing.plan.intervalLabel": "Faturalama dönemi",
+  "billing.plan.monthly": "Aylık",
+  "billing.plan.annual": "Yıllık",
+  "billing.plan.atLimit": "Plan sınırınıza ulaştınız. Göndermeye devam etmek için planınızı yükseltin.",
+  "billing.meter.storage": "Depolama",
+  "billing.meter.activeTransfers": "Etkin aktarımlar",
+  "billing.meter.usedOf": "{{used}} / {{allowed}}",
+  "billing.meter.unlimited": "∞",
+  "billing.error.loadFailed": "Planınız yüklenemedi.",
+  "billing.error.upgradeFailed": "Yükseltme başlatılamadı. Lütfen tekrar deneyin.",
+  "profile.plan.viewPlan": "Planı görüntüle"
 }

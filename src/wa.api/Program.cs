@@ -1258,6 +1258,21 @@ app.MapGet("/api/v1/billing/portal", async (HttpContext ctx, ISender sender, Can
     }
 });
 
+// US-020-03 (FR-020-3 / AC-020-3): GET /api/v1/billing/plan. Cookie auth. Current plan + live usage vs. PlanContext limits. Persists nothing.
+app.MapGet("/api/v1/billing/plan", async (HttpContext ctx, ISender sender, CancellationToken ct) =>
+{
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+
+    var r = await sender.Send(new wa.application.UseCases.Billing.GetPlanUsageQuery(userId), ct);
+    return Results.Ok(new
+    {
+        planCode = r.PlanCode,
+        storage = new { usedBytes = r.StorageUsedBytes, allowedBytes = r.StorageAllowedBytes },
+        activeTransfers = new { used = r.ActiveTransfersUsed, allowed = r.ActiveTransfersAllowed }
+    });
+});
+
 app.Run();
 
 // Empty partial class so WebApplicationFactory<Program> can resolve the entry point.

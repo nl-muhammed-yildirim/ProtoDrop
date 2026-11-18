@@ -181,5 +181,22 @@
   "auth.linkSent.sectionAria": "Link enviado",
   "auth.page.ariaLabel": "Iniciar sessão",
   "plural.test.files_one": "{{count}} arquivo",
-  "plural.test.files_other": "{{count}} arquivos"
+  "plural.test.files_other": "{{count}} arquivos",
+  "billing.plan.heading": "O seu plano",
+  "billing.plan.current": "Plano atual: {{name}}",
+  "billing.plan.nameFree": "Gratuito",
+  "billing.plan.namePro": "Pro",
+  "billing.plan.nameBusiness": "Business",
+  "billing.plan.upgrade": "Fazer upgrade",
+  "billing.plan.intervalLabel": "Período de faturação",
+  "billing.plan.monthly": "Mensal",
+  "billing.plan.annual": "Anual",
+  "billing.plan.atLimit": "Atingiu um limite do seu plano. Faça upgrade para continuar a enviar.",
+  "billing.meter.storage": "Armazenamento",
+  "billing.meter.activeTransfers": "Transferências ativas",
+  "billing.meter.usedOf": "{{used}} de {{allowed}}",
+  "billing.meter.unlimited": "∞",
+  "billing.error.loadFailed": "Não foi possível carregar o seu plano.",
+  "billing.error.upgradeFailed": "Não foi possível iniciar o upgrade. Tente novamente.",
+  "profile.plan.viewPlan": "Ver plano"
 }

@@ -181,5 +181,22 @@
   "auth.linkSent.sectionAria": "Link gesendet",
   "auth.page.ariaLabel": "Anmeldung",
   "plural.test.files_one": "{{count}} Datei",
-  "plural.test.files_other": "{{count}} Dateien"
+  "plural.test.files_other": "{{count}} Dateien",
+  "billing.plan.heading": "Ihr Tarif",
+  "billing.plan.current": "Aktueller Tarif: {{name}}",
+  "billing.plan.nameFree": "Kostenlos",
+  "billing.plan.namePro": "Pro",
+  "billing.plan.nameBusiness": "Business",
+  "billing.plan.upgrade": "Upgrade",
+  "billing.plan.intervalLabel": "Abrechnungszeitraum",
+  "billing.plan.monthly": "Monatlich",
+  "billing.plan.annual": "Jährlich",
+  "billing.plan.atLimit": "Sie haben ein Limit Ihres Tarifs erreicht. Wechseln Sie auf einen höheren Tarif, um weiter zu senden.",
+  "billing.meter.storage": "Speicher",
+  "billing.meter.activeTransfers": "Aktive Übertragungen",
+  "billing.meter.usedOf": "{{used}} von {{allowed}}",
+  "billing.meter.unlimited": "∞",
+  "billing.error.loadFailed": "Ihr Tarif konnte nicht geladen werden.",
+  "billing.error.upgradeFailed": "Das Upgrade konnte nicht gestartet werden. Bitte erneut versuchen.",
+  "profile.plan.viewPlan": "Tarif ansehen"
 }

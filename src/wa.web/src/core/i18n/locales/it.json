@@ -181,5 +181,22 @@
   "auth.linkSent.sectionAria": "Link inviato",
   "auth.page.ariaLabel": "Accesso",
   "plural.test.files_one": "{{count}} file",
-  "plural.test.files_other": "{{count}} files"
+  "plural.test.files_other": "{{count}} files",
+  "billing.plan.heading": "Il tuo piano",
+  "billing.plan.current": "Piano attuale: {{name}}",
+  "billing.plan.nameFree": "Gratuito",
+  "billing.plan.namePro": "Pro",
+  "billing.plan.nameBusiness": "Business",
+  "billing.plan.upgrade": "Passa a un piano superiore",
+  "billing.plan.intervalLabel": "Periodo di fatturazione",
+  "billing.plan.monthly": "Mensile",
+  "billing.plan.annual": "Annuale",
+  "billing.plan.atLimit": "Hai raggiunto un limite del tuo piano. Passa a un piano superiore per continuare a inviare.",
+  "billing.meter.storage": "Spazio di archiviazione",
+  "billing.meter.activeTransfers": "Trasferimenti attivi",
+  "billing.meter.usedOf": "{{used}} di {{allowed}}",
+  "billing.meter.unlimited": "∞",
+  "billing.error.loadFailed": "Impossibile caricare il tuo piano.",
+  "billing.error.upgradeFailed": "Impossibile avviare l'upgrade. Riprova.",
+  "profile.plan.viewPlan": "Vedi piano"
 }

@@ -16,6 +16,8 @@ import AuthPage from './features/auth/AuthPage'
 import { matchAccountPath } from './features/auth/authRoute'
 import ProfilePage from './features/profile/ProfilePage'
 import { matchProfilePath, PROFILE_PATH } from './features/profile/profileRoute'
+import PlanPage from './features/billing/PlanPage'
+import { matchPlanPath } from './features/billing/planRoute'
 import FilesPage from './features/files/FilesPage'
 import { matchFilesPath } from './features/files/filesRoute'
 import RecipientPage from './features/recipient/RecipientPage'
@@ -131,6 +133,8 @@ export default function App() {
             <UnsubscribePage token={unsubscribeToken} />
           ) : session && matchProfilePath(pathname) ? (
             <ProfilePage profile={session} onSignedIn={setSession} onThemeChange={handleThemeChange} onDeleteAccount={handleDeleteAccount} />
+          ) : session && matchPlanPath(pathname) ? (
+            <PlanPage />
           ) : session && matchFilesPath(pathname) ? (
             <FilesPage onNewTransfer={goHome} />
           ) : session && resendTransferId !== null ? (
