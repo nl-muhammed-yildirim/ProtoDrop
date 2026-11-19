@@ -6,6 +6,6 @@ namespace wa.application.UseCases.Auth;
 /// </summary>
 public interface IOrgLogoStore
 {
-    /// <summary>Set (or clear, with null) the logo blob path of a non-deleted user. A missing row is a no-op.</summary>
-    Task SetPathAsync(Guid userId, string? blobPath, CancellationToken ct);
+    /// <summary>Set (or clear, with null) the logo blob path of a non-deleted user. Returns false when no row matched (missing or soft-deleted).</summary>
+    Task<bool> SetPathAsync(Guid userId, string? blobPath, CancellationToken ct);
 }

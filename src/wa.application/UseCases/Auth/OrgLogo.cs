@@ -10,8 +10,8 @@ namespace wa.application.UseCases.Auth;
 public sealed record RemoveOrgLogoCommand(Guid UserId) : IRequest<Unit>;
 
 /// <summary>
-/// Clears OrgLogoBlobPath first, then deletes the blob: the recipient page falls back to the org name at once, and a
-/// failed blob delete only leaves an orphan. Idempotent (no stored path = no-op). Not plan-gated: an owner may always
+/// Deletes the blob first, then clears OrgLogoBlobPath: a failed blob delete surfaces with the path still set, so the
+/// owner can retry and no orphan is left unreachable. Idempotent (no stored path = no-op). Not plan-gated: an owner may always
 /// remove their own data.
 /// </summary>
 public sealed class RemoveOrgLogoHandler : IRequestHandler<RemoveOrgLogoCommand, Unit>
@@ -37,8 +37,8 @@ public sealed class RemoveOrgLogoHandler : IRequestHandler<RemoveOrgLogoCommand,
         if (string.IsNullOrEmpty(path))
             return Unit.Value;
 
-        await _logos.SetPathAsync(request.UserId, null, cancellationToken);
         await _blobs.DeleteAsync(path, cancellationToken);
+        await _logos.SetPathAsync(request.UserId, null, cancellationToken);
         return Unit.Value;
     }
 }
@@ -131,7 +131,9 @@ public sealed class UploadOrgLogoHandler : IRequestHandler<UploadOrgLogoCommand,
 
         try
         {
-            await _logos.SetPathAsync(request.UserId, canonical, cancellationToken);
+            // false = no live row matched (soft-deleted between the read above and now): same cleanup as a failed write.
+            if (!await _logos.SetPathAsync(request.UserId, canonical, cancellationToken))
+                throw MeProfileException.ForNotFound();
         }
         catch
         {

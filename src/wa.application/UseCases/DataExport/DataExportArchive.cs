@@ -37,6 +37,7 @@ public static class DataExportArchive
             theme = snapshot.Profile.Theme,
             plan = snapshot.Profile.PlanCode,
             createdAtUtc = Utc(snapshot.Profile.CreatedAtUtc),
+            organizationName = snapshot.Profile.OrgName, // F-PRF-001 (FR-021-1): null when unset; logo bytes are never exported
             emailNotifications = true, // constant until T-067 adds the column (FR-046-1: NULL = on)
         };
 

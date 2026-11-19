@@ -14,10 +14,11 @@ public sealed class OrgLogoStore : IOrgLogoStore
 
     public OrgLogoStore(WaDbContext db) => _db = db;
 
-    public async Task SetPathAsync(Guid userId, string? blobPath, CancellationToken ct)
+    public async Task<bool> SetPathAsync(Guid userId, string? blobPath, CancellationToken ct)
     {
-        await _db.Set<AppUser>()
+        var rows = await _db.Set<AppUser>()
             .Where(u => u.Id == userId && u.DeletedAtUtc == null)
             .ExecuteUpdateAsync(s => s.SetProperty(u => u.OrgLogoBlobPath, blobPath), ct);
+        return rows > 0;
     }
 }

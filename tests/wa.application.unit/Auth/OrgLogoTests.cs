@@ -47,13 +47,29 @@ public class OrgLogoTests
     }
 
     [Fact]
-    public async Task Remove_PathSet_ClearsColumnThenDeletesBlob()
+    public async Task Remove_PathSet_DeletesBlobThenClearsColumn()
     {
         var (handler, userId) = Build("transfers/x/logo");
 
         await handler.Handle(new RemoveOrgLogoCommand(userId), CancellationToken.None);
 
-        Assert.Equal(["SetPath(null)", "Delete(transfers/x/logo)"], _calls);
+        Assert.Equal(["Delete(transfers/x/logo)", "SetPath(null)"], _calls);
+    }
+
+    [Fact]
+    public async Task Remove_BlobDeleteFails_LeavesPathSetAndRethrows()
+    {
+        var userId = Guid.NewGuid();
+        var users = new StubUsers();
+        users.Users[userId] = new AppUser { Id = userId, Email = "a@example.com", DisplayName = "A", OrgLogoBlobPath = "transfers/x/logo" };
+        var blobs = new StubBlobs(_calls) { ThrowOnDelete = true };
+        var handler = new RemoveOrgLogoHandler(users, new StubLogos(_calls), blobs);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            handler.Handle(new RemoveOrgLogoCommand(userId), CancellationToken.None));
+
+        Assert.DoesNotContain(_calls, c => c.StartsWith("SetPath("));
+        Assert.Equal("transfers/x/logo", users.Users[userId].OrgLogoBlobPath);
     }
 
     [Fact]
@@ -177,6 +193,20 @@ public class OrgLogoTests
     }
 
     [Fact]
+    public async Task Upload_SetPathAffectsNoRow_DeletesNewBlobAndThrowsNotFound() // concurrent soft-delete
+    {
+        var (handler, userId, logos) = BuildUpload();
+        logos.Matched = false;
+        var canonical = BlobPaths.OrgLogo(userId);
+
+        var ex = await Assert.ThrowsAsync<MeProfileException>(() =>
+            handler.Handle(new UploadOrgLogoCommand(userId, new MemoryStream(Png(20))), CancellationToken.None));
+
+        Assert.Equal(ProblemCodes.TitleOf(ProblemCodes.NotFound), ex.Message);
+        Assert.Equal([$"Upload({canonical},image/png,20)", $"SetPath({canonical})", $"Delete({canonical})"], _calls);
+    }
+
+    [Fact]
     public async Task Upload_ReplacesLegacyPath_DeletesOldBlobAfterSetPath()
     {
         var (handler, userId, _) = BuildUpload(previousPath: "transfers/legacy/logo");
@@ -256,18 +286,21 @@ public class OrgLogoTests
     private sealed class StubLogos(List<string> calls) : IOrgLogoStore
     {
         public bool Throw { get; set; }
+        public bool Matched { get; set; } = true;
 
-        public Task SetPathAsync(Guid userId, string? blobPath, CancellationToken ct)
+        public Task<bool> SetPathAsync(Guid userId, string? blobPath, CancellationToken ct)
         {
             calls.Add($"SetPath({blobPath ?? "null"})");
             if (Throw)
                 throw new InvalidOperationException("db down");
-            return Task.CompletedTask;
+            return Task.FromResult(Matched);
         }
     }
 
     private sealed class StubBlobs(List<string> calls) : IBlobStore, IBlobContentWriter
     {
+        public bool ThrowOnDelete { get; set; }
+
         public Task UploadAsync(string path, Stream content, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task UploadAsync(string path, Stream content, string contentType, CancellationToken cancellationToken = default)
@@ -282,6 +315,8 @@ public class OrgLogoTests
         public Task<bool> ExistsAsync(string path, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task DeleteAsync(string path, CancellationToken cancellationToken = default)
         {
+            if (ThrowOnDelete)
+                throw new InvalidOperationException("storage down");
             calls.Add($"Delete({path})");
             return Task.CompletedTask;
         }

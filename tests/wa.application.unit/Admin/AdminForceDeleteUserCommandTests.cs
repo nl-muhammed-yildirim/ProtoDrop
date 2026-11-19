@@ -107,6 +107,21 @@ public class AdminForceDeleteUserCommandTests
         Assert.Equal([$"avatars/{userId:N}/logo"], _blobs.Deleted);
     }
 
+    [Fact]
+    public async Task ForceDelete_LogoDeleteFails_StillReturnsResult()
+    {
+        var userId = Guid.NewGuid();
+        var user = NewUser(userId);
+        user.OrgLogoBlobPath = $"avatars/{userId:N}/logo";
+        _users.User = user;
+        _blobs.Throw = true;
+
+        var result = await _handler.Handle(new AdminForceDeleteUserCommand(userId), CancellationToken.None);
+
+        Assert.NotNull(result); // the account is already deleted; a storage failure must not become a 500
+        Assert.Equal(1, _users.SoftDeleteCallCount);
+    }
+
     // ---- Helpers ----
 
     private static class JsonSerializerHelper
@@ -128,7 +143,13 @@ public class AdminForceDeleteUserCommandTests
     private sealed class RecordingBlobs : IBlobStore
     {
         public List<string> Deleted { get; } = [];
-        public Task DeleteAsync(string path, CancellationToken cancellationToken = default) { Deleted.Add(path); return Task.CompletedTask; }
+        public bool Throw { get; set; }
+        public Task DeleteAsync(string path, CancellationToken cancellationToken = default)
+        {
+            if (Throw) throw new InvalidOperationException("storage down");
+            Deleted.Add(path);
+            return Task.CompletedTask;
+        }
         public Task UploadAsync(string path, Stream content, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<Stream> DownloadAsync(string path, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task CopyAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken = default) => throw new NotSupportedException();

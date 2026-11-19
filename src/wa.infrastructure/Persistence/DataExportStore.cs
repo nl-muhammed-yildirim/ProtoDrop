@@ -96,7 +96,7 @@ public sealed class DataExportJobStore : IDataExportJobStore
             from u in db.Set<AppUser>().AsNoTracking()
             join p in db.Set<Plan>().AsNoTracking() on u.PlanId equals p.Id
             where u.Id == userId && u.DeletedAtUtc == null
-            select new ExportProfile(u.Email, u.DisplayName, u.Theme, p.Code, u.CreatedAtUtc))
+            select new ExportProfile(u.Email, u.DisplayName, u.Theme, p.Code, u.CreatedAtUtc, u.OrgName))
             .FirstOrDefaultAsync(ct);
         if (profile is null)
             return null;
