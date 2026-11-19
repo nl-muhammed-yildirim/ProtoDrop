@@ -1,5 +1,8 @@
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
+using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -21,17 +24,19 @@ public class PublicTransferBrandingTests : IAsyncLifetime
     private string _connString = null!;
     private WaDbContext _db = null!;
     private HttpClient _client = null!;
+    private Uri _accountUrl = null!;
+    private const string TestSecret = "test-jwt-secret";
 
     public async Task InitializeAsync()
     {
         _azurite = new AzuriteBuilder("mcr.microsoft.com/azure-storage/azurite:3.37.0").Build();
         await _azurite.StartAsync();
         var port = _azurite.GetMappedPublicPort(AzuriteBuilder.BlobPort);
-        var accountUrl = new Uri($"http://127.0.0.1:{port}/{AzuriteBuilder.AccountName}");
+        _accountUrl = new Uri($"http://127.0.0.1:{port}/{AzuriteBuilder.AccountName}");
 
-        Environment.SetEnvironmentVariable("Wa__Blob__AccountUrl", accountUrl.ToString());
+        Environment.SetEnvironmentVariable("Wa__Blob__AccountUrl", _accountUrl.ToString());
         Environment.SetEnvironmentVariable("Wa__Blob__AccountKey", AzuriteBuilder.AccountKey);
-        Environment.SetEnvironmentVariable("Wa__Jwt__Secret", "test-jwt-secret");
+        Environment.SetEnvironmentVariable("Wa__Jwt__Secret", TestSecret);
         Environment.SetEnvironmentVariable("Wa__Url__Public", "http://localhost:5173");
 
         _sql = new MsSqlBuilder().WithImage("mcr.microsoft.com/mssql/server:2022-latest").Build();
@@ -130,6 +135,63 @@ public class PublicTransferBrandingTests : IAsyncLifetime
         Assert.Equal(("varchar", 400, "YES"), cols["OrgLogoBlobPath"]);
     }
 
+    [Fact]
+    public async Task DeleteLogo_RemovesBlobAndPath_RecipientShowsOrgWithoutLogo() // AC-021-5
+    {
+        var blobName = "test-logo/logo";
+        var ownerId = await SeedOwnerAsync("pro", "Studio Nova", $"transfers/{blobName}");
+        var container = new BlobServiceClient(_accountUrl, new Azure.Storage.StorageSharedKeyCredential(AzuriteBuilder.AccountName, AzuriteBuilder.AccountKey))
+            .GetBlobContainerClient("transfers");
+        await container.CreateIfNotExistsAsync();
+        var blob = container.GetBlobClient(blobName);
+        await blob.UploadAsync(new BinaryData(new byte[8]), overwrite: true);
+        await SeedActiveTransferAsync(ownerId, "f1b2c3d4");
+
+        using var response = await _client.SendAsync(DeleteLogoRequest(ownerId));
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var path = await _db.Set<AppUser>().AsNoTracking().Where(u => u.Id == ownerId).Select(u => u.OrgLogoBlobPath).SingleAsync();
+        Assert.Null(path);
+        Assert.False((await blob.ExistsAsync()).Value);
+        var root = await GetAsync("f1b2c3d4");
+        Assert.Equal("Studio Nova", root.GetProperty("orgName").GetString());
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("orgLogoUrl").ValueKind);
+    }
+
+    [Fact]
+    public async Task DeleteLogo_Guest_Returns401()
+    {
+        using var response = await _client.SendAsync(DeleteLogoRequest(null));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteLogo_NoLogo_Returns204Idempotent()
+    {
+        var ownerId = await SeedOwnerAsync("pro", "Studio Nova");
+
+        using var first = await _client.SendAsync(DeleteLogoRequest(ownerId));
+        using var second = await _client.SendAsync(DeleteLogoRequest(ownerId));
+
+        Assert.Equal(HttpStatusCode.NoContent, first.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, second.StatusCode);
+    }
+
+    private static HttpRequestMessage DeleteLogoRequest(Guid? userId)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Delete, "/api/v1/auth/me/logo");
+        if (userId is { } id)
+        {
+            var exp = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 300;
+            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(TestSecret));
+            var unsigned = $"{id:N}|{exp}";
+            var sig = Convert.ToBase64String(hmac.ComputeHash(Encoding.UTF8.GetBytes(unsigned)));
+            request.Headers.Add("Cookie", $"wa.session={Convert.ToBase64String(Encoding.UTF8.GetBytes($"{unsigned}|{sig}"))}");
+        }
+        return request;
+    }
+
     private async Task<JsonElement> GetAsync(string linkId)
     {
         using var response = await _client.GetAsync($"/api/v1/public/transfers/{linkId}");
@@ -138,7 +200,7 @@ public class PublicTransferBrandingTests : IAsyncLifetime
         return doc.RootElement.Clone();
     }
 
-    private async Task<Guid> SeedOwnerAsync(string planCode, string? orgName)
+    private async Task<Guid> SeedOwnerAsync(string planCode, string? orgName, string? orgLogoBlobPath = null)
     {
         var planId = await _db.Set<Plan>().Where(p => p.Code == planCode).Select(p => p.Id).FirstAsync();
         var user = new AppUser
@@ -149,7 +211,8 @@ public class PublicTransferBrandingTests : IAsyncLifetime
             PlanId = planId,
             Theme = "system",
             CreatedAtUtc = DateTime.UtcNow,
-            OrgName = orgName
+            OrgName = orgName,
+            OrgLogoBlobPath = orgLogoBlobPath
         };
         _db.Set<AppUser>().Add(user);
         await _db.SaveChangesAsync();

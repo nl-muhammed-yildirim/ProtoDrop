@@ -74,6 +74,8 @@ builder.Services.AddSingleton<wa.application.UseCases.Transfers.ISendStore>(sp =
 builder.Services.AddSingleton<wa.application.UseCases.Transfers.IPublicTransferStore>(sp => new wa.infrastructure.Persistence.PublicTransferStore(sp.GetRequiredService<WaDbContext>()));
 // US-021-01: sender branding read port (org name beside the sender on the recipient page).
 builder.Services.AddSingleton<wa.application.UseCases.Transfers.ISenderBrandingStore>(sp => new wa.infrastructure.Persistence.SenderBrandingStore(sp.GetRequiredService<WaDbContext>()));
+// US-021-04: org logo path write port (DELETE /auth/me/logo).
+builder.Services.AddSingleton<wa.application.UseCases.Auth.IOrgLogoStore>(sp => new wa.infrastructure.Persistence.OrgLogoStore(sp.GetRequiredService<WaDbContext>()));
 // T-002-02 (TA-4.1.5): generic HTTP idempotency store — used by IdempotencyMiddleware for finalize + send endpoints.
 builder.Services.AddSingleton<IIdempotencyStore>(sp => new wa.infrastructure.Persistence.IdempotencyStore(sp.GetRequiredService<WaDbContext>()));
 // T-011-02 (FR-011-5 / TA-3.2): audit write helper — one AuditLog row + one admin.action domain event per mutation.
@@ -1221,6 +1223,23 @@ app.MapDelete("/api/v1/auth/me", async (HttpContext ctx, ISender sender, Cancell
     catch (MeProfileException ex) when (ex.Message == ProblemCodes.TitleOf(ProblemCodes.NotFound))
     {
         // Same as GET — valid cookie, no row → 404 NOT_FOUND.
+        return Results.Json(ProblemWriter.Build(404, ProblemCodes.NotFound, ProblemCodes.TitleOf(ProblemCodes.NotFound)), statusCode: 404);
+    }
+});
+
+// US-021-04 (FR-021-3 / AC-021-5): DELETE /api/v1/auth/me/logo — remove the session user's org logo (idempotent; not plan-gated).
+app.MapDelete("/api/v1/auth/me/logo", async (HttpContext ctx, ISender sender, CancellationToken ct) =>
+{
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+
+    try
+    {
+        await sender.Send(new RemoveOrgLogoCommand(userId), ct);
+        return Results.NoContent();
+    }
+    catch (MeProfileException ex) when (ex.Message == ProblemCodes.TitleOf(ProblemCodes.NotFound))
+    {
         return Results.Json(ProblemWriter.Build(404, ProblemCodes.NotFound, ProblemCodes.TitleOf(ProblemCodes.NotFound)), statusCode: 404);
     }
 });
