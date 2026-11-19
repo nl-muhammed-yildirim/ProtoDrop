@@ -112,18 +112,8 @@ public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransfer
     /// F-PRF-001 EC-021-1/EC-021-5: resolved at render time from the sender's CURRENT profile and plan.
     /// Guest sends, blank org names and plans without Branding yield null (name-only header).
     /// </summary>
-    private async Task<string?> ResolveOrgNameAsync(Guid? ownerAppUserId, CancellationToken ct)
-    {
-        if (ownerAppUserId is null)
-            return null;
-
-        var row = await _branding.GetAsync(ownerAppUserId.Value, ct);
-        if (row is null || string.IsNullOrWhiteSpace(row.OrgName))
-            return null;
-
-        var features = await _features.Resolve(row.PlanCode, ct);
-        return features.Branding ? row.OrgName.Trim() : null;
-    }
+    private Task<string?> ResolveOrgNameAsync(Guid? ownerAppUserId, CancellationToken ct) =>
+        SenderBranding.ResolveOrgNameAsync(_branding, _features, ownerAppUserId, ct);
 
     /// <summary>8 chars from the LinkId charset (TA-9.6) — anything else is treated as unknown on purpose.</summary>
     private static bool IsWellFormedLinkId(string linkId) =>

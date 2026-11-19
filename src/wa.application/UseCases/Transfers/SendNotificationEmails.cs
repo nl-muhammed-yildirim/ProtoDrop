@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using wa.application.Events;
+using wa.application.Limits;
 using wa.application.Ports;
 using wa.application.Telemetry;
 using wa.domain;
@@ -24,6 +25,8 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
     private readonly WaTelemetryReporter _telemetry;
     private readonly IConfiguration _config;
     private readonly ILogger<SendNotificationEmailsHandler> _logger;
+    private readonly ISenderBrandingStore _branding;
+    private readonly IFeaturesProvider _features;
 
     public SendNotificationEmailsHandler(
         IEmailStore store,
@@ -33,8 +36,12 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
         EventDeduplicator deduplicator,
         WaTelemetryReporter telemetry,
         IConfiguration config,
-        ILogger<SendNotificationEmailsHandler> logger)
+        ILogger<SendNotificationEmailsHandler> logger,
+        ISenderBrandingStore branding,
+        IFeaturesProvider features)
     {
+        _branding = branding;
+        _features = features;
         _store = store;
         _emailSender = emailSender;
         _templateRenderer = templateRenderer;
@@ -96,8 +103,10 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
         var expiryDays = (int)Math.Ceiling((context.ExpiresAtUtc - DateTime.UtcNow).TotalDays);
         var publicOrigin = _config["Wa:Url:Public"] ?? "http://localhost:5173";
         var ctaUrl = $"{publicOrigin}/t/{context.LinkId}";
+        // F-PRF-001 US-021-02 (D-1): org resolved once at dispatch; the rendered email is the send-time snapshot. Never logged (D-6).
+        var orgName = await SenderBranding.ResolveOrgNameAsync(_branding, _features, context.OwnerAppUserId, ct);
         var templateData = new TemplateData(
-            context.SenderName,
+            SenderBranding.ComposeEmailSenderLine(context.SenderName, orgName),
             context.Files,
             ctaUrl,
             expiryDays);

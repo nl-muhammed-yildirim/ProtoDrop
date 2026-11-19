@@ -17,6 +17,7 @@ using Testcontainers.MsSql;
 using Xunit.Abstractions;
 using wa.application.Blob;
 using wa.application.Events;
+using wa.application.Limits;
 using wa.application.Ports;
 using wa.application.Telemetry;
 using wa.application.UseCases.Transfers;
@@ -261,7 +262,11 @@ public class EmailLogSenderE2ETests : IAsyncLifetime
             new EventDeduplicator(() => DateTimeOffset.UtcNow),
             telemetry,
             config,
-            _loggerFactory.CreateLogger<SendNotificationEmailsHandler>());
+            _loggerFactory.CreateLogger<SendNotificationEmailsHandler>(),
+            new SenderBrandingStore(workerDb),
+            new FeaturesProvider(
+                new PlansCache(new PlansStore(workerDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow),
+                new FlagsCache(new FlagsStore(workerDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow)));
         await handler.HandleAsync(envelope, 1, 5, CancellationToken.None);
     }
 
