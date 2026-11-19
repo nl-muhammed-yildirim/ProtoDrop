@@ -13,13 +13,14 @@ public class AdminForceDeleteUserCommandTests
 {
     private readonly StubAppUserStore _users;
     private readonly StubEventPublisher _eventPublisher;
+    private readonly RecordingBlobs _blobs = new();
     private readonly AdminForceDeleteUserHandler _handler;
 
     public AdminForceDeleteUserCommandTests()
     {
         _users = new StubAppUserStore();
         _eventPublisher = new StubEventPublisher();
-        _handler = new AdminForceDeleteUserHandler(_users, _eventPublisher);
+        _handler = new AdminForceDeleteUserHandler(_users, _eventPublisher, _blobs);
     }
 
     // ---- Exit check: unknown user → null (endpoint → 404 NOT_FOUND) ----
@@ -91,6 +92,21 @@ public class AdminForceDeleteUserCommandTests
         Assert.Empty(_eventPublisher.Published); // no event — the delete did not happen (the store returned false)
     }
 
+    // ---- US-021-04 (decision 4): the org logo is deleted with the account ----
+
+    [Fact]
+    public async Task ForceDelete_WithLogo_DeletesLogoBlob()
+    {
+        var userId = Guid.NewGuid();
+        var user = NewUser(userId);
+        user.OrgLogoBlobPath = $"avatars/{userId:N}/logo";
+        _users.User = user;
+
+        await _handler.Handle(new AdminForceDeleteUserCommand(userId), CancellationToken.None);
+
+        Assert.Equal([$"avatars/{userId:N}/logo"], _blobs.Deleted);
+    }
+
     // ---- Helpers ----
 
     private static class JsonSerializerHelper
@@ -108,6 +124,17 @@ public class AdminForceDeleteUserCommandTests
     };
 
     // ---- Stubs (hand-written, no Moq — mirrors DeleteAccountHandler / AdminDeleteTransferCommand event-once tests) ----
+
+    private sealed class RecordingBlobs : IBlobStore
+    {
+        public List<string> Deleted { get; } = [];
+        public Task DeleteAsync(string path, CancellationToken cancellationToken = default) { Deleted.Add(path); return Task.CompletedTask; }
+        public Task UploadAsync(string path, Stream content, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<Stream> DownloadAsync(string path, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task CopyAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<long> GetSizeAsync(string path, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<bool> ExistsAsync(string path, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    }
 
     private sealed class StubEventPublisher : IEventPublisher
     {

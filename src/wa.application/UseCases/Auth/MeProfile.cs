@@ -160,12 +160,14 @@ public sealed class DeleteAccountHandler : IRequestHandler<DeleteAccountCommand,
     private readonly IAppUserStore _users;
     private readonly IEventPublisher _eventPublisher;
     private readonly WaTelemetryReporter _telemetry;
+    private readonly IBlobStore _blobs;
 
-    public DeleteAccountHandler(IAppUserStore users, IEventPublisher eventPublisher, WaTelemetryReporter telemetry)
+    public DeleteAccountHandler(IAppUserStore users, IEventPublisher eventPublisher, WaTelemetryReporter telemetry, IBlobStore blobs)
     {
         _users = users;
         _eventPublisher = eventPublisher;
         _telemetry = telemetry;
+        _blobs = blobs;
     }
 
     public async Task<DeleteAccountResult> Handle(DeleteAccountCommand request, CancellationToken cancellationToken)
@@ -200,6 +202,10 @@ public sealed class DeleteAccountHandler : IRequestHandler<DeleteAccountCommand,
 
         // 5. Telemetry: exactly ONE account_deleted after publish — already a member of the TA-10.2 closed set.
         _telemetry.LogEvent(TelemetryEvents.AccountDeleted);
+
+        // 6. US-021-04 (decision 4): the org logo lives in the avatars container with no lifecycle rule — deleted with the account.
+        if (!string.IsNullOrEmpty(user.OrgLogoBlobPath))
+            await _blobs.DeleteAsync(user.OrgLogoBlobPath, cancellationToken);
 
         return new DeleteAccountResult();
     }

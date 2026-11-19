@@ -124,7 +124,8 @@ public class MeProfileTests
         var handler = new DeleteAccountHandler(
             _users,
             publisher,
-            new WaTelemetryReporter(_telemetryLogger, System.Text.Encoding.UTF8.GetBytes("unit-test-key")));
+            new WaTelemetryReporter(_telemetryLogger, System.Text.Encoding.UTF8.GetBytes("unit-test-key")),
+            new RecordingBlobs());
 
         await handler.Handle(new DeleteAccountCommand(userId), CancellationToken.None);
 
@@ -153,7 +154,8 @@ public class MeProfileTests
         var handler = new DeleteAccountHandler(
             _users,
             new StubEventPublisher(),
-            new WaTelemetryReporter(_telemetryLogger, System.Text.Encoding.UTF8.GetBytes("unit-test-key")));
+            new WaTelemetryReporter(_telemetryLogger, System.Text.Encoding.UTF8.GetBytes("unit-test-key")),
+            new RecordingBlobs());
 
         await Assert.ThrowsAsync<MeProfileException>(async () =>
             await handler.Handle(new DeleteAccountCommand(userId), CancellationToken.None));
@@ -162,7 +164,39 @@ public class MeProfileTests
         Assert.Empty(_users.SoftDeletes);
     }
 
+    // ---- US-021-04 (decision 4): the org logo is deleted with the account ----
+
+    [Fact]
+    public async Task DeleteAccount_WithLogo_DeletesLogoBlob()
+    {
+        var userId = Guid.NewGuid();
+        var user = SeedRealAppUser(userId);
+        user.OrgLogoBlobPath = $"avatars/{userId:N}/logo";
+        _users.UserById[userId] = user;
+        var blobs = new RecordingBlobs();
+        var handler = new DeleteAccountHandler(
+            _users,
+            new StubEventPublisher(),
+            new WaTelemetryReporter(_telemetryLogger, System.Text.Encoding.UTF8.GetBytes("unit-test-key")),
+            blobs);
+
+        await handler.Handle(new DeleteAccountCommand(userId), CancellationToken.None);
+
+        Assert.Equal([$"avatars/{userId:N}/logo"], blobs.Deleted);
+    }
+
     // ---- Stubs (T-008-01 style — hand-written stubs, no Moq) ----
+
+    private sealed class RecordingBlobs : IBlobStore
+    {
+        public List<string> Deleted { get; } = [];
+        public Task DeleteAsync(string path, CancellationToken cancellationToken = default) { Deleted.Add(path); return Task.CompletedTask; }
+        public Task UploadAsync(string path, Stream content, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<Stream> DownloadAsync(string path, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task CopyAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<long> GetSizeAsync(string path, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<bool> ExistsAsync(string path, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    }
 
     private sealed class StubAppUserStore : IAppUserStore
     {

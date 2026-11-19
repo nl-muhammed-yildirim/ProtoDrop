@@ -3,7 +3,7 @@ using wa.application.Ports;
 namespace wa.infrastructure.Blob;
 
 /// <summary>TA-3.6 — DI adapter over <see cref="BlobSasMinter"/>: the only production implementation of <see cref="IBlobSasMinter"/>.</summary>
-public sealed class DraftBlobSasMinter : IBlobSasMinter, IExportSasMinter
+public sealed class DraftBlobSasMinter : IBlobSasMinter, IExportSasMinter, IOrgLogoSasMinter
 {
     private readonly BlobSasMinter _inner;
 
@@ -22,4 +22,7 @@ public sealed class DraftBlobSasMinter : IBlobSasMinter, IExportSasMinter
 
     /// <summary>US-047-01: 24 h read SAS on one data-export zip (exports container).</summary>
     public Uri MintExportDownload(Guid userId, Guid exportId) => _inner.MintExportDownload(userId, exportId);
+
+    /// <summary>US-021-04: 30-minute inline read SAS on one org logo (avatars container).</summary>
+    public Uri MintOrgLogo(Guid userId) => _inner.MintOrgLogo(userId);
 }

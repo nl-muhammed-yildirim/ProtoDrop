@@ -16,6 +16,15 @@ public static class BlobPaths
     /// <summary>Exports container name (US-047-01, TA-3.5 data-export row).</summary>
     public const string ExportsContainer = "exports";
 
+    /// <summary>Avatars container name (US-021-04, TA-3.5 avatars row).</summary>
+    public const string AvatarsContainer = "avatars";
+
+    /// <summary>
+    /// TA-3.5 avatars row (US-021-04): the org logo of one user. Lifetime: with the user (deleted with the account); no lifecycle rule.
+    /// </summary>
+    public static string OrgLogo(Guid userId)
+        => $"avatars/{userId:N}/logo";
+
     /// <summary>
     /// TA-3.5 staging row: a file staged against a draft — the browser uploads here as block blobs before finalize creates the transfer. Lifetime: 24 h lifecycle (safety net). The only path exercised at M0 (AC-055-3).
     /// </summary>

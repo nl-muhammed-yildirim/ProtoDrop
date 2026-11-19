@@ -43,6 +43,24 @@ public class SenderBrandingTests
         Assert.Equal("Studio Nova", await SenderBranding.ResolveOrgNameAsync(store, new Features(), Guid.NewGuid(), CancellationToken.None));
     }
 
+    [Fact]
+    public async Task ResolveView_FreePlan_ReturnsEmptyView()
+    {
+        var store = new Store(new SenderBrandingRow("free", "Studio Nova", "avatars/x/logo"));
+        var view = await SenderBranding.ResolveAsync(store, new Features(), Guid.NewGuid(), CancellationToken.None);
+        Assert.Null(view.OrgName);
+        Assert.False(view.HasLogo);
+    }
+
+    [Fact]
+    public async Task ResolveView_ProWithPath_HasLogoTrue_EvenWithoutOrgName()
+    {
+        var store = new Store(new SenderBrandingRow("pro", null, "avatars/x/logo"));
+        var view = await SenderBranding.ResolveAsync(store, new Features(), Guid.NewGuid(), CancellationToken.None);
+        Assert.Null(view.OrgName);
+        Assert.True(view.HasLogo);
+    }
+
     private sealed class Store(SenderBrandingRow? row) : ISenderBrandingStore
     {
         public int Calls { get; private set; }

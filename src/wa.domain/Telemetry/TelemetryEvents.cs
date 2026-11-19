@@ -1,7 +1,7 @@
 namespace wa.domain.Telemetry;
 
 /// <summary>
-/// The closed TA-10.2 telemetry contract — "names are code" (TA-10.2): exactly these 23 event names + 7 metric names, no others in M0.
+/// The closed TA-10.2 telemetry contract — "names are code" (TA-10.2): exactly these 24 event names + 7 metric names, no others in M0.
 /// Adding a member later is an architecture change (EC-056-4: it requires adding the name to TA-10.2 first). No renames — wire values are what App Insights queries by.
 /// </summary>
 public static class TelemetryEvents
@@ -31,6 +31,7 @@ public static class TelemetryEvents
     public const string DlqCount = "dlq_count";
     public const string EmailTemplateFallback = "email.template_fallback";
     public const string TemplateRenderError = "template_render_error";
+    public const string BrandingLogoMissing = "branding_logo_missing"; // US-021-04 (EC-021-2): property-free
 
     // ---- Metrics (TA-10.2 line 818) — same pipeline, no separate metrics SDK ----
 
@@ -47,7 +48,7 @@ public static class TelemetryEvents
         UploadStarted, UploadCompleted, UploadFailed, TransferPageViewed, TransferNotFound, PasswordCorrect, PasswordWrong,
         DownloadStarted, DownloadCompleted, ZipGenerated, ZipFailed, EmailSent, EmailFailed, UserCreated, LoginSuccess,
         LoginFailed, AccountDeleted, PlanChanged, TranslationMissing, AdminAction, DlqCount,
-        EmailTemplateFallback, TemplateRenderError
+        EmailTemplateFallback, TemplateRenderError, BrandingLogoMissing
     ];
 
     private static readonly string[] Metrics =

@@ -53,8 +53,10 @@ else
 // T-055-02 (TA-3.5 topology, §5.2 config): blob store + one-time container bootstrap. GR#7 — no "is this the fake?" branch; the adapter is picked by its §5.2 config values only.
 var blobAccountUrl = builder.Configuration["Wa:Blob:AccountUrl"];
 var blobAccountKey = builder.Configuration["Wa:Blob:AccountKey"];
-builder.Services.AddSingleton<wa.application.Ports.IBlobStore>(sp => new AzureBlobStore(
+builder.Services.AddSingleton(sp => new AzureBlobStore(
     new Uri(blobAccountUrl!), blobAccountKey!, sp.GetRequiredService<ILogger<AzureBlobStore>>()));
+builder.Services.AddSingleton<wa.application.Ports.IBlobStore>(sp => sp.GetRequiredService<AzureBlobStore>());
+builder.Services.AddSingleton<wa.application.Ports.IBlobContentWriter>(sp => sp.GetRequiredService<AzureBlobStore>()); // US-021-04: logo upload with Content-Type
 // BlobContainerBootstrap (TA-3.5) needs a raw client for service-level properties; account name via the adapter's helper.
 builder.Services.AddSingleton(new BlobServiceClient(
     new Uri(blobAccountUrl!),
@@ -113,6 +115,7 @@ builder.Services.AddScoped<IPlanContextAccessor>(sp => sp.GetRequiredService<Pla
 var sasMinter = new DraftBlobSasMinter(new Uri(blobAccountUrl!), blobAccountKey!);
 builder.Services.AddSingleton<IBlobSasMinter>(sasMinter);
 builder.Services.AddSingleton<IExportSasMinter>(sasMinter); // US-047-01: export download SAS (TA-3.6)
+builder.Services.AddSingleton<IOrgLogoSasMinter>(sasMinter); // US-021-04: org logo read SAS (TA-3.6)
 builder.Services.AddSingleton<wa.application.UseCases.DataExport.IDataExportStore>(sp => new wa.infrastructure.Persistence.DataExportStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
 // TA-9.5 second line (T-056-03): AspNetCoreRateLimit frozen at 5.0.0, in-memory store — per-instance state is correct at M0 scale; a distributed store would be an ADR change.
 builder.Services.AddMemoryCache(); // the package's MemoryCache* stores need IMemoryCache, which this app does not register by default (DI validation caught it)
@@ -1243,6 +1246,47 @@ app.MapDelete("/api/v1/auth/me/logo", async (HttpContext ctx, ISender sender, Ca
         return Results.Json(ProblemWriter.Build(404, ProblemCodes.NotFound, ProblemCodes.TitleOf(ProblemCodes.NotFound)), statusCode: 404);
     }
 });
+
+// US-021-04 (FR-021-3..5): PUT /api/v1/auth/me/logo — raw image body; the handler bounds the read, sniffs the content and stores it.
+app.MapPut("/api/v1/auth/me/logo", async (HttpContext ctx, ISender sender, CancellationToken ct) =>
+{
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+
+    try
+    {
+        var view = await sender.Send(new UploadOrgLogoCommand(userId, ctx.Request.Body), ct);
+        return Results.Json(ToLogoBody(view), statusCode: 200);
+    }
+    catch (OrgLogoRejectedException ex)
+    {
+        throw new BusinessException(ex.Code, ex.Message, ex);
+    }
+    catch (MeProfileException ex) when (ex.Message == ProblemCodes.TitleOf(ProblemCodes.NotFound))
+    {
+        return Results.Json(ProblemWriter.Build(404, ProblemCodes.NotFound, ProblemCodes.TitleOf(ProblemCodes.NotFound)), statusCode: 404);
+    }
+});
+
+// US-021-04 (D-B5): GET /api/v1/auth/me/logo — owner view { logoUrl, maxLogoSize, brandingEnabled }.
+app.MapGet("/api/v1/auth/me/logo", async (HttpContext ctx, ISender sender, CancellationToken ct) =>
+{
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+
+    try
+    {
+        var view = await sender.Send(new GetOrgLogoQuery(userId), ct);
+        return Results.Json(ToLogoBody(view), statusCode: 200);
+    }
+    catch (MeProfileException ex) when (ex.Message == ProblemCodes.TitleOf(ProblemCodes.NotFound))
+    {
+        return Results.Json(ProblemWriter.Build(404, ProblemCodes.NotFound, ProblemCodes.TitleOf(ProblemCodes.NotFound)), statusCode: 404);
+    }
+});
+
+static object ToLogoBody(OrgLogoView view) =>
+    new { logoUrl = view.LogoUrl?.ToString(), maxLogoSize = view.MaxLogoSize, brandingEnabled = view.BrandingEnabled };
 
 // US-047-01 (FR-047-1/2/4): POST /api/v1/auth/me/export — request a GDPR data export (gated by feature.dataExport); 202 + processing view.
 app.MapPost("/api/v1/auth/me/export", async (HttpContext ctx, ISender sender, CancellationToken ct) =>

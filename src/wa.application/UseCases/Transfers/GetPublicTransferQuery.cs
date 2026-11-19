@@ -1,6 +1,8 @@
 using MediatR;
 using Microsoft.Extensions.Logging;
+using wa.application.Blob;
 using wa.application.Limits;
+using wa.application.Ports;
 using wa.application.Telemetry;
 using wa.domain.Telemetry;
 using wa.domain.ValueObjects;
@@ -30,7 +32,7 @@ public sealed record GetPublicTransferResult(
     bool PasswordRequired = false,  // Active only
     string? SenderEmail = null,     // terminal bodies render it into Problem+JSON details (FR-003-8/9)
     string? OrgName = null,         // Active only — sender's org when their plan has Branding (F-PRF-001)
-    string? OrgLogoUrl = null);     // Active only — always null until US-021-04
+    string? OrgLogoUrl = null);     // Active only — 30-min inline read SAS when branding is on and the blob exists
 
 /// <summary>
 /// T-014 (TA-4.2#4): recipient metadata for GET /api/v1/public/transfers/{linkId}. No auth, no cookie;
@@ -44,6 +46,8 @@ public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransfer
     private readonly IUnlockTokenMinter _tokens;
     private readonly ISenderBrandingStore _branding;
     private readonly IFeaturesProvider _features;
+    private readonly IBlobStore _blobs;
+    private readonly IOrgLogoSasMinter _logoMinter;
     private readonly ILogger<GetPublicTransferHandler> _logger;
 
     public GetPublicTransferHandler(
@@ -53,6 +57,8 @@ public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransfer
         IUnlockTokenMinter tokens,
         ISenderBrandingStore branding,
         IFeaturesProvider features,
+        IBlobStore blobs,
+        IOrgLogoSasMinter logoMinter,
         ILogger<GetPublicTransferHandler> logger)
     {
         _store = store;
@@ -61,6 +67,8 @@ public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransfer
         _tokens = tokens;
         _branding = branding;
         _features = features;
+        _blobs = blobs;
+        _logoMinter = logoMinter;
         _logger = logger;
     }
 
@@ -96,6 +104,16 @@ public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransfer
 
         // Active — full metadata payload; no SAS minted at page view, no download consumed.
         var limits = await _limits.Resolve(ILimitsProvider.GuestPlanCode, cancellationToken); // no auth on this endpoint → guest/free plan (TA-3.4: never a literal).
+        var branding = await SenderBranding.ResolveAsync(_branding, _features, transfer.OwnerAppUserId, cancellationToken);
+        string? logoUrl = null;
+        if (branding.HasLogo && transfer.OwnerAppUserId is { } ownerId)
+        {
+            if (await _blobs.ExistsAsync(BlobPaths.OrgLogo(ownerId), cancellationToken))
+                logoUrl = _logoMinter.MintOrgLogo(ownerId).ToString();
+            else
+                _telemetry.LogEvent(TelemetryEvents.BrandingLogoMissing); // EC-021-2: graceful fallback to the name-only header
+        }
+
         return new GetPublicTransferResult(
             PublicTransferState.Active,
             From: transfer.SenderName,
@@ -105,15 +123,9 @@ public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransfer
             // T-007-01: -1 sentinel means infinite cap for THIS transfer (FR-003-5 hides the line).
             DownloadsLeft: transfer.MaxDownloads < 0 ? null : transfer.MaxDownloads - transfer.DownloadsCount,
             PasswordRequired: passwordRequired,
-            OrgName: await ResolveOrgNameAsync(transfer.OwnerAppUserId, cancellationToken));
+            OrgName: branding.OrgName,
+            OrgLogoUrl: logoUrl);
     }
-
-    /// <summary>
-    /// F-PRF-001 EC-021-1/EC-021-5: resolved at render time from the sender's CURRENT profile and plan.
-    /// Guest sends, blank org names and plans without Branding yield null (name-only header).
-    /// </summary>
-    private Task<string?> ResolveOrgNameAsync(Guid? ownerAppUserId, CancellationToken ct) =>
-        SenderBranding.ResolveOrgNameAsync(_branding, _features, ownerAppUserId, ct);
 
     /// <summary>8 chars from the LinkId charset (TA-9.6) — anything else is treated as unknown on purpose.</summary>
     private static bool IsWellFormedLinkId(string linkId) =>

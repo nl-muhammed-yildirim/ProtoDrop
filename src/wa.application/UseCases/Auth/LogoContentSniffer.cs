@@ -24,6 +24,16 @@ public static class LogoContentSniffer
     private static ReadOnlySpan<byte> Riff => "RIFF"u8;
     private static ReadOnlySpan<byte> WebPTag => "WEBP"u8;
 
+    /// <summary>The Content-Type stored with a sniffed logo (never the client's header).</summary>
+    public static string ContentTypeOf(LogoImageType type) => type switch
+    {
+        LogoImageType.Png => "image/png",
+        LogoImageType.Jpeg => "image/jpeg",
+        LogoImageType.WebP => "image/webp",
+        LogoImageType.Svg => "image/svg+xml",
+        _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
+    };
+
     public static LogoImageType? Sniff(ReadOnlySpan<byte> head)
     {
         if (head.StartsWith(PngMagic))
