@@ -69,9 +69,98 @@ public class DownloadAnalyticsTests
     public void Build_Total_IsSumOfDaily()
     {
         var from = new DateOnly(2026, 11, 17);
-        var r = DownloadAnalytics.Build([new DailyCount(from, 2), new DailyCount(from.AddDays(2), 5)], [("NL", 7)], [("Chrome", 7)], from, from.AddDays(2));
+        var r = DownloadAnalytics.Build([new DailyCount(from, 2), new DailyCount(from.AddDays(2), 5)], [("NL", 7)], [("Chrome", 7)], [], [], from, from.AddDays(2));
 
         Assert.Equal(7, r.Total);
         Assert.Equal(3, r.Daily.Count);
+    }
+
+    private static readonly DateTime T0 = new(2026, 11, 17, 10, 0, 0, DateTimeKind.Utc);
+    private static AnalyticsFile F(int n) => new(new Guid(n, 0, 0, new byte[8]), $"f{n}.txt", n);
+    private static FileCountRow R(int n, int count, int minutes = 0) => new(new Guid(n, 0, 0, new byte[8]), count, T0.AddMinutes(minutes));
+
+    [Fact]
+    public void FileCounts_EveryFileListed_ZeroFilled_SortOrder()
+    {
+        var r = DownloadAnalytics.FileCounts([F(3), F(1), F(2)], [R(1, 4), R(3, 2)]);
+
+        Assert.Equal(["f1.txt", "f2.txt", "f3.txt"], r.Files.Select(f => f.Name));
+        Assert.Equal([4, 0, 2], r.Files.Select(f => f.Count));
+    }
+
+    [Fact]
+    public void FileCounts_NullFileId_IsDownloadAll_NotInTop()
+    {
+        var r = DownloadAnalytics.FileCounts([F(1), F(2)], [R(1, 2), new FileCountRow(null, 9, T0)]);
+
+        Assert.Equal(9, r.DownloadAll);
+        Assert.Single(r.Top);
+        Assert.Equal(F(1).Id, r.Top[0].FileId);
+    }
+
+    [Fact]
+    public void FileCounts_SingleFile_NoZipEvents_DownloadAllNull()
+    {
+        var r = DownloadAnalytics.FileCounts([F(1)], [R(1, 3)]);
+
+        Assert.Null(r.DownloadAll);
+    }
+
+    [Fact]
+    public void FileCounts_MultiFile_NoZipEvents_DownloadAllZero()
+    {
+        var r = DownloadAnalytics.FileCounts([F(1), F(2)], []);
+
+        Assert.Equal(0, r.DownloadAll);
+        Assert.Empty(r.Top);
+    }
+
+    [Fact]
+    public void FileCounts_TieOnCount_MostRecentFirst()
+    {
+        var r = DownloadAnalytics.FileCounts([F(1), F(2)], [R(1, 2, 0), R(2, 2, 30)]);
+
+        Assert.Equal([F(2).Id, F(1).Id], r.Top.Select(f => f.FileId));
+    }
+
+    [Fact]
+    public void FileCounts_FullTie_FallsBackToSortOrder()
+    {
+        var r = DownloadAnalytics.FileCounts([F(2), F(1)], [R(1, 2, 5), R(2, 2, 5)]);
+
+        Assert.Equal([F(1).Id, F(2).Id], r.Top.Select(f => f.FileId));
+    }
+
+    [Fact]
+    public void FileCounts_SevenFiles_TopCutToFive_ZeroCountsExcluded()
+    {
+        var files = Enumerable.Range(1, 7).Select(F).ToList();
+        var rows = Enumerable.Range(1, 6).Select(n => R(n, n)).ToList();   // file 7 has zero
+
+        var r = DownloadAnalytics.FileCounts(files, rows);
+
+        Assert.Equal(5, r.Top.Count);
+        Assert.Equal([6, 5, 4, 3, 2], r.Top.Select(f => f.Count));
+        Assert.DoesNotContain(r.Top, f => f.Count == 0);
+    }
+
+    [Fact]
+    public void FileCounts_OrphanFileId_Ignored()
+    {
+        var r = DownloadAnalytics.FileCounts([F(1), F(2)], [R(1, 1), R(99, 8)]);
+
+        Assert.Equal(2, r.Files.Count);
+        Assert.Single(r.Top);
+    }
+
+    [Fact]
+    public void Build_CarriesFileBreakdown()
+    {
+        var from = new DateOnly(2026, 11, 17);
+        var r = DownloadAnalytics.Build([], [], [], [F(1), F(2)], [R(2, 3), new FileCountRow(null, 1, T0)], from, from);
+
+        Assert.Equal(2, r.Files.Files.Count);
+        Assert.Equal(1, r.Files.DownloadAll);
+        Assert.Equal(F(2).Id, r.Files.Top[0].FileId);
     }
 }

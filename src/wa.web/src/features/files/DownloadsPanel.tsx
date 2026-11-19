@@ -77,6 +77,29 @@ function AnalyticsBody({ data }: { data: TransferAnalyticsDto }): ReactElement {
         <span className="mf-dl-chip">{i18n.t('files.analytics.topCountry')}: <strong>{country === null ? '–' : countryLabel(country)}</strong></span>
         <span className="mf-dl-chip">{i18n.t('files.analytics.topBrowser')}: <strong>{browser === null ? '–' : browserLabel(browser)}</strong></span>
       </div>
+      <table className="mf-dl-files" aria-label={i18n.t('files.analytics.perFile')}>
+        <thead>
+          <tr><th scope="col">{i18n.t('files.analytics.fileColumn')}</th><th scope="col">{i18n.t('files.analytics.countColumn')}</th></tr>
+        </thead>
+        <tbody>
+          {data.files.map((f) => (
+            <tr key={f.fileId}><td>{f.name}</td><td>{f.count}</td></tr>
+          ))}
+          {data.downloadAll !== null && (
+            <tr className="mf-dl-zip"><td>{i18n.t('files.analytics.downloadAll')}</td><td>{data.downloadAll}</td></tr>
+          )}
+        </tbody>
+      </table>
+      {data.topFiles.length > 0 && (
+        <div className="mf-dl-topwrap">
+          <h4 className="mf-dl-toptitle">{i18n.t('files.analytics.topDownloads')}</h4>
+          <ol className="mf-dl-top">
+            {data.topFiles.map((f) => (
+              <li key={f.fileId}>{f.name} <span className="mf-dl-count">{f.count}</span></li>
+            ))}
+          </ol>
+        </div>
+      )}
     </>
   )
 }

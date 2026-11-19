@@ -271,5 +271,10 @@
   "files.analytics.otherBrowser": "Overig",
   "files.analytics.error": "Downloadstatistieken konden niet worden geladen.",
   "files.analytics.loading": "Downloads laden…",
-  "files.analytics.chartLabel": "Downloads per dag"
+  "files.analytics.chartLabel": "Downloads per dag",
+  "files.analytics.perFile": "Downloads per bestand",
+  "files.analytics.fileColumn": "Bestand",
+  "files.analytics.countColumn": "Downloads",
+  "files.analytics.downloadAll": "Alles downloaden (zip)",
+  "files.analytics.topDownloads": "Meest gedownload"
 }

@@ -119,8 +119,9 @@ public abstract class TransferAnalyticsEndpointTestsBase(bool gateOn) : IAsyncLi
         return id;
     }
 
-    protected static DownloadEvent Event(Guid transferId, DateTime atUtc, string? country, string? family) => new()
+    protected static DownloadEvent Event(Guid transferId, DateTime atUtc, string? country, string? family, Guid? fileId = null) => new()
     {
+        FileId = fileId,
         TransferId = transferId,
         IpHash = "IPHASH-SENTINEL",
         UaHash = "UAHASH-SENTINEL",
@@ -128,6 +129,40 @@ public abstract class TransferAnalyticsEndpointTestsBase(bool gateOn) : IAsyncLi
         UserAgentFamily = family,
         CreatedAtUtc = atUtc
     };
+
+    /// <summary>US-023-02: FileItem (+ BlobRef, UQ_FileItem_T_B) per name, SortOrder = index; returns the FileItem ids.</summary>
+    protected async Task<Guid[]> SeedFilesAsync(Guid transferId, params string[] names)
+    {
+        var ids = new Guid[names.Length];
+        for (var i = 0; i < names.Length; i++)
+        {
+            ids[i] = Guid.NewGuid();
+            var blobRef = new BlobRef
+            {
+                Id = Guid.NewGuid(),
+                BlobPath = BlobPaths.TransferFile(transferId, ids[i]),
+                SizeBytes = 1,
+                RefCount = 1,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            Db.Set<BlobRef>().Add(blobRef);
+            Db.Set<FileItem>().Add(new FileItem
+            {
+                Id = ids[i],
+                TransferId = transferId,
+                BlobRefId = blobRef.Id,
+                OriginalName = names[i],
+                SizeBytes = 1,
+                ContentType = "text/plain",
+                SortOrder = i
+            });
+        }
+
+        var transfer = await Db.Set<Transfer>().FirstAsync(t => t.Id == transferId);
+        transfer.FileCount = names.Length;
+        await Db.SaveChangesAsync();
+        return ids;
+    }
 
     protected async Task AddEventsAsync(params DownloadEvent[] events)
     {
@@ -204,7 +239,7 @@ public class TransferAnalyticsEndpointTests() : TransferAnalyticsEndpointTestsBa
         Assert.DoesNotContain("SENTINEL", raw);
         Assert.DoesNotContain("Mozilla", raw);
         using var doc = JsonDocument.Parse(raw);
-        Assert.Equal(["total", "daily", "countries", "browsers"], doc.RootElement.EnumerateObject().Select(p => p.Name));
+        Assert.Equal(["total", "daily", "countries", "browsers", "files", "downloadAll", "topFiles"], doc.RootElement.EnumerateObject().Select(p => p.Name));
     }
 
     [Fact]
@@ -359,6 +394,123 @@ public class TransferAnalyticsEndpointTests() : TransferAnalyticsEndpointTestsBa
 
         await using var ctx = new WaDbContext(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(Sql.GetConnectionString()).Options);
         var sql = TransferAnalyticsStore.DailyQuery(ctx.Set<DownloadEvent>(), id, DateTime.UtcNow.AddDays(-30)).ToQueryString();
+
+        await using var conn = new SqlConnection(Sql.GetConnectionString());
+        await conn.OpenAsync();
+        await using (var on = conn.CreateCommand())
+        {
+            on.CommandText = "SET SHOWPLAN_XML ON";
+            await on.ExecuteNonQueryAsync();
+        }
+
+        var plan = new StringBuilder();
+        await using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = sql;
+            await using var reader = await cmd.ExecuteReaderAsync();
+            do
+            {
+                while (await reader.ReadAsync())
+                    plan.Append(reader.GetString(0));
+            } while (await reader.NextResultAsync());
+        }
+
+        await using (var off = conn.CreateCommand())
+        {
+            off.CommandText = "SET SHOWPLAN_XML OFF";
+            await off.ExecuteNonQueryAsync();
+        }
+
+        var xml = plan.ToString();
+        Assert.Contains("Index=\"[IX_DownEvent_T]\"", xml);
+        Assert.Contains("<SeekPredicates>", xml);
+    }
+
+    [Fact]
+    public async Task ProUser_ThreeFiles_PerFileCounts_DownloadAllSeparate() // FR-023-2, story AC 1
+    {
+        var userId = await SeedUserAsync("pro");
+        var id = await SeedTransferAsync(userId);
+        var f = await SeedFilesAsync(id, "a.txt", "b.txt", "c.txt");
+        var now = DateTime.UtcNow;
+        await AddEventsAsync(
+            Event(id, now.AddHours(-3), "NL", "Chrome", f[0]), Event(id, now.AddHours(-2), "NL", "Chrome", f[0]), Event(id, now.AddHours(-1), "NL", "Chrome", f[0]),
+            Event(id, now.AddHours(-1), "NL", "Chrome", f[1]),
+            Event(id, now.AddHours(-1), "NL", "Chrome"), Event(id, now.AddHours(-2), "NL", "Chrome"));
+
+        using var response = await AnalyticsAsync(id, userId);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await ReadJsonAsync(response);
+        var files = body.GetProperty("files").EnumerateArray().ToList();
+        Assert.Equal(["a.txt", "b.txt", "c.txt"], files.Select(x => x.GetProperty("name").GetString()));
+        Assert.Equal([3, 1, 0], files.Select(x => x.GetProperty("count").GetInt32()));
+        Assert.Equal(2, body.GetProperty("downloadAll").GetInt32());
+        Assert.Equal(["a.txt", "b.txt"], body.GetProperty("topFiles").EnumerateArray().Select(x => x.GetProperty("name").GetString()));
+    }
+
+    [Fact]
+    public async Task ProUser_TopFiles_TieBrokenByRecency() // AC-023-5
+    {
+        var userId = await SeedUserAsync("pro");
+        var id = await SeedTransferAsync(userId);
+        var f = await SeedFilesAsync(id, "a.txt", "b.txt");
+        var now = DateTime.UtcNow;
+        await AddEventsAsync(
+            Event(id, now.AddHours(-5), "NL", "Chrome", f[0]), Event(id, now.AddHours(-4), "NL", "Chrome", f[0]),
+            Event(id, now.AddHours(-3), "NL", "Chrome", f[1]), Event(id, now.AddHours(-1), "NL", "Chrome", f[1]));
+
+        using var response = await AnalyticsAsync(id, userId);
+
+        var body = await ReadJsonAsync(response);
+        Assert.Equal(["b.txt", "a.txt"], body.GetProperty("topFiles").EnumerateArray().Select(x => x.GetProperty("name").GetString()));
+    }
+
+    [Fact]
+    public async Task ProUser_SingleFile_DownloadAllNull()
+    {
+        var userId = await SeedUserAsync("pro");
+        var id = await SeedTransferAsync(userId);
+        var f = await SeedFilesAsync(id, "only.txt");
+        await AddEventsAsync(Event(id, DateTime.UtcNow.AddHours(-1), "NL", "Chrome", f[0]));
+
+        using var response = await AnalyticsAsync(id, userId);
+
+        var body = await ReadJsonAsync(response);
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("downloadAll").ValueKind);
+        Assert.Equal(1, body.GetProperty("files").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task ProUser_ZeroDownloads_FilesListedAtZero() // EC-023-1
+    {
+        var userId = await SeedUserAsync("pro");
+        var id = await SeedTransferAsync(userId);
+        await SeedFilesAsync(id, "a.txt", "b.txt");
+
+        using var response = await AnalyticsAsync(id, userId);
+
+        var body = await ReadJsonAsync(response);
+        Assert.Equal([0, 0], body.GetProperty("files").EnumerateArray().Select(x => x.GetProperty("count").GetInt32()));
+        Assert.Equal(0, body.GetProperty("downloadAll").GetInt32());
+        Assert.Equal(0, body.GetProperty("topFiles").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task FileQuery_SeeksIxDownEventT()
+    {
+        var id = await SeedTransferAsync(null);
+        // FileId is not in IX_DownEvent_T (key lookup). ToQueryString declares locals, so the optimizer uses average density:
+        // spread events over many transfers so a seek + lookup is estimated cheaper than a clustered scan (needs ~100k rows).
+        for (var t = 0; t < 200; t++)
+        {
+            var other = await SeedTransferAsync(null);
+            await AddEventsAsync(Enumerable.Range(0, 500).Select(i => Event(other, DateTime.UtcNow.AddMinutes(-i), "NL", "Chrome", Guid.NewGuid())).ToArray());
+        }
+        await AddEventsAsync(Enumerable.Range(0, 50).Select(i => Event(id, DateTime.UtcNow.AddHours(-i), "NL", "Chrome", i % 2 == 0 ? Guid.NewGuid() : null)).ToArray());
+
+        await using var ctx = new WaDbContext(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(Sql.GetConnectionString()).Options);
+        var sql = TransferAnalyticsStore.FileQuery(ctx.Set<DownloadEvent>(), id, DateTime.UtcNow.AddDays(-30)).ToQueryString();
 
         await using var conn = new SqlConnection(Sql.GetConnectionString());
         await conn.OpenAsync();

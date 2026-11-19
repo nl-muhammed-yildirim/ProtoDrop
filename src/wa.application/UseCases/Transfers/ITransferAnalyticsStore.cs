@@ -22,4 +22,6 @@ public sealed record AnalyticsTransfer(Guid Id, DateTime CreatedAtUtc, byte Stat
 public sealed record AnalyticsAggregate(
     IReadOnlyList<DailyCount> Daily,
     IReadOnlyList<(string? Key, int Count)> Countries,
-    IReadOnlyList<(string? Key, int Count)> Browsers);
+    IReadOnlyList<(string? Key, int Count)> Browsers,
+    IReadOnlyList<AnalyticsFile> FileItems,
+    IReadOnlyList<FileCountRow> FileCounts);

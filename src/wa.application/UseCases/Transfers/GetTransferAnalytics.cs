@@ -40,6 +40,6 @@ public sealed class GetTransferAnalyticsHandler : IRequestHandler<GetTransferAna
         var sinceUtc = from.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
 
         var agg = await _store.AggregateAsync(request.Id, sinceUtc, ct);
-        return DownloadAnalytics.Build(agg.Daily, agg.Countries, agg.Browsers, from, to);
+        return DownloadAnalytics.Build(agg.Daily, agg.Countries, agg.Browsers, agg.FileItems, agg.FileCounts, from, to);
     }
 }

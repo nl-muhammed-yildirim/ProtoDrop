@@ -1270,6 +1270,46 @@ main:has(.sl) .dz {
   color: var(--fg-muted);
 }
 
+.mf-dl-files {
+  width: 100%;
+  max-width: 480px;
+  border-collapse: collapse;
+  font-size: var(--fs-small);
+}
+
+.mf-dl-files th,
+.mf-dl-files td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mf-dl-files th:last-child,
+.mf-dl-files td:last-child {
+  text-align: right;
+  width: 1%;
+  white-space: nowrap;
+}
+
+.mf-dl-files td:first-child { max-width: 0; white-space: nowrap; }
+
+.mf-dl-zip td {
+  border-top: 1px solid var(--border);
+  color: var(--fg-muted);
+}
+
+.mf-dl-toptitle { margin: 0 0 4px; font-size: var(--fs-small); }
+
+.mf-dl-top {
+  margin: 0;
+  padding-left: 20px;
+  font-size: var(--fs-small);
+}
+
+.mf-dl-top .mf-dl-count { color: var(--fg-muted); }
+
 .mf-name {
   flex: 1;
   min-width: 0; /* allow ellipsis inside a flex item */

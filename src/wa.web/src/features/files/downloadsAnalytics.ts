@@ -13,11 +13,17 @@ export interface DailyPoint { date: string; count: number }
 export interface CountryBucket { code: string; count: number }
 export interface BrowserBucket { family: string; count: number }
 
+export interface FileCountDto { fileId: string; name: string; count: number }
+
 export interface TransferAnalyticsDto {
   total: number
   daily: DailyPoint[]
   countries: CountryBucket[]
   browsers: BrowserBucket[]
+  files: FileCountDto[]
+  /** null = absent (single-file transfer, no zip) */
+  downloadAll: number | null
+  topFiles: FileCountDto[]
 }
 
 export type AnalyticsResult =
@@ -31,6 +37,15 @@ function isCount(n: unknown): n is number {
 
 function asArray(v: unknown): unknown[] {
   return Array.isArray(v) ? v : []
+}
+
+function parseFileCounts(v: unknown): FileCountDto[] {
+  const out: FileCountDto[] = []
+  for (const e of asArray(v)) {
+    const f = e as { fileId?: unknown; name?: unknown; count?: unknown }
+    if (typeof f?.fileId === 'string' && typeof f.name === 'string' && isCount(f.count)) out.push({ fileId: f.fileId, name: f.name, count: f.count })
+  }
+  return out
 }
 
 /** Total-safe parse: junk input yields an empty result; malformed entries are dropped. */
@@ -51,7 +66,15 @@ export function parseAnalytics(raw: unknown): TransferAnalyticsDto {
     const b = e as { family?: unknown; count?: unknown }
     if (typeof b?.family === 'string' && isCount(b.count)) browsers.push({ family: b.family, count: b.count })
   }
-  return { total: isCount(o.total) ? o.total : 0, daily, countries, browsers }
+  return {
+    total: isCount(o.total) ? o.total : 0,
+    daily,
+    countries,
+    browsers,
+    files: parseFileCounts(o.files),
+    downloadAll: isCount(o.downloadAll) ? o.downloadAll : null,
+    topFiles: parseFileCounts(o.topFiles),
+  }
 }
 
 /**

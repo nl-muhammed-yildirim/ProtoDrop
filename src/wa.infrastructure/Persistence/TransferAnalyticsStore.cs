@@ -36,11 +36,20 @@ public sealed class TransferAnalyticsStore : ITransferAnalyticsStore
             .GroupBy(e => e.UserAgentFamily)
             .Select(g => new KeyCount(g.Key, g.Count()))
             .ToListAsync(ct);
+        var fileRows = await FileQuery(events, transferId, sinceUtc).ToListAsync(ct);
+        var files = await _db.Set<FileItem>()
+            .AsNoTracking()
+            .Where(f => f.TransferId == transferId)
+            .OrderBy(f => f.SortOrder)
+            .Select(f => new AnalyticsFile(f.Id, f.OriginalName, f.SortOrder))
+            .ToListAsync(ct);
 
         return new AnalyticsAggregate(
             daily.Select(d => new DailyCount(DateOnly.FromDateTime(d.Day), d.Count)).ToList(),
             countries.Select(c => (c.Key, c.Count)).ToList(),
-            browsers.Select(b => (b.Key, b.Count)).ToList());
+            browsers.Select(b => (b.Key, b.Count)).ToList(),
+            files,
+            fileRows.Select(r => new FileCountRow(r.FileId, r.Count, r.LastAtUtc)).ToList());
     }
 
     /// <summary>GROUP BY CONVERT(date, CreatedAtUtc). Public so the integration test can inspect the real plan (IX_DownEvent_T seek).</summary>
@@ -49,11 +58,20 @@ public sealed class TransferAnalyticsStore : ITransferAnalyticsStore
             .GroupBy(e => e.CreatedAtUtc.Date)
             .Select(g => new DayCount(g.Key, g.Count()));
 
+    /// <summary>GROUP BY FileId (NULL = download-all) with count and latest event time. Public for the plan-inspection test.</summary>
+    public static IQueryable<FileKeyCount> FileQuery(IQueryable<DownloadEvent> events, Guid transferId, DateTime sinceUtc) =>
+        Scope(events, transferId, sinceUtc)
+            .GroupBy(e => e.FileId)
+            .Select(g => new FileKeyCount(g.Key, g.Count(), g.Max(e => e.CreatedAtUtc)));
+
     private static IQueryable<DownloadEvent> Scope(IQueryable<DownloadEvent> events, Guid transferId, DateTime sinceUtc) =>
         events.Where(e => e.TransferId == transferId && e.CreatedAtUtc >= sinceUtc);
 
     /// <summary>SQL-side projection: a UTC calendar day and its count.</summary>
     public sealed record DayCount(DateTime Day, int Count);
+
+    /// <summary>SQL-side projection: a FileId (null = download-all), its count and last event time.</summary>
+    public sealed record FileKeyCount(Guid? FileId, int Count, DateTime LastAtUtc);
 
     private sealed record KeyCount(string? Key, int Count);
 }

@@ -6,12 +6,28 @@ public sealed record DailyCount(DateOnly Day, int Count);
 /// <summary>A top-N bucket (country code or browser family) with its count.</summary>
 public sealed record BucketCount(string Key, int Count);
 
+/// <summary>A transfer's file as the per-file breakdown input.</summary>
+public sealed record AnalyticsFile(Guid Id, string Name, int SortOrder);
+
+/// <summary>SQL-grouped per-file row: FileId null = download-all (zip); LastAtUtc = most recent event (tie-break).</summary>
+public sealed record FileCountRow(Guid? FileId, int Count, DateTime LastAtUtc);
+
+/// <summary>One file with its download count.</summary>
+public sealed record FileDownloadCount(Guid FileId, string Name, int Count);
+
+/// <summary>FR-023-2/3: every file with its count (SortOrder), the separate download-all count (null = absent), top files.</summary>
+public sealed record FileBreakdown(
+    IReadOnlyList<FileDownloadCount> Files,
+    int? DownloadAll,
+    IReadOnlyList<FileDownloadCount> Top);
+
 /// <summary>F-PRF-003 FR-023-1 result: aggregates only, never raw rows.</summary>
 public sealed record TransferAnalytics(
     int Total,
     IReadOnlyList<DailyCount> Daily,
     IReadOnlyList<BucketCount> Countries,
-    IReadOnlyList<BucketCount> Browsers);
+    IReadOnlyList<BucketCount> Browsers,
+    FileBreakdown Files);
 
 /// <summary>F-PRF-003: pure analytics functions (window, zero fill, top-N merge). All date logic takes <c>now</c> for testability.</summary>
 public static class DownloadAnalytics
@@ -60,13 +76,53 @@ public static class DownloadAnalytics
         IEnumerable<DailyCount> sparseDaily,
         IEnumerable<(string? Key, int Count)> countries,
         IEnumerable<(string? Key, int Count)> browsers,
+        IEnumerable<AnalyticsFile> files,
+        IEnumerable<FileCountRow> fileRows,
         DateOnly from,
         DateOnly to)
     {
         var daily = FillDaily(sparseDaily, from, to);
         var total = 0;
         foreach (var d in daily) total += d.Count;
-        return new TransferAnalytics(total, daily, TopCountries(countries), TopBrowsers(browsers));
+        return new TransferAnalytics(total, daily, TopCountries(countries), TopBrowsers(browsers), FileCounts(files, fileRows));
+    }
+
+    /// <summary>
+    /// FR-023-2/3: every file in SortOrder with its count (0 when none); download-all (FileId null) kept separate and
+    /// absent (null) only for a single-file transfer with no zip events; top 5 = count desc, most recent event first,
+    /// then SortOrder, then Id. Rows whose FileId matches no file (orphans) are ignored.
+    /// </summary>
+    public static FileBreakdown FileCounts(IEnumerable<AnalyticsFile> files, IEnumerable<FileCountRow> rows)
+    {
+        var ordered = files.OrderBy(f => f.SortOrder).ThenBy(f => f.Id).ToList();
+        var counts = new Dictionary<Guid, int>();
+        var last = new Dictionary<Guid, DateTime>();
+        var zip = 0;
+        foreach (var r in rows)
+        {
+            if (r.FileId is null) { zip += r.Count; continue; }
+            counts[r.FileId.Value] = counts.GetValueOrDefault(r.FileId.Value) + r.Count;
+            if (!last.TryGetValue(r.FileId.Value, out var l) || r.LastAtUtc > l) last[r.FileId.Value] = r.LastAtUtc;
+        }
+
+        var order = new Dictionary<Guid, int>();
+        var list = new List<FileDownloadCount>(ordered.Count);
+        for (var i = 0; i < ordered.Count; i++)
+        {
+            var f = ordered[i];
+            order[f.Id] = i;
+            list.Add(new FileDownloadCount(f.Id, f.Name, counts.GetValueOrDefault(f.Id)));
+        }
+
+        int? downloadAll = ordered.Count <= 1 && zip == 0 ? null : zip;
+        var top = list.Where(f => f.Count > 0)
+            .OrderByDescending(f => f.Count)
+            .ThenByDescending(f => last.GetValueOrDefault(f.FileId))
+            .ThenBy(f => order[f.FileId])
+            .ThenBy(f => f.FileId)
+            .Take(TopCount)
+            .ToList();
+        return new FileBreakdown(list, downloadAll, top);
     }
 
     private static string NormalizeCountry(string? code)

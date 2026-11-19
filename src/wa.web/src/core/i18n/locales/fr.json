@@ -271,5 +271,10 @@
   "files.analytics.otherBrowser": "Autre",
   "files.analytics.error": "Impossible de charger les statistiques de téléchargement.",
   "files.analytics.loading": "Chargement des téléchargements…",
-  "files.analytics.chartLabel": "Téléchargements par jour"
+  "files.analytics.chartLabel": "Téléchargements par jour",
+  "files.analytics.perFile": "Téléchargements par fichier",
+  "files.analytics.fileColumn": "Fichier",
+  "files.analytics.countColumn": "Téléchargements",
+  "files.analytics.downloadAll": "Tout télécharger (zip)",
+  "files.analytics.topDownloads": "Les plus téléchargés"
 }

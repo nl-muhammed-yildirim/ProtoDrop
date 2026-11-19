@@ -271,5 +271,10 @@
   "files.analytics.otherBrowser": "Outro",
   "files.analytics.error": "Não foi possível carregar as estatísticas de transferências.",
   "files.analytics.loading": "A carregar transferências…",
-  "files.analytics.chartLabel": "Transferências por dia"
+  "files.analytics.chartLabel": "Transferências por dia",
+  "files.analytics.perFile": "Transferências por ficheiro",
+  "files.analytics.fileColumn": "Ficheiro",
+  "files.analytics.countColumn": "Transferências",
+  "files.analytics.downloadAll": "Transferir tudo (zip)",
+  "files.analytics.topDownloads": "Mais transferidos"
 }

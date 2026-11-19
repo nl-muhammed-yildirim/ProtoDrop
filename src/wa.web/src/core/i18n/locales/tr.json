@@ -271,5 +271,10 @@
   "files.analytics.otherBrowser": "Diğer",
   "files.analytics.error": "İndirme istatistikleri yüklenemedi.",
   "files.analytics.loading": "İndirmeler yükleniyor…",
-  "files.analytics.chartLabel": "Günlük indirmeler"
+  "files.analytics.chartLabel": "Günlük indirmeler",
+  "files.analytics.perFile": "Dosya başına indirmeler",
+  "files.analytics.fileColumn": "Dosya",
+  "files.analytics.countColumn": "İndirmeler",
+  "files.analytics.downloadAll": "Tümünü indir (zip)",
+  "files.analytics.topDownloads": "En çok indirilenler"
 }

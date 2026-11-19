@@ -51,7 +51,9 @@ public class GetTransferAnalyticsHandlerTests
             Aggregate = new AnalyticsAggregate(
                 [new DailyCount(today, 3), new DailyCount(today.AddDays(-2), 1)],
                 [("NL", 3), ("DE", 1)],
-                [("Chrome", 3), ("Firefox", 1)])
+                [("Chrome", 3), ("Firefox", 1)],
+                [],
+                [])
         };
 
         var r = await Handler(true, store).Handle(new GetTransferAnalyticsQuery(TransferId, OwnerId), default);
@@ -103,6 +105,28 @@ public class GetTransferAnalyticsHandlerTests
         Assert.Equal(created.Date, store.LastSinceUtc);
     }
 
+    [Fact]
+    public async Task Handle_ProPlan_PassesFileCountsThrough()
+    {
+        var a = Guid.NewGuid();
+        var b = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var store = new StubStore
+        {
+            Aggregate = new AnalyticsAggregate(
+                [], [], [],
+                [new AnalyticsFile(a, "a.pdf", 0), new AnalyticsFile(b, "b.pdf", 1)],
+                [new FileCountRow(b, 4, now), new FileCountRow(a, 1, now), new FileCountRow(null, 2, now)])
+        };
+
+        var r = await Handler(true, store).Handle(new GetTransferAnalyticsQuery(TransferId, OwnerId), default);
+
+        Assert.NotNull(r);
+        Assert.Equal(2, r!.Files.Files.Count);
+        Assert.Equal(2, r.Files.DownloadAll);
+        Assert.Equal(b, r.Files.Top[0].FileId);
+    }
+
     [Theory]
     [InlineData((byte)2)]
     [InlineData((byte)3)]
@@ -125,7 +149,7 @@ public class GetTransferAnalyticsHandlerTests
     private sealed class StubStore : ITransferAnalyticsStore
     {
         public AnalyticsTransfer? Transfer { get; set; } = new(TransferId, DateTime.UtcNow.AddDays(-1), 1);
-        public AnalyticsAggregate Aggregate { get; set; } = new([], [], []);
+        public AnalyticsAggregate Aggregate { get; set; } = new([], [], [], [], []);
         public int OwnedCalls { get; private set; }
         public int AggregateCalls { get; private set; }
         public (Guid Owner, Guid Transfer) LastOwnedArgs { get; private set; }

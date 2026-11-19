@@ -14,7 +14,7 @@ afterEach(() => { vi.unstubAllGlobals() })
 describe('parseAnalytics', () => {
   it('junk input yields a safe empty result', () => {
     for (const junk of [null, undefined, 'x', 42, [], {}]) {
-      expect(parseAnalytics(junk)).toEqual({ total: 0, daily: [], countries: [], browsers: [] })
+      expect(parseAnalytics(junk)).toEqual({ total: 0, daily: [], countries: [], browsers: [], files: [], downloadAll: null, topFiles: [] })
     }
   })
 
@@ -29,6 +29,20 @@ describe('parseAnalytics', () => {
     expect(r.daily).toEqual([{ date: '2026-11-18', count: 3 }])
     expect(r.countries).toEqual([{ code: 'NL', count: 2 }])
     expect(r.browsers).toEqual([{ family: 'Chrome', count: 3 }])
+  })
+
+  it('parse files/topFiles drops malformed; downloadAll missing or junk -> null; 0 kept', () => {
+    const r = parseAnalytics({
+      files: [{ fileId: 'a', name: 'a.txt', count: 2 }, { fileId: 5, name: 'x', count: 1 }, { fileId: 'b', name: 'b.txt' }, null],
+      topFiles: [{ fileId: 'a', name: 'a.txt', count: 2 }, { fileId: 'c', name: 7, count: 1 }],
+      downloadAll: 0,
+    })
+    expect(r.files).toEqual([{ fileId: 'a', name: 'a.txt', count: 2 }])
+    expect(r.topFiles).toEqual([{ fileId: 'a', name: 'a.txt', count: 2 }])
+    expect(r.downloadAll).toBe(0)
+    expect(parseAnalytics({}).downloadAll).toBeNull()
+    expect(parseAnalytics({ downloadAll: 'x' }).downloadAll).toBeNull()
+    expect(parseAnalytics({ downloadAll: null }).downloadAll).toBeNull()
   })
 })
 
@@ -47,7 +61,7 @@ describe('fetchTransferAnalytics', () => {
 
   it('200 -> ok with parsed data', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ total: 1, daily: [], countries: [], browsers: [] }), { status: 200 })))
-    expect(await fetchTransferAnalytics('abc')).toEqual({ kind: 'ok', data: { total: 1, daily: [], countries: [], browsers: [] } })
+    expect(await fetchTransferAnalytics('abc')).toEqual({ kind: 'ok', data: { total: 1, daily: [], countries: [], browsers: [], files: [], downloadAll: null, topFiles: [] } })
   })
 })
 

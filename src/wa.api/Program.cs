@@ -1242,7 +1242,10 @@ app.MapGet("/api/v1/transfers/{id}/analytics", async (Guid id, HttpContext ctx, 
         total = r.Total,
         daily = r.Daily.Select(d => new { date = d.Day.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), count = d.Count }),
         countries = r.Countries.Select(c => new { code = c.Key, count = c.Count }),
-        browsers = r.Browsers.Select(b => new { family = b.Key, count = b.Count })
+        browsers = r.Browsers.Select(b => new { family = b.Key, count = b.Count }),
+        files = r.Files.Files.Select(f => new { fileId = f.FileId, name = f.Name, count = f.Count }),
+        downloadAll = r.Files.DownloadAll,
+        topFiles = r.Files.Top.Select(f => new { fileId = f.FileId, name = f.Name, count = f.Count })
     }, statusCode: 200);
 }).RequireFeature(FeatureGates.Analytics);
 

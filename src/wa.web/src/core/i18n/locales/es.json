@@ -271,5 +271,10 @@
   "files.analytics.otherBrowser": "Otro",
   "files.analytics.error": "No se pudieron cargar las estadísticas de descargas.",
   "files.analytics.loading": "Cargando descargas…",
-  "files.analytics.chartLabel": "Descargas por día"
+  "files.analytics.chartLabel": "Descargas por día",
+  "files.analytics.perFile": "Descargas por archivo",
+  "files.analytics.fileColumn": "Archivo",
+  "files.analytics.countColumn": "Descargas",
+  "files.analytics.downloadAll": "Descargar todo (zip)",
+  "files.analytics.topDownloads": "Más descargados"
 }

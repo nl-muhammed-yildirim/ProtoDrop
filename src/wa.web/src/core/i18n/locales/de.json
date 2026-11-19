@@ -271,5 +271,10 @@
   "files.analytics.otherBrowser": "Andere",
   "files.analytics.error": "Download-Statistiken konnten nicht geladen werden.",
   "files.analytics.loading": "Downloads werden geladen…",
-  "files.analytics.chartLabel": "Downloads pro Tag"
+  "files.analytics.chartLabel": "Downloads pro Tag",
+  "files.analytics.perFile": "Downloads pro Datei",
+  "files.analytics.fileColumn": "Datei",
+  "files.analytics.countColumn": "Downloads",
+  "files.analytics.downloadAll": "Alles herunterladen (ZIP)",
+  "files.analytics.topDownloads": "Top-Downloads"
 }
