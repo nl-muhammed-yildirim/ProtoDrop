@@ -54,6 +54,7 @@ These are the *current* values of the Limits Registry (TA-3.4 / Feature Plan App
 | `ANALYTICS` | false | true | true |
 | `ADS` | false (D-14) | false | false |
 | `SSO_SCIM` | false | false | true |
+| `MAX_LOGO_SIZE` (Limits key `maxLogoSize`, F-PRF-001 FR-021-5) | 1048576 (1 MiB) | 1048576 (1 MiB) | 1048576 (1 MiB) |
 
 **Technical constants (code):**
 
@@ -75,6 +76,8 @@ These are the *current* values of the Limits Registry (TA-3.4 / Feature Plan App
 | Blob delete buffer | 24 h after RefCount=0 | TA-6.5 |
 | Staging lifecycle | 24 h | TA-3.5 |
 | Transfers lifecycle safety net | 30 d | TA-3.5 |
+| `ORG_NAME_MAX_LENGTH` | 60 | `AppUser.OrgNameMaxLength`; column `NVARCHAR(60)`; FR-021-5. Domain constant next to the column, not in the Limits Registry (Part 3, 2026-11-19). |
+| Logo read SAS | 1800 s, permission `r`, inline `Content-Disposition` | `RecipientTtl`; `BlobSasMinter.MintOrgLogo`; TA-3.6 (F-PRF-001) |
 
 ## Part 3 — Decision log (append-only)
 
@@ -125,4 +128,14 @@ No new packages; key from `Wa:Blob:AccountKey` (Key Vault unwrap = prod deploy c
 | 2026-11-18 | EC-019-4 out-of-order webhooks (US-019-07, feature review) | Re-fetch the subscription from Stripe on every subscription event; fetch before the DB transaction; Stripe 404 → canceled | **User decision: re-fetch** (over defer). No ordering column, so no migration. One extra Stripe call per subscription webhook | user + AI (review) |
 | 2026-11-18 | F-BIL-002 deferred items | (a) EC-019-1 DLQ: retry relies on Stripe redelivery, no Service Bus intake. (b) billing_grace_ending email: no send time in spec. (c) grace banner and "You're on Pro/back on Pro" banners: T-036. (d) reviewer minors: SendBillingEmailHandler has no status re-check at send; ExpireFunction shares one try block across billing and transfer steps; plan resolved before dedup; no customer reuse on re-upgrade; BillingSequenceStore past_due write has no row lock; retry branch of the 2601 insert race has no direct test | Deferred to a follow-up task after the F-BIL-002 PR; none blocks the Phase 1 gate in the spec | AI (feature review) |
 | 2026-11-18 | F-BIL-003 US-020-02 active-transfers cap (AI, orchestrator) | Add `ACTIVE_TRANSFERS_EXCEEDED` (409, "Active transfers limit reached") to the closed TA-4.1.3 list; finalize and send map to it (finalize was 400 VALIDATION, send had no mapping) | Spec F-BIL-003 names the code; the closed list needs it for a stable paywall code. Count 19 → 20 in REPO-FACTS | AI (orchestrator, decision A from US-020-02 architect) |
+| 2026-11-19 | F-PRF-001 closed-set additions (US-021-04) | **Option A:** `LOGO_TOO_LARGE` (422) and `LOGO_TYPE_INVALID` (415) added to the TA-4.1.3 closed list; `branding_logo_missing` added to TA-10.2 | Approved by user. Stable codes for logo validation and EC-021-2 telemetry | user |
+| 2026-11-19 | F-PRF-001 `MAX_LOGO_SIZE` storage | **Option A:** per-plan Limits Registry key `maxLogoSize` seeded by migration `AddMaxLogoSizeLimit` (overridable via `limits.<plan>.maxLogoSize` flags); 1048576 on all plans | Approved by user | user |
+| 2026-11-19 | F-PRF-001 recipient logo delivery | **Option A:** direct 30-min read SAS on the logo blob; blob host added to `img-src` in TA-9.5 | Approved by user. CSP is not emitted by code today, so the `img-src` change is spec text only | user |
+| 2026-11-19 | F-PRF-001 logo container (FR-021-3) | **Option A:** new `avatars` container, path `avatars/{userId:N}/logo`, no lifecycle rule (deleted with account, F-TRF-008-6) | Approved by user. The 30-day transfers lifecycle would delete logos | user |
+| 2026-11-19 | F-PRF-001 SVG logos (EC-021-3) | **Option A:** SVG accepted as a documented risk (TA-9.6) | Served `Content-Disposition: inline`, rendered only via `<img>`; scripts run only on the cookie-less blob origin. Approved by user | user |
+| 2026-11-19 | F-PRF-001 email org name source | **Option A:** org name resolved at dispatch, not stamped at send; no Transfer column | User chose A | user |
+| 2026-11-19 | F-PRF-001 domain guard `FeaturesProviderAllowList` | Extended with `GetPublicTransferQuery.cs`, `SenderBranding.cs`, `SendNotificationEmails.cs`, `WorkerServices.cs` for sender-plan gating; no viewer PlanContext | Approved by user | user |
+| 2026-11-19 | F-PRF-001 CORS for logo endpoint | `PUT` added to preflight allow-methods for `/auth/me/logo`; origins, headers and credentials unchanged | Accepted by reviewer | AI (reviewer) |
+| 2026-11-19 | F-PRF-001 `ORG_NAME_MAX_LENGTH` placement | Domain constant next to the column (schema width, like `DisplayNameMaxLength`), not in the Limits Registry | Orchestrator decision, **pending user confirmation** | AI (orchestrator) |
+| 2026-11-19 | F-PRF-001 org-name write gate (review fix) | Server Pro gate: `PATCH /auth/me` `orgName` requires branding; clearing (null/blank) allowed on every plan | Review fix so a Free account cannot set an org name by calling the API directly | AI (review fix) |
 | 2026-11-18 | F-BIL-003 US-020-03 plan-screen read endpoint (AI, orchestrator) | Add `GET /api/v1/billing/plan` (`GetPlanUsageQuery`, cookie-gated) for usage + limits; `/auth/me` unchanged. Active count = `Status IN (1,3)` (story said `Status=1`, fixed to match enforcement) | Architect DECISION-1 option A: keeps the `/me` key set pinned and adds queries only on the plan screen. Open product question: Pro's Upgrade goes to the Billing Portal, but US-019-02 says hide Upgrade when subscribed | AI (orchestrator) |

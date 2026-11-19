@@ -1709,6 +1709,37 @@ html[data-theme='dark'] .tb-dropdown {
   color: var(--danger);
 }
 
+/* US-021-04: organization logo uploader on the profile page */
+.pf-logo {
+  margin-top: 16px;
+}
+
+.pf-logo-drop {
+  display: flex;
+  align-items: center;
+  min-height: 44px; /* F-TRF-017-4 touch targets */
+  padding: 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.pf-logo-drop[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.pf-logo-preview {
+  display: block;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 8px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+}
+
 .pf-plan-link {
   display: inline-flex;
   align-items: center;

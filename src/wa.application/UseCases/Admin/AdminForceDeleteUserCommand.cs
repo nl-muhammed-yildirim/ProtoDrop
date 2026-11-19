@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.Extensions.Logging;
 using wa.application.Ports;
 using wa.application.UseCases.Auth;
 using wa.domain;
@@ -27,9 +28,14 @@ public sealed class AdminForceDeleteUserHandler : IRequestHandler<AdminForceDele
 {
     private readonly IAppUserStore _users;
     private readonly IEventPublisher _eventPublisher;
+    private readonly IBlobStore _blobs;
+    private readonly ILogger<AdminForceDeleteUserHandler>? _logger;
 
-    public AdminForceDeleteUserHandler(IAppUserStore users, IEventPublisher eventPublisher)
+    public AdminForceDeleteUserHandler(IAppUserStore users, IEventPublisher eventPublisher, IBlobStore blobs,
+        ILogger<AdminForceDeleteUserHandler>? logger = null)
     {
+        _logger = logger;
+        _blobs = blobs ?? throw new ArgumentNullException(nameof(blobs));
         _users = users ?? throw new ArgumentNullException(nameof(users));
         _eventPublisher = eventPublisher ?? throw new ArgumentNullException(nameof(eventPublisher));
     }
@@ -62,6 +68,20 @@ public sealed class AdminForceDeleteUserHandler : IRequestHandler<AdminForceDele
 
         // 4. Emit via outbox (EC-054-1: IsPublished false → re-publish picks it up on broker failure).
         await _eventPublisher.PublishAsync(envelope, cancellationToken);
+
+        // US-021-04 (decision 4): the org logo is deleted with the account.
+        //    The account is already deleted: a storage failure here must not turn it into a 500.
+        if (!string.IsNullOrEmpty(user.OrgLogoBlobPath))
+        {
+            try
+            {
+                await _blobs.DeleteAsync(user.OrgLogoBlobPath, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger?.LogWarning("Org logo blob delete failed after account deletion for user {UserId}.", user.Id);
+            }
+        }
 
         // 5. Return the email PRE-delete so the endpoint can audit {email} after the row is soft-deleted.
         return new AdminForceDeleteResult(user.Id, user.Email);

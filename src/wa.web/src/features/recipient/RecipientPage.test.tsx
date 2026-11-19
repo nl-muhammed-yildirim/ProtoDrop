@@ -21,6 +21,8 @@ interface PublicTransferBody {
   hasDownloadAll: boolean
   downloadsLeft: number | null
   passwordRequired: boolean
+  orgName?: string | null
+  orgLogoUrl?: string | null
 }
 
 // Live roots are tracked so afterEach can unmount them — React 18 warns on store updates hitting
@@ -1360,3 +1362,95 @@ describe('RecipientPage (T-003-08 — mobile sticky bar, store-driven DOM)', () 
   })
 })
 
+describe('RecipientPage (F-PRF-001 US-021-01 — org branding in the From heading)', () => {
+  const isGatedActive = (): boolean => useRecipientStore.getState().status === 'active' && useRecipientStore.getState().passwordRequired === true
+
+  beforeEach(() => {
+    window.history.pushState('', '', `/t/${LINK_ID}`)
+  })
+
+  afterEach(() => {
+    for (const root of roots.splice(0)) act(() => { root.unmount() })
+    useRecipientStore.getState().reset()
+    window.history.replaceState(null, '', '/')
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('appends " · {orgName}" and renders no logo when only the name is present (AC-021-1, EC-021-4)', async () => {
+    stubFetch(200, activeBody({ from: 'Anna K.', orgName: 'Studio Nova', orgLogoUrl: null }))
+
+    const host = await renderApp(isActive)
+
+    expect(host.querySelector('.rp-heading')?.textContent).toBe('From: Anna K. · Studio Nova')
+    expect(host.querySelector('.rp-org-logo')).toBeNull()
+    host.remove()
+  })
+
+  it('shows plain "From: {name}" with no separator when orgName is null (AC-021-3)', async () => {
+    stubFetch(200, activeBody({ from: 'Anna K.', orgName: null, orgLogoUrl: null }))
+
+    const host = await renderApp(isActive)
+
+    expect(host.querySelector('.rp-heading')?.textContent).toBe('From: Anna K.')
+    expect(host.querySelector('.rp-heading')?.textContent).not.toContain('·')
+    host.remove()
+  })
+
+  it('renders the logo img inside the heading when orgLogoUrl is set (D-5 slot)', async () => {
+    stubFetch(200, activeBody({ from: 'Anna K.', orgName: 'Studio Nova', orgLogoUrl: 'https://logo.example/l.png' }))
+
+    const host = await renderApp(isActive)
+
+    const imgs = host.querySelectorAll('.rp-heading .rp-org-logo')
+    expect(imgs).toHaveLength(1)
+    expect(imgs[0].getAttribute('src')).toBe('https://logo.example/l.png')
+    host.remove()
+  })
+
+  it('shows the org on the password gate heading too', async () => {
+    stubFetch(200, activeBody({ from: 'Anna K.', passwordRequired: true, orgName: 'Studio Nova' }))
+
+    const host = await renderApp(isGatedActive)
+
+    expect(host.querySelector('.rp-heading')?.textContent).toBe('From: Anna K. · Studio Nova')
+    host.remove()
+  })
+
+  it('shows person first, org second (AC-021-2)', async () => {
+    stubFetch(200, activeBody({ from: 'Anna', orgName: 'Studio Nova' }))
+
+    const host = await renderApp(isActive)
+
+    expect(host.querySelector('.rp-heading')?.textContent).toBe('From: Anna · Studio Nova')
+    host.remove()
+  })
+
+  it('drops the separator when the person name is blank', async () => {
+    stubFetch(200, activeBody({ from: '', orgName: 'Studio Nova' }))
+
+    const host = await renderApp(isActive)
+
+    expect(host.querySelector('.rp-heading')?.textContent).toBe('From: Studio Nova')
+    expect(host.querySelector('.rp-heading')?.textContent).not.toContain('·')
+    host.remove()
+  })
+
+  it('falls back to Anonymous when both parts are blank', async () => {
+    stubFetch(200, activeBody({ from: '', orgName: null }))
+
+    const host = await renderApp(isActive)
+
+    expect(host.querySelector('.rp-heading')?.textContent).toBe('From: Anonymous')
+    host.remove()
+  })
+
+  it('uses the same composition on the gate heading', async () => {
+    stubFetch(200, activeBody({ from: '', passwordRequired: true, orgName: 'Studio Nova' }))
+
+    const host = await renderApp(isGatedActive)
+
+    expect(host.querySelector('.rp-heading')?.textContent).toBe('From: Studio Nova')
+    host.remove()
+  })
+})

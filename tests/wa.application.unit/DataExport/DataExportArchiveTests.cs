@@ -40,7 +40,16 @@ public class DataExportArchiveTests
         Assert.Equal("free", p.GetProperty("plan").GetString());
         Assert.Equal(Created, p.GetProperty("createdAtUtc").GetDateTime().ToUniversalTime());
         Assert.True(p.GetProperty("emailNotifications").GetBoolean());
-        Assert.Equal(6, p.EnumerateObject().Count());
+        Assert.Equal(JsonValueKind.Null, p.GetProperty("organizationName").ValueKind);
+        Assert.Equal(7, p.EnumerateObject().Count());
+    }
+
+    [Fact]
+    public void Profile_IncludesOrganizationNameWhenSet() // F-PRF-001 FR-021-1
+    {
+        var withOrg = Profile() with { OrgName = "Studio Nova" };
+        var p = Read(DataExportArchive.Build(new ExportSnapshot(withOrg, [])))["profile.json"];
+        Assert.Equal("Studio Nova", p.GetProperty("organizationName").GetString());
     }
 
     [Fact]

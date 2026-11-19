@@ -39,5 +39,9 @@ public sealed class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
         theme.HasColumnType("VARCHAR(16)").HasDefaultValue("system").IsRequired();
         // TA-3.2 names the default constraint DF_AppUser_Theme — EF needs an explicit name per column to match verbatim (AC-052-4).
         theme.Metadata.SetAnnotation("Relational:DefaultConstraintName", "DF_AppUser_Theme");
+
+        // F-PRF-001 (US-021-01): nullable org branding columns.
+        b.Property(u => u.OrgName).HasColumnType($"NVARCHAR({AppUser.OrgNameMaxLength})");
+        b.Property(u => u.OrgLogoBlobPath).HasColumnType("VARCHAR(400)");
     }
 }

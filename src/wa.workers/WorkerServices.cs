@@ -52,6 +52,8 @@ public static class WorkerServices
         services.AddSingleton(sp => new PlansCache(sp.GetRequiredService<IPlansStore>(), limitsTtl, () => DateTimeOffset.UtcNow));
         services.AddSingleton(sp => new FlagsCache(sp.GetRequiredService<IFlagsStore>(), limitsTtl, () => DateTimeOffset.UtcNow));
         services.AddSingleton<ILimitsProvider>(sp => new LimitsProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
+        services.AddSingleton<IFeaturesProvider>(sp => new FeaturesProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
+        services.AddSingleton<ISenderBrandingStore>(sp => new SenderBrandingStore(sp.GetRequiredService<WaDbContext>()));
 
         // Zip file source
         services.AddSingleton<IZipFileSource>(sp => new ZipFileSource(sp.GetRequiredService<WaDbContext>()));
@@ -154,7 +156,9 @@ public static class WorkerServices
             sp.GetRequiredService<EventDeduplicator>(),
             sp.GetRequiredService<wa.application.Telemetry.WaTelemetryReporter>(),
             sp.GetRequiredService<IConfiguration>(),
-            sp.GetRequiredService<ILogger<SendNotificationEmailsHandler>>()));
+            sp.GetRequiredService<ILogger<SendNotificationEmailsHandler>>(),
+            sp.GetRequiredService<ISenderBrandingStore>(),
+            sp.GetRequiredService<IFeaturesProvider>()));
 
         // T-008-04 (D-6): magic-link f-email handler — self-contained, loads template from Emails/templates/magic-link/.
         services.AddSingleton<SendMagicLinkEmailHandler>(sp => new SendMagicLinkEmailHandler(

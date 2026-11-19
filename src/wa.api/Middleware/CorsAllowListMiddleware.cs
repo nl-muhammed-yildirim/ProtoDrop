@@ -37,7 +37,7 @@ public sealed class CorsAllowListMiddleware
             {
                 // traceparent: the SPA attaches a W3C traceparent header to every API fetch (T-008 correlation) — must be in the preflight allow-list or cross-origin POSTs fail.
                 context.Response.Headers.AccessControlAllowHeaders = "Authorization, Content-Type, Idempotency-Key, Traceparent";
-                context.Response.Headers.AccessControlAllowMethods = "GET, POST, PATCH, DELETE, OPTIONS";
+                context.Response.Headers.AccessControlAllowMethods = "GET, POST, PUT, PATCH, DELETE, OPTIONS";
                 context.Response.Headers.AccessControlMaxAge = PreflightMaxAge.TotalSeconds.ToString(CultureInfo.InvariantCulture); // StringValues has no implicit int conversion
                 context.Response.StatusCode = 204;
                 return; // don't fall through to routing — the 405 would fail the access-control check

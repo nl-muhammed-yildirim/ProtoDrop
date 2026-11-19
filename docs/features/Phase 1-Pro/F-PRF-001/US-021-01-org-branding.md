@@ -1,6 +1,6 @@
 # US-021-01 — Show my organization on my transfers
 
-**Feature:** F-PRF-001 — Custom "From" Branding | **Status:** pending
+**Feature:** F-PRF-001 — Custom "From" Branding | **Status:** done (2026-11-19)
 
 ---
 

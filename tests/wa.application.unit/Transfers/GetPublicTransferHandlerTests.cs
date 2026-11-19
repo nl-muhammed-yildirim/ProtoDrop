@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using wa.application.Limits;
+using wa.application.Ports;
 using wa.application.Telemetry;
 using wa.application.UseCases.Transfers;
 using wa.domain;
@@ -15,6 +16,8 @@ public class GetPublicTransferHandlerTests
     private readonly StubPublicTransferStore _store;
     private readonly TelemetryRecorder _telemetryLogger;
     private readonly StubUnlockTokenMinter _minter;
+    private readonly StubSenderBrandingStore _branding = new();
+    private readonly StubLogoBlobs _blobs = new();
     private GetPublicTransferHandler _handler;
 
     public GetPublicTransferHandlerTests()
@@ -30,6 +33,10 @@ public class GetPublicTransferHandlerTests
         NewLimits(maxZipSize, maxDownloads),
         new WaTelemetryReporter(_telemetryLogger, System.Text.Encoding.UTF8.GetBytes("unit-test-key")),
         _minter,
+        _branding,
+        new StubFeaturesProvider(),
+        _blobs,
+        new StubLogoMinter(),
         NullLogger<GetPublicTransferHandler>.Instance);
 
     // ---- Active: full metadata payload (exit check 3 / FR-003-5) ----
@@ -315,7 +322,176 @@ public class GetPublicTransferHandlerTests
         Assert.Equal("alice@example.com", result.SenderEmail);
     }
 
+    // ---- F-PRF-001 US-021-01: org branding resolved at render time ----
+
+    private static readonly Guid BrandingOwner = Guid.NewGuid();
+
+    [Fact]
+    public async Task Branding_ProOwnerWithOrg_ReturnsOrgName() // AC-021-1
+    {
+        _store.SetupStatus(status: 1, senderEmail: "alice@example.com", ownerAppUserId: BrandingOwner);
+        _branding.Row = new SenderBrandingRow("pro", "Studio Nova", null);
+
+        var result = await _handler.Handle(new GetPublicTransferQuery("abcdefgh"), CancellationToken.None);
+
+        Assert.Equal("Studio Nova", result.OrgName);
+        Assert.Equal("Alice", result.From);
+    }
+
+    [Fact]
+    public async Task Branding_FreeOwnerWithOrg_OrgNameNull() // AC-021-3 / EC-021-5
+    {
+        _store.SetupStatus(status: 1, senderEmail: "alice@example.com", ownerAppUserId: BrandingOwner);
+        _branding.Row = new SenderBrandingRow("free", "Studio Nova", null);
+
+        var result = await _handler.Handle(new GetPublicTransferQuery("abcdefgh"), CancellationToken.None);
+
+        Assert.Null(result.OrgName);
+    }
+
+    [Fact]
+    public async Task Branding_GuestTransfer_OrgNameNull_StoreNotCalled()
+    {
+        _store.SetupStatus(status: 1, senderEmail: "alice@example.com", ownerAppUserId: null);
+        _branding.Row = new SenderBrandingRow("pro", "Studio Nova", null);
+
+        var result = await _handler.Handle(new GetPublicTransferQuery("abcdefgh"), CancellationToken.None);
+
+        Assert.Null(result.OrgName);
+        Assert.Equal(0, _branding.Calls);
+    }
+
+    [Fact]
+    public async Task Branding_ProOwnerBlankOrgName_OrgNameNull()
+    {
+        _store.SetupStatus(status: 1, senderEmail: "alice@example.com", ownerAppUserId: BrandingOwner);
+        _branding.Row = new SenderBrandingRow("pro", "   ", null);
+
+        var result = await _handler.Handle(new GetPublicTransferQuery("abcdefgh"), CancellationToken.None);
+
+        Assert.Null(result.OrgName);
+    }
+
+    [Fact]
+    public async Task Branding_ProfileChangedBetweenViews_SecondViewShowsCurrentName() // EC-021-1
+    {
+        _store.SetupStatus(status: 1, senderEmail: "alice@example.com", ownerAppUserId: BrandingOwner);
+        _branding.Row = new SenderBrandingRow("pro", "Studio Nova", null);
+        var first = await _handler.Handle(new GetPublicTransferQuery("abcdefgh"), CancellationToken.None);
+
+        _branding.Row = new SenderBrandingRow("pro", "Nova Labs", null);
+        var second = await _handler.Handle(new GetPublicTransferQuery("abcdefgh"), CancellationToken.None);
+
+        Assert.Equal("Studio Nova", first.OrgName);
+        Assert.Equal("Nova Labs", second.OrgName);
+    }
+
+    private string LogoPath => $"avatars/{BrandingOwner:N}/logo";
+
+    [Fact]
+    public async Task Branding_ProLogoBlobExists_OrgLogoUrlMinted()
+    {
+        _store.SetupStatus(status: 1, senderEmail: "alice@example.com", ownerAppUserId: BrandingOwner);
+        _branding.Row = new SenderBrandingRow("pro", "Studio Nova", LogoPath);
+        _blobs.Exists = true;
+
+        var result = await _handler.Handle(new GetPublicTransferQuery("abcdefgh"), CancellationToken.None);
+
+        Assert.Equal("Studio Nova", result.OrgName);
+        Assert.Equal($"https://acct.example/avatars/{BrandingOwner:N}/logo?sig=x", result.OrgLogoUrl);
+        Assert.Equal([LogoPath], _blobs.Checked);
+    }
+
+    [Fact]
+    public async Task Branding_ProLogoBlobMissing_OrgLogoUrlNull_EmitsBrandingLogoMissing() // EC-021-2
+    {
+        _store.SetupStatus(status: 1, senderEmail: "alice@example.com", ownerAppUserId: BrandingOwner);
+        _branding.Row = new SenderBrandingRow("pro", "Studio Nova", LogoPath);
+        _blobs.Exists = false;
+
+        var result = await _handler.Handle(new GetPublicTransferQuery("abcdefgh"), CancellationToken.None);
+
+        Assert.Equal("Studio Nova", result.OrgName);
+        Assert.Null(result.OrgLogoUrl);
+        Assert.Contains(_telemetryLogger.Entries, e => e.RenderedText == "branding_logo_missing");
+    }
+
+    [Fact]
+    public async Task Branding_FreeOwnerWithLogoPath_OrgLogoUrlNull_NoBlobCheck() // EC-021-5
+    {
+        _store.SetupStatus(status: 1, senderEmail: "alice@example.com", ownerAppUserId: BrandingOwner);
+        _branding.Row = new SenderBrandingRow("free", "Studio Nova", LogoPath);
+        _blobs.Exists = true;
+
+        var result = await _handler.Handle(new GetPublicTransferQuery("abcdefgh"), CancellationToken.None);
+
+        Assert.Null(result.OrgName);
+        Assert.Null(result.OrgLogoUrl);
+        Assert.Empty(_blobs.Checked);
+        Assert.DoesNotContain(_telemetryLogger.Entries, e => e.RenderedText == "branding_logo_missing");
+    }
+
+    [Fact]
+    public async Task Branding_ProLogoWithoutOrgName_LogoStillMinted()
+    {
+        _store.SetupStatus(status: 1, senderEmail: "alice@example.com", ownerAppUserId: BrandingOwner);
+        _branding.Row = new SenderBrandingRow("pro", null, LogoPath);
+        _blobs.Exists = true;
+
+        var result = await _handler.Handle(new GetPublicTransferQuery("abcdefgh"), CancellationToken.None);
+
+        Assert.Null(result.OrgName);
+        Assert.NotNull(result.OrgLogoUrl);
+    }
+
+    [Fact]
+    public async Task Branding_NoLogoPath_NoBlobCheck()
+    {
+        _store.SetupStatus(status: 1, senderEmail: "alice@example.com", ownerAppUserId: BrandingOwner);
+        _branding.Row = new SenderBrandingRow("pro", "Studio Nova", null);
+
+        var result = await _handler.Handle(new GetPublicTransferQuery("abcdefgh"), CancellationToken.None);
+
+        Assert.Null(result.OrgLogoUrl);
+        Assert.Empty(_blobs.Checked);
+    }
+
+    [Fact]
+    public async Task Branding_ExpiredTransfer_NoOrgName_StoreNotCalled()
+    {
+        _store.SetupStatus(status: 2, senderEmail: "alice@example.com", ownerAppUserId: BrandingOwner);
+        _branding.Row = new SenderBrandingRow("pro", "Studio Nova", null);
+
+        var result = await _handler.Handle(new GetPublicTransferQuery("abcdefgh"), CancellationToken.None);
+
+        Assert.Null(result.OrgName);
+        Assert.Equal(0, _branding.Calls);
+    }
+
     // ---- Stubs ----
+
+    private sealed class StubLogoBlobs : IBlobStore
+    {
+        public bool Exists { get; set; }
+        public List<string> Checked { get; } = [];
+
+        public Task<bool> ExistsAsync(string path, CancellationToken cancellationToken = default)
+        {
+            Checked.Add(path);
+            return Task.FromResult(Exists);
+        }
+
+        public Task UploadAsync(string path, Stream content, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<Stream> DownloadAsync(string path, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task CopyAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<long> GetSizeAsync(string path, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task DeleteAsync(string path, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    }
+
+    private sealed class StubLogoMinter : IOrgLogoSasMinter
+    {
+        public Uri MintOrgLogo(Guid userId) => new($"https://acct.example/avatars/{userId:N}/logo?sig=x");
+    }
 
     private sealed class StubPublicTransferStore : IPublicTransferStore
     {
@@ -341,7 +517,7 @@ public class GetPublicTransferHandlerTests
         public void SetupActive(IReadOnlyList<PublicFileItem> files, int maxDownloads, int downloadsCount, string? passwordHash) =>
             SetupStatus(status: 1, senderEmail: "alice@example.com", files: files, maxDownloads: maxDownloads, downloadsCount: downloadsCount, passwordHash: passwordHash);
 
-        public void SetupStatus(int status, string? senderEmail = null, IReadOnlyList<PublicFileItem>? files = null, int maxDownloads = -1, int downloadsCount = 0, string? passwordHash = null, long? totalBytesOverride = null, int? fileCountOverride = null)
+        public void SetupStatus(int status, string? senderEmail = null, IReadOnlyList<PublicFileItem>? files = null, int maxDownloads = -1, int downloadsCount = 0, string? passwordHash = null, long? totalBytesOverride = null, int? fileCountOverride = null, Guid? ownerAppUserId = null)
         {
             Files = files;
             Transfer = new Transfer
@@ -350,6 +526,7 @@ public class GetPublicTransferHandlerTests
                 LinkId = "abcdefgh",
                 Status = (byte)status,
                 SenderName = "Alice",
+                OwnerAppUserId = ownerAppUserId,
                 SenderEmail = senderEmail,
                 Note = "Hello there",
                 MaxDownloads = maxDownloads,
@@ -360,6 +537,25 @@ public class GetPublicTransferHandlerTests
                 ExpiresAtUtc = DateTime.UtcNow.AddDays(7)
             };
         }
+    }
+
+    private sealed class StubSenderBrandingStore : ISenderBrandingStore
+    {
+        public SenderBrandingRow? Row { get; set; }
+        public int Calls { get; private set; }
+
+        public Task<SenderBrandingRow?> GetAsync(Guid ownerAppUserId, CancellationToken ct)
+        {
+            Calls++;
+            return Task.FromResult(Row);
+        }
+    }
+
+    /// <summary>Plan code to features: pro and business have Branding, everything else does not (seed parity, PlanCatalogIntegrationTests).</summary>
+    private sealed class StubFeaturesProvider : IFeaturesProvider
+    {
+        public Task<PlanFeatures> Resolve(string? planCode, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new PlanFeatures { Branding = planCode is "pro" or "business" });
     }
 
     private static ILimitsProvider NewLimits(long maxZipSize, int maxDownloads = 100) => new StubLimitsProvider(maxZipSize, maxDownloads);

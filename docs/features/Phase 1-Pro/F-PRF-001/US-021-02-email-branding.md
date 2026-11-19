@@ -1,6 +1,6 @@
 # US-021-02 — Brand my emails too
 
-**Feature:** F-PRF-001 — Custom "From" Branding | **Status:** pending
+**Feature:** F-PRF-001 — Custom "From" Branding | **Status:** done (2026-11-19)
 
 ---
 

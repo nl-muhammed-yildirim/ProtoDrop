@@ -137,6 +137,28 @@ public class BlobSasMinterTest : IDisposable
         Assert.Equal(Convert.ToBase64String(sst), q["sig"]);
     }
 
+    [Fact]
+    public void OrgLogo_SAS_pins_r_scope_30min_no_st_and_inline_rscd()
+    {
+        var userId = Guid.Parse("5e6f7a8b-9c0d-1e2f-3a4b-5c6d7e8f9a0b");
+        var url = _minter.MintOrgLogo(userId).ToString();
+        var q = Query(url);
+        Assert.Equal("r", q["sp"]);
+        Assert.Equal("2024", q["sv"]);
+        Assert.Equal(Now.AddMinutes(30).ToString("yyyy-MM-ddTHH:mm:ssZ"), q["se"]);   // TA-3.6: 30 min
+        Assert.False(q.ContainsKey("st"));
+        Assert.Equal("inline", q["rscd"]);                                              // EC-021-3: rendered via img, never forced to download
+
+        var path = $"avatars/{userId:N}/logo";
+        Assert.Contains("/" + path + "?", url);
+        var sst = Sign(
+            permissions: q["sp"], start: "", expiry: q["se"],
+            path: $"/blob/blob.local.test.example/{path}",
+            ipRange: q.GetValueOrDefault("sip", ""), protocol: "https", resourceType: "b",
+            accountKey: _accountKey, respContentDisposition: q["rscd"]);
+        Assert.Equal(Convert.ToBase64String(sst), q["sig"]);
+    }
+
     private void assertValidSignature(Dictionary<string, string> q, string canonicalPath)
     {
         var sst = Sign(

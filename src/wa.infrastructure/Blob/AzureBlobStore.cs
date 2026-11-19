@@ -13,7 +13,7 @@ namespace wa.infrastructure.Blob;
 /// <see cref="wa.application.Blob.BlobPaths"/> — the first segment is the
 /// container, the rest the blob name.
 /// </summary>
-public sealed class AzureBlobStore : IBlobStore
+public sealed class AzureBlobStore : IBlobStore, IBlobContentWriter
 {
     private readonly BlobServiceClient _svc;
 
@@ -54,6 +54,19 @@ public sealed class AzureBlobStore : IBlobStore
         return _svc.GetBlobContainerClient(container)
             .GetBlobClient(blobName)
             .UploadAsync(content, true, cancellationToken);
+    }
+
+    /// <summary>US-021-04: overwrite upload that stores the given Content-Type (no Conditions = overwrite).</summary>
+    public Task UploadAsync(
+        string path, Stream content, string contentType, CancellationToken cancellationToken = default)
+    {
+        var (container, blobName) = SplitPath(path);
+        return _svc.GetBlobContainerClient(container)
+            .GetBlobClient(blobName)
+            .UploadAsync(
+                content,
+                new BlobUploadOptions { HttpHeaders = new BlobHttpHeaders { ContentType = contentType } },
+                cancellationToken);
     }
 
     public async Task<Stream> DownloadAsync(
