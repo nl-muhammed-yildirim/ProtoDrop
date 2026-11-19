@@ -321,12 +321,26 @@ app.MapPost("/api/v1/transfers/{id}/send", async (Guid id, HttpContext httpConte
     var note = root.TryGetProperty("note", out var n) ? n.GetString() : null;
     var password = root.TryGetProperty("password", out var pw) ? pw.GetString() : null;
 
+    // US-022-01 (D-3): optional scheduledSendAt — ISO-8601 with offset; absent/null = send now; anything else → 400 VALIDATION.
+    DateTimeOffset? scheduledSendAt = null;
+    if (root.TryGetProperty("scheduledSendAt", out var sa) && sa.ValueKind != System.Text.Json.JsonValueKind.Null)
+    {
+        if (sa.ValueKind != System.Text.Json.JsonValueKind.String || !sa.TryGetDateTimeOffset(out var parsedSchedule))
+            throw new BusinessException(ProblemCodes.Validation, "scheduledSendAt must be an ISO 8601 date-time with an offset.");
+        scheduledSendAt = parsedSchedule;
+    }
+
     try
     {
-        var result = await sender.Send(new SendTransferCommand(id, senderName, senderEmail, note, emails, password, ownerAppUserId), ct);
+        var result = await sender.Send(new SendTransferCommand(id, senderName, senderEmail, note, emails, password, ownerAppUserId, scheduledSendAt?.UtcDateTime), ct);
         if (result is null)
             throw new BusinessException(ProblemCodes.NotFound, "Transfer not found.");
-        return Results.Json(new { id = result.TransferId.ToString("n"), linkId = result.LinkId, status = "Active", expiresAt = result.ExpiresAtUtc, totalBytes = result.TotalBytes, fileCount = result.FileCount, recipients = result.Recipients }, statusCode: 201);
+        return Results.Json(new { id = result.TransferId.ToString("n"), linkId = result.LinkId, status = result.Status == wa.domain.TransferStatus.Scheduled ? "Scheduled" : "Active", expiresAt = result.ExpiresAtUtc, totalBytes = result.TotalBytes, fileCount = result.FileCount, recipients = result.Recipients, scheduledSendAt = result.ScheduledSendAtUtc }, statusCode: 201);
+    }
+    catch (wa.application.UseCases.Transfers.ScheduleForbiddenException ex)
+    {
+        // US-022-01 (FR-022-3): plan/gate does not allow scheduling → 403 FORBIDDEN (closed list unchanged).
+        throw new BusinessException(ProblemCodes.Forbidden, ex.Message);
     }
     catch (TransferSizeExceededException ex)
     {
@@ -1435,7 +1449,8 @@ app.MapGet("/api/v1/billing/plan", async (HttpContext ctx, ISender sender, Cance
         planCode = r.PlanCode,
         storage = new { usedBytes = r.StorageUsedBytes, allowedBytes = r.StorageAllowedBytes },
         activeTransfers = new { used = r.ActiveTransfersUsed, allowed = r.ActiveTransfersAllowed },
-        limits = new { maxTransferSize = r.MaxTransferSize, maxSingleFile = r.MaxSingleFile }
+        limits = new { maxTransferSize = r.MaxTransferSize, maxSingleFile = r.MaxSingleFile },
+        features = new { scheduling = r.Scheduling }   // US-022-01 (FR-022-3, D-6)
     });
 });
 

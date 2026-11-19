@@ -6,6 +6,10 @@ import { MAX_EMAILS, parseRecipients, validateAddress } from './recipients'
 import i18n from '../../core/i18n/init'
 import { ACTIVE_TRANSFERS_EXCEEDED, parseProblem } from '../../core/api/errorMap'
 import ActiveTransfersLimit from './ActiveTransfersLimit'
+import ScheduleControl from './ScheduleControl'
+import type { SendMode } from './ScheduleControl'
+import { toUtcIso } from './schedule'
+import { formatDate, formatTime } from '../../core/i18n/format'
 
 interface LinkScreenProps {
   linkId: string
@@ -28,6 +32,8 @@ type SendResponse = {
   totalBytes: number
   fileCount: number
   recipients: string[]
+  // US-022-01 (FR-022-4): echoed due time (UTC ISO) when the transfer was scheduled; null/absent otherwise.
+  scheduledSendAt?: string | null
 }
 
 type SendPhase = 'form' | 'sent'
@@ -77,6 +83,12 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
   const [sending, setSending] = useState(false) // double-click guard — endpoint 3 is idempotent per key anyway (TA-4.1.5).
   const [sendError, setSendError] = useState<string | null>(null)
   const [activeLimit, setActiveLimit] = useState<{ details?: string } | null>(null) // US-020-02: ACTIVE_TRANSFERS_EXCEEDED paywall
+
+  // US-022-01 (FR-022-1): send-time choice — 'now' (default) or a scheduled datetime-local value; scheduledFor = the server's echoed due time.
+  const [sendMode, setSendMode] = useState<SendMode>('now')
+  const [scheduleLocal, setScheduleLocal] = useState('')
+  const [scheduleRequiredError, setScheduleRequiredError] = useState(false)
+  const [scheduledFor, setScheduledFor] = useState<string | null>(null)
 
   // T-016-04 (D-3): sent-phase swap focus — the form's focused button unmounts with it; land on the sent-state Copy.
   useEffect(() => { if (sendState === 'sent') sentCopyBtnRef.current?.focus() }, [sendState])
@@ -174,7 +186,7 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
   const blankOr = (value: string): string | undefined => (value.trim() === '' ? undefined : value) // blank sender fields are omitted.
 
   // T-002-08 (AC-002-3): endpoint 3 — activate the transfer; emails [] is the link-only path (zero EmailRecipient rows).
-  const sendTransfer = async (emails: string[]): Promise<boolean> => {
+  const sendTransfer = async (emails: string[], scheduledSendAt?: string): Promise<boolean> => {
     setSending(true)
     setSendError(null)
     setActiveLimit(null)
@@ -196,6 +208,8 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
             note: blankOr(note),
             // T-010-03 (FR-010-2): password — only included when non-empty; the handler at Program.cs L217 reads it.
             password: blankOr(passwordValue),
+            // US-022-01 (FR-022-4): UTC ISO instant — only present when scheduling; absent = send now.
+            ...(scheduledSendAt !== undefined ? { scheduledSendAt } : {}),
           }),
         })
       } catch {
@@ -213,7 +227,7 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
         return false
       }
       const response = (await res.json()) as SendResponse
-      void response // T-002-08: phase-only state — the body is cast for the record but intentionally never read.
+      setScheduledFor(response.scheduledSendAt ?? null)   // US-022-01: drives the sent-phase "Scheduled for" line.
       setSendState('sent')
       return true
     } finally {
@@ -232,6 +246,13 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
   // T-002-08: "Send transfer" — non-empty parsed emails from the field.
   const handleSendTransfer = async (): Promise<void> => {
     if (sending || blockReason !== null) return
+    if (sendMode === 'schedule') {
+      const iso = toUtcIso(scheduleLocal)
+      if (iso === null) { setScheduleRequiredError(true); return }   // empty/unparseable: inline error, nothing sent
+      setScheduleRequiredError(false)
+      await sendTransfer(parseRecipients(recipientsRaw), iso)
+      return
+    }
     await sendTransfer(parseRecipients(recipientsRaw))
   }
 
@@ -242,7 +263,11 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
           // T-002-08 (FR-002-7): confirmation screen — in-place swap, no route navigation.
           <>
             <h1 className="ls-heading">{sentHeading ?? i18n.t('link.ready.transferSent')}</h1>
-            <p className="ls-sent-sub">{i18n.t('link.ready.shareLater')}</p>
+            <p className="ls-sent-sub">
+              {scheduledFor
+                ? i18n.t('link.ready.scheduledFor', { date: formatDate(scheduledFor), time: formatTime(scheduledFor) })
+                : i18n.t('link.ready.shareLater')}
+            </p>
             <div className="ls-field">
               <span className="ls-url">{url}</span>
               {/* T-016-04 (D-3): this is the SENT-state Copy — focus target after Send transfer swaps the form out. */}
@@ -378,6 +403,14 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
                 </button>
               </div>
             </div>
+            {/* US-022-01 (FR-022-1): Send now / Schedule — renders nothing while feature.scheduling is off. */}
+            <ScheduleControl
+              mode={sendMode}
+              onModeChange={setSendMode}
+              value={scheduleLocal}
+              onValueChange={(v) => { setScheduleLocal(v); setScheduleRequiredError(false) }}
+              showRequiredError={scheduleRequiredError}
+            />
             {/* T-002-08: Send transfer + Copy link only — disabled while blocked or in flight; wrapper spans carry the title (§4.2). */}
             <div className="ls-actions">
               <span className="ls-actions-wrap" title={blockReason ?? undefined}>

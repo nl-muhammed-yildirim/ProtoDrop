@@ -7,7 +7,7 @@ public class Transfer
     /// <summary>8-char unique link ID (TA-7.1).</summary>
     public string LinkId { get; set; } = null!;
     public Guid? OwnerAppUserId { get; set; }
-    /// <summary>0=Draft, 1=Active, 2=Expired, 3=DownloadLimit, 4=Deleted.</summary>
+    /// <summary>0=Draft, 1=Active, 2=Expired, 3=DownloadLimit, 4=Deleted, 5=Scheduled (F-PRF-002); see <see cref="TransferStatus"/>.</summary>
     public byte Status { get; set; }
     public DateTime ExpiresAtUtc { get; set; }
     public int MaxDownloads { get; set; }

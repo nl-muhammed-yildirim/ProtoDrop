@@ -1068,7 +1068,8 @@ namespace wa.infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<byte>("Status")
-                        .HasColumnType("TINYINT");
+                        .HasColumnType("TINYINT")
+                        .HasComment("0 Draft,1 Active,2 Expired,3 DownloadLimit,4 Deleted,5 Scheduled");
 
                     b.Property<Guid?>("SupersededBy")
                         .HasColumnType("uniqueidentifier");

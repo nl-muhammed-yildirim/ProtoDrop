@@ -654,6 +654,43 @@ main:has(.sl) .dz {
   cursor: default;
 }
 
+/* US-022-01 (FR-022-1): Send now / Schedule toggle + datetime picker (UI-Reference §4.5 secondary button; accent as .ls-password-toggle). */
+.ls-schedule {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ls-mode {
+  display: flex;
+  gap: 8px;
+}
+
+.ls-mode-btn {
+  min-height: 44px;
+  padding: 12px 24px;
+  background: transparent;
+  color: var(--fg-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-body);
+  cursor: pointer;
+}
+
+.ls-mode-btn:hover {
+  color: var(--fg);
+}
+
+.ls-mode-btn[aria-pressed='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.ls-mode-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .ls-sent-sub {
   margin: 0;
   font-size: var(--fs-small);
@@ -1544,6 +1581,10 @@ html[data-theme='dark'] .tb-dropdown {
 
   .ls-password-toggle {
     min-width: 44px;
+    min-height: 44px;
+  }
+
+  .ls-mode-btn {
     min-height: 44px;
   }
 

@@ -5,7 +5,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useUploadEngine } from '../../core/upload/UploadEngine'
 import { parseRecipients, validateAddress } from './recipients'
+import { resetFeatureGates, useFeatureGateStore } from '../../core/features/featureGates'
+import { toUtcIso } from './schedule'
 import LinkScreen from './LinkScreen'
+
+// US-022-01: ScheduleControl kicks the shared gate read on mount; stubbed so the existing fetch call-count assertions never see GET /features.
+vi.mock('../../core/features/featureGates', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../core/features/featureGates')>()
+  return { ...actual, loadFeatureGates: () => Promise.resolve() }
+})
 
 ;(globalThis as unknown as Record<string, boolean>).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -615,5 +623,121 @@ describe('LinkScreen', () => {
     const body = JSON.parse(calls[0].body) as { password?: string }
     expect(body.password).toBe('s3cret')
     host.remove()
+  })
+})
+
+// ---- US-022-01 (F-PRF-002): schedule at create ----
+describe('schedule', () => {
+  type Call = { url: string; body: string }
+
+  // Plan read (GET /billing/plan) answers the scheduling feature; the send POST answers 201 with the echoed due time.
+  function stubFetch(planScheduling: boolean, echoScheduled: boolean): Call[] {
+    const calls: Call[] = []
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.endsWith('/billing/plan'))
+        return new Response(JSON.stringify({ features: { scheduling: planScheduling } }), { status: 200 })
+      const body = typeof init?.body === 'string' ? init.body : ''
+      calls.push({ url, body })
+      const parsed = body ? (JSON.parse(body) as { scheduledSendAt?: string }) : {}
+      return new Response(JSON.stringify({
+        id: '1', linkId: 'Ab3dEf5g', status: 'Scheduled', expiresAt: '2026-12-31T00:00:00Z', totalBytes: 0, fileCount: 0, recipients: [],
+        scheduledSendAt: echoScheduled ? (parsed.scheduledSendAt ?? null) : null,
+      }), { status: 201 })
+    })
+    return calls
+  }
+
+  const flush = async (): Promise<void> => { await act(async () => { await Promise.resolve() }) }
+  const btn = (host: HTMLDivElement, text: string): HTMLButtonElement =>
+    Array.from(host.querySelectorAll('button')).find((b) => b.textContent === text) as HTMLButtonElement
+
+  const setPicker = (host: HTMLDivElement, value: string): void => {
+    const input = host.querySelector('#schedule-at') as HTMLInputElement
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    act(() => {
+      setter.call(input, value)
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+  }
+
+  const mountScheduling = async (): Promise<HTMLDivElement> => {
+    useFeatureGateStore.setState({ 'feature.scheduling': true })
+    const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g', transferId: '1' }))
+    await flush()
+    await flush()
+    return host
+  }
+
+  beforeEach(() => {
+    vi.useRealTimers()
+    useUploadEngine.getState().reset()
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn().mockResolvedValue(undefined) }, writable: true })
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    resetFeatureGates()
+    useUploadEngine.getState().reset()
+    document.body.innerHTML = ''
+  })
+
+  it('Schedule + datetime + Send transfer: one POST whose body carries the UTC instant (story AC client half)', async () => {
+    const calls = stubFetch(true, true)
+    const host = await mountScheduling()
+    act(() => { btn(host, 'Schedule').click() })
+    const local = '2026-12-01T10:30'
+    setPicker(host, local)
+
+    await act(async () => { btn(host, 'Send transfer').click() })
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0].url).toBe('http://localhost:8080/api/v1/transfers/1/send')
+    expect((JSON.parse(calls[0].body) as { scheduledSendAt: string }).scheduledSendAt).toBe(toUtcIso(local))
+  })
+
+  it('empty picker: inline error, nothing sent', async () => {
+    const calls = stubFetch(true, true)
+    const host = await mountScheduling()
+    act(() => { btn(host, 'Schedule').click() })
+
+    await act(async () => { btn(host, 'Send transfer').click() })
+
+    expect(calls).toHaveLength(0)
+    expect(host.querySelector('#schedule-at-error')?.textContent).toBe('Pick a date and time.')
+  })
+
+  it('Copy link only in schedule mode always sends now (no scheduledSendAt)', async () => {
+    const calls = stubFetch(true, false)
+    const host = await mountScheduling()
+    act(() => { btn(host, 'Schedule').click() })
+    setPicker(host, '2026-12-01T10:30')
+
+    await act(async () => { btn(host, 'Copy link only').click() })
+
+    expect(calls).toHaveLength(1)
+    expect(JSON.parse(calls[0].body)).not.toHaveProperty('scheduledSendAt')
+  })
+
+  it('201 with scheduledSendAt: the sent line reads "Scheduled for ... the link is live, emails go out then."', async () => {
+    stubFetch(true, true)
+    const host = await mountScheduling()
+    act(() => { btn(host, 'Schedule').click() })
+    setPicker(host, '2026-12-01T10:30')
+
+    await act(async () => { btn(host, 'Send transfer').click() })
+
+    const sub = host.querySelector('.ls-sent-sub')?.textContent ?? ''
+    expect(sub).toContain('Scheduled for')
+    expect(sub).toContain('the link is live, emails go out then.')
+  })
+
+  it('regression: a plain send body has no scheduledSendAt key and the sent line is unchanged', async () => {
+    const calls = stubFetch(true, false)
+    const host = await mountScheduling()
+
+    await act(async () => { btn(host, 'Send transfer').click() })
+
+    expect(JSON.parse(calls[0].body)).not.toHaveProperty('scheduledSendAt')
+    expect(host.querySelector('.ls-sent-sub')?.textContent).toBe('Share the link or send it again later.')
   })
 })
