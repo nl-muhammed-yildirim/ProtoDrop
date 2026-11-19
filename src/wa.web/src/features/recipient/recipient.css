@@ -138,6 +138,14 @@
   text-align: center;
 }
 
+/* F-PRF-002 US-022-02 (FR-022-6): pre-due line above the file list - same muted small copy as .rp-cap-note. */
+.rp-scheduled-note {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: var(--fs-small);
+  text-align: center;
+}
+
 /* T-004-03: inline spinner for the preparing label - currentColor only, rotation gated on reduced-motion (index.css .dz-toast precedent). */
 .rp-spinner {
   display: inline-block;

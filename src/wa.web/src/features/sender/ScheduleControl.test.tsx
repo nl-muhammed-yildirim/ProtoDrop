@@ -37,6 +37,8 @@ function stubPlan(scheduling: boolean | 'unauth'): ReturnType<typeof vi.fn> {
   return fetchMock
 }
 
+const SEMANTICS = 'The link works early; emails go out on schedule.'
+
 const flush = async (): Promise<void> => { await act(async () => { await Promise.resolve() }) }
 
 describe('ScheduleControl', () => {
@@ -65,6 +67,7 @@ describe('ScheduleControl', () => {
     const link = host.querySelector('a') as HTMLAnchorElement
     expect(link.getAttribute('href')).toBe('/account/plan')
     expect(host.querySelector('input[type="datetime-local"]')).toBeNull()
+    expect(host.textContent).not.toContain(SEMANTICS)
   })
 
   it('gate on + guest (401): treated as not allowed', async () => {
@@ -87,12 +90,29 @@ describe('ScheduleControl', () => {
     const schedule = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === 'Schedule') as HTMLButtonElement
     expect(schedule.disabled).toBe(false)
     expect(host.querySelector('input[type="datetime-local"]')).toBeNull()
+    expect(host.textContent).not.toContain(SEMANTICS)
 
     act(() => { schedule.click() })
 
     expect(host.querySelector('input[type="datetime-local"]')).not.toBeNull()
     expect(host.querySelector('label[for="schedule-at"]')?.textContent).toBe('Send at')
     expect(host.textContent).toContain('Between now and 14 days from now.')
+    expect(host.textContent).toContain(SEMANTICS)
     expect(schedule.getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('Schedule then Send now hides the semantics sentence again (no schedule)', async () => {
+    useFeatureGateStore.setState({ 'feature.scheduling': true })
+    stubPlan(true)
+    const host = renderClient()
+    await flush()
+    await flush()
+
+    const buttons = () => Array.from(host.querySelectorAll('button'))
+    act(() => { (buttons().find((b) => b.textContent === 'Schedule') as HTMLButtonElement).click() })
+    expect(host.textContent).toContain(SEMANTICS)
+
+    act(() => { (buttons().find((b) => b.textContent === 'Send now') as HTMLButtonElement).click() })
+    expect(host.textContent).not.toContain(SEMANTICS)
   })
 })

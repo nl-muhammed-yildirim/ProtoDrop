@@ -8,6 +8,7 @@ import { useAriaLive } from '../../core/ui/useAriaLive'
 import { toastRole } from '../../core/ui/toastRole'
 import { trackGrowthCta } from './growthTelemetry'
 import { useRecipientStore } from './RecipientStore'
+import { formatScheduledWhen, isPreDue } from './scheduledLine'
 import { formatSenderLine } from './senderLine'
 
 // T-004-03: failure toast auto-dismiss (App.tsx 5 s toast precedent).
@@ -47,6 +48,7 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
   const from = useRecipientStore((s) => s.from)
   const orgName = useRecipientStore((s) => s.orgName)
   const orgLogoUrl = useRecipientStore((s) => s.orgLogoUrl)
+  const scheduledSendAt = useRecipientStore((s) => s.scheduledSendAt)
   const note = useRecipientStore((s) => s.note)
   const files = useRecipientStore((s) => s.files)
   const hasDownloadAll = useRecipientStore((s) => s.hasDownloadAll)
@@ -272,6 +274,11 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
       {/* Note as plain-text blockquote — no markdown (TA-8.2); overflow-wrap handles long unbroken URLs. */}
       {note && note.trim() !== '' && (
         <blockquote className="rp-note">{note}</blockquote>
+      )}
+      {scheduledSendAt !== null && isPreDue(scheduledSendAt, Date.now()) && (
+        <p className="rp-scheduled-note">
+          {i18n.t('recipient.active.scheduledNote', { when: formatScheduledWhen(scheduledSendAt) })}
+        </p>
       )}
       <ul className="rp-list" aria-label={i18n.t('recipient.active.filesAria')}>
         {files.map((f) => (

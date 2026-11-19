@@ -218,6 +218,44 @@ public class ScheduledSendEndpointTests() : ScheduledSendEndpointTestsBase(gateO
     }
 
     [Fact]
+    public async Task ProUser_Scheduled_PublicPage_CarriesUtcScheduledSendAt() // FR-022-6, EC-022-6 (UTC on the wire)
+    {
+        var userId = await SeedUserAsync("pro");
+        var transferId = await SetupDraftTransferAsync(userId);
+        var due = DateTimeOffset.UtcNow.AddHours(2);
+        using var send = await PostSendAsync(transferId, ScheduleBody(due), userId);
+        Assert.Equal(HttpStatusCode.Created, send.StatusCode);
+        var linkId = (await RowAsync(transferId)).LinkId;
+
+        using var response = await GetAsync($"/api/v1/public/transfers/{linkId}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await ReadJsonAsync(response);
+        Assert.Equal(1, body.GetProperty("files").GetArrayLength());
+        var wire = body.GetProperty("scheduledSendAt");
+        Assert.Equal(JsonValueKind.String, wire.ValueKind);
+        var parsed = wire.GetDateTimeOffset();
+        Assert.Equal(TimeSpan.Zero, parsed.Offset);
+        Assert.Equal(due.UtcDateTime, parsed.UtcDateTime, TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
+    public async Task ProUser_NoSchedule_PublicPage_ScheduledSendAtNull()
+    {
+        var userId = await SeedUserAsync("pro");
+        var transferId = await SetupDraftTransferAsync(userId);
+        using var send = await PostSendAsync(transferId, "{\"emails\":[]}", userId);
+        Assert.Equal(HttpStatusCode.Created, send.StatusCode);
+        var linkId = (await RowAsync(transferId)).LinkId;
+
+        using var response = await GetAsync($"/api/v1/public/transfers/{linkId}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await ReadJsonAsync(response);
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("scheduledSendAt").ValueKind);
+    }
+
+    [Fact]
     public async Task ProUser_Scheduled_CountsTowardActiveTransfers() // D-5, D-6
     {
         var userId = await SeedUserAsync("pro");

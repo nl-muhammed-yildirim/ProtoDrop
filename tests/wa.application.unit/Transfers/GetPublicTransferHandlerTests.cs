@@ -205,6 +205,44 @@ public class GetPublicTransferHandlerTests
         Assert.Null(result.Files); // no byte leak even though the row exists
     }
 
+    // ---- F-PRF-002 US-022-02: scheduledSendAt (FR-022-6) ----
+
+    [Fact]
+    public async Task Handle_Scheduled_ReturnsActiveWithFilesAndScheduledSendAt()
+    {
+        var due = DateTime.UtcNow.AddHours(2);
+        var file = new PublicFileItem(Guid.NewGuid(), "a.txt", 100);
+        _store.SetupStatus(status: 5, files: [file], scheduledSendAtUtc: due);
+
+        var result = await _handler.Handle(new GetPublicTransferQuery("abcdefgh"), CancellationToken.None);
+
+        Assert.Equal(PublicTransferState.Active, result.State);
+        Assert.Equal([file], result.Files!.ToArray());
+        Assert.Equal(due, result.ScheduledSendAtUtc);
+    }
+
+    [Fact]
+    public async Task Handle_ActiveStatus_ScheduledSendAtNull_EvenWhenColumnSet()
+    {
+        _store.SetupStatus(status: 1, files: [], scheduledSendAtUtc: DateTime.UtcNow.AddHours(2));
+
+        var result = await _handler.Handle(new GetPublicTransferQuery("abcdefgh"), CancellationToken.None);
+
+        Assert.Equal(PublicTransferState.Active, result.State);
+        Assert.Null(result.ScheduledSendAtUtc);
+    }
+
+    [Fact]
+    public async Task Handle_TerminalStatus_NoScheduledSendAt()
+    {
+        _store.SetupStatus(status: 2, scheduledSendAtUtc: DateTime.UtcNow.AddHours(2));
+
+        var result = await _handler.Handle(new GetPublicTransferQuery("abcdefgh"), CancellationToken.None);
+
+        Assert.Equal(PublicTransferState.Expired, result.State);
+        Assert.Null(result.ScheduledSendAtUtc);
+    }
+
     // ---- Telemetry (TA-4.2#4 emits column; AC-003-4) ----
 
     [Fact]
@@ -517,7 +555,7 @@ public class GetPublicTransferHandlerTests
         public void SetupActive(IReadOnlyList<PublicFileItem> files, int maxDownloads, int downloadsCount, string? passwordHash) =>
             SetupStatus(status: 1, senderEmail: "alice@example.com", files: files, maxDownloads: maxDownloads, downloadsCount: downloadsCount, passwordHash: passwordHash);
 
-        public void SetupStatus(int status, string? senderEmail = null, IReadOnlyList<PublicFileItem>? files = null, int maxDownloads = -1, int downloadsCount = 0, string? passwordHash = null, long? totalBytesOverride = null, int? fileCountOverride = null, Guid? ownerAppUserId = null)
+        public void SetupStatus(int status, string? senderEmail = null, IReadOnlyList<PublicFileItem>? files = null, int maxDownloads = -1, int downloadsCount = 0, string? passwordHash = null, long? totalBytesOverride = null, int? fileCountOverride = null, Guid? ownerAppUserId = null, DateTime? scheduledSendAtUtc = null)
         {
             Files = files;
             Transfer = new Transfer
@@ -534,7 +572,8 @@ public class GetPublicTransferHandlerTests
                 PasswordHash = passwordHash,
                 TotalBytes = totalBytesOverride ?? (files?.Sum(f => f.SizeBytes) ?? 0),
                 FileCount = fileCountOverride ?? (files?.Count ?? 0),
-                ExpiresAtUtc = DateTime.UtcNow.AddDays(7)
+                ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+                ScheduledSendAtUtc = scheduledSendAtUtc
             };
         }
     }

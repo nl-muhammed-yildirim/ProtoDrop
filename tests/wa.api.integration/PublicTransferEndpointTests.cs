@@ -75,7 +75,7 @@ public class PublicTransferEndpointTests : IAsyncLifetime
         var root = doc.RootElement;
 
         // TA-4.2#4 exact wire shape — property names pinned at the single construction site (endpoints 1–3 style).
-        Assert.Equal(["from", "note", "files", "hasDownloadAll", "downloadsLeft", "passwordRequired", "orgName", "orgLogoUrl"],
+        Assert.Equal(["from", "note", "files", "hasDownloadAll", "downloadsLeft", "passwordRequired", "orgName", "orgLogoUrl", "scheduledSendAt"],
             root.EnumerateObject().Select(p => p.Name).ToArray());
 
         Assert.Equal("Alice", root.GetProperty("from").GetString());
@@ -99,6 +99,7 @@ public class PublicTransferEndpointTests : IAsyncLifetime
         Assert.False(root.GetProperty("passwordRequired").GetBoolean());
         Assert.Equal(JsonValueKind.Null, root.GetProperty("orgName").ValueKind); // guest-owned seed (US-021-01)
         Assert.Equal(JsonValueKind.Null, root.GetProperty("orgLogoUrl").ValueKind);
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("scheduledSendAt").ValueKind); // status-1 seed (F-PRF-002)
 
         // No SAS minted: zero DownloadEvent rows for this transfer and DownloadsCount unchanged (the endpoint never counts).
         Assert.Equal(0, await _db.Set<DownloadEvent>().CountAsync(e => e.TransferId == transferId));

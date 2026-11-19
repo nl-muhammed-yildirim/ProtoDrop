@@ -8,6 +8,7 @@ import { useUploadEngine } from '../../core/upload/UploadEngine'
 import { useRecipientStore } from './RecipientStore'
 import { matchLinkPath } from './recipientRoute'
 import { growthTelemetryLog } from './growthTelemetry'
+import { formatScheduledWhen } from './scheduledLine'
 
 ;(globalThis as unknown as Record<string, boolean>).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -23,6 +24,7 @@ interface PublicTransferBody {
   passwordRequired: boolean
   orgName?: string | null
   orgLogoUrl?: string | null
+  scheduledSendAt?: string | null
 }
 
 // Live roots are tracked so afterEach can unmount them — React 18 warns on store updates hitting
@@ -1451,6 +1453,72 @@ describe('RecipientPage (F-PRF-001 US-021-01 — org branding in the From headin
     const host = await renderApp(isGatedActive)
 
     expect(host.querySelector('.rp-heading')?.textContent).toBe('From: Studio Nova')
+    host.remove()
+  })
+})
+
+describe('RecipientPage (F-PRF-002 US-022-02 — pre-due line)', () => {
+  const isGatedActive = (): boolean => useRecipientStore.getState().status === 'active' && useRecipientStore.getState().passwordRequired === true
+  const hoursFromNow = (h: number): string => new Date(Date.now() + h * 3_600_000).toISOString()
+
+  beforeEach(() => {
+    window.history.pushState('', '', `/t/${LINK_ID}`)
+  })
+
+  afterEach(() => {
+    for (const root of roots.splice(0)) act(() => { root.unmount() })
+    useRecipientStore.getState().reset()
+    window.history.replaceState(null, '', '/')
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('future due: shows the line with the locale-formatted time, no "!", downloads stay available (FR-022-6)', async () => {
+    const iso = hoursFromNow(2)
+    stubFetch(200, activeBody({ scheduledSendAt: iso }))
+
+    const host = await renderApp(isActive)
+
+    const line = host.querySelector('.rp-scheduled-note')
+    expect(line?.textContent).toBe(`Files are ready — email goes out at ${formatScheduledWhen(iso)}`)
+    expect(line?.textContent).not.toContain('!')
+    const downloads = Array.from(host.querySelectorAll('.rp-download')) as HTMLButtonElement[]
+    expect(downloads.length).toBeGreaterThan(0)
+    expect(downloads.every((b) => !b.disabled)).toBe(true)
+    expect(host.textContent).toContain('Download all')
+    host.remove()
+  })
+
+  it('past due: no line, file list still rendered', async () => {
+    stubFetch(200, activeBody({ scheduledSendAt: hoursFromNow(-2) }))
+
+    const host = await renderApp(isActive)
+
+    expect(host.querySelector('.rp-scheduled-note')).toBeNull()
+    expect(host.querySelectorAll('.rp-row').length).toBe(2)
+    host.remove()
+  })
+
+  it('null or absent scheduledSendAt: no line', async () => {
+    stubFetch(200, activeBody({ scheduledSendAt: null }))
+    const hostNull = await renderApp(isActive)
+    expect(hostNull.querySelector('.rp-scheduled-note')).toBeNull()
+    hostNull.remove()
+    for (const root of roots.splice(0)) act(() => { root.unmount() })
+    useRecipientStore.getState().reset()
+
+    stubFetch(200, activeBody())
+    const hostAbsent = await renderApp(isActive)
+    expect(hostAbsent.querySelector('.rp-scheduled-note')).toBeNull()
+    hostAbsent.remove()
+  })
+
+  it('password gate + future due: gate card only, no line', async () => {
+    stubFetch(200, activeBody({ passwordRequired: true, scheduledSendAt: hoursFromNow(2) }))
+
+    const host = await renderApp(isGatedActive)
+
+    expect(host.querySelector('.rp-scheduled-note')).toBeNull()
     host.remove()
   })
 })

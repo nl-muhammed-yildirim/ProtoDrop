@@ -89,6 +89,7 @@ export function ScheduleControl({ mode, onModeChange, value, onValueChange, show
             aria-describedby={showRequiredError ? 'schedule-at-error' : undefined}
           />
           <p className="ls-recipients-helper">{i18n.t('link.schedule.helper')}</p>
+          <p className="ls-recipients-helper">{i18n.t('link.schedule.semantics')}</p>
           {showRequiredError && (
             <p id="schedule-at-error" role="alert" className="ls-sender-error">{i18n.t('link.schedule.required')}</p>
           )}

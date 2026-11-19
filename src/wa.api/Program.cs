@@ -415,7 +415,8 @@ app.MapGet("/api/v1/public/transfers/{linkId}", async (string linkId, HttpReques
             from = result.From, note = result.Note,
             files = result.Files!.Select(f => new { fileId = f.FileId.ToString("n"), name = f.Name, sizeBytes = f.SizeBytes }),
             hasDownloadAll = result.HasDownloadAll, downloadsLeft = result.DownloadsLeft, passwordRequired = result.PasswordRequired,
-            orgName = result.OrgName, orgLogoUrl = result.OrgLogoUrl
+            orgName = result.OrgName, orgLogoUrl = result.OrgLogoUrl,
+            scheduledSendAt = result.ScheduledSendAtUtc is { } due ? AsUtc(due) : (DateTime?)null
         }), // TA-4.2#4 exact wire shape — property names pinned at the single construction site (same style as endpoints 1–3)
 
         // D8: status pin = 410 for both terminal expired shapes; the unknown case overrides to 404 below (FR-003-9: same body, different status line only).
