@@ -162,9 +162,9 @@ public sealed class GetDownloadAllUrlHandler : IRequestHandler<GetDownloadAllUrl
     private string? IpHash(string? clientIp) =>
         string.IsNullOrEmpty(clientIp) ? null : _telemetry.IpSlot(clientIp);
 
-    /// <summary>TA-9.4: User-Agent → SHA-256 lowercase hex (exactly 64 chars — fits UaHash VARCHAR(64); null stays null).</summary>
-    private static string? UaHash(string? userAgent) =>
-        string.IsNullOrEmpty(userAgent) ? null : Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(userAgent))).ToLowerInvariant();
+    /// <summary>TA-9.4: User-Agent → HMAC-SHA256 lowercase hex keyed like IpHash (exactly 64 chars — fits UaHash VARCHAR(64); null stays null).</summary>
+    private string? UaHash(string? userAgent) =>
+        string.IsNullOrEmpty(userAgent) ? null : _telemetry.IpSlot(userAgent); // IpSlot IS the keyed HMAC-SHA256 hex slot (== PiiTransforms.UserAgent) — keeps the reporter's closed slot set unchanged
 
     /// <summary>8 chars from the LinkId charset (TA-9.6) — same filter as GetPublicTransferHandler's private helper.</summary>
     private static bool IsWellFormedLinkId(string linkId) =>

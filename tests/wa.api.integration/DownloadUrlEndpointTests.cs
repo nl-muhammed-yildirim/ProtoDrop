@@ -149,7 +149,8 @@ public class DownloadUrlEndpointTests : IAsyncLifetime
         using var freshDb = FreshDb();
         var row = Assert.Single(await freshDb.Set<DownloadEvent>().AsNoTracking().Where(e => e.TransferId == transferId).ToListAsync());
 
-        Assert.Equal(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(chromeUa))).ToLowerInvariant(), row.UaHash);
+        // TA-9.4: UaHash = HMAC-SHA256(UA) keyed with Wa:Jwt:Secret (same key as IpHash).
+        Assert.Equal(wa.domain.Telemetry.PiiTransforms.UserAgent(chromeUa, Encoding.UTF8.GetBytes("test-jwt-secret")), row.UaHash);
         Assert.Equal("Chrome", row.UserAgentFamily);
         // TestServer has no remote IP -> null; if one is ever present it must be the 64-hex HMAC, never an IP literal.
         Assert.True(row.IpHash is null || Regex.IsMatch(row.IpHash, "^[0-9a-f]{64}$"), "IpHash must be null or a 64-hex digest");

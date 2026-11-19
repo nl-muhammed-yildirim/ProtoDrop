@@ -60,7 +60,8 @@ public class GetFileDownloadUrlHandlerTests
         Assert.Equal(_store.Transfer!.Id, rec.TransferId);
         Assert.Equal(fileId, rec.FileId);
         Assert.Equal(PiiTransforms.IpAddress("1.2.3.4", Encoding.UTF8.GetBytes(UnitTestKey)), rec.IpHash); // IpSlot semantics — non-null when ClientIp given
-        Assert.Equal(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("ua-xyz"))).ToLowerInvariant(), rec.UaHash); // exactly 64 hex chars
+        Assert.Equal(PiiTransforms.UserAgent("ua-xyz", Encoding.UTF8.GetBytes(UnitTestKey)), rec.UaHash); // HMAC keyed like IpHash, exactly 64 hex chars
+        Assert.NotEqual(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("ua-xyz"))).ToLowerInvariant(), rec.UaHash); // no longer the unkeyed SHA-256
 
         // ExpiresAt ≈ now + 30 min (the minter's own fixed window — the handler just reports it).
         Assert.NotNull(result.Url);
