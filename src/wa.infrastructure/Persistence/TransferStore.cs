@@ -28,9 +28,9 @@ public sealed class TransferStore : ITransferStore
     /// </summary>
     public async Task<long> GetActiveStorageBytesAsync(Guid ownerId, CancellationToken ct)
     {
-        // (a) active transfer ids for this owner — Status IN (1,3), same predicate as before.
+        // (a) active transfer ids for this owner — Status IN (1,3,5): a Scheduled transfer is live and holds its blobs (US-022-01, D-5).
         var activeIds = _db.Set<Transfer>()
-            .Where(t => t.OwnerAppUserId == ownerId && (t.Status == 1 || t.Status == 3))
+            .Where(t => t.OwnerAppUserId == ownerId && (t.Status == 1 || t.Status == 3 || t.Status == TransferStatus.Scheduled))
             .Select(t => t.Id);
 
         // (b) distinct blob ids those transfers' FileItems reference.
@@ -47,7 +47,7 @@ public sealed class TransferStore : ITransferStore
 
     public async Task<int> GetActiveTransferCountAsync(Guid ownerId, CancellationToken ct) =>
         await _db.Set<Transfer>()
-            .Where(t => t.OwnerAppUserId == ownerId && (t.Status == 1 || t.Status == 3))
+            .Where(t => t.OwnerAppUserId == ownerId && (t.Status == 1 || t.Status == 3 || t.Status == TransferStatus.Scheduled))
             .CountAsync(ct);
 
     /// <summary>

@@ -25,8 +25,9 @@ public sealed class TransferConfiguration : IEntityTypeConfiguration<Transfer>
         // TA-3.2 defines no index on OwnerAppUserId alone (only the IX_Transfer_Owner composite below) —
         // the automatic FK index is suppressed via ForeignKeyIndexConvention removal in WaDbContext.ConfigureConventions.
 
-        // TINYINT — 0 Draft, 1 Active, 2 Expired, 3 DownloadLimit, 4 Deleted.
-        b.Property(t => t.Status).HasColumnType("TINYINT");
+        // TINYINT — 0 Draft, 1 Active, 2 Expired, 3 DownloadLimit, 4 Deleted, 5 Scheduled (F-PRF-002).
+        b.Property(t => t.Status).HasColumnType("TINYINT")
+            .HasComment("0 Draft,1 Active,2 Expired,3 DownloadLimit,4 Deleted,5 Scheduled");
         // INT NOT NULL CONSTRAINT DF_T_Downloads DEFAULT 0 — TA-3.2 names the default constraint explicitly (AC-052-4).
         var downloadsCount = b.Property(t => t.DownloadsCount);
         downloadsCount.HasDefaultValue(0);
@@ -63,7 +64,7 @@ public sealed class TransferConfiguration : IEntityTypeConfiguration<Transfer>
             .IsDescending([false, true])
             .HasDatabaseName("IX_Transfer_Owner");
 
-        // (Status, ScheduledSendAtUtc) — scheduler picks due drafts.
+        // (Status, ScheduledSendAtUtc) — scheduler picks due Scheduled rows (US-022-04).
         b.HasIndex(t => new { t.Status, t.ScheduledSendAtUtc })
             .HasDatabaseName("IX_Transfer_Sched");
     }

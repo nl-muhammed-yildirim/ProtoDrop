@@ -32,7 +32,8 @@ public sealed record GetPublicTransferResult(
     bool PasswordRequired = false,  // Active only
     string? SenderEmail = null,     // terminal bodies render it into Problem+JSON details (FR-003-8/9)
     string? OrgName = null,         // Active only — sender's org when their plan has Branding (F-PRF-001)
-    string? OrgLogoUrl = null);     // Active only — 30-min inline read SAS when branding is on and the blob exists
+    string? OrgLogoUrl = null,      // Active only — 30-min inline read SAS when branding is on and the blob exists
+    DateTime? ScheduledSendAtUtc = null); // Active only — set only for Status Scheduled (F-PRF-002)
 
 /// <summary>
 /// T-014 (TA-4.2#4): recipient metadata for GET /api/v1/public/transfers/{linkId}. No auth, no cookie;
@@ -124,7 +125,8 @@ public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransfer
             DownloadsLeft: transfer.MaxDownloads < 0 ? null : transfer.MaxDownloads - transfer.DownloadsCount,
             PasswordRequired: passwordRequired,
             OrgName: branding.OrgName,
-            OrgLogoUrl: logoUrl);
+            OrgLogoUrl: logoUrl,
+            ScheduledSendAtUtc: transfer.Status == wa.domain.TransferStatus.Scheduled ? transfer.ScheduledSendAtUtc : null);
     }
 
     /// <summary>8 chars from the LinkId charset (TA-9.6) — anything else is treated as unknown on purpose.</summary>

@@ -3,7 +3,7 @@ using wa.domain;
 
 namespace wa.application.UseCases.Transfers;
 
-/// <summary>Transfer context needed for email notification (TA-6.7). OwnerAppUserId = US-021-02 branding gate input (null for guest sends).</summary>
+/// <summary>Transfer context needed for email notification (TA-6.7). OwnerAppUserId = US-021-02 branding gate input (null for guest sends). US-022-04: Status + ScheduledSendAtUtc feed the f-email notify gate (defaults = legacy immediate send).</summary>
 public sealed record EmailTransferContext(
     Guid TransferId,
     string SenderName,
@@ -11,7 +11,9 @@ public sealed record EmailTransferContext(
     DateTime ExpiresAtUtc,
     string LinkId,
     IReadOnlyList<FileEntry> Files,
-    Guid? OwnerAppUserId = null);
+    Guid? OwnerAppUserId = null,
+    byte Status = TransferStatus.Active,
+    DateTime? ScheduledSendAtUtc = null);
 
 /// <summary>Email store port — implemented by EmailStore adapter.</summary>
 public interface IEmailStore

@@ -19,9 +19,9 @@ public sealed class OverviewStore : IOverviewStore
     /// </summary>
     public async Task<OverviewData> GetAsync(DateTime todayStartUtc, DateTime emailsWindowStartUtc, CancellationToken ct)
     {
-        // (a) Active transfers — Status=1 per FR-011-2's literal.
+        // (a) Active transfers — Status=1 per FR-011-2's literal, plus Scheduled (5): a live transfer awaiting its send time (F-PRF-002 review).
         var activeTransfers = await _db.Set<Transfer>()
-            .CountAsync(t => t.Status == 1, ct);
+            .CountAsync(t => t.Status == 1 || t.Status == TransferStatus.Scheduled, ct);
 
         // (b) Storage bytes used — platform-wide variant of TransferStore.GetActiveStorageBytesAsync (T-010-04 idiom):
         // Status IN (1,3), no owner filter, three bounded queries (active ids → distinct blob ids → SUM of SizeBytes).

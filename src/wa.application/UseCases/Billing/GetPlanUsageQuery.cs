@@ -8,7 +8,7 @@ namespace wa.application.UseCases.Billing;
 public sealed record GetPlanUsageQuery(Guid UserId) : IRequest<PlanUsageResult>;
 
 /// <summary>ActiveTransfersAllowed null = unlimited (-1 sentinel). Storage has no sentinel (Part 2).</summary>
-public sealed record PlanUsageResult(string PlanCode, long StorageUsedBytes, long StorageAllowedBytes, int ActiveTransfersUsed, int? ActiveTransfersAllowed, long MaxTransferSize, long MaxSingleFile);
+public sealed record PlanUsageResult(string PlanCode, long StorageUsedBytes, long StorageAllowedBytes, int ActiveTransfersUsed, int? ActiveTransfersAllowed, long MaxTransferSize, long MaxSingleFile, bool Scheduling = false);
 
 public sealed class GetPlanUsageHandler : IRequestHandler<GetPlanUsageQuery, PlanUsageResult>
 {
@@ -36,6 +36,7 @@ public sealed class GetPlanUsageHandler : IRequestHandler<GetPlanUsageQuery, Pla
             activeCount,
             plan.Limits.IsActiveTransfersMaxInfinite() ? null : plan.Limits.ActiveTransfersMax,
             plan.Limits.MaxTransferSize,
-            plan.Limits.MaxSingleFile);
+            plan.Limits.MaxSingleFile,
+            plan.Features.Scheduling);   // US-022-01 (FR-022-3): lets the SPA disable the schedule control on Free
     }
 }

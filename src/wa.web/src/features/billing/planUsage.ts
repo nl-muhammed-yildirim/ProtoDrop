@@ -9,6 +9,8 @@ export interface PlanUsageDto {
   activeTransfers: { used: number; allowed: number | null }
   /** Per-upload caps from PlanContext.Limits (bytes); the upload pre-check source. */
   limits?: { maxTransferSize: number; maxSingleFile: number }
+  /** US-022-01 (FR-022-3): plan features the SPA gates on; absent on older servers. */
+  features?: { scheduling: boolean }
 }
 
 export interface MeterState {

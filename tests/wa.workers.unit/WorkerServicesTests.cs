@@ -68,6 +68,14 @@ public class WorkerServicesTests
     }
 
     [Fact]
+    public void ActivateScheduledTransfersHandler_Resolves() // US-022-04: f-expire schedule sub-step is composed
+    {
+        using var sp = Build(InMemory(BaseSettings()));
+
+        Assert.NotNull(sp.GetRequiredService<wa.application.UseCases.Transfers.ActivateScheduledTransfersHandler>());
+    }
+
+    [Fact]
     public void SendNotificationEmailsHandler_Resolves() // US-021-02: f-email branding deps are composed
     {
         var settings = BaseSettings();

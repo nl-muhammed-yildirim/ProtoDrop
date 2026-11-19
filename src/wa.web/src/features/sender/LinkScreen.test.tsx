@@ -5,7 +5,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useUploadEngine } from '../../core/upload/UploadEngine'
 import { parseRecipients, validateAddress } from './recipients'
+import { resetFeatureGates, useFeatureGateStore } from '../../core/features/featureGates'
+import { toUtcIso } from './schedule'
 import LinkScreen from './LinkScreen'
+
+// US-022-01: ScheduleControl kicks the shared gate read on mount; stubbed so the existing fetch call-count assertions never see GET /features.
+vi.mock('../../core/features/featureGates', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../core/features/featureGates')>()
+  return { ...actual, loadFeatureGates: () => Promise.resolve() }
+})
 
 ;(globalThis as unknown as Record<string, boolean>).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -615,5 +623,190 @@ describe('LinkScreen', () => {
     const body = JSON.parse(calls[0].body) as { password?: string }
     expect(body.password).toBe('s3cret')
     host.remove()
+  })
+})
+
+// ---- US-022-01 (F-PRF-002): schedule at create ----
+describe('schedule', () => {
+  type Call = { url: string; body: string }
+
+  // Plan read (GET /billing/plan) answers the scheduling feature; the send POST answers 201 with the echoed due time.
+  function stubFetch(planScheduling: boolean, echoScheduled: boolean, sendOverride?: { status: number; body: unknown }): Call[] {
+    const calls: Call[] = []
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.endsWith('/billing/plan'))
+        return new Response(JSON.stringify({ features: { scheduling: planScheduling }, scheduleWindow: { minMinutes: 5, maxDays: 14 } }), { status: 200 })
+      const body = typeof init?.body === 'string' ? init.body : ''
+      calls.push({ url, body })
+      if (sendOverride) return new Response(JSON.stringify(sendOverride.body), { status: sendOverride.status })
+      const parsed = body ? (JSON.parse(body) as { scheduledSendAt?: string }) : {}
+      return new Response(JSON.stringify({
+        id: '1', linkId: 'Ab3dEf5g', status: 'Scheduled', expiresAt: '2026-12-31T00:00:00Z', totalBytes: 0, fileCount: 0, recipients: [],
+        scheduledSendAt: echoScheduled ? (parsed.scheduledSendAt ?? null) : null,
+      }), { status: 201 })
+    })
+    return calls
+  }
+
+  const flush = async (): Promise<void> => { await act(async () => { await Promise.resolve() }) }
+  const btn = (host: HTMLDivElement, text: string): HTMLButtonElement =>
+    Array.from(host.querySelectorAll('button')).find((b) => b.textContent === text) as HTMLButtonElement
+
+  const setPicker = (host: HTMLDivElement, value: string): void => {
+    const input = host.querySelector('#schedule-at') as HTMLInputElement
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    act(() => {
+      setter.call(input, value)
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+  }
+
+  // Local wall-clock datetime-local value for (Date.now() + ms), whole minutes.
+  const pad2 = (n: number): string => String(n).padStart(2, '0')
+  const localPlus = (ms: number): string => {
+    const d = new Date(Date.now() + ms)
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+  }
+  const MIN = 60_000
+  const HOUR = 60 * MIN
+  const DAY = 24 * HOUR
+
+  const mountScheduling = async (): Promise<HTMLDivElement> => {
+    useFeatureGateStore.setState({ 'feature.scheduling': true })
+    const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g', transferId: '1' }))
+    await flush()
+    await flush()
+    return host
+  }
+
+  beforeEach(() => {
+    vi.useRealTimers()
+    useUploadEngine.getState().reset()
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn().mockResolvedValue(undefined) }, writable: true })
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+    resetFeatureGates()
+    useUploadEngine.getState().reset()
+    document.body.innerHTML = ''
+  })
+
+  it('Schedule + datetime + Send transfer: one POST whose body carries the UTC instant (story AC client half)', async () => {
+    const calls = stubFetch(true, true)
+    const host = await mountScheduling()
+    act(() => { btn(host, 'Schedule').click() })
+    const local = localPlus(2 * HOUR)
+    setPicker(host, local)
+
+    await act(async () => { btn(host, 'Send transfer').click() })
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0].url).toBe('http://localhost:8080/api/v1/transfers/1/send')
+    expect((JSON.parse(calls[0].body) as { scheduledSendAt: string }).scheduledSendAt).toBe(toUtcIso(local))
+  })
+
+  it('empty picker: inline error, nothing sent', async () => {
+    const calls = stubFetch(true, true)
+    const host = await mountScheduling()
+    act(() => { btn(host, 'Schedule').click() })
+
+    await act(async () => { btn(host, 'Send transfer').click() })
+
+    expect(calls).toHaveLength(0)
+    expect(host.querySelector('#schedule-at-error')?.textContent).toBe('Pick a date and time.')
+  })
+
+  it('Copy link only in schedule mode always sends now (no scheduledSendAt)', async () => {
+    const calls = stubFetch(true, false)
+    const host = await mountScheduling()
+    act(() => { btn(host, 'Schedule').click() })
+    setPicker(host, localPlus(2 * HOUR))
+
+    await act(async () => { btn(host, 'Copy link only').click() })
+
+    expect(calls).toHaveLength(1)
+    expect(JSON.parse(calls[0].body)).not.toHaveProperty('scheduledSendAt')
+  })
+
+  it('201 with scheduledSendAt: the sent line reads "Scheduled for ... the link is live, emails go out then."', async () => {
+    stubFetch(true, true)
+    const host = await mountScheduling()
+    act(() => { btn(host, 'Schedule').click() })
+    setPicker(host, localPlus(2 * HOUR))
+
+    await act(async () => { btn(host, 'Send transfer').click() })
+
+    const sub = host.querySelector('.ls-sent-sub')?.textContent ?? ''
+    expect(sub).toContain('Scheduled for')
+    expect(sub).toContain('the link is live, emails go out then.')
+  })
+
+  it('regression: a plain send body has no scheduledSendAt key and the sent line is unchanged', async () => {
+    const calls = stubFetch(true, false)
+    const host = await mountScheduling()
+
+    await act(async () => { btn(host, 'Send transfer').click() })
+
+    expect(JSON.parse(calls[0].body)).not.toHaveProperty('scheduledSendAt')
+    expect(host.querySelector('.ls-sent-sub')?.textContent).toBe('Share the link or send it again later.')
+  })
+
+  // US-022-03 (FR-022-2): window check on submit, named copy, inclusive boundaries, server re-validation.
+  it('+2 min: inline error naming the 5-minute minimum, nothing sent (AC-022-2)', async () => {
+    const calls = stubFetch(true, true)
+    const host = await mountScheduling()
+    act(() => { btn(host, 'Schedule').click() })
+    setPicker(host, localPlus(2 * MIN))
+
+    await act(async () => { btn(host, 'Send transfer').click() })
+
+    expect(calls).toHaveLength(0)
+    expect(host.querySelector('#schedule-at-error')?.textContent).toBe('Pick a time at least 5 minutes from now.')
+  })
+
+  it('+30 days: inline error naming the 14-day maximum, nothing sent (AC-022-3)', async () => {
+    const calls = stubFetch(true, true)
+    const host = await mountScheduling()
+    act(() => { btn(host, 'Schedule').click() })
+    setPicker(host, localPlus(30 * DAY))
+
+    await act(async () => { btn(host, 'Send transfer').click() })
+
+    expect(calls).toHaveLength(0)
+    expect(host.querySelector('#schedule-at-error')?.textContent).toBe('Pick a time no more than 14 days from now.')
+  })
+
+  it.each([
+    ['exactly +5 min', 5 * MIN],
+    ['exactly +14 days', 14 * DAY],
+  ])('%s is accepted: one POST (boundary AC)', async (_label, offset) => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 11, 1, 10, 0, 0, 0))   // whole minute so the picker value is exact
+    const calls = stubFetch(true, true)
+    const host = await mountScheduling()
+    act(() => { btn(host, 'Schedule').click() })
+    setPicker(host, localPlus(offset))
+
+    await act(async () => { btn(host, 'Send transfer').click() })
+
+    expect(calls).toHaveLength(1)
+    expect(host.querySelector('#schedule-at-error')).toBeNull()
+  })
+
+  it('server 422 SCHEDULE_OUT_OF_WINDOW (clock skew): inline window copy, no generic failure, still the form', async () => {
+    const calls = stubFetch(true, true, { status: 422, body: { code: 'SCHEDULE_OUT_OF_WINDOW', title: 'Schedule out of window', status: 422 } })
+    const host = await mountScheduling()
+    act(() => { btn(host, 'Schedule').click() })
+    setPicker(host, localPlus(2 * HOUR))
+
+    await act(async () => { btn(host, 'Send transfer').click() })
+    await flush()
+
+    expect(calls).toHaveLength(1)
+    expect(host.querySelector('#schedule-at-error')?.textContent).toBe('Pick a time between 5 minutes and 14 days from now.')
+    expect(host.textContent).not.toContain('Sending failed')
+    expect(host.querySelector('.ls-sent-sub')).toBeNull()
   })
 })

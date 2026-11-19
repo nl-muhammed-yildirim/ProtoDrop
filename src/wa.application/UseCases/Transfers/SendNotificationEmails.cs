@@ -8,6 +8,7 @@ using wa.application.Ports;
 using wa.application.Telemetry;
 using wa.domain;
 using wa.domain.Telemetry;
+using wa.domain.Transfers;
 
 namespace wa.application.UseCases.Transfers;
 
@@ -79,6 +80,14 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
         if (context is null)
         {
             _logger.LogWarning("f-email: transfer {TransferId} not found", transferId);
+            return;
+        }
+
+        // 3b. US-022-04 (FR-022-4, D-1): a scheduled transfer may notify only while its DB status is Active. Runs before dedup so a
+        // skipped delivery is not recorded as seen; returns (no throw) so the message completes. The timer re-emits transfer.created on flip.
+        if (!ScheduledSend.MayNotify(context.Status, context.ScheduledSendAtUtc))
+        {
+            _logger.LogInformation("f-email: transfer {TransferId} is not due for notification, skipping", transferId);
             return;
         }
 

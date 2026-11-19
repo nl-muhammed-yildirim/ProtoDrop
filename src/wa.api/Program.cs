@@ -321,12 +321,31 @@ app.MapPost("/api/v1/transfers/{id}/send", async (Guid id, HttpContext httpConte
     var note = root.TryGetProperty("note", out var n) ? n.GetString() : null;
     var password = root.TryGetProperty("password", out var pw) ? pw.GetString() : null;
 
+    // US-022-01 (D-3): optional scheduledSendAt — ISO-8601 with offset; absent/null = send now; anything else → 400 VALIDATION.
+    DateTimeOffset? scheduledSendAt = null;
+    if (root.TryGetProperty("scheduledSendAt", out var sa) && sa.ValueKind != System.Text.Json.JsonValueKind.Null)
+    {
+        if (sa.ValueKind != System.Text.Json.JsonValueKind.String || !sa.TryGetDateTimeOffset(out var parsedSchedule))
+            throw new BusinessException(ProblemCodes.Validation, "scheduledSendAt must be an ISO 8601 date-time with an offset.");
+        scheduledSendAt = parsedSchedule;
+    }
+
     try
     {
-        var result = await sender.Send(new SendTransferCommand(id, senderName, senderEmail, note, emails, password, ownerAppUserId), ct);
+        var result = await sender.Send(new SendTransferCommand(id, senderName, senderEmail, note, emails, password, ownerAppUserId, scheduledSendAt?.UtcDateTime), ct);
         if (result is null)
             throw new BusinessException(ProblemCodes.NotFound, "Transfer not found.");
-        return Results.Json(new { id = result.TransferId.ToString("n"), linkId = result.LinkId, status = "Active", expiresAt = result.ExpiresAtUtc, totalBytes = result.TotalBytes, fileCount = result.FileCount, recipients = result.Recipients }, statusCode: 201);
+        return Results.Json(new { id = result.TransferId.ToString("n"), linkId = result.LinkId, status = result.Status == wa.domain.TransferStatus.Scheduled ? "Scheduled" : "Active", expiresAt = result.ExpiresAtUtc, totalBytes = result.TotalBytes, fileCount = result.FileCount, recipients = result.Recipients, scheduledSendAt = result.ScheduledSendAtUtc }, statusCode: 201);
+    }
+    catch (wa.application.UseCases.Transfers.ScheduleForbiddenException ex)
+    {
+        // US-022-01 (FR-022-3): plan/gate does not allow scheduling → 403 FORBIDDEN (closed list unchanged).
+        throw new BusinessException(ProblemCodes.Forbidden, ex.Message);
+    }
+    catch (wa.application.UseCases.Transfers.ScheduleOutOfWindowException ex)
+    {
+        // US-022-03 (FR-022-2): scheduledSendAt outside now+5 min .. now+14 days (server time) → 422 SCHEDULE_OUT_OF_WINDOW.
+        throw new BusinessException(ProblemCodes.ScheduleOutOfWindow, ex.Message);
     }
     catch (TransferSizeExceededException ex)
     {
@@ -401,7 +420,8 @@ app.MapGet("/api/v1/public/transfers/{linkId}", async (string linkId, HttpReques
             from = result.From, note = result.Note,
             files = result.Files!.Select(f => new { fileId = f.FileId.ToString("n"), name = f.Name, sizeBytes = f.SizeBytes }),
             hasDownloadAll = result.HasDownloadAll, downloadsLeft = result.DownloadsLeft, passwordRequired = result.PasswordRequired,
-            orgName = result.OrgName, orgLogoUrl = result.OrgLogoUrl
+            orgName = result.OrgName, orgLogoUrl = result.OrgLogoUrl,
+            scheduledSendAt = result.ScheduledSendAtUtc is { } due ? AsUtc(due) : (DateTime?)null
         }), // TA-4.2#4 exact wire shape — property names pinned at the single construction site (same style as endpoints 1–3)
 
         // D8: status pin = 410 for both terminal expired shapes; the unknown case overrides to 404 below (FR-003-9: same body, different status line only).
@@ -1137,7 +1157,7 @@ app.MapGet("/api/v1/transfers", async (HttpContext ctx, HttpRequest request, ISe
         }
 
     // T-009-02 (US-009-02): optional ?status=all|active|expired (case-insensitive; absent → all).
-    // Resolved byte set threaded into the query — null = no status predicate (all), {1} = active, {2,3} = expired.
+    // Resolved byte set threaded into the query — null = no status predicate (all), {1,5} = active (Active + Scheduled), {2,3} = expired.
     static IReadOnlyCollection<byte>? ResolveStatusFilter(HttpRequest request)
     {
         var raw = request.Query["status"].FirstOrDefault();
@@ -1145,7 +1165,7 @@ app.MapGet("/api/v1/transfers", async (HttpContext ctx, HttpRequest request, ISe
         return raw.Trim().ToLowerInvariant() switch
         {
             "all" => null,
-            "active" => new byte[] { 1 },
+            "active" => new byte[] { 1, wa.domain.TransferStatus.Scheduled }, // F-PRF-002: Scheduled (5) rows are live, so "active" shows them
             "expired" => new byte[] { 2, 3 }, // US-009-02: Status IN (2,3) — download-limit included
             _ => throw new BusinessException(ProblemCodes.Validation, "status must be one of all / active / expired.")
         };
@@ -1435,7 +1455,9 @@ app.MapGet("/api/v1/billing/plan", async (HttpContext ctx, ISender sender, Cance
         planCode = r.PlanCode,
         storage = new { usedBytes = r.StorageUsedBytes, allowedBytes = r.StorageAllowedBytes },
         activeTransfers = new { used = r.ActiveTransfersUsed, allowed = r.ActiveTransfersAllowed },
-        limits = new { maxTransferSize = r.MaxTransferSize, maxSingleFile = r.MaxSingleFile }
+        limits = new { maxTransferSize = r.MaxTransferSize, maxSingleFile = r.MaxSingleFile },
+        features = new { scheduling = r.Scheduling },   // US-022-01 (FR-022-3, D-6)
+        scheduleWindow = new { minMinutes = wa.domain.Transfers.ScheduleWindow.MinMinutes, maxDays = wa.domain.Transfers.ScheduleWindow.MaxDays }   // US-022-03 (FR-022-2)
     });
 });
 

@@ -40,6 +40,7 @@ export function statusLabel(status: number): string {
     case 2: return 'Expired'
     case 3: return 'Download limit reached'
     case 4: return 'Deleted'
+    case 5: return 'Scheduled'
     default: return String(status)
   }
 }

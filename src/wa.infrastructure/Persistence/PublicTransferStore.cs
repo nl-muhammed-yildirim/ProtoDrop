@@ -56,9 +56,9 @@ public sealed class PublicTransferStore : IPublicTransferStore
         if (rowsAffected is not 1)
         {
             // US-005-03 technical note literal: idempotent flip — Status=3 + ExpiredAtUtc set when it flips (grace clock starts),
-            // WHERE Id=@id AND Status=1 so concurrent racers all write the same value.
+            // WHERE Id=@id AND Status IN (1,5) so concurrent racers all write the same value.
             _ = await _db.Database.ExecuteSqlRawAsync(
-                "UPDATE [Transfer] SET [Status]=3, [ExpiredAtUtc]=COALESCE([ExpiredAtUtc], GETUTCDATE()) WHERE [Id] = {0} AND [Status] = 1",
+                "UPDATE [Transfer] SET [Status]=3, [ExpiredAtUtc]=COALESCE([ExpiredAtUtc], GETUTCDATE()) WHERE [Id] = {0} AND [Status] IN (1, 5)",
                 [transferId], ct);
 
             // The raw-SQL UPDATE bypasses the change tracker: detach any tracked copy so later SaveChanges can't resurrect the old
@@ -102,9 +102,9 @@ public sealed class PublicTransferStore : IPublicTransferStore
         if (rowsAffected is not 1)
         {
             // US-005-03 technical note literal: idempotent flip — Status=3 + ExpiredAtUtc set when it flips (grace clock starts),
-            // WHERE Id=@id AND Status=1 so concurrent racers all write the same value.
+            // WHERE Id=@id AND Status IN (1,5) so concurrent racers all write the same value.
             _ = await _db.Database.ExecuteSqlRawAsync(
-                "UPDATE [Transfer] SET [Status]=3, [ExpiredAtUtc]=COALESCE([ExpiredAtUtc], GETUTCDATE()) WHERE [Id] = {0} AND [Status] = 1",
+                "UPDATE [Transfer] SET [Status]=3, [ExpiredAtUtc]=COALESCE([ExpiredAtUtc], GETUTCDATE()) WHERE [Id] = {0} AND [Status] IN (1, 5)",
                 [transferId], ct);
 
             // The raw-SQL UPDATE bypasses the change tracker: detach any tracked copy so later SaveChanges can't resurrect the old
