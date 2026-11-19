@@ -1157,7 +1157,7 @@ app.MapGet("/api/v1/transfers", async (HttpContext ctx, HttpRequest request, ISe
         }
 
     // T-009-02 (US-009-02): optional ?status=all|active|expired (case-insensitive; absent → all).
-    // Resolved byte set threaded into the query — null = no status predicate (all), {1} = active, {2,3} = expired.
+    // Resolved byte set threaded into the query — null = no status predicate (all), {1,5} = active (Active + Scheduled), {2,3} = expired.
     static IReadOnlyCollection<byte>? ResolveStatusFilter(HttpRequest request)
     {
         var raw = request.Query["status"].FirstOrDefault();
@@ -1165,7 +1165,7 @@ app.MapGet("/api/v1/transfers", async (HttpContext ctx, HttpRequest request, ISe
         return raw.Trim().ToLowerInvariant() switch
         {
             "all" => null,
-            "active" => new byte[] { 1 },
+            "active" => new byte[] { 1, wa.domain.TransferStatus.Scheduled }, // F-PRF-002: Scheduled (5) rows are live, so "active" shows them
             "expired" => new byte[] { 2, 3 }, // US-009-02: Status IN (2,3) — download-limit included
             _ => throw new BusinessException(ProblemCodes.Validation, "status must be one of all / active / expired.")
         };

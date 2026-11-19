@@ -50,6 +50,8 @@ public sealed class ActivateScheduledTransfersHandler
                     if (activated is null) continue; // expired, deleted or already flipped (AC-022-5, EC-022-3)
 
                     activatedInBatch++;
+                    // The outbox writer (IEventPublisher) opens its own DbContext, so this publish cannot join the flip's transaction
+                    // without changing the port; the same flip-then-publish window exists for every transfer.created emission (TA-4.1.7).
                     var envelope = new EventEnvelope
                     {
                         EventId = Guid.NewGuid(),

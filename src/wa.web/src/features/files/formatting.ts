@@ -14,7 +14,7 @@ export interface MyTransferRowDto {
   name: string            // the transfer's display name (truncated in the row via CSS + title attr)
   fileCount: number       // int
   totalBytes: number      // long
-  status: number          // byte 0..4 as a JSON number
+  status: number          // byte 0..5 as a JSON number
   expiresAtUtc: string    // ISO DateTime string
   downloadsCount: number  // int
   maxDownloads: number    // int
@@ -32,11 +32,12 @@ export interface ListTransfersResponse {
 export type StatusFilter = 'all' | 'active' | 'expired'
 
 // T-009-02 canonical byte map (verified: Program.cs ResolveStatusFilter — active={1}, expired={2,3}):
-//   1 → "Active" / green; 3 → "Download limit reached" / amber (US-009-01 edge copy); 2 → "Expired" / gray.
+//   5 → "Scheduled" / amber (F-PRF-002; the server's "active" filter includes 5 too); 1 → "Active" / green; 3 → "Download limit reached" / amber (US-009-01 edge copy); 2 → "Expired" / gray.
 // Unknown byte → defensive gray text, never a throw (a future status can't crash the list).
 export function statusChip(status: number): { text: string; tone: 'green' | 'amber' | 'gray' } {
   switch (status) {
     case 1: return { text: i18n.t('files.status.active'), tone: 'green' }
+    case 5: return { text: i18n.t('files.status.scheduled'), tone: 'amber' }
     case 3: return { text: i18n.t('files.status.limitReached'), tone: 'amber' }
     case 2: return { text: i18n.t('files.status.expired'), tone: 'gray' }
     default: return { text: String(status), tone: 'gray' }

@@ -116,6 +116,7 @@
   "auth.linkSent.heading": "Bağlantı {{email}} adresine gönderildi",
   "auth.resend.label": "Gelmedi mi? Tekrar gönder",
   "files.status.active": "Aktif",
+  "files.status.scheduled": "Zamanlandı",
   "files.status.limitReached": "İndirme sınırına ulaşıldı",
   "files.status.expired": "Süresi doldu",
   "files.countdown.dayOne": "1 gün içinde doluyor",

@@ -116,6 +116,7 @@
   "auth.linkSent.heading": "Link gestuurd naar {{email}}",
   "auth.resend.label": "Niet ontvangen? Stuur opnieuw",
   "files.status.active": "Actief",
+  "files.status.scheduled": "Ingepland",
   "files.status.limitReached": "Downloadlimiet bereikt",
   "files.status.expired": "Verlopen",
   "files.countdown.dayOne": "verloopt over 1 dag",

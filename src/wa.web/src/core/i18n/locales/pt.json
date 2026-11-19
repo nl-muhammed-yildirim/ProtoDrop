@@ -116,6 +116,7 @@
   "auth.linkSent.heading": "Link enviado para {{email}}",
   "auth.resend.label": "Não recebeu? Enviar novamente",
   "files.status.active": "Ativo",
+  "files.status.scheduled": "Agendado",
   "files.status.limitReached": "Limite de downloads atingido",
   "files.status.expired": "Expirado",
   "files.countdown.dayOne": "expira em 1 dia",

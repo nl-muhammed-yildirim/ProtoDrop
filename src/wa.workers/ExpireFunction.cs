@@ -83,7 +83,10 @@ public class ExpireFunction
         if (!JobAuth.Verify(_config, req))
             return JobAuth.CreateProblem(req, 401, "Unauthenticated", "Invalid or missing signature.");
 
-        var count = await _handler.RunAsync(DateTime.UtcNow, context.CancellationToken);
-        return JobAuth.CreateSuccess(req, new { expired = count });
+        var now = DateTime.UtcNow;
+        var count = await _handler.RunAsync(now, context.CancellationToken);
+        // US-022-04: same order as the timer — expiry first, then the schedule step (its own "schedule" JobRun claim).
+        var activated = await _scheduled.RunAsync(now, context.CancellationToken);
+        return JobAuth.CreateSuccess(req, new { expired = count, activated });
     }
 }

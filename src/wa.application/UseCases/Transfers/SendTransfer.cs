@@ -156,7 +156,7 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
 
         // 5. Stamp send-time limits once (FR-018-4: retention + download cap; live rows never re-resolve), then activate.
         SendTimeLimits.Stamp(transfer, limits, now);
-        // US-022-01 (FR-022-4/7): ExpiresAt was stamped from creation above; a scheduled transfer is live now (Status 5).
+        // US-022-01 (FR-022-4/7): ExpiresAt was stamped at send time by SendTimeLimits.Stamp above; a scheduled transfer is live now (Status 5).
         transfer.ScheduledSendAtUtc = request.ScheduledSendAtUtc;
         transfer.Status = request.ScheduledSendAtUtc is null ? TransferStatus.Active : TransferStatus.Scheduled;
 

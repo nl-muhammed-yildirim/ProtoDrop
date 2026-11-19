@@ -56,8 +56,8 @@ public sealed class AdminUserStore : IAdminUserStore
                         .Distinct()
                         .Contains(b.Id))
                     .Sum(b => b.SizeBytes),
-                // Active transfer count — Status == 1 only (task file literal).
-                _db.Set<Transfer>().Count(t => t.OwnerAppUserId == u.Id && t.Status == 1),
+                // Active transfer count — Status == 1 plus Scheduled (5), consistent with the owner's My Files "active" filter.
+                _db.Set<Transfer>().Count(t => t.OwnerAppUserId == u.Id && (t.Status == 1 || t.Status == TransferStatus.Scheduled)),
                 u.CreatedAtUtc))
             .ToListAsync(ct);
 
