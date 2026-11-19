@@ -12,6 +12,7 @@ import { FeatureGate } from '../../core/features/FeatureGate'
 import DangerZone from './DangerZone'
 import DataExportSection from './DataExportSection'
 import OrgLogoSection from './OrgLogoSection'
+import OrgNameSection from './OrgNameSection'
 
 // T-008-06 wire (TA-4.2#12–13), verified against src/wa.api/Program.cs — GET/PATCH /auth/me + logout:
 export const ME_BASE = 'http://localhost:8080/api/v1/auth/me'   // fixed-port absolute, AuthPage API_BASE precedent; shared with DangerZone (T-008-09 D-1)
@@ -121,6 +122,8 @@ export function ProfilePage({ profile, onSignedIn, onThemeChange, onDeleteAccoun
       {/* Plan line — read-only in MVP (FR-008-4: "Free by default"). planCode comes from the session DTO; no extra fetch. */}
       <p className="pf-plan">{profile.planCode === 'free' ? i18n.t('profile.plan.free') : profile.planCode}</p>
       <a className="pf-plan-link" href={PLAN_PATH}>{i18n.t('profile.plan.viewPlan')}</a>
+      {/* F-PRF-001: organization name — Pro only (disabled on Free); read/saved via /auth/me. */}
+      <OrgNameSection />
       {/* US-021-04: organization logo — plan gate comes from the server (brandingEnabled), not FeatureGate. */}
       <OrgLogoSection />
       {/* US-047-01: My data — GDPR export; absent unless feature.dataExport is on (AC-044-2 contract). */}

@@ -78,6 +78,8 @@ builder.Services.AddSingleton<wa.application.UseCases.Transfers.IPublicTransferS
 builder.Services.AddSingleton<wa.application.UseCases.Transfers.ISenderBrandingStore>(sp => new wa.infrastructure.Persistence.SenderBrandingStore(sp.GetRequiredService<WaDbContext>()));
 // US-021-04: org logo path write port (DELETE /auth/me/logo).
 builder.Services.AddSingleton<wa.application.UseCases.Auth.IOrgLogoStore>(sp => new wa.infrastructure.Persistence.OrgLogoStore(sp.GetRequiredService<WaDbContext>()));
+// F-PRF-001: org name write port (PATCH /auth/me orgName).
+builder.Services.AddSingleton<wa.application.UseCases.Auth.IOrgNameStore>(sp => new wa.infrastructure.Persistence.OrgNameStore(sp.GetRequiredService<WaDbContext>()));
 // T-002-02 (TA-4.1.5): generic HTTP idempotency store — used by IdempotencyMiddleware for finalize + send endpoints.
 builder.Services.AddSingleton<IIdempotencyStore>(sp => new wa.infrastructure.Persistence.IdempotencyStore(sp.GetRequiredService<WaDbContext>()));
 // T-011-02 (FR-011-5 / TA-3.2): audit write helper — one AuditLog row + one admin.action domain event per mutation.
@@ -1045,7 +1047,8 @@ app.MapGet("/api/v1/auth/me", async (HttpContext ctx, ISender sender, Cancellati
             ["email"] = result.Email,
             ["displayName"] = result.DisplayName,
             ["theme"] = result.Theme,
-            ["planCode"] = result.PlanCode
+            ["planCode"] = result.PlanCode,
+            ["orgName"] = result.OrgName! // F-PRF-001 (FR-021-1): null when unset; the profile page reads it
         };
         if (roleField is not null)
             meBody["role"] = roleField;
@@ -1067,14 +1070,15 @@ app.MapPatch("/api/v1/auth/me", async (UpdateProfileRequest req, HttpContext ctx
     try
     {
         // Single construction site (TA-4.2a): UserId from the session cookie — NOT in the JSON body.
-        var result = await sender.Send(new UpdateProfileCommand(userId, req.DisplayName, req.Theme), ct);
+        var result = await sender.Send(new UpdateProfileCommand(userId, req.DisplayName, req.Theme, req.OrgName), ct);
         return Results.Json(new
         {
             userId = result.UserId.ToString("n"),
             email = result.Email,
             displayName = result.DisplayName,
             theme = result.Theme,
-            planCode = result.PlanCode
+            planCode = result.PlanCode,
+            orgName = result.OrgName
         }, statusCode: 200);
     }
     catch (MeProfileException ex) when (ex.Message == ProblemCodes.TitleOf(ProblemCodes.NotFound))
@@ -1086,7 +1090,10 @@ app.MapPatch("/api/v1/auth/me", async (UpdateProfileRequest req, HttpContext ctx
     {
         // Validation family (invalid theme / too-long name / empty PATCH) → BusinessException(Validation, ...) —
         // inner-exception-preservation pattern from T-008-01 fix round.
-        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex)
+        {
+            Errors = ex.Field is null ? null : [new ProblemFieldError(ex.Field, ex.Message)]
+        };
     }
 });
 

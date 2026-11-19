@@ -1,4 +1,7 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using MediatR;
+using Microsoft.Extensions.Logging;
 using wa.application.Ports;
 using wa.application.Telemetry;
 using wa.domain;
@@ -12,14 +15,46 @@ namespace wa.application.UseCases.Auth;
 public sealed record GetProfileCommand(Guid UserId) : IRequest<GetProfileResult>;
 
 /// <summary>T-008-06 (FR-008-4 / TA-4.2#13): PATCH /api/v1/auth/me — partial update (null = leave the field alone).</summary>
-public sealed record UpdateProfileCommand(Guid UserId, string? DisplayName, string? Theme) : IRequest<GetProfileResult>;
+public sealed record UpdateProfileCommand(Guid UserId, string? DisplayName, string? Theme, OrgNamePatch OrgName = default) : IRequest<GetProfileResult>;
+
+/// <summary>
+/// F-PRF-001 (FR-021-1 / TA-4.2#13): tri-state PATCH field. Absent from the body = <c>default</c> (<see cref="IsSet"/> false, unchanged);
+/// explicit null or a blank string = clear; a string = the (trimmed) value. Needed because a plain string? cannot tell absent from null.
+/// </summary>
+[JsonConverter(typeof(OrgNamePatchJsonConverter))]
+public readonly record struct OrgNamePatch(bool IsSet, string? Value)
+{
+    public static OrgNamePatch Of(string? value) => new(true, value);
+}
+
+/// <summary>Reads the org name PATCH field; HandleNull makes an explicit JSON null reach Read so it can be told apart from absence.</summary>
+public sealed class OrgNamePatchJsonConverter : JsonConverter<OrgNamePatch>
+{
+    public override bool HandleNull => true;
+
+    public override OrgNamePatch Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.TokenType switch
+        {
+            JsonTokenType.Null => OrgNamePatch.Of(null),
+            JsonTokenType.String => OrgNamePatch.Of(reader.GetString()),
+            _ => throw new JsonException("orgName must be a string or null.")
+        };
+
+    public override void Write(Utf8JsonWriter writer, OrgNamePatch value, JsonSerializerOptions options)
+    {
+        if (value.IsSet && value.Value is not null)
+            writer.WriteStringValue(value.Value);
+        else
+            writer.WriteNullValue();
+    }
+}
 
 /// <summary>T-008-06 (FR-008-8 / TA-4.2#13): DELETE /api/v1/auth/me — soft-delete + re-home transfers + account_deleted.</summary>
 public sealed record DeleteAccountCommand(Guid UserId) : IRequest<DeleteAccountResult>;
 
 /// <summary>T-008-06: wire record bound from the PATCH JSON body by Minimal API (TA-4.2a). The session supplies UserId — NOT in the body;
-/// constructed at Program.cs's single construction site as new UpdateProfileCommand(userId.Value, req.DisplayName, req.Theme).</summary>
-public sealed record UpdateProfileRequest(string? DisplayName, string? Theme);
+/// constructed at Program.cs's single construction site as new UpdateProfileCommand(userId.Value, req.DisplayName, req.Theme, req.OrgName).</summary>
+public sealed record UpdateProfileRequest(string? DisplayName, string? Theme, OrgNamePatch OrgName = default);
 
 // Wire shape pinned at the endpoint's single construction site (TA-4.2a): identical to LoginResult minus SessionToken —
 // the cookie already carries the session, /auth/me does not re-mint one.
@@ -28,7 +63,8 @@ public sealed record GetProfileResult(
     string Email,
     string DisplayName,
     string Theme,
-    string PlanCode);
+    string PlanCode,
+    string? OrgName = null);
 
 public sealed record DeleteAccountResult();
 
@@ -40,6 +76,9 @@ public sealed record DeleteAccountResult();
 public sealed class MeProfileException : Exception
 {
     private MeProfileException(string message) : base(message) { }
+
+    /// <summary>The request field a validation failure belongs to (TA-4.1.3 errors[].field); null when not field-specific.</summary>
+    public string? Field { get; private init; }
 
     /// <summary>No row for the session user id (unknown OR soft-deleted) — endpoint 13 → 404 NOT_FOUND (spec's literal pin).</summary>
     public static MeProfileException ForNotFound() =>
@@ -55,7 +94,11 @@ public sealed class MeProfileException : Exception
 
     /// <summary>PATCH with an all-null body → 400 VALIDATION (an empty PATCH is a silent no-op; reject it).</summary>
     public static MeProfileException ForEmptyPatch() =>
-        new("Provide at least one of displayName or theme.");
+        new("Provide at least one of displayName, theme or orgName.");
+
+    /// <summary>PATCH orgName longer than ORG_NAME_MAX_LENGTH (after trimming) or containing a line break → 400 VALIDATION (field orgName).</summary>
+    public static MeProfileException ForInvalidOrgName() =>
+        new($"orgName must be at most {AppUser.OrgNameMaxLength} characters and contain no line breaks.") { Field = "orgName" };
 }
 
 /// <summary>T-008-06 (TA-4.2#13): GET /api/v1/auth/me — returns the profile DTO verbatim from the session user's row.</summary>
@@ -82,7 +125,7 @@ public sealed class GetProfileHandler : IRequestHandler<GetProfileCommand, GetPr
         if (plan is null)
             throw MeProfileException.ForNotFound();
 
-        return new GetProfileResult(user.Id, user.Email, user.DisplayName, user.Theme, plan.Code);
+        return new GetProfileResult(user.Id, user.Email, user.DisplayName, user.Theme, plan.Code, user.OrgName);
     }
 }
 
@@ -94,6 +137,7 @@ public sealed class UpdateProfileHandler : IRequestHandler<UpdateProfileCommand,
 {
     private readonly IAppUserStore _users;
     private readonly IPlansStore _plans;
+    private readonly IOrgNameStore _orgNames;
 
     /// <summary>NVARCHAR(100) column width — TA-3.2 (verified in WaDbContextModelSnapshot). Single re-check site.</summary>
     public const int DisplayNameMaxLength = 100;
@@ -101,10 +145,11 @@ public sealed class UpdateProfileHandler : IRequestHandler<UpdateProfileCommand,
     /// <summary>The three closed theme values (spec + entity only — NOT in the frozen Open-Decisions-and-Constants registry).</summary>
     private static readonly string[] AllowedThemes = ["system", "light", "dark"];
 
-    public UpdateProfileHandler(IAppUserStore users, IPlansStore plans)
+    public UpdateProfileHandler(IAppUserStore users, IPlansStore plans, IOrgNameStore orgNames)
     {
         _users = users;
         _plans = plans;
+        _orgNames = orgNames;
     }
 
     public async Task<GetProfileResult> Handle(UpdateProfileCommand request, CancellationToken cancellationToken)
@@ -115,7 +160,7 @@ public sealed class UpdateProfileHandler : IRequestHandler<UpdateProfileCommand,
             throw MeProfileException.ForNotFound();
 
         // 2. Empty PATCH → VALIDATION (an all-null body changes nothing; reject it rather than waste a round-trip).
-        if (request.DisplayName is null && request.Theme is null)
+        if (request.DisplayName is null && request.Theme is null && !request.OrgName.IsSet)
             throw MeProfileException.ForEmptyPatch();
 
         // 3. theme validation (only when non-null): exactly system / light / dark → else VALIDATION.
@@ -130,8 +175,23 @@ public sealed class UpdateProfileHandler : IRequestHandler<UpdateProfileCommand,
                 throw MeProfileException.ForDisplayNameTooLong(DisplayNameMaxLength.ToString());
         }
 
+        // 4b. orgName validation (only when present in the body): no CR/LF, <= ORG_NAME_MAX_LENGTH after trim; blank = clear.
+        string? orgName = null;
+        if (request.OrgName.IsSet && request.OrgName.Value is { } rawOrg)
+        {
+            if (rawOrg.AsSpan().IndexOfAny('\r', '\n') >= 0)
+                throw MeProfileException.ForInvalidOrgName();
+            var trimmedOrg = rawOrg.Trim();
+            if (trimmedOrg.Length > AppUser.OrgNameMaxLength)
+                throw MeProfileException.ForInvalidOrgName();
+            orgName = trimmedOrg.Length == 0 ? null : trimmedOrg;
+        }
+
         // 5. Persist the partial update (D-1: null args are left alone; empty displayName falls back to the email local part).
-        await _users.UpdateProfileAsync(request.UserId, request.DisplayName, request.Theme, cancellationToken);
+        if (request.DisplayName is not null || request.Theme is not null)
+            await _users.UpdateProfileAsync(request.UserId, request.DisplayName, request.Theme, cancellationToken);
+        if (request.OrgName.IsSet)
+            await _orgNames.SetOrgNameAsync(request.UserId, orgName, cancellationToken);
 
         // PATCH response is byte-shaped like GET's — client can re-render without a follow-up request.
         return await ResolveResult(request.UserId, cancellationToken);
@@ -147,7 +207,7 @@ public sealed class UpdateProfileHandler : IRequestHandler<UpdateProfileCommand,
         if (plan is null)
             throw MeProfileException.ForNotFound();
 
-        return new GetProfileResult(user.Id, user.Email, user.DisplayName, user.Theme, plan.Code);
+        return new GetProfileResult(user.Id, user.Email, user.DisplayName, user.Theme, plan.Code, user.OrgName);
     }
 }
 
@@ -161,9 +221,12 @@ public sealed class DeleteAccountHandler : IRequestHandler<DeleteAccountCommand,
     private readonly IEventPublisher _eventPublisher;
     private readonly WaTelemetryReporter _telemetry;
     private readonly IBlobStore _blobs;
+    private readonly ILogger<DeleteAccountHandler>? _logger;
 
-    public DeleteAccountHandler(IAppUserStore users, IEventPublisher eventPublisher, WaTelemetryReporter telemetry, IBlobStore blobs)
+    public DeleteAccountHandler(IAppUserStore users, IEventPublisher eventPublisher, WaTelemetryReporter telemetry, IBlobStore blobs,
+        ILogger<DeleteAccountHandler>? logger = null)
     {
+        _logger = logger;
         _users = users;
         _eventPublisher = eventPublisher;
         _telemetry = telemetry;
@@ -204,8 +267,18 @@ public sealed class DeleteAccountHandler : IRequestHandler<DeleteAccountCommand,
         _telemetry.LogEvent(TelemetryEvents.AccountDeleted);
 
         // 6. US-021-04 (decision 4): the org logo lives in the avatars container with no lifecycle rule — deleted with the account.
+        //    The account is already deleted: a storage failure here must not turn it into a 500 (the blob is an orphan at worst).
         if (!string.IsNullOrEmpty(user.OrgLogoBlobPath))
-            await _blobs.DeleteAsync(user.OrgLogoBlobPath, cancellationToken);
+        {
+            try
+            {
+                await _blobs.DeleteAsync(user.OrgLogoBlobPath, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger?.LogWarning("Org logo blob delete failed after account deletion for user {UserId}.", user.Id);
+            }
+        }
 
         return new DeleteAccountResult();
     }

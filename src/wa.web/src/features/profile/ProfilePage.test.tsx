@@ -69,6 +69,8 @@ function stubFetch(
       if (String(input).endsWith('/billing/plan')) return new Response(null, { status: 404 })
       // US-021-04: OrgLogoSection's mount read must not overwrite what these tests capture (render-nothing on non-ok).
       if (String(input).endsWith('/auth/me/logo')) return new Response(null, { status: 404 })
+      // F-PRF-001: OrgNameSection's mount read (GET /auth/me) must not overwrite what these tests capture either.
+      if (String(input).endsWith('/auth/me') && !init?.method) return new Response(null, { status: 404 })
       // US-047-01: FeatureGate's mount read of the phase gates must not overwrite what these tests capture.
       if (String(input).endsWith('/api/v1/features')) return new Response(JSON.stringify(featuresBody), { status: 200 })
       captured.url = typeof input === 'string' ? input : String(input)

@@ -74,7 +74,7 @@ public class MeProfileTests
         var userId = Guid.NewGuid();
         _users.UserById[userId] = SeedRealAppUser(userId);
 
-        var handler = new UpdateProfileHandler(_users, _plans);
+        var handler = new UpdateProfileHandler(_users, _plans, new StubOrgNames());
 
         // Case A: normal displayName — trimmed; theme untouched (null passed through).
         var result = await handler.Handle(new UpdateProfileCommand(userId, "  Grace Hopper ", null), CancellationToken.None);
@@ -95,7 +95,7 @@ public class MeProfileTests
         var userId = Guid.NewGuid();
         _users.UserById[userId] = SeedRealAppUser(userId);
 
-        var handler = new UpdateProfileHandler(_users, _plans);
+        var handler = new UpdateProfileHandler(_users, _plans, new StubOrgNames());
         await Assert.ThrowsAsync<MeProfileException>(async () =>
             await handler.Handle(new UpdateProfileCommand(userId, null, "purple"), CancellationToken.None));
     }
@@ -108,7 +108,7 @@ public class MeProfileTests
         var userId = Guid.NewGuid();
         _users.UserById[userId] = SeedRealAppUser(userId);
 
-        var handler = new UpdateProfileHandler(_users, _plans);
+        var handler = new UpdateProfileHandler(_users, _plans, new StubOrgNames());
         await Assert.ThrowsAsync<MeProfileException>(async () =>
             await handler.Handle(new UpdateProfileCommand(userId, null, null), CancellationToken.None));
     }
@@ -185,12 +185,39 @@ public class MeProfileTests
         Assert.Equal([$"avatars/{userId:N}/logo"], blobs.Deleted);
     }
 
+    [Fact]
+    public async Task DeleteAccount_LogoDeleteFails_StillCompletes()
+    {
+        var userId = Guid.NewGuid();
+        var user = SeedRealAppUser(userId);
+        user.OrgLogoBlobPath = $"avatars/{userId:N}/logo";
+        _users.UserById[userId] = user;
+        var publisher = new StubEventPublisher();
+        var handler = new DeleteAccountHandler(
+            _users,
+            publisher,
+            new WaTelemetryReporter(_telemetryLogger, System.Text.Encoding.UTF8.GetBytes("unit-test-key")),
+            new RecordingBlobs { Throw = true });
+
+        var result = await handler.Handle(new DeleteAccountCommand(userId), CancellationToken.None);
+
+        Assert.NotNull(result); // soft-delete already committed; a storage failure must not become a 500
+        Assert.Single(_users.SoftDeletes);
+        Assert.Single(publisher.Envelopes);
+    }
+
     // ---- Stubs (T-008-01 style — hand-written stubs, no Moq) ----
 
     private sealed class RecordingBlobs : IBlobStore
     {
         public List<string> Deleted { get; } = [];
-        public Task DeleteAsync(string path, CancellationToken cancellationToken = default) { Deleted.Add(path); return Task.CompletedTask; }
+        public bool Throw { get; set; }
+        public Task DeleteAsync(string path, CancellationToken cancellationToken = default)
+        {
+            if (Throw) throw new InvalidOperationException("storage down");
+            Deleted.Add(path);
+            return Task.CompletedTask;
+        }
         public Task UploadAsync(string path, Stream content, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<Stream> DownloadAsync(string path, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task CopyAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -232,6 +259,11 @@ public class MeProfileTests
             UserById[userId] = null; // simulate the row going soft-deleted (readers now see null → ForNotFound)
             return Task.FromResult(UserById.ContainsKey(userId)); // true when the row existed — handler maps to the not-found shape on false
         }
+    }
+
+    private sealed class StubOrgNames : IOrgNameStore
+    {
+        public Task SetOrgNameAsync(Guid userId, string? orgName, CancellationToken ct) => Task.CompletedTask;
     }
 
     private sealed class StubPlansStore : IPlansStore

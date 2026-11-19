@@ -41,7 +41,7 @@ public sealed class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
         theme.Metadata.SetAnnotation("Relational:DefaultConstraintName", "DF_AppUser_Theme");
 
         // F-PRF-001 (US-021-01): nullable org branding columns.
-        b.Property(u => u.OrgName).HasColumnType("NVARCHAR(60)");
+        b.Property(u => u.OrgName).HasColumnType($"NVARCHAR({AppUser.OrgNameMaxLength})");
         b.Property(u => u.OrgLogoBlobPath).HasColumnType("VARCHAR(400)");
     }
 }

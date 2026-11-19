@@ -153,6 +153,57 @@ public class OrgLogoUploadTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task GetLogo_Guest_Returns401()
+    {
+        using var response = await _client.SendAsync(Request(HttpMethod.Get, null, null));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchMe_OrgName_RoundTripsThroughGetMe() // FR-021-1, FR-021-5
+    {
+        var ownerId = await SeedOwnerAsync("pro", null);
+
+        using var patch = await _client.SendAsync(MeRequest(HttpMethod.Patch, ownerId, "{\"orgName\":\"  Studio Nova \"}"));
+        Assert.Equal(HttpStatusCode.OK, patch.StatusCode);
+        Assert.Equal("Studio Nova", (await ReadJsonAsync(patch)).GetProperty("orgName").GetString());
+
+        using var get = await _client.SendAsync(MeRequest(HttpMethod.Get, ownerId, null));
+        Assert.Equal("Studio Nova", (await ReadJsonAsync(get)).GetProperty("orgName").GetString());
+        Assert.Equal("Studio Nova", await _db.Set<AppUser>().AsNoTracking().Where(u => u.Id == ownerId).Select(u => u.OrgName).SingleAsync());
+    }
+
+    [Fact]
+    public async Task PatchMe_OrgNameTooLong_Returns400Validation_NothingStored()
+    {
+        var ownerId = await SeedOwnerAsync("pro", "Keep");
+        var tooLong = new string('a', AppUser.OrgNameMaxLength + 1);
+
+        using var response = await _client.SendAsync(MeRequest(HttpMethod.Patch, ownerId, $"{{\"orgName\":\"{tooLong}\"}}"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await ReadJsonAsync(response);
+        Assert.Equal("VALIDATION", problem.GetProperty("code").GetString());
+        Assert.Equal("orgName", problem.GetProperty("errors")[0].GetProperty("field").GetString());
+        Assert.Equal("Keep", await _db.Set<AppUser>().AsNoTracking().Where(u => u.Id == ownerId).Select(u => u.OrgName).SingleAsync());
+    }
+
+    [Fact]
+    public async Task PatchMe_NullOrAbsentOrgName_ClearsOrKeeps()
+    {
+        var ownerId = await SeedOwnerAsync("pro", "Keep");
+
+        using var rename = await _client.SendAsync(MeRequest(HttpMethod.Patch, ownerId, "{\"displayName\":\"Alice B\"}"));
+        Assert.Equal(HttpStatusCode.OK, rename.StatusCode);
+        Assert.Equal("Keep", await _db.Set<AppUser>().AsNoTracking().Where(u => u.Id == ownerId).Select(u => u.OrgName).SingleAsync());
+
+        using var clear = await _client.SendAsync(MeRequest(HttpMethod.Patch, ownerId, "{\"orgName\":null}"));
+        Assert.Equal(HttpStatusCode.OK, clear.StatusCode);
+        Assert.Null(await _db.Set<AppUser>().AsNoTracking().Where(u => u.Id == ownerId).Select(u => u.OrgName).SingleAsync());
+    }
+
+    [Fact]
     public async Task PutLogo_Svg_StoredAsSvgXml_OwnerGetHasInlineSas() // EC-021-3
     {
         var ownerId = await SeedOwnerAsync("pro", "Studio Nova");
@@ -253,11 +304,24 @@ public class OrgLogoUploadTests : IAsyncLifetime
         return request;
     }
 
+    private static HttpRequestMessage MeRequest(HttpMethod method, Guid? userId, string? json)
+    {
+        var request = new HttpRequestMessage(method, "/api/v1/auth/me");
+        if (json is not null)
+            request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+        return Authorize(request, userId);
+    }
+
     private static HttpRequestMessage Request(HttpMethod method, Guid? userId, byte[]? body)
     {
         var request = new HttpRequestMessage(method, "/api/v1/auth/me/logo");
         if (body is not null)
             request.Content = new ByteArrayContent(body);
+        return Authorize(request, userId);
+    }
+
+    private static HttpRequestMessage Authorize(HttpRequestMessage request, Guid? userId)
+    {
         if (userId is { } id)
         {
             var exp = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 300;
