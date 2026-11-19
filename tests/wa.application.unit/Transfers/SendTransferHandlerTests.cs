@@ -879,6 +879,63 @@ public class SendTransferHandlerTests
         Assert.Equal(0, _store.Transfer!.Status);
     }
 
+    // ---- US-022-03 (FR-022-2): schedule window, server time ----
+
+    private async Task AssertOutOfWindowNoWrite(DateTime due, string messagePart)
+    {
+        var transferId = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+
+        var ex = await Assert.ThrowsAsync<ScheduleOutOfWindowException>(() => ProHandler().Handle(
+            new SendTransferCommand(transferId, null, null, null, ["a@x.com"], null, Guid.NewGuid(), due), CancellationToken.None));
+
+        Assert.Contains(messagePart, ex.Message);
+        Assert.Equal(0, _store.SaveSendCalls);
+        Assert.Empty(_eventPublisher.Published);
+        Assert.Equal(0, _store.Transfer!.Status);
+    }
+
+    [Fact]
+    public Task Send_Scheduled_PlusTwoMinutes_ThrowsOutOfWindow_NoWrite() =>
+        AssertOutOfWindowNoWrite(DateTime.UtcNow.AddMinutes(2), "5 minutes");
+
+    [Fact]
+    public Task Send_Scheduled_PlusThirtyDays_ThrowsOutOfWindow_NoWrite() =>
+        AssertOutOfWindowNoWrite(DateTime.UtcNow.AddDays(30), "14 days");
+
+    [Fact]
+    public Task Send_Scheduled_InPast_ThrowsOutOfWindow() =>
+        AssertOutOfWindowNoWrite(DateTime.UtcNow.AddHours(-1), "5 minutes");
+
+    [Theory]
+    [InlineData(true)]    // +5 min 30 s
+    [InlineData(false)]   // +14 d -30 s
+    public async Task Send_Scheduled_JustInsideWindow_Accepted(bool nearMin)
+    {
+        var transferId = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+        var due = nearMin
+            ? DateTime.UtcNow + wa.domain.Transfers.ScheduleWindow.Min + TimeSpan.FromSeconds(30)
+            : DateTime.UtcNow + wa.domain.Transfers.ScheduleWindow.Max - TimeSpan.FromSeconds(30);
+
+        var result = await ProHandler().Handle(
+            new SendTransferCommand(transferId, null, null, null, [], null, Guid.NewGuid(), due), CancellationToken.None);
+
+        Assert.Equal(5, result!.Status);
+    }
+
+    [Fact]
+    public async Task Send_Scheduled_FreePlanAndOutOfWindow_ForbiddenWins()
+    {
+        var transferId = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+
+        await Assert.ThrowsAsync<ScheduleForbiddenException>(() => _handler.Handle(
+            new SendTransferCommand(transferId, null, null, null, ["a@x.com"], null, null, DateTime.UtcNow.AddDays(30)), CancellationToken.None));
+
+        Assert.Equal(0, _store.SaveSendCalls);
+    }
+
     [Fact]
     public async Task Send_NoSchedule_StaysActive_ScheduledSendAtNull()
     {

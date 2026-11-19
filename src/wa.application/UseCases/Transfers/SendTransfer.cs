@@ -130,7 +130,10 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
         if (request.ScheduledSendAtUtc is not null && !plan.Features.Scheduling)
             throw new ScheduleForbiddenException();
 
-        // SEAM (US-022-03): window validation (5 min..14 days, server time, SCHEDULE_OUT_OF_WINDOW) goes here, before mutation.
+        // 3e. US-022-03 (FR-022-2): window re-validated against SERVER time (client clock skew defense), inclusive, before mutation.
+        var now = DateTime.UtcNow;
+        if (request.ScheduledSendAtUtc is { } due && !ScheduleWindow.Contains(due, now))
+            throw new ScheduleOutOfWindowException();
 
         // 4. Parse recipients: split on [\r\n,;\s]+, trim, drop empties, validate per-address, lowercase, dedupe, cap.
         var addresses = new List<string>();
@@ -152,7 +155,6 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
             throw new TransferValidationException($"Maximum {limits.MaxEmails} recipients allowed.");
 
         // 5. Stamp send-time limits once (FR-018-4: retention + download cap; live rows never re-resolve), then activate.
-        var now = DateTime.UtcNow;
         SendTimeLimits.Stamp(transfer, limits, now);
         // US-022-01 (FR-022-4/7): ExpiresAt was stamped from creation above; a scheduled transfer is live now (Status 5).
         transfer.ScheduledSendAtUtc = request.ScheduledSendAtUtc;
@@ -292,6 +294,13 @@ public sealed class TransferValidationException : Exception
 public sealed class ScheduleForbiddenException : Exception
 {
     public ScheduleForbiddenException() : base("Pro plan required.") { }
+}
+
+/// <summary>US-022-03 (FR-022-2): scheduledSendAt is outside now+5 min .. now+14 days (server time).
+/// The endpoint maps it to 422 SCHEDULE_OUT_OF_WINDOW.</summary>
+public sealed class ScheduleOutOfWindowException : Exception
+{
+    public ScheduleOutOfWindowException() : base(ScheduleWindow.OutOfWindowMessage) { }
 }
 
 /// <summary>

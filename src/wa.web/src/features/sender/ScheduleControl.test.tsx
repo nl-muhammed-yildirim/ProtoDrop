@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetFeatureGates, useFeatureGateStore } from '../../core/features/featureGates'
 import ScheduleControl from './ScheduleControl'
 import type { SendMode } from './ScheduleControl'
+import type { ScheduleError } from './schedule'
 
 vi.mock('../../core/features/featureGates', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../core/features/featureGates')>()
@@ -14,25 +15,25 @@ vi.mock('../../core/features/featureGates', async (importOriginal) => {
 
 ;(globalThis as unknown as Record<string, boolean>).IS_REACT_ACT_ENVIRONMENT = true
 
-function Harness() {
+function Harness({ error }: { error: ScheduleError | null }) {
   const [mode, setMode] = useState<SendMode>('now')
   const [value, setValue] = useState('')
-  return createElement(ScheduleControl, { mode, onModeChange: setMode, value, onValueChange: setValue, showRequiredError: false })
+  return createElement(ScheduleControl, { mode, onModeChange: setMode, value, onValueChange: setValue, error, onWindowChange: () => {} })
 }
 
-function renderClient(): HTMLDivElement {
+function renderClient(error: ScheduleError | null = null): HTMLDivElement {
   const host = document.createElement('div')
   document.body.appendChild(host)
   const root = createRoot(host)
-  act(() => { root.render(createElement(Harness)) })
+  act(() => { root.render(createElement(Harness, { error })) })
   return host
 }
 
-function stubPlan(scheduling: boolean | 'unauth'): ReturnType<typeof vi.fn> {
+function stubPlan(scheduling: boolean | 'unauth', withWindow = true): ReturnType<typeof vi.fn> {
   const fetchMock = vi.fn(async () =>
     scheduling === 'unauth'
       ? new Response('{}', { status: 401 })
-      : new Response(JSON.stringify({ planCode: 'x', features: { scheduling } }), { status: 200 }))
+      : new Response(JSON.stringify({ planCode: 'x', features: { scheduling }, ...(withWindow ? { scheduleWindow: { minMinutes: 5, maxDays: 14 } } : {}) }), { status: 200 }))
   vi.stubGlobal('fetch', fetchMock)
   return fetchMock
 }
@@ -114,5 +115,32 @@ describe('ScheduleControl', () => {
 
     act(() => { (buttons().find((b) => b.textContent === 'Send now') as HTMLButtonElement).click() })
     expect(host.textContent).not.toContain(SEMANTICS)
+  })
+
+  it('gate on + scheduling true but no scheduleWindow: Schedule disabled (fail closed)', async () => {
+    useFeatureGateStore.setState({ 'feature.scheduling': true })
+    stubPlan(true, false)
+    const host = renderClient()
+    await flush()
+    await flush()
+    const schedule = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === 'Schedule') as HTMLButtonElement
+    expect(schedule.disabled).toBe(true)
+  })
+
+  it.each([
+    ['tooSoon', 'Pick a time at least 5 minutes from now.'],
+    ['tooLate', 'Pick a time no more than 14 days from now.'],
+  ] as const)('error %s renders the named-window copy with role alert under the field', async (error, copy) => {
+    useFeatureGateStore.setState({ 'feature.scheduling': true })
+    stubPlan(true)
+    const host = renderClient(error)
+    await flush()
+    await flush()
+    act(() => { (Array.from(host.querySelectorAll('button')).find((b) => b.textContent === 'Schedule') as HTMLButtonElement).click() })
+
+    const alert = host.querySelector('#schedule-at-error')
+    expect(alert?.textContent).toBe(copy)
+    expect(alert?.getAttribute('role')).toBe('alert')
+    expect(host.querySelector('#schedule-at')?.getAttribute('aria-describedby')).toBe('schedule-at-error')
   })
 })

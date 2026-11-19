@@ -269,6 +269,39 @@ public class ScheduledSendEndpointTests() : ScheduledSendEndpointTestsBase(gateO
         var body = await ReadJsonAsync(response);
         Assert.Equal(1, body.GetProperty("activeTransfers").GetProperty("used").GetInt32());
         Assert.True(body.GetProperty("features").GetProperty("scheduling").GetBoolean());
+        var window = body.GetProperty("scheduleWindow");   // US-022-03 (D-4): the SPA reads the window from the server
+        Assert.Equal(wa.domain.Transfers.ScheduleWindow.MinMinutes, window.GetProperty("minMinutes").GetInt32());
+        Assert.Equal(wa.domain.Transfers.ScheduleWindow.MaxDays, window.GetProperty("maxDays").GetInt32());
+    }
+
+    [Fact]
+    public async Task ProUser_Schedule_PlusTwoMinutes_422OutOfWindow_DraftUntouched() // AC-022-2 (server half)
+    {
+        var userId = await SeedUserAsync("pro");
+        var transferId = await SetupDraftTransferAsync(userId);
+
+        using var response = await PostSendAsync(transferId, ScheduleBody(DateTimeOffset.UtcNow.AddMinutes(2)), userId);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal("SCHEDULE_OUT_OF_WINDOW", (await ReadJsonAsync(response)).GetProperty("code").GetString());
+        var row = await RowAsync(transferId);
+        Assert.Equal(TransferStatus.Draft, row.Status);
+        Assert.Null(await CreatedEventAsync(row.LinkId));
+    }
+
+    [Fact]
+    public async Task ProUser_Schedule_PlusThirtyDays_422OutOfWindow_DraftUntouched() // AC-022-3 (server half)
+    {
+        var userId = await SeedUserAsync("pro");
+        var transferId = await SetupDraftTransferAsync(userId);
+
+        using var response = await PostSendAsync(transferId, ScheduleBody(DateTimeOffset.UtcNow.AddDays(30)), userId);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal("SCHEDULE_OUT_OF_WINDOW", (await ReadJsonAsync(response)).GetProperty("code").GetString());
+        var row = await RowAsync(transferId);
+        Assert.Equal(TransferStatus.Draft, row.Status);
+        Assert.Null(await CreatedEventAsync(row.LinkId));
     }
 
     [Fact]

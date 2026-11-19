@@ -342,6 +342,11 @@ app.MapPost("/api/v1/transfers/{id}/send", async (Guid id, HttpContext httpConte
         // US-022-01 (FR-022-3): plan/gate does not allow scheduling → 403 FORBIDDEN (closed list unchanged).
         throw new BusinessException(ProblemCodes.Forbidden, ex.Message);
     }
+    catch (wa.application.UseCases.Transfers.ScheduleOutOfWindowException ex)
+    {
+        // US-022-03 (FR-022-2): scheduledSendAt outside now+5 min .. now+14 days (server time) → 422 SCHEDULE_OUT_OF_WINDOW.
+        throw new BusinessException(ProblemCodes.ScheduleOutOfWindow, ex.Message);
+    }
     catch (TransferSizeExceededException ex)
     {
         // T-007-04 / AC-007-1: send-time size re-check violation — same closed-code mapping as the draft endpoint (TA-4.2a).
@@ -1451,7 +1456,8 @@ app.MapGet("/api/v1/billing/plan", async (HttpContext ctx, ISender sender, Cance
         storage = new { usedBytes = r.StorageUsedBytes, allowedBytes = r.StorageAllowedBytes },
         activeTransfers = new { used = r.ActiveTransfersUsed, allowed = r.ActiveTransfersAllowed },
         limits = new { maxTransferSize = r.MaxTransferSize, maxSingleFile = r.MaxSingleFile },
-        features = new { scheduling = r.Scheduling }   // US-022-01 (FR-022-3, D-6)
+        features = new { scheduling = r.Scheduling },   // US-022-01 (FR-022-3, D-6)
+        scheduleWindow = new { minMinutes = wa.domain.Transfers.ScheduleWindow.MinMinutes, maxDays = wa.domain.Transfers.ScheduleWindow.MaxDays }   // US-022-03 (FR-022-2)
     });
 });
 

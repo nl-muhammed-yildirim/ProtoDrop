@@ -41,6 +41,8 @@ public static class ProblemCodes
     public const string LogoTooLarge = "LOGO_TOO_LARGE";
     // US-021-04 (FR-021-5): org logo is not a PNG/JPEG/WebP/SVG by content sniffing — nothing stored.
     public const string LogoTypeInvalid = "LOGO_TYPE_INVALID";
+    // US-022-03 (FR-022-2): scheduledSendAt outside now+5 min .. now+14 days (server time) — nothing written.
+    public const string ScheduleOutOfWindow = "SCHEDULE_OUT_OF_WINDOW";
     public const string Internal = "INTERNAL";
 
     private static readonly Dictionary<string, (int Status, string Title)> Table = new(StringComparer.Ordinal)
@@ -70,6 +72,7 @@ public static class ProblemCodes
         [ExportInFlight] = (409, "Export already in progress"), // US-047-01 (EC-047-6): one processing export per user
         [LogoTooLarge] = (422, "Logo too large"), // US-021-04 (AC-021-4)
         [LogoTypeInvalid] = (415, "Logo type not supported"), // US-021-04 (FR-021-5)
+        [ScheduleOutOfWindow] = (422, "Schedule out of window"), // US-022-03 (FR-022-2): well-formed but out of range
         [Internal] = (500, "Internal server error") // /health's component-unreachable variant writes an explicit 503 through the same writer
     };
 

@@ -4,11 +4,12 @@ import { useUploadEngine } from '../../core/upload/UploadEngine'
 import { getTraceParent } from '../../core/traceparent'
 import { MAX_EMAILS, parseRecipients, validateAddress } from './recipients'
 import i18n from '../../core/i18n/init'
-import { ACTIVE_TRANSFERS_EXCEEDED, parseProblem } from '../../core/api/errorMap'
+import { ACTIVE_TRANSFERS_EXCEEDED, SCHEDULE_OUT_OF_WINDOW, parseProblem } from '../../core/api/errorMap'
 import ActiveTransfersLimit from './ActiveTransfersLimit'
 import ScheduleControl from './ScheduleControl'
 import type { SendMode } from './ScheduleControl'
-import { toUtcIso } from './schedule'
+import { checkSchedule, toUtcIso } from './schedule'
+import type { ScheduleError, ScheduleWindow } from './schedule'
 import { formatDate, formatTime } from '../../core/i18n/format'
 
 interface LinkScreenProps {
@@ -87,7 +88,8 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
   // US-022-01 (FR-022-1): send-time choice — 'now' (default) or a scheduled datetime-local value; scheduledFor = the server's echoed due time.
   const [sendMode, setSendMode] = useState<SendMode>('now')
   const [scheduleLocal, setScheduleLocal] = useState('')
-  const [scheduleRequiredError, setScheduleRequiredError] = useState(false)
+  const [scheduleError, setScheduleError] = useState<ScheduleError | null>(null)
+  const [scheduleWindow, setScheduleWindow] = useState<ScheduleWindow | null>(null)   // US-022-03: served by GET /billing/plan
   const [scheduledFor, setScheduledFor] = useState<string | null>(null)
 
   // T-016-04 (D-3): sent-phase swap focus — the form's focused button unmounts with it; land on the sent-state Copy.
@@ -223,6 +225,10 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
           setActiveLimit({ details: problem.details }) // FR-020-6: exact number + Upgrade CTA instead of the generic failure
           return false
         }
+        if (problem?.code === SCHEDULE_OUT_OF_WINDOW) {
+          setScheduleError('outOfWindow')   // US-022-03: server re-validation (clock skew / idle form) — inline, not a generic failure
+          return false
+        }
         setSendError('Sending failed. Please try again.')
         return false
       }
@@ -247,9 +253,11 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
   const handleSendTransfer = async (): Promise<void> => {
     if (sending || blockReason !== null) return
     if (sendMode === 'schedule') {
+      // US-022-03 (FR-022-2): window check on submit; a missing window fails closed as 'required'. Non-null = inline error, nothing sent.
+      const err = scheduleWindow ? checkSchedule(scheduleLocal, Date.now(), scheduleWindow) : 'required'
       const iso = toUtcIso(scheduleLocal)
-      if (iso === null) { setScheduleRequiredError(true); return }   // empty/unparseable: inline error, nothing sent
-      setScheduleRequiredError(false)
+      if (err !== null || iso === null) { setScheduleError(err ?? 'required'); return }
+      setScheduleError(null)
       await sendTransfer(parseRecipients(recipientsRaw), iso)
       return
     }
@@ -408,8 +416,9 @@ export function LinkScreen({ linkId, senderName, transferId, onSendAgain, initia
               mode={sendMode}
               onModeChange={setSendMode}
               value={scheduleLocal}
-              onValueChange={(v) => { setScheduleLocal(v); setScheduleRequiredError(false) }}
-              showRequiredError={scheduleRequiredError}
+              onValueChange={(v) => { setScheduleLocal(v); setScheduleError(null) }}
+              error={scheduleError}
+              onWindowChange={setScheduleWindow}
             />
             {/* T-002-08: Send transfer + Copy link only — disabled while blocked or in flight; wrapper spans carry the title (§4.2). */}
             <div className="ls-actions">

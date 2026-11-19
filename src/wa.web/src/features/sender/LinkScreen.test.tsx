@@ -631,14 +631,15 @@ describe('schedule', () => {
   type Call = { url: string; body: string }
 
   // Plan read (GET /billing/plan) answers the scheduling feature; the send POST answers 201 with the echoed due time.
-  function stubFetch(planScheduling: boolean, echoScheduled: boolean): Call[] {
+  function stubFetch(planScheduling: boolean, echoScheduled: boolean, sendOverride?: { status: number; body: unknown }): Call[] {
     const calls: Call[] = []
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
       if (url.endsWith('/billing/plan'))
-        return new Response(JSON.stringify({ features: { scheduling: planScheduling } }), { status: 200 })
+        return new Response(JSON.stringify({ features: { scheduling: planScheduling }, scheduleWindow: { minMinutes: 5, maxDays: 14 } }), { status: 200 })
       const body = typeof init?.body === 'string' ? init.body : ''
       calls.push({ url, body })
+      if (sendOverride) return new Response(JSON.stringify(sendOverride.body), { status: sendOverride.status })
       const parsed = body ? (JSON.parse(body) as { scheduledSendAt?: string }) : {}
       return new Response(JSON.stringify({
         id: '1', linkId: 'Ab3dEf5g', status: 'Scheduled', expiresAt: '2026-12-31T00:00:00Z', totalBytes: 0, fileCount: 0, recipients: [],
@@ -661,6 +662,16 @@ describe('schedule', () => {
     })
   }
 
+  // Local wall-clock datetime-local value for (Date.now() + ms), whole minutes.
+  const pad2 = (n: number): string => String(n).padStart(2, '0')
+  const localPlus = (ms: number): string => {
+    const d = new Date(Date.now() + ms)
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+  }
+  const MIN = 60_000
+  const HOUR = 60 * MIN
+  const DAY = 24 * HOUR
+
   const mountScheduling = async (): Promise<HTMLDivElement> => {
     useFeatureGateStore.setState({ 'feature.scheduling': true })
     const host = renderClient(createElement(LinkScreen, { linkId: 'Ab3dEf5g', transferId: '1' }))
@@ -675,6 +686,7 @@ describe('schedule', () => {
     Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn().mockResolvedValue(undefined) }, writable: true })
   })
   afterEach(() => {
+    vi.useRealTimers()
     vi.unstubAllGlobals()
     resetFeatureGates()
     useUploadEngine.getState().reset()
@@ -685,7 +697,7 @@ describe('schedule', () => {
     const calls = stubFetch(true, true)
     const host = await mountScheduling()
     act(() => { btn(host, 'Schedule').click() })
-    const local = '2026-12-01T10:30'
+    const local = localPlus(2 * HOUR)
     setPicker(host, local)
 
     await act(async () => { btn(host, 'Send transfer').click() })
@@ -710,7 +722,7 @@ describe('schedule', () => {
     const calls = stubFetch(true, false)
     const host = await mountScheduling()
     act(() => { btn(host, 'Schedule').click() })
-    setPicker(host, '2026-12-01T10:30')
+    setPicker(host, localPlus(2 * HOUR))
 
     await act(async () => { btn(host, 'Copy link only').click() })
 
@@ -722,7 +734,7 @@ describe('schedule', () => {
     stubFetch(true, true)
     const host = await mountScheduling()
     act(() => { btn(host, 'Schedule').click() })
-    setPicker(host, '2026-12-01T10:30')
+    setPicker(host, localPlus(2 * HOUR))
 
     await act(async () => { btn(host, 'Send transfer').click() })
 
@@ -739,5 +751,62 @@ describe('schedule', () => {
 
     expect(JSON.parse(calls[0].body)).not.toHaveProperty('scheduledSendAt')
     expect(host.querySelector('.ls-sent-sub')?.textContent).toBe('Share the link or send it again later.')
+  })
+
+  // US-022-03 (FR-022-2): window check on submit, named copy, inclusive boundaries, server re-validation.
+  it('+2 min: inline error naming the 5-minute minimum, nothing sent (AC-022-2)', async () => {
+    const calls = stubFetch(true, true)
+    const host = await mountScheduling()
+    act(() => { btn(host, 'Schedule').click() })
+    setPicker(host, localPlus(2 * MIN))
+
+    await act(async () => { btn(host, 'Send transfer').click() })
+
+    expect(calls).toHaveLength(0)
+    expect(host.querySelector('#schedule-at-error')?.textContent).toBe('Pick a time at least 5 minutes from now.')
+  })
+
+  it('+30 days: inline error naming the 14-day maximum, nothing sent (AC-022-3)', async () => {
+    const calls = stubFetch(true, true)
+    const host = await mountScheduling()
+    act(() => { btn(host, 'Schedule').click() })
+    setPicker(host, localPlus(30 * DAY))
+
+    await act(async () => { btn(host, 'Send transfer').click() })
+
+    expect(calls).toHaveLength(0)
+    expect(host.querySelector('#schedule-at-error')?.textContent).toBe('Pick a time no more than 14 days from now.')
+  })
+
+  it.each([
+    ['exactly +5 min', 5 * MIN],
+    ['exactly +14 days', 14 * DAY],
+  ])('%s is accepted: one POST (boundary AC)', async (_label, offset) => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 11, 1, 10, 0, 0, 0))   // whole minute so the picker value is exact
+    const calls = stubFetch(true, true)
+    const host = await mountScheduling()
+    act(() => { btn(host, 'Schedule').click() })
+    setPicker(host, localPlus(offset))
+
+    await act(async () => { btn(host, 'Send transfer').click() })
+
+    expect(calls).toHaveLength(1)
+    expect(host.querySelector('#schedule-at-error')).toBeNull()
+  })
+
+  it('server 422 SCHEDULE_OUT_OF_WINDOW (clock skew): inline window copy, no generic failure, still the form', async () => {
+    const calls = stubFetch(true, true, { status: 422, body: { code: 'SCHEDULE_OUT_OF_WINDOW', title: 'Schedule out of window', status: 422 } })
+    const host = await mountScheduling()
+    act(() => { btn(host, 'Schedule').click() })
+    setPicker(host, localPlus(2 * HOUR))
+
+    await act(async () => { btn(host, 'Send transfer').click() })
+    await flush()
+
+    expect(calls).toHaveLength(1)
+    expect(host.querySelector('#schedule-at-error')?.textContent).toBe('Pick a time between 5 minutes and 14 days from now.')
+    expect(host.textContent).not.toContain('Sending failed')
+    expect(host.querySelector('.ls-sent-sub')).toBeNull()
   })
 })
