@@ -676,6 +676,98 @@ public class SendNotificationEmailsHandlerTests
         Assert.Contains("Studio Nova", Assert.Single(_emailSender.Sent).Subject);
     }
 
+    // ---- US-022-04: scheduled-send notify gate (FR-022-4, AC-022-1, AC-022-5, EC-022-2, EC-022-3) ----
+
+    private static readonly DateTime ScheduledDue = new(2026, 12, 1, 12, 0, 0, DateTimeKind.Utc);
+
+    private Guid ArrangeScheduled(byte status, params string[] addresses)
+    {
+        var transferId = Guid.NewGuid();
+        _store.Context = new EmailTransferContext(
+            transferId, "Alice", null, DateTime.UtcNow.AddDays(30), "ABCD1234",
+            [new FileEntry("file.txt", 1024)], null, status, ScheduledDue);
+        _store.Recipients = addresses
+            .Select(a => new EmailRecipient { Id = Guid.NewGuid(), TransferId = transferId, Address = a })
+            .ToList();
+        return transferId;
+    }
+
+    [Fact]
+    public async Task Handle_ScheduledStatus_NoSend_NotMarked_NoEmailSentEvent()
+    {
+        var transferId = ArrangeScheduled(TransferStatus.Scheduled, "a@x.com");
+
+        await _handler.HandleAsync(CreateEnvelope(transferId, ["a@x.com"]), 1, 5, CancellationToken.None);
+
+        Assert.Empty(_emailSender.Sent);
+        Assert.All(_store.Recipients, r => Assert.Null(r.NotifiedAtUtc));
+        Assert.DoesNotContain(_eventPublisher.Published, e => e.Type == EventType.EmailSent);
+    }
+
+    [Fact]
+    public async Task Handle_ScheduledRow_Redelivered_StillSkipped_ThenSendsAfterActive()
+    {
+        var transferId = ArrangeScheduled(TransferStatus.Scheduled, "a@x.com");
+        var envelope = CreateEnvelope(transferId, ["a@x.com"]);
+
+        await _handler.HandleAsync(envelope, 1, 5, CancellationToken.None);
+        await _handler.HandleAsync(envelope, 2, 5, CancellationToken.None);
+        Assert.Empty(_emailSender.Sent);
+
+        // The timer flips the row; the same EventId must not have been recorded by dedup while skipped.
+        _store.Context = _store.Context! with { Status = TransferStatus.Active };
+        await _handler.HandleAsync(envelope, 3, 5, CancellationToken.None);
+
+        Assert.Single(_emailSender.Sent);
+    }
+
+    [Fact]
+    public async Task Handle_ScheduledThenExpired_NoSend()
+    {
+        var transferId = ArrangeScheduled(TransferStatus.Expired, "a@x.com");
+
+        await _handler.HandleAsync(CreateEnvelope(transferId, ["a@x.com"]), 1, 5, CancellationToken.None);
+
+        Assert.Empty(_emailSender.Sent);
+    }
+
+    [Fact]
+    public async Task Handle_ScheduledThenDeleted_NoSend()
+    {
+        var transferId = ArrangeScheduled(TransferStatus.Deleted, "a@x.com");
+
+        await _handler.HandleAsync(CreateEnvelope(transferId, ["a@x.com"]), 1, 5, CancellationToken.None);
+
+        Assert.Empty(_emailSender.Sent);
+    }
+
+    [Fact]
+    public async Task Handle_ActivatedScheduled_SuppressedAddressSkipped()
+    {
+        var transferId = ArrangeScheduled(TransferStatus.Active, "a@x.com", "suppressed@x.com");
+        _store.SuppressedAddresses = new HashSet<string> { "suppressed@x.com" };
+
+        await _handler.HandleAsync(CreateEnvelope(transferId, ["a@x.com", "suppressed@x.com"]), 1, 5, CancellationToken.None);
+
+        Assert.Equal("a@x.com", Assert.Single(_emailSender.Sent).To);
+    }
+
+    [Theory]
+    [InlineData(TransferStatus.Active)]
+    [InlineData(TransferStatus.Scheduled)] // a null schedule keeps the legacy path regardless of status
+    public async Task Handle_ImmediateSend_NoSchedule_StatusIgnored_Sends(byte status)
+    {
+        var transferId = Guid.NewGuid();
+        _store.Context = new EmailTransferContext(
+            transferId, "Alice", null, DateTime.UtcNow.AddDays(30), "ABCD1234",
+            [new FileEntry("file.txt", 1024)], null, status, null);
+        _store.Recipients = [new() { Id = Guid.NewGuid(), TransferId = transferId, Address = "a@x.com" }];
+
+        await _handler.HandleAsync(CreateEnvelope(transferId, ["a@x.com"]), 1, 5, CancellationToken.None);
+
+        Assert.Single(_emailSender.Sent);
+    }
+
     // ---- Stubs ----
 
     private sealed class StubSenderBrandingStore : ISenderBrandingStore

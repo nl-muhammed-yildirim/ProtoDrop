@@ -12,10 +12,12 @@ namespace wa.workers;
 /// T-005-01: f-expire Azure Function — timer every 15 min, concurrency 1 (TA-6.2).
 /// Claims its window via JobRun (TA-6.1) so scale-out instances don't double-process (FR-005-9).
 /// T-005-04: HTTP trigger for E2E manual invocation.
+/// US-022-04: also runs the schedule sub-step (Scheduled → Active + transfer.created re-emit) after expiry.
 /// </summary>
 public class ExpireFunction
 {
     private readonly ExpireTransfersHandler _handler;
+    private readonly ActivateScheduledTransfersHandler _scheduled;
     private readonly SendBillingEmailsHandler _billingEmails;
     private readonly EndBillingGraceHandler _billingGrace;
     private readonly ILogger<ExpireFunction> _logger;
@@ -23,12 +25,14 @@ public class ExpireFunction
 
     public ExpireFunction(
         ExpireTransfersHandler handler,
+        ActivateScheduledTransfersHandler scheduled,
         SendBillingEmailsHandler billingEmails,
         EndBillingGraceHandler billingGrace,
         ILogger<ExpireFunction> logger,
         IConfiguration config)
     {
         _handler = handler;
+        _scheduled = scheduled;
         _billingEmails = billingEmails;
         _billingGrace = billingGrace;
         _logger = logger;
@@ -49,6 +53,11 @@ public class ExpireFunction
         {
             var count = await _handler.RunAsync(now, context.CancellationToken);
             _logger.LogInformation("f-expire completed: {Count} transfers expired", count);
+
+            // US-022-04 (D-2): flip due Scheduled transfers to Active and re-emit transfer.created. After expiry so an
+            // expired Scheduled row is swept first (AC-022-5); own JobRun claim.
+            var activated = await _scheduled.RunAsync(now, context.CancellationToken);
+            _logger.LogInformation("f-expire schedule: {Count} transfers activated", activated);
 
             // US-019-04 (D-6): billing email sub-step; each send is gated by its own JobRun step claim.
             var billingCount = await _billingEmails.RunAsync(now, context.CancellationToken);

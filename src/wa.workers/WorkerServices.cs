@@ -86,6 +86,14 @@ public static class WorkerServices
             sp.GetRequiredService<wa.application.Telemetry.WaTelemetryReporter>(),
             sp.GetRequiredService<ILogger<ExpireTransfersHandler>>()));
 
+        // US-022-04 (D-2): schedule sub-step of the f-expire pass — own JobRun key ("schedule"), fresh DbContext per call.
+        services.AddSingleton<IScheduledSendStore>(sp => new ScheduledSendStore(
+            sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+        services.AddSingleton<ActivateScheduledTransfersHandler>(sp => new ActivateScheduledTransfersHandler(
+            sp.GetRequiredService<IScheduledSendStore>(),
+            sp.GetRequiredService<IEventPublisher>(),
+            sp.GetRequiredService<ILogger<ActivateScheduledTransfersHandler>>()));
+
         // US-019-04 (D-6): billing email sub-step of the f-expire pass — per-step JobRun claims, no window claim.
         services.AddSingleton<IBillingSequenceStore>(sp => new BillingSequenceStore(
             sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));

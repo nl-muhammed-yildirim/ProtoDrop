@@ -35,7 +35,7 @@ public sealed class ExpiryStore : IExpiryStore
     {
         return await _db.Set<Transfer>()
             .AsNoTracking()
-            .Where(t => t.Status == 1 && t.ExpiresAtUtc < cutoffUtc)
+            .Where(t => (t.Status == TransferStatus.Active || t.Status == TransferStatus.Scheduled) && t.ExpiresAtUtc < cutoffUtc)
             .OrderBy(t => t.ExpiresAtUtc)
             .Take(batchSize)
             .Select(t => new ExpiryBatchRow(t.Id, t.LinkId))
@@ -46,7 +46,7 @@ public sealed class ExpiryStore : IExpiryStore
     {
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
         var updated = await _db.Set<Transfer>()
-            .Where(t => transferIds.Contains(t.Id) && t.Status == 1) // TA-6.3 note 5: must not fight Status=3
+            .Where(t => transferIds.Contains(t.Id) && (t.Status == TransferStatus.Active || t.Status == TransferStatus.Scheduled)) // TA-6.3 note 5: must not fight Status=3
             .ExecuteUpdateAsync(s => s
                 .SetProperty(t => t.Status, (byte)2)
                 .SetProperty(t => t.ExpiredAtUtc, expiredAtUtc), ct);
