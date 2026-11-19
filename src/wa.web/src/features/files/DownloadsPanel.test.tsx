@@ -88,6 +88,33 @@ describe('DownloadsPanel', () => {
     expect(host.querySelectorAll('.mf-dl-chip')).toHaveLength(0)
   })
 
+  it('Pro_WithData_ShowsPrivacyNote_UnderCountryStat (AC-023-2)', async () => {
+    stubApi({ allowed: true, analytics: { status: 200, body: DATA } })
+    const host = render()
+    await flush()
+
+    const note = host.querySelector('.mf-dl-privacy')!
+    expect(note.textContent).toBe("Country is estimated from your download's first IP; we keep no raw IP.")
+    expect(note.previousElementSibling!.classList.contains('mf-dl-chips')).toBe(true)
+    expect(host.querySelectorAll('.mf-dl-chip')).toHaveLength(3)
+  })
+
+  it('Pro_ZeroDownloads_NoPrivacyNote', async () => {
+    stubApi({ allowed: true, analytics: { status: 200, body: { total: 0, daily: [{ date: '2026-11-19', count: 0 }], countries: [], browsers: [] } } })
+    const host = render()
+    await flush()
+
+    expect(host.querySelector('.mf-dl-privacy')).toBeNull()
+  })
+
+  it('Free_NoPrivacyNote', async () => {
+    stubApi({ allowed: false })
+    const host = render()
+    await flush()
+
+    expect(host.querySelector('.mf-dl-privacy')).toBeNull()
+  })
+
   it('Pro_403_ShowsProRequired (EC-023-6)', async () => {
     stubApi({ allowed: true, analytics: { status: 403 } })
     const host = render()

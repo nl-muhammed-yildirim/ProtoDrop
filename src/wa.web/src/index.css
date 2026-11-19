@@ -1270,6 +1270,12 @@ main:has(.sl) .dz {
   color: var(--fg-muted);
 }
 
+.mf-dl-privacy {
+  margin: 0;
+  font-size: var(--fs-tiny);
+  color: var(--fg-muted);
+}
+
 .mf-dl-files {
   width: 100%;
   max-width: 480px;

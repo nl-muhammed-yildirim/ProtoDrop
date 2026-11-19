@@ -276,5 +276,6 @@
   "files.analytics.fileColumn": "Ficheiro",
   "files.analytics.countColumn": "Transferências",
   "files.analytics.downloadAll": "Transferir tudo (zip)",
-  "files.analytics.topDownloads": "Mais transferidos"
+  "files.analytics.topDownloads": "Mais transferidos",
+  "files.analytics.privacyNote": "O país é estimado a partir do primeiro IP do download; não guardamos nenhum IP bruto."
 }

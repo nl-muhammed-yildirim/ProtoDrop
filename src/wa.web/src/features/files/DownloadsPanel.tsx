@@ -77,6 +77,7 @@ function AnalyticsBody({ data }: { data: TransferAnalyticsDto }): ReactElement {
         <span className="mf-dl-chip">{i18n.t('files.analytics.topCountry')}: <strong>{country === null ? '–' : countryLabel(country)}</strong></span>
         <span className="mf-dl-chip">{i18n.t('files.analytics.topBrowser')}: <strong>{browser === null ? '–' : browserLabel(browser)}</strong></span>
       </div>
+      <p className="mf-dl-privacy">{i18n.t('files.analytics.privacyNote')}</p>
       <table className="mf-dl-files" aria-label={i18n.t('files.analytics.perFile')}>
         <thead>
           <tr><th scope="col">{i18n.t('files.analytics.fileColumn')}</th><th scope="col">{i18n.t('files.analytics.countColumn')}</th></tr>

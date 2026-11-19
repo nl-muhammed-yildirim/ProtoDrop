@@ -276,5 +276,6 @@
   "files.analytics.fileColumn": "File",
   "files.analytics.countColumn": "Download",
   "files.analytics.downloadAll": "Scarica tutto (zip)",
-  "files.analytics.topDownloads": "Più scaricati"
+  "files.analytics.topDownloads": "Più scaricati",
+  "files.analytics.privacyNote": "Il paese è stimato dal primo IP del download; non conserviamo alcun IP in chiaro."
 }
