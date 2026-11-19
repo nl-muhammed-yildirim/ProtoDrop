@@ -82,16 +82,41 @@ public class GetTransferAnalyticsHandlerTests
     }
 
     [Fact]
-    public async Task Handle_SinceUtc_IsWindowStartFromPlanLimits()
+    public async Task Handle_SinceUtc_OldTransfer_IsSendDate_NotPlanWindow()
     {
-        var store = new StubStore { Transfer = new AnalyticsTransfer(TransferId, DateTime.UtcNow.AddDays(-400), 1) };
+        var created = DateTime.UtcNow.AddDays(-33);   // last grace day for R=30, G=3
+        var store = new StubStore { Transfer = new AnalyticsTransfer(TransferId, created, 1) };
 
         await Handler(true, store).Handle(new GetTransferAnalyticsQuery(TransferId, OwnerId), default);
 
-        var expected = DateTime.UtcNow.Date.AddDays(-32);
-        // Tolerate a midnight rollover between the handler's clock read and this one.
-        Assert.True(store.LastSinceUtc == expected || store.LastSinceUtc == expected.AddDays(1), $"since = {store.LastSinceUtc:o}");
+        Assert.Equal(created.Date, store.LastSinceUtc);
         Assert.Equal(DateTimeKind.Utc, store.LastSinceUtc.Kind);
+    }
+
+    [Fact]
+    public async Task Handle_DayZeroEvent_CountedOnLastGraceDay_AndChartLengthCapped()
+    {
+        var created = DateTime.UtcNow.AddDays(-33);
+        var store = new StubStore
+        {
+            Transfer = new AnalyticsTransfer(TransferId, created, 1),
+            Aggregate = new AnalyticsAggregate([new DailyCount(DateOnly.FromDateTime(created), 5)], [], [], [], [])
+        };
+
+        var r = await Handler(true, store).Handle(new GetTransferAnalyticsQuery(TransferId, OwnerId), default);
+
+        Assert.Equal(5, r!.Total);
+        Assert.Equal(34, r.Daily.Count);
+    }
+
+    [Fact]
+    public async Task Handle_VeryOldTransfer_ChartCappedAtRetentionPlusGracePlusOne()
+    {
+        var store = new StubStore { Transfer = new AnalyticsTransfer(TransferId, DateTime.UtcNow.AddDays(-400), 1) };
+
+        var r = await Handler(true, store).Handle(new GetTransferAnalyticsQuery(TransferId, OwnerId), default);
+
+        Assert.Equal(34, r!.Daily.Count);
     }
 
     [Fact]

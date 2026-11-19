@@ -39,14 +39,17 @@ public static class DownloadAnalytics
     /// <summary>FR-023-1 "top 5" — a spec display constant, not a plan limit.</summary>
     public const int TopCount = 5;
 
-    /// <summary>First day of the window: max(today - (retention + grace - 1) days, created date).</summary>
-    public static DateOnly WindowStart(DateTime nowUtc, DateTime createdUtc, int retentionDays, int graceDays)
+    /// <summary>First day of the window: the transfer's own send date (UTC day). Never the viewer's current plan — a transfer
+    /// lives R + G days from SEND, so day-0 events must survive the last grace day and plan downgrades (FR-023-1).</summary>
+    public static DateOnly WindowStart(DateTime createdUtc) => DateOnly.FromDateTime(createdUtc);
+
+    /// <summary>Last day of the window: min(today, send date + retention + grace). The R + G cap only bounds the upper reach
+    /// (chart length at most R + G + 1 days: send day through the deletion-job day).</summary>
+    public static DateOnly WindowEnd(DateTime nowUtc, DateTime createdUtc, int retentionDays, int graceDays)
     {
         var today = DateOnly.FromDateTime(nowUtc);
-        var span = Math.Max(1, retentionDays + graceDays);
-        var floor = today.AddDays(-(span - 1));
-        var created = DateOnly.FromDateTime(createdUtc);
-        return created > floor ? created : floor;
+        var cap = DateOnly.FromDateTime(createdUtc).AddDays(Math.Max(0, retentionDays + graceDays));
+        return today < cap ? today : cap;
     }
 
     /// <summary>One entry per day from..to inclusive, ascending, zeros filled; empty when to &lt; from.</summary>

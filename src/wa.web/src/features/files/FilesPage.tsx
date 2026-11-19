@@ -7,7 +7,7 @@ import { getTraceParent } from '../../core/traceparent'
 import i18n from '../../core/i18n/init'
 import { useFocusTrap } from '../../core/ui/useFocusTrap'
 import { loadFeatureGates, useFeatureGate } from '../../core/features/featureGates'
-import { DownloadsPanel } from './DownloadsPanel'
+import { DownloadsPanel, downloadsPanelId } from './DownloadsPanel'
 import {
   downloadsLabel,
   formatRemaining,
@@ -327,6 +327,7 @@ export function FilesPage({ onNewTransfer }: FilesPageProps) {
                         type="button"
                         className="au-ghost-btn"
                         aria-expanded={openAnalyticsId === row.id}
+                        aria-controls={openAnalyticsId === row.id ? downloadsPanelId(row.id) : undefined}
                         onClick={() => setOpenAnalyticsId((cur) => (cur === row.id ? null : row.id))}
                       >{i18n.t('files.analytics.toggle')}</button>
                     )}

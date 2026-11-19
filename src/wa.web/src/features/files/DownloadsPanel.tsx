@@ -11,7 +11,11 @@ import {
   polylinePoints,
   topLabel,
 } from './downloadsAnalytics'
+import { statusChip } from './formatting'
 import type { TransferAnalyticsDto } from './downloadsAnalytics'
+
+/** Stable, per-transfer DOM id: the Downloads toggle's aria-controls target. */
+export const downloadsPanelId = (transferId: string): string => `mf-dl-panel-${transferId}`
 
 type PanelState =
   | { kind: 'loading' }
@@ -44,10 +48,11 @@ export function DownloadsPanel({ transferId, status }: { transferId: string; sta
   }, [transferId])
 
   const expired = status === 2 || status === 3
+  const chip = statusChip(status)
 
   return (
-    <div className="mf-dl-panel">
-      {expired && <span className="mf-chip mf-chip-gray">{i18n.t('files.status.expired')}</span>}
+    <div className="mf-dl-panel" id={downloadsPanelId(transferId)}>
+      {expired && <span className={`mf-chip mf-chip-${chip.tone}`}>{chip.text}</span>}
       {state.kind === 'loading' && <p className="mf-loading">{i18n.t('files.analytics.loading')}</p>}
       {state.kind === 'error' && <p role="alert" className="mf-error">{i18n.t('files.analytics.error')}</p>}
       {state.kind === 'proRequired' && (

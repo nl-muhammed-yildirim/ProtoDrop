@@ -8,21 +8,46 @@ public class DownloadAnalyticsTests
     private static readonly DateTime Now = new(2026, 11, 19, 12, 0, 0, DateTimeKind.Utc);
 
     [Fact]
-    public void WindowStart_CreatedInsideWindow_ReturnsCreatedDate() =>
-        Assert.Equal(new DateOnly(2026, 11, 10), DownloadAnalytics.WindowStart(Now, new DateTime(2026, 11, 10, 8, 0, 0, DateTimeKind.Utc), 30, 3));
+    public void WindowStart_IsSendDateUtc_RegardlessOfAge() =>
+        Assert.Equal(new DateOnly(2026, 1, 1), DownloadAnalytics.WindowStart(new DateTime(2026, 1, 1, 23, 59, 0, DateTimeKind.Utc)));
 
     [Fact]
-    public void WindowStart_OldTransfer_ReturnsTodayMinusRetentionPlusGraceMinusOne() =>
-        Assert.Equal(new DateOnly(2026, 11, 19).AddDays(-32), DownloadAnalytics.WindowStart(Now, new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), 30, 3));
+    public void Window_DayZeroEventStillCounted_OnLastGraceDay()
+    {
+        var created = new DateTime(2026, 10, 17, 9, 0, 0, DateTimeKind.Utc);   // R+G = 33 days before Now
+        var from = DownloadAnalytics.WindowStart(created);
+        var to = DownloadAnalytics.WindowEnd(Now, created, 30, 3);
+
+        var r = DownloadAnalytics.Build([new DailyCount(from, 2)], [], [], [], [], from, to);
+
+        Assert.Equal(2, r.Total);
+        Assert.Equal(new DateOnly(2026, 10, 17), r.Daily[0].Day);
+    }
 
     [Fact]
-    public void WindowStart_MidnightBoundary_LandsOnDifferentDays()
+    public void Window_Downgrade_ShorterPlanDoesNotDropSendDayEvents()
+    {
+        var created = new DateTime(2026, 10, 25, 0, 0, 0, DateTimeKind.Utc);   // 25 days old; downgraded plan has R+G = 10
+        var from = DownloadAnalytics.WindowStart(created);
+
+        Assert.Equal(new DateOnly(2026, 10, 25), from);
+        Assert.True(DownloadAnalytics.WindowEnd(Now, created, 7, 3) >= from);
+    }
+
+    [Fact]
+    public void WindowEnd_CapsChartLength_ToRetentionPlusGracePlusOne()
     {
         var created = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        var before = DownloadAnalytics.WindowStart(new DateTime(2026, 11, 18, 23, 59, 59, DateTimeKind.Utc), created, 30, 3);
-        var after = DownloadAnalytics.WindowStart(new DateTime(2026, 11, 19, 0, 0, 0, DateTimeKind.Utc), created, 30, 3);
-        Assert.Equal(before.AddDays(1), after);
+        var from = DownloadAnalytics.WindowStart(created);
+        var to = DownloadAnalytics.WindowEnd(Now, created, 30, 3);
+
+        Assert.Equal(new DateOnly(2026, 2, 3), to);
+        Assert.Equal(34, DownloadAnalytics.FillDaily([], from, to).Count);
     }
+
+    [Fact]
+    public void WindowEnd_RecentTransfer_IsToday() =>
+        Assert.Equal(new DateOnly(2026, 11, 19), DownloadAnalytics.WindowEnd(Now, new DateTime(2026, 11, 10, 8, 0, 0, DateTimeKind.Utc), 30, 3));
 
     [Fact]
     public void FillDaily_FillsZeros_Ascending_InclusiveEnds()

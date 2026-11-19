@@ -35,8 +35,8 @@ public sealed class GetTransferAnalyticsHandler : IRequestHandler<GetTransferAna
         if (owned is null) return null;   // expired (2) / DownloadLimit (3) rows are still returned (EC-023-5)
 
         var now = DateTime.UtcNow;
-        var from = DownloadAnalytics.WindowStart(now, owned.CreatedAtUtc, plan.Limits.RetentionDays, plan.Limits.GraceDays);
-        var to = DateOnly.FromDateTime(now);
+        var from = DownloadAnalytics.WindowStart(owned.CreatedAtUtc);
+        var to = DownloadAnalytics.WindowEnd(now, owned.CreatedAtUtc, plan.Limits.RetentionDays, plan.Limits.GraceDays);
         var sinceUtc = from.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
 
         var agg = await _store.AggregateAsync(request.Id, sinceUtc, ct);

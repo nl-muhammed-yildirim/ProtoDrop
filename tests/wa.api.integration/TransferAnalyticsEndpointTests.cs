@@ -205,7 +205,8 @@ public class TransferAnalyticsEndpointTests() : TransferAnalyticsEndpointTestsBa
     {
         var userId = await SeedUserAsync("pro");
         var id = await SeedTransferAsync(userId);
-        var today = DateTime.UtcNow.Date.AddHours(1);
+        var nowUtc = DateTime.UtcNow;   // one clock read: seeding and the date assertion must agree across UTC midnight
+        var today = nowUtc.Date.AddHours(1);
         await AddEventsAsync(
             Event(id, today, "NL", "Chrome"), Event(id, today.AddDays(-1), "NL", "Chrome"), Event(id, today.AddDays(-2), "NL", "Firefox"),
             Event(id, today, "DE", "Chrome"),
@@ -220,7 +221,7 @@ public class TransferAnalyticsEndpointTests() : TransferAnalyticsEndpointTestsBa
         Assert.Equal([("NL", 3), ("??", 2), ("DE", 1)], countries);
         Assert.Equal("Chrome", body.GetProperty("browsers")[0].GetProperty("family").GetString());
         var daily = body.GetProperty("daily").EnumerateArray().ToList();
-        Assert.Equal(DateTime.UtcNow.ToString("yyyy-MM-dd"), daily[^1].GetProperty("date").GetString());
+        Assert.Equal(nowUtc.ToString("yyyy-MM-dd"), daily[^1].GetProperty("date").GetString());
         Assert.Equal(3, daily[^1].GetProperty("count").GetInt32());
         Assert.Equal(daily.Sum(d => d.GetProperty("count").GetInt32()), body.GetProperty("total").GetInt32());
     }
@@ -287,16 +288,17 @@ public class TransferAnalyticsEndpointTests() : TransferAnalyticsEndpointTestsBa
     }
 
     [Fact]
-    public async Task ProUser_EventOlderThanWindow_Excluded()
+    public async Task ProUser_SendDayEvent_Counted_WindowFloorIsSendDate() // FR-023-1: window starts at the transfer's own send date
     {
         var userId = await SeedUserAsync("pro");
-        var id = await SeedTransferAsync(userId, createdUtc: DateTime.UtcNow.AddDays(-1500));
-        await AddEventsAsync(Event(id, DateTime.UtcNow.AddDays(-1000), "NL", "Chrome"), Event(id, DateTime.UtcNow.AddHours(-1), "DE", "Chrome"));
+        var created = DateTime.UtcNow.AddDays(-20);
+        var id = await SeedTransferAsync(userId, createdUtc: created);
+        await AddEventsAsync(Event(id, created.AddMinutes(5), "NL", "Chrome"), Event(id, DateTime.UtcNow.AddHours(-1), "DE", "Chrome"));
 
         var body = await ReadJsonAsync(await AnalyticsAsync(id, userId));
 
-        Assert.Equal(1, body.GetProperty("total").GetInt32());
-        Assert.Equal("DE", body.GetProperty("countries")[0].GetProperty("code").GetString());
+        Assert.Equal(2, body.GetProperty("total").GetInt32());
+        Assert.Equal(created.ToString("yyyy-MM-dd"), body.GetProperty("daily")[0].GetProperty("date").GetString());
     }
 
     [Fact]

@@ -107,6 +107,15 @@ describe('DownloadsPanel', () => {
     expect(host.querySelector('.mf-dl-privacy')).toBeNull()
   })
 
+  it('Status3_ChipUsesRowLabel_DownloadLimitReached', async () => {
+    stubApi({ allowed: true, analytics: { status: 200, body: DATA } })
+    const host = render(3)
+    await flush()
+
+    expect(host.querySelector('.mf-chip')!.textContent).toBe('Download limit reached')
+    expect(host.querySelector('.mf-dl-panel')!.id).toBe('mf-dl-panel-t-1')
+  })
+
   it('Free_NoPrivacyNote', async () => {
     stubApi({ allowed: false })
     const host = render()
