@@ -38,6 +38,8 @@ export function ProfilePage({ profile, onSignedIn, onThemeChange, onDeleteAccoun
   const [savingName, setSavingName] = useState(false)
   const [savingTheme, setSavingTheme] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Server Features.Branding, reported by OrgLogoSection's GET /auth/me/logo (null until known) — gates the org name input too.
+  const [brandingEnabled, setBrandingEnabled] = useState<boolean | null>(null)
 
   // PATCH { displayName } only — theme is a separate field so the two Save paths stay independent.
   async function saveName() {
@@ -123,9 +125,9 @@ export function ProfilePage({ profile, onSignedIn, onThemeChange, onDeleteAccoun
       <p className="pf-plan">{profile.planCode === 'free' ? i18n.t('profile.plan.free') : profile.planCode}</p>
       <a className="pf-plan-link" href={PLAN_PATH}>{i18n.t('profile.plan.viewPlan')}</a>
       {/* F-PRF-001: organization name — Pro only (disabled on Free); read/saved via /auth/me. */}
-      <OrgNameSection />
+      <OrgNameSection brandingEnabled={brandingEnabled} />
       {/* US-021-04: organization logo — plan gate comes from the server (brandingEnabled), not FeatureGate. */}
-      <OrgLogoSection />
+      <OrgLogoSection onBrandingChange={setBrandingEnabled} />
       {/* US-047-01: My data — GDPR export; absent unless feature.dataExport is on (AC-044-2 contract). */}
       <FeatureGate gate="feature.dataExport">
         <DataExportSection />

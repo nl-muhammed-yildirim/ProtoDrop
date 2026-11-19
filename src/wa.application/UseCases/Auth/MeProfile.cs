@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using MediatR;
 using Microsoft.Extensions.Logging;
+using wa.application.Limits;
 using wa.application.Ports;
 using wa.application.Telemetry;
 using wa.domain;
@@ -138,6 +139,7 @@ public sealed class UpdateProfileHandler : IRequestHandler<UpdateProfileCommand,
     private readonly IAppUserStore _users;
     private readonly IPlansStore _plans;
     private readonly IOrgNameStore _orgNames;
+    private readonly IPlanContextAccessor _plan;
 
     /// <summary>NVARCHAR(100) column width — TA-3.2 (verified in WaDbContextModelSnapshot). Single re-check site.</summary>
     public const int DisplayNameMaxLength = 100;
@@ -145,11 +147,12 @@ public sealed class UpdateProfileHandler : IRequestHandler<UpdateProfileCommand,
     /// <summary>The three closed theme values (spec + entity only — NOT in the frozen Open-Decisions-and-Constants registry).</summary>
     private static readonly string[] AllowedThemes = ["system", "light", "dark"];
 
-    public UpdateProfileHandler(IAppUserStore users, IPlansStore plans, IOrgNameStore orgNames)
+    public UpdateProfileHandler(IAppUserStore users, IPlansStore plans, IOrgNameStore orgNames, IPlanContextAccessor plan)
     {
         _users = users;
         _plans = plans;
         _orgNames = orgNames;
+        _plan = plan;
     }
 
     public async Task<GetProfileResult> Handle(UpdateProfileCommand request, CancellationToken cancellationToken)
@@ -186,6 +189,10 @@ public sealed class UpdateProfileHandler : IRequestHandler<UpdateProfileCommand,
                 throw MeProfileException.ForInvalidOrgName();
             orgName = trimmedOrg.Length == 0 ? null : trimmedOrg;
         }
+
+        // 4c. Setting a non-empty org name is a branding feature (same 403 as the logo upload); clearing is allowed on every plan.
+        if (orgName is not null && !(await _plan.GetAsync(cancellationToken)).Features.Branding)
+            throw OrgLogoRejectedException.ForPlan();
 
         // 5. Persist the partial update (D-1: null args are left alone; empty displayName falls back to the email local part).
         if (request.DisplayName is not null || request.Theme is not null)

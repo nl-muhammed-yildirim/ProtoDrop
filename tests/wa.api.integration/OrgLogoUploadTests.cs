@@ -175,6 +175,18 @@ public class OrgLogoUploadTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task PatchMe_OrgName_FreeOwner_Returns403Forbidden_NothingStored() // FR-021-4 server gate on the name write
+    {
+        var ownerId = await SeedOwnerAsync("free", null);
+
+        using var response = await _client.SendAsync(MeRequest(HttpMethod.Patch, ownerId, "{\"orgName\":\"Studio Nova\"}"));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal("FORBIDDEN", (await ReadJsonAsync(response)).GetProperty("code").GetString());
+        Assert.Null(await _db.Set<AppUser>().AsNoTracking().Where(u => u.Id == ownerId).Select(u => u.OrgName).SingleAsync());
+    }
+
+    [Fact]
     public async Task PatchMe_OrgNameTooLong_Returns400Validation_NothingStored()
     {
         var ownerId = await SeedOwnerAsync("pro", "Keep");

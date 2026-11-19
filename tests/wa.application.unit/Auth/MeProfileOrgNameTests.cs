@@ -1,4 +1,5 @@
 using System.Text.Json;
+using wa.application.Limits;
 using wa.application.Ports;
 using wa.application.UseCases.Auth;
 using wa.domain;
@@ -12,13 +13,16 @@ public class MeProfileOrgNameTests
     private readonly Users _users = new();
     private readonly OrgNames _orgNames = new();
     private readonly UpdateProfileHandler _handler;
+    private readonly Plan _plan = new() { Id = Guid.NewGuid(), Code = "pro", Name = "Pro" };
 
-    public MeProfileOrgNameTests()
+    public MeProfileOrgNameTests() : this(true) { }
+
+    private MeProfileOrgNameTests(bool branding)
     {
-        var plan = new Plan { Id = Guid.NewGuid(), Code = "pro", Name = "Pro" };
+        var plan = _plan;
         _users.User = new AppUser { Id = _userId, Email = "ada@example.com", DisplayName = "Ada", Theme = "system", PlanId = plan.Id, OrgName = "Old" };
         _orgNames.Users = _users;
-        _handler = new UpdateProfileHandler(_users, new Plans(plan), _orgNames);
+        _handler = new UpdateProfileHandler(_users, new Plans(plan), _orgNames, new StubPlanContext(branding));
     }
 
     private Task<GetProfileResult> Patch(OrgNamePatch org) =>
@@ -74,6 +78,32 @@ public class MeProfileOrgNameTests
         var ex = await Assert.ThrowsAsync<MeProfileException>(() => Patch(OrgNamePatch.Of(value)));
         Assert.Contains("orgName", ex.Message);
         Assert.Empty(_orgNames.Writes);
+    }
+
+    [Fact]
+    public async Task Free_SetNonEmpty_Rejected403_NothingStored()
+    {
+        var free = new MeProfileOrgNameTests(false);
+        var ex = await Assert.ThrowsAsync<OrgLogoRejectedException>(() => free.Patch(OrgNamePatch.Of("Studio Nova")));
+        Assert.Equal(wa.domain.Errors.ProblemCodes.Forbidden, ex.Code);
+        Assert.Empty(free._orgNames.Writes);
+        Assert.Equal("Old", free._users.User!.OrgName);
+    }
+
+    [Fact]
+    public async Task Free_Clear_Allowed()
+    {
+        var free = new MeProfileOrgNameTests(false);
+        await free.Patch(OrgNamePatch.Of("  "));
+        Assert.Null(free._users.User!.OrgName);
+        Assert.Equal([null], free._orgNames.Writes);
+    }
+
+    [Fact]
+    public async Task Pro_SetNonEmpty_Stored()
+    {
+        await Patch(OrgNamePatch.Of("Studio Nova"));
+        Assert.Equal(["Studio Nova"], _orgNames.Writes);
     }
 
     [Fact]
@@ -136,5 +166,11 @@ public class MeProfileOrgNameTests
     {
         public Task<Plan> GetAsync(string planCode, CancellationToken cancellationToken) => Task.FromResult(plan);
         public Task<Plan?> GetByIdAsync(Guid planId, CancellationToken cancellationToken) => Task.FromResult<Plan?>(plan);
+    }
+
+    private sealed class StubPlanContext(bool branding) : IPlanContextAccessor
+    {
+        public Task<PlanContext> GetAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new PlanContext(branding ? "pro" : "free", new LimitsRecord(), new PlanFeatures { Branding = branding }));
     }
 }

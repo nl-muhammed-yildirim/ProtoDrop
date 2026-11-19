@@ -18,7 +18,7 @@ interface LogoBody {
  * The size cap comes from the server (GET /auth/me/logo maxLogoSize); the plan gate is the server's brandingEnabled.
  * Renders nothing when the owner read fails.
  */
-export function OrgLogoSection() {
+export function OrgLogoSection({ onBrandingChange }: { onBrandingChange?: (enabled: boolean) => void }) {
   const [loaded, setLoaded] = useState(false)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [maxLogoSize, setMaxLogoSize] = useState(0)
@@ -32,7 +32,8 @@ export function OrgLogoSection() {
     setLogoUrl(body.logoUrl ?? null)
     setMaxLogoSize(body.maxLogoSize ?? 0)
     setBrandingEnabled(body.brandingEnabled === true)
-  }, [])
+    onBrandingChange?.(body.brandingEnabled === true)   // single GET /auth/me/logo feeds the name section's Pro gate too
+  }, [onBrandingChange])
 
   useEffect(() => {
     alive.current = true

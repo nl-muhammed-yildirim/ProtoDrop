@@ -25,11 +25,11 @@ function stubFetch(): void {
 
 const json = (status: number, body: unknown) => () => new Response(JSON.stringify(body), { status })
 
-function mount(): { host: HTMLElement; unmount: () => void } {
+function mount(brandingEnabled: boolean | null = true): { host: HTMLElement; unmount: () => void } {
   const host = document.createElement('div')
   document.body.appendChild(host)
   const root = createRoot(host)
-  act(() => { void root.render(createElement(OrgNameSection)) })
+  act(() => { void root.render(createElement(OrgNameSection, { brandingEnabled })) })
   return { host, unmount: () => { act(() => root.unmount()); host.remove() } }
 }
 
@@ -57,7 +57,7 @@ afterEach(() => {
 
 describe('OrgNameSection (F-PRF-001 FR-021-1)', () => {
   it('renders the saved organization name from GET /auth/me', async () => {
-    responses = [json(200, { orgName: 'Studio Nova', planCode: 'pro' })]
+    responses = [json(200, { orgName: 'Studio Nova' })]
     const { host, unmount } = mount()
     await flush()
 
@@ -69,7 +69,7 @@ describe('OrgNameSection (F-PRF-001 FR-021-1)', () => {
   })
 
   it('sends orgName in the PATCH body (trimmed) and shows the saved value', async () => {
-    responses = [json(200, { orgName: null, planCode: 'pro' }), json(200, { orgName: 'Studio Nova', planCode: 'pro' })]
+    responses = [json(200, { orgName: null }), json(200, { orgName: 'Studio Nova' })]
     const { host, unmount } = mount()
     await flush()
 
@@ -91,7 +91,7 @@ describe('OrgNameSection (F-PRF-001 FR-021-1)', () => {
   })
 
   it('sends null when the field is cleared', async () => {
-    responses = [json(200, { orgName: 'Studio Nova', planCode: 'pro' }), json(200, { orgName: null, planCode: 'pro' })]
+    responses = [json(200, { orgName: 'Studio Nova' }), json(200, { orgName: null })]
     const { host, unmount } = mount()
     await flush()
 
@@ -108,8 +108,8 @@ describe('OrgNameSection (F-PRF-001 FR-021-1)', () => {
   })
 
   it('is disabled on the Free plan with the Pro plan required copy', async () => {
-    responses = [json(200, { orgName: null, planCode: 'free' })]
-    const { host, unmount } = mount()
+    responses = [json(200, { orgName: null })]
+    const { host, unmount } = mount(false)
     await flush()
 
     const input = host.querySelector('#pf-org-name') as HTMLInputElement
@@ -121,7 +121,7 @@ describe('OrgNameSection (F-PRF-001 FR-021-1)', () => {
   })
 
   it('shows an alert when the server rejects the save', async () => {
-    responses = [json(200, { orgName: null, planCode: 'pro' }), json(400, { code: 'VALIDATION' })]
+    responses = [json(200, { orgName: null }), json(400, { code: 'VALIDATION' })]
     const { host, unmount } = mount()
     await flush()
 
@@ -134,6 +134,15 @@ describe('OrgNameSection (F-PRF-001 FR-021-1)', () => {
     })
 
     expect(host.querySelector('[role="alert"]')).not.toBeNull()
+    unmount()
+  })
+
+  it('renders nothing while branding is unknown', async () => {
+    responses = [json(200, { orgName: 'Studio Nova' })]
+    const { host, unmount } = mount(null)
+    await flush()
+
+    expect(host.querySelector('#pf-org-name')).toBeNull()
     unmount()
   })
 

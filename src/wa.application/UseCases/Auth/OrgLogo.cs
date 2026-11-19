@@ -129,11 +129,10 @@ public sealed class UploadOrgLogoHandler : IRequestHandler<UploadOrgLogoCommand,
         using (var content = new MemoryStream(buffer, 0, length, writable: false))
             await _writer.UploadAsync(canonical, content, LogoContentSniffer.ContentTypeOf(type.Value), cancellationToken);
 
+        bool updated;
         try
         {
-            // false = no live row matched (soft-deleted between the read above and now): same cleanup as a failed write.
-            if (!await _logos.SetPathAsync(request.UserId, canonical, cancellationToken))
-                throw MeProfileException.ForNotFound();
+            updated = await _logos.SetPathAsync(request.UserId, canonical, cancellationToken);
         }
         catch
         {
@@ -142,6 +141,14 @@ public sealed class UploadOrgLogoHandler : IRequestHandler<UploadOrgLogoCommand,
             if (!string.Equals(previous, canonical, StringComparison.Ordinal))
                 await _blobs.DeleteAsync(canonical, CancellationToken.None);
             throw;
+        }
+
+        if (!updated)
+        {
+            // No live row matched (soft-deleted between the read above and now): the canonical blob is orphaned whatever
+            // the previous path was, so always remove it.
+            await _blobs.DeleteAsync(canonical, CancellationToken.None);
+            throw MeProfileException.ForNotFound();
         }
 
         if (!string.IsNullOrEmpty(previous) && !string.Equals(previous, canonical, StringComparison.Ordinal))

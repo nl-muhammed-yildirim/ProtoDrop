@@ -207,6 +207,23 @@ public class OrgLogoTests
     }
 
     [Fact]
+    public async Task Upload_PreviousIsCanonical_SetPathAffectsNoRow_DeletesBlobAndThrowsNotFound()
+    {
+        var userId = Guid.NewGuid();
+        var canonical = BlobPaths.OrgLogo(userId);
+        var users = new StubUsers();
+        users.Users[userId] = new AppUser { Id = userId, Email = "a@example.com", DisplayName = "A", OrgLogoBlobPath = canonical };
+        var blobs = new StubBlobs(_calls);
+        var logos = new StubLogos(_calls) { Matched = false };
+        var handler = new UploadOrgLogoHandler(users, new StubPlan(true), blobs, blobs, logos, new StubMinter());
+
+        await Assert.ThrowsAsync<MeProfileException>(() =>
+            handler.Handle(new UploadOrgLogoCommand(userId, new MemoryStream(Png(20))), CancellationToken.None));
+
+        Assert.Equal([$"Upload({canonical},image/png,20)", $"SetPath({canonical})", $"Delete({canonical})"], _calls);
+    }
+
+    [Fact]
     public async Task Upload_ReplacesLegacyPath_DeletesOldBlobAfterSetPath()
     {
         var (handler, userId, _) = BuildUpload(previousPath: "transfers/legacy/logo");

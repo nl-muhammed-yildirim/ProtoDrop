@@ -1081,6 +1081,11 @@ app.MapPatch("/api/v1/auth/me", async (UpdateProfileRequest req, HttpContext ctx
             orgName = result.OrgName
         }, statusCode: 200);
     }
+    catch (OrgLogoRejectedException ex)
+    {
+        // Free plan setting an org name (branding is Pro) -> same 403 FORBIDDEN as the logo upload.
+        throw new BusinessException(ex.Code, ex.Message, ex);
+    }
     catch (MeProfileException ex) when (ex.Message == ProblemCodes.TitleOf(ProblemCodes.NotFound))
     {
         // Same as GET — valid cookie, no row → 404 NOT_FOUND.

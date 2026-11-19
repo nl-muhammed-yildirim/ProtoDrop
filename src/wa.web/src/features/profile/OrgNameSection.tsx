@@ -7,7 +7,6 @@ import { ME_BASE } from './ProfilePage'
 
 interface MeBody {
   orgName?: string | null
-  planCode?: string
 }
 
 // Mirrors the server's ORG_NAME_MAX_LENGTH (AppUser.OrgNameMaxLength); the server stays the authority.
@@ -15,14 +14,14 @@ const ORG_NAME_MAX_LENGTH = 60
 
 /**
  * F-PRF-001 (FR-021-1 / FR-021-5): organization name on the profile page. Read from GET /auth/me, saved with
- * PATCH /auth/me { orgName } (blank clears it). Free plan: the input is disabled with the same "Pro plan required"
- * copy the logo section uses. Renders nothing when the read fails.
+ * PATCH /auth/me { orgName } (blank clears it); the session profile carries no orgName, hence the one read here.
+ * Pro gate = the server's brandingEnabled (GET /auth/me/logo, passed down by ProfilePage): otherwise the input is disabled
+ * with the same "Pro plan required" copy the logo section uses. Renders nothing when the read fails.
  */
-export function OrgNameSection() {
+export function OrgNameSection({ brandingEnabled }: { brandingEnabled: boolean | null }) {
   const [loaded, setLoaded] = useState(false)
   const [saved, setSaved] = useState('')
   const [value, setValue] = useState('')
-  const [pro, setPro] = useState(false)
   const [saving, setSaving] = useState(false)
   const [errorKey, setErrorKey] = useState<string | null>(null)
   const alive = useRef(true)
@@ -38,7 +37,6 @@ export function OrgNameSection() {
         const current = body.orgName ?? ''
         setSaved(current)
         setValue(current)
-        setPro(body.planCode !== undefined && body.planCode !== 'free')
         setLoaded(true)
       } catch {
         // Render nothing; a reload retries.
@@ -74,7 +72,9 @@ export function OrgNameSection() {
     }
   }
 
-  if (!loaded) return null
+  // Pro = the server's Features.Branding (same source as the logo uploader); unknown (logo read pending/failed) renders nothing.
+  if (!loaded || brandingEnabled === null) return null
+  const pro = brandingEnabled
 
   return (
     <section className="pf-org">
