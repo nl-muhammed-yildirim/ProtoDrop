@@ -305,6 +305,119 @@ public class DeleteTransfersJobIntegrationTests : IAsyncLifetime
         Assert.Equal((byte)4, transfer.Status); // Deleted
     }
 
+    // ---- US-023-04: DownloadEvent rows deleted with the transfer (AC-023-4, EC-023-5) ----
+
+    private static DownloadEvent NewDownloadEvent(Guid transferId, Guid? fileId, int i) => new()
+    {
+        TransferId = transferId,
+        FileId = fileId,
+        IpHash = new string('a', 64),
+        UaHash = new string('b', 64),
+        UserAgentFamily = "Chrome",
+        CreatedAtUtc = DateTime.UtcNow.AddDays(-(i % 10) - 5)
+    };
+
+    [Fact]
+    public async Task ThreeFileTransfer_FullyDeleted_AllDownloadEventsGone()
+    {
+        var transferId = Guid.NewGuid();
+        var fileIds = new[] { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
+        for (var k = 0; k < 3; k++)
+        {
+            var blobRefId = Guid.NewGuid();
+            _db.Set<BlobRef>().Add(new BlobRef
+            {
+                Id = blobRefId,
+                BlobPath = $"transfers/00000000-0000-0000-0000-00000000005{k}/blob{k}.dat",
+                SizeBytes = 1024,
+                RefCount = 1,
+                CreatedAtUtc = DateTime.UtcNow.AddDays(-10)
+            });
+            _db.Set<FileItem>().Add(new FileItem
+            {
+                Id = fileIds[k],
+                TransferId = transferId,
+                BlobRefId = blobRefId,
+                OriginalName = $"f{k}.pdf",
+                SizeBytes = 1024,
+                SortOrder = k
+            });
+        }
+        _db.Set<Transfer>().Add(new Transfer
+        {
+            Id = transferId,
+            LinkId = "DELT05A",
+            Status = 2,
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(-7),
+            ExpiredAtUtc = DateTime.UtcNow.AddDays(-4), // past grace
+            MaxDownloads = 1000,
+            SenderName = "Test",
+            TotalBytes = 3072,
+            FileCount = 3,
+            CreatedAtUtc = DateTime.UtcNow.AddDays(-14)
+        });
+
+        var controlId = Guid.NewGuid();
+        _db.Set<Transfer>().Add(new Transfer
+        {
+            Id = controlId,
+            LinkId = "DELT05B",
+            Status = 1,
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(5),
+            MaxDownloads = 1000,
+            SenderName = "Test",
+            TotalBytes = 0,
+            FileCount = 0,
+            CreatedAtUtc = DateTime.UtcNow.AddDays(-1)
+        });
+        await _db.SaveChangesAsync();
+
+        for (var i = 0; i < 100; i++)
+            _db.Set<DownloadEvent>().Add(NewDownloadEvent(transferId, i % 4 == 3 ? null : fileIds[i % 4], i));
+        for (var i = 0; i < 5; i++)
+            _db.Set<DownloadEvent>().Add(NewDownloadEvent(controlId, null, i));
+        await _db.SaveChangesAsync();
+
+        var count = await BuildHandler(_db).RunAsync(DateTime.UtcNow, CancellationToken.None);
+
+        Assert.Equal(1, count);
+
+        var fresh = new WaDbContext(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(_connString).Options);
+        Assert.Equal(0, await fresh.Set<DownloadEvent>().CountAsync(e => e.TransferId == transferId));
+        Assert.Equal(5, await fresh.Set<DownloadEvent>().CountAsync(e => e.TransferId == controlId));
+    }
+
+    [Fact]
+    public async Task ExpiredWithinGrace_KeepsDownloadEvents()
+    {
+        var transferId = Guid.NewGuid();
+        _db.Set<Transfer>().Add(new Transfer
+        {
+            Id = transferId,
+            LinkId = "DELT06A",
+            Status = 2,
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(-3),
+            ExpiredAtUtc = DateTime.UtcNow.AddDays(-1), // inside the 3-day grace
+            MaxDownloads = 100,
+            SenderName = "Test",
+            TotalBytes = 0,
+            FileCount = 0,
+            CreatedAtUtc = DateTime.UtcNow.AddDays(-10)
+        });
+        await _db.SaveChangesAsync();
+        for (var i = 0; i < 4; i++)
+            _db.Set<DownloadEvent>().Add(NewDownloadEvent(transferId, null, i));
+        await _db.SaveChangesAsync();
+
+        var count = await BuildHandler(_db).RunAsync(DateTime.UtcNow, CancellationToken.None);
+
+        Assert.Equal(0, count);
+
+        var fresh = new WaDbContext(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(_connString).Options);
+        Assert.Equal((byte)2, (await fresh.Set<Transfer>().FirstAsync(t => t.Id == transferId)).Status);
+        Assert.Equal(4, await fresh.Set<DownloadEvent>().CountAsync(e => e.TransferId == transferId));
+    }
+
     // ---- NoOp blob store for integration tests (no Azurite needed) ----
 
     private sealed class NoOpBlobStore : wa.application.Ports.IBlobStore

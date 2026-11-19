@@ -14,7 +14,7 @@ public interface IExpiryDeletionStore
     /// <summary>Scan for transfers with Status IN (2,3) AND ExpiredAtUtc + GRACE_DAYS &lt; cutoff. Returns up to batchSize rows ordered by ExpiredAtUtc ASC.</summary>
     Task<IReadOnlyList<TransferDeletionBatchRow>> GetNextBatchAsync(DateTime cutoffUtc, int batchSize, CancellationToken ct);
 
-    /// <summary>In a single transaction: set Status=4, DeletedAtUtc=@now for the given transfer IDs; decrement BlobRef.RefCount per FileItem; delete FileItem + EmailRecipient rows.
+    /// <summary>In a single transaction: set Status=4, DeletedAtUtc=@now for the given transfer IDs; decrement BlobRef.RefCount per FileItem; delete FileItem + EmailRecipient rows and DownloadEvent rows (US-023-04, FR-023-6).
     /// When a BlobRef hits RefCount=0, set PhysicallyDeletedAtUtc = now + 24h (EC-005-4 buffer). Returns rows actually updated.</summary>
     Task<int> DeleteTransfersAsync(IReadOnlyList<Guid> transferIds, DateTime deletedAtUtc, CancellationToken ct);
 
