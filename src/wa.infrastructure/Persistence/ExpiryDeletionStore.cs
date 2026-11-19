@@ -98,6 +98,11 @@ public sealed class ExpiryDeletionStore : IExpiryDeletionStore
         _db.Set<FileItem>().RemoveRange(fileItems);
         await _db.SaveChangesAsync(ct);
 
+        // 6. US-023-04 (FR-023-6): hard-delete the transfers' DownloadEvent rows — analytics live exactly as long as the transfer.
+        await _db.Set<DownloadEvent>()
+            .Where(e => transferIds.Contains(e.TransferId))
+            .ExecuteDeleteAsync(ct);
+
         await tx.CommitAsync(ct);
         return updated;
     }

@@ -22,10 +22,12 @@ public sealed class AdminTransferStore : IAdminTransferStore
     /// </summary>
     public async Task<MarkDeleteResult?> AdminMarkDeletedAsync(Guid id, DateTime deletedAtUtc, CancellationToken ct)
     {
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+
         // 1. Load the row with platform-scoped predicate (Id=@id AND Status != 4 — NO owner predicate).
         var t = await _db.Set<Transfer>()
             .FirstOrDefaultAsync(t => t.Id == id && t.Status != 4, ct);
-        if (t is null) return null; // already-deleted / unknown → handler returns null → NOT_FOUND
+        if (t is null) return null; // already-deleted / unknown → handler returns null → NOT_FOUND (tx disposed → rolled back)
 
         // 2. Soft-delete the row (TA-3.1: NO hard delete).
         t.Status = 4;
@@ -57,8 +59,16 @@ public sealed class AdminTransferStore : IAdminTransferStore
                 }
             }
 
-            await _db.SaveChangesAsync(ct);
         }
+
+        await _db.SaveChangesAsync(ct);
+
+        // 4. US-023-04 (FR-023-6): analytics live exactly as long as the transfer — hard-delete its DownloadEvent rows in the same transaction.
+        await _db.Set<DownloadEvent>()
+            .Where(e => e.TransferId == id)
+            .ExecuteDeleteAsync(ct);
+
+        await tx.CommitAsync(ct);
 
         return new MarkDeleteResult(deletedAtUtc, t.LinkId);
     }

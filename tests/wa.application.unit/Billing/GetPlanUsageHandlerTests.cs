@@ -81,6 +81,19 @@ public class GetPlanUsageHandlerTests
         Assert.Equal(scheduling, r.Scheduling);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Handle_Analytics_MirrorsPlanContextFeature(bool analytics)
+    {
+        var handler = new GetPlanUsageHandler(
+            new StubPlanContext("pro", Limits(107374182400L, 100), new PlanFeatures { Analytics = analytics }), new StubTransferStore());
+
+        var r = await handler.Handle(new GetPlanUsageQuery(UserId), default);
+
+        Assert.Equal(analytics, r.Analytics);
+    }
+
     private sealed class StubPlanContext(string code, LimitsRecord limits, PlanFeatures? features = null) : IPlanContextAccessor
     {
         public Task<PlanContext> GetAsync(CancellationToken cancellationToken = default) =>

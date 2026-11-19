@@ -282,6 +282,9 @@ namespace wa.infrastructure.Persistence.Migrations
                     b.Property<string>("UaHash")
                         .HasColumnType("VARCHAR(64)");
 
+                    b.Property<string>("UserAgentFamily")
+                        .HasColumnType("VARCHAR(64)");
+
                     b.HasKey("Id")
                         .HasName("PK_DownEvent");
 

@@ -13,5 +13,7 @@ public class DownloadEvent
     /// <summary>ISO country code (2 chars).</summary>
     public string? Country { get; set; }
     public string? UaHash { get; set; }
+    /// <summary>UA family at write time (F-PRF-003), never the raw UA.</summary>
+    public string? UserAgentFamily { get; set; }
     public DateTime CreatedAtUtc { get; set; }
 }

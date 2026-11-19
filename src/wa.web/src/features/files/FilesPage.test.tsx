@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../../App'
 import type { StoredProfile } from '../../core/auth/session'
 import { clearSession, writeSession } from '../../core/auth/session'
+import { resetFeatureGates } from '../../core/features/featureGates'
 import { formatBytes } from '../../core/upload/formatBytes'
 import { FILES_PATH } from './filesRoute'
 
@@ -92,6 +93,7 @@ async function flush(): Promise<void> {
 beforeEach(() => {
   installLocalStorageShim()
   clearSession()
+  resetFeatureGates()
 })
 
 afterEach(() => {
@@ -155,7 +157,7 @@ describe('FilesPage (T-009-05)', () => {
       const rowEls = host.querySelectorAll('.mf-row')
       expect(rowEls.length).toBe(5)          // exactly the remaining 5 render (page REPLACES rows)
       expect(rowEls[0].querySelector('.mf-name')!.getAttribute('title')).toBe('Page2 Row 1')   // provably the 2nd page
-      expect(captured.calls[1]).toContain('cursor=CURSOR_PAGE2')   // the opaque cursor is forwarded verbatim (TA-4.1.4)
+      expect(captured.calls.filter((c) => c.includes('/transfers'))[1]).toContain('cursor=CURSOR_PAGE2')   // the opaque cursor is forwarded verbatim (TA-4.1.4)
 
       const nextBtnAfter = host.querySelectorAll('.mf-next')[0] as HTMLButtonElement
       expect(nextBtnAfter.disabled).toBe(true)   // nextCursor null → last page
@@ -252,7 +254,7 @@ describe('FilesPage (T-009-05)', () => {
     const { host, cleanup } = renderAppAtFiles()
     try {
       await flush()
-      const initialFetchCount = captured.calls.length   // the initial fetch — nothing else is allowed (AC-009-3).
+      const initialFetchCount = captured.calls.filter((c) => c.includes('/transfers')).length   // the initial fetch — nothing else is allowed (AC-009-3).
       expect(initialFetchCount).toBe(1)
 
       // Advance 65 fake seconds: advanceTimersByTime both fires the component's 1s interval and
@@ -264,7 +266,7 @@ describe('FilesPage (T-009-05)', () => {
       const rowEl = host.querySelectorAll('.mf-row')[0] as HTMLElement
       expect(rowEl.textContent).toContain('Expired')   // the countdown flipped to "Expired {date}" client-side.
       expect(rowEl.textContent).not.toContain('expires in')
-      expect(captured.calls.length).toBe(initialFetchCount)   // no per-second server calls (AC-009-3 client half).
+      expect(captured.calls.filter((c) => c.includes('/transfers')).length).toBe(initialFetchCount)   // no per-second server calls (AC-009-3 client half).
     } finally {
       cleanup()
     }
@@ -603,7 +605,7 @@ describe('FilesPage (T-009-05)', () => {
     const { host, cleanup } = renderAppAtFiles()
     try {
       await flush()
-      const initialCalls = captured.calls.length   // exactly the initial list fetch — nothing else is allowed.
+      const initialCalls = captured.calls.filter((c) => c.includes('/transfers')).length   // exactly the initial list fetch — nothing else is allowed.
 
       const deleteBtn = Array.from(host.querySelectorAll('.mf-actions button')) as HTMLButtonElement[]
       await act(async () => {
@@ -617,7 +619,7 @@ describe('FilesPage (T-009-05)', () => {
         cancelBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
       expect(host.querySelector('.pf-modal')).toBeNull()   // the modal closed.
-      expect(captured.calls.length).toBe(initialCalls)     // nothing sent on Cancel.
+      expect(captured.calls.filter((c) => c.includes('/transfers')).length).toBe(initialCalls)     // nothing sent on Cancel.
 
       // Escape closes it too — still nothing sent.
       await act(async () => {
@@ -629,7 +631,7 @@ describe('FilesPage (T-009-05)', () => {
         window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
       })
       expect(host.querySelector('.pf-modal')).toBeNull()       // Escape closed it (closeDelete — nothing sent).
-      expect(captured.calls.length).toBe(initialCalls)         // still nothing sent on Escape.
+      expect(captured.calls.filter((c) => c.includes('/transfers')).length).toBe(initialCalls)         // still nothing sent on Escape.
     } finally {
       cleanup()
     }
@@ -678,6 +680,57 @@ describe('FilesPage (T-009-05)', () => {
     } finally {
       // cleanup already ran inside the try for the restore assertion — no-op on second call is safe.
       host.remove()
+    }
+  })
+})
+
+// US-023-01 (FR-023-5, FR-044-7): the Downloads action exists only with feature.analytics on.
+describe('FilesPage Downloads action (US-023-01)', () => {
+  const listResponder = (): Response => new Response(JSON.stringify({ items: makeRows(2, 1, 3600_000), nextCursor: null }), { status: 200 })
+
+  it('GateOff_NoDownloadsButton', async () => {
+    stubFetch({ calls: [] }, listResponder)
+    const { host, cleanup } = renderAppAtFiles()
+    try {
+      await flush()
+      expect(host.querySelectorAll('.mf-row').length).toBe(2)
+      expect(Array.from(host.querySelectorAll('.mf-actions button')).some((b) => b.textContent === 'Downloads')).toBe(false)
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('GateOn_DownloadsToggle_OpensPanel_AriaExpanded', async () => {
+    const captured: { calls: string[] } = { calls: [] }
+    stubFetch(captured, (req) => {
+      if (req.url.endsWith('/features')) return new Response(JSON.stringify({ 'feature.analytics': true }), { status: 200 })
+      if (req.url.endsWith('/billing/plan')) return new Response(JSON.stringify({ features: { analytics: false } }), { status: 200 })
+      return listResponder()
+    })
+    const { host, cleanup } = renderAppAtFiles()
+    try {
+      await flush()
+      const buttons = Array.from(host.querySelectorAll('.mf-actions button')).filter((b) => b.textContent === 'Downloads') as HTMLButtonElement[]
+      expect(buttons).toHaveLength(2)
+      expect(buttons[0].getAttribute('aria-expanded')).toBe('false')
+      expect(host.querySelector('.mf-dl-row')).toBeNull()
+
+      await act(async () => { buttons[0].click() })
+      await flush()
+      expect(buttons[0].getAttribute('aria-expanded')).toBe('true')
+      expect(host.querySelectorAll('.mf-dl-row')).toHaveLength(1)
+      expect(host.querySelector('.mf-dl-row')!.textContent).toContain('Pro plan required')
+
+      await act(async () => { buttons[1].click() })   // one open panel at a time
+      await flush()
+      expect(buttons[0].getAttribute('aria-expanded')).toBe('false')
+      expect(host.querySelectorAll('.mf-dl-row')).toHaveLength(1)
+
+      await act(async () => { buttons[1].click() })
+      expect(host.querySelector('.mf-dl-row')).toBeNull()
+      expect(captured.calls.some((c) => c.includes('/analytics'))).toBe(false)
+    } finally {
+      cleanup()
     }
   })
 })

@@ -239,7 +239,7 @@ public class ScheduledSendTimerIntegrationTests : IAsyncLifetime
         var id = await SeedAsync("SCHED06A", TransferStatus.Scheduled, T0.AddHours(1), T0.AddDays(7), maxDownloads: 1, downloads: 1);
 
         var result = await new PublicTransferStore(new WaDbContext(_options))
-            .RecordSingleFileDownloadAsync(id, Guid.NewGuid(), null, null, CancellationToken.None);
+            .RecordSingleFileDownloadAsync(id, Guid.NewGuid(), null, null, null, CancellationToken.None);
 
         Assert.Equal(SingleFileDownloadOutcome.CapReached, result.Outcome);
         Assert.Equal(TransferStatus.DownloadLimit, await StatusAsync(id));

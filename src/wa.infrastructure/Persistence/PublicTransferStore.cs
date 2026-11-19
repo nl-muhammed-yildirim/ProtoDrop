@@ -46,6 +46,7 @@ public sealed class PublicTransferStore : IPublicTransferStore
         Guid fileId,
         string? ipHash,
         string? uaHash,
+        string? userAgentFamily,
         CancellationToken ct)
     {
         // TA-7.2 step 4: the guard runs in the UPDATE itself — rowsAffected==1 iff the download is within cap at execution time.
@@ -75,6 +76,7 @@ public sealed class PublicTransferStore : IPublicTransferStore
             FileId = fileId,
             IpHash = ipHash,
             UaHash = uaHash,
+            UserAgentFamily = userAgentFamily,
             CreatedAtUtc = DateTime.UtcNow
         });
         await _db.SaveChangesAsync(ct);
@@ -92,6 +94,7 @@ public sealed class PublicTransferStore : IPublicTransferStore
         Guid transferId,
         string? ipHash,
         string? uaHash,
+        string? userAgentFamily,
         CancellationToken ct)
     {
         // TA-7.2 step 4: the guard runs in the UPDATE itself — rowsAffected==1 iff the download is within cap at execution time.
@@ -122,6 +125,7 @@ public sealed class PublicTransferStore : IPublicTransferStore
             FileId = null, // download-all
             IpHash = ipHash,
             UaHash = uaHash,
+            UserAgentFamily = userAgentFamily,
             CreatedAtUtc = DateTime.UtcNow
         });
         await _db.SaveChangesAsync(ct);

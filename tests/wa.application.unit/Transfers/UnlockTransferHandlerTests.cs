@@ -232,10 +232,10 @@ public class UnlockTransferHandlerTests
             return Task.FromResult<(Transfer?, IReadOnlyList<PublicFileItem>)>((Transfer, []));
         }
 
-        public Task<SingleFileDownloadResult> RecordSingleFileDownloadAsync(Guid transferId, Guid fileId, string? ipHash, string? uaHash, CancellationToken ct) =>
+        public Task<SingleFileDownloadResult> RecordSingleFileDownloadAsync(Guid transferId, Guid fileId, string? ipHash, string? uaHash, string? userAgentFamily, CancellationToken ct) =>
             Task.FromException<SingleFileDownloadResult>(new NotSupportedException("Not used by UnlockTransferHandler (T-003-04); T-003-06's handler tests carry their own stub."));
 
-        public Task<SingleFileDownloadResult> RecordZipDownloadAsync(Guid transferId, string? ipHash, string? uaHash, CancellationToken ct) =>
+        public Task<SingleFileDownloadResult> RecordZipDownloadAsync(Guid transferId, string? ipHash, string? uaHash, string? userAgentFamily, CancellationToken ct) =>
             Task.FromException<SingleFileDownloadResult>(new NotSupportedException("Not used by UnlockTransferHandler (T-003-04); T-004-02's handler tests carry their own stub."));
 
         public void Setup(int status, string? passwordHash, string? senderEmail = null) =>
