@@ -600,16 +600,28 @@ public class SendNotificationEmailsHandlerTests
 
     // ---- US-021-02: org branding in the notification email ----
 
-    private EventEnvelope ArrangeBrandingTransfer(Guid? ownerId)
+    private EventEnvelope ArrangeBrandingTransfer(Guid? ownerId, string senderName = "Anna K.")
     {
         var transferId = Guid.NewGuid();
         _store.Context = new EmailTransferContext(
-            transferId, "Anna K.", null, DateTime.UtcNow.AddDays(30), "ABCD1234", [new FileEntry("file.txt", 1024)], ownerId);
+            transferId, senderName, null, DateTime.UtcNow.AddDays(30), "ABCD1234", [new FileEntry("file.txt", 1024)], ownerId);
         _store.Recipients = new List<EmailRecipient>
         {
             new() { Id = Guid.NewGuid(), TransferId = transferId, Address = "a@x.com" }
         };
         return CreateEnvelope(transferId, ["a@x.com"]);
+    }
+
+    [Fact]
+    public async Task Handle_PerTransferNameWithOrg_SubjectOrgThenPerson() // AC-021-2
+    {
+        var envelope = ArrangeBrandingTransfer(Guid.NewGuid(), "Anna");
+        _branding.Row = new SenderBrandingRow("pro", "Studio Nova", null);
+
+        await _handler.HandleAsync(envelope, 1, 5, CancellationToken.None);
+
+        var sent = Assert.Single(_emailSender.Sent);
+        Assert.Equal("Transfer from Studio Nova — Anna", sent.Subject);
     }
 
     [Fact]

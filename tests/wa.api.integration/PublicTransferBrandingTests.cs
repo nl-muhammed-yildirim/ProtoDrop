@@ -100,6 +100,18 @@ public class PublicTransferBrandingTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task PerTransferNameWinsOverDisplayName_ReturnsPersonAndOrg() // AC-021-2
+    {
+        var ownerId = await SeedOwnerAsync("pro", "Studio Nova"); // profile DisplayName is "Alice"
+        await SeedActiveTransferAsync(ownerId, "e1b2c3d4", "Anna");
+
+        var root = await GetAsync("e1b2c3d4");
+
+        Assert.Equal("Anna", root.GetProperty("from").GetString());
+        Assert.Equal("Studio Nova", root.GetProperty("orgName").GetString());
+    }
+
+    [Fact]
     public async Task Migration_AddsNullableOrgColumns()
     {
         await using var conn = new SqlConnection(_connString);
@@ -144,7 +156,7 @@ public class PublicTransferBrandingTests : IAsyncLifetime
         return user.Id;
     }
 
-    private async Task SeedActiveTransferAsync(Guid ownerId, string linkId)
+    private async Task SeedActiveTransferAsync(Guid ownerId, string linkId, string senderName = "Alice")
     {
         _db.Set<Transfer>().Add(new Transfer
         {
@@ -154,7 +166,7 @@ public class PublicTransferBrandingTests : IAsyncLifetime
             ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
             MaxDownloads = 5,
             DownloadsCount = 0,
-            SenderName = "Alice",
+            SenderName = senderName,
             OwnerAppUserId = ownerId,
             TotalBytes = 0,
             FileCount = 0,

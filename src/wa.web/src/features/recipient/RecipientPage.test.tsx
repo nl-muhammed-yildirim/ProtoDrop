@@ -1416,4 +1416,41 @@ describe('RecipientPage (F-PRF-001 US-021-01 — org branding in the From headin
     expect(host.querySelector('.rp-heading')?.textContent).toBe('From: Anna K. · Studio Nova')
     host.remove()
   })
+
+  it('shows person first, org second (AC-021-2)', async () => {
+    stubFetch(200, activeBody({ from: 'Anna', orgName: 'Studio Nova' }))
+
+    const host = await renderApp(isActive)
+
+    expect(host.querySelector('.rp-heading')?.textContent).toBe('From: Anna · Studio Nova')
+    host.remove()
+  })
+
+  it('drops the separator when the person name is blank', async () => {
+    stubFetch(200, activeBody({ from: '', orgName: 'Studio Nova' }))
+
+    const host = await renderApp(isActive)
+
+    expect(host.querySelector('.rp-heading')?.textContent).toBe('From: Studio Nova')
+    expect(host.querySelector('.rp-heading')?.textContent).not.toContain('·')
+    host.remove()
+  })
+
+  it('falls back to Anonymous when both parts are blank', async () => {
+    stubFetch(200, activeBody({ from: '', orgName: null }))
+
+    const host = await renderApp(isActive)
+
+    expect(host.querySelector('.rp-heading')?.textContent).toBe('From: Anonymous')
+    host.remove()
+  })
+
+  it('uses the same composition on the gate heading', async () => {
+    stubFetch(200, activeBody({ from: '', passwordRequired: true, orgName: 'Studio Nova' }))
+
+    const host = await renderApp(isGatedActive)
+
+    expect(host.querySelector('.rp-heading')?.textContent).toBe('From: Studio Nova')
+    host.remove()
+  })
 })

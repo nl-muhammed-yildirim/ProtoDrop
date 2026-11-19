@@ -8,6 +8,7 @@ import { useAriaLive } from '../../core/ui/useAriaLive'
 import { toastRole } from '../../core/ui/toastRole'
 import { trackGrowthCta } from './growthTelemetry'
 import { useRecipientStore } from './RecipientStore'
+import { formatSenderLine } from './senderLine'
 
 // T-004-03: failure toast auto-dismiss (App.tsx 5 s toast precedent).
 const TOAST_DISMISS_MS = 5000
@@ -211,7 +212,7 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
       <section className="rp rp-gate" aria-label={i18n.t('recipient.gate.sectionAria', { name: from })}>
         <h1 className="rp-heading">
           {orgLogoUrl !== null && <img className="rp-org-logo" src={orgLogoUrl} alt="" />}
-          {i18n.t('recipient.gate.fromHeading')}{from}{orgName !== null && ` · ${orgName}`}
+          {i18n.t('recipient.gate.fromHeading')}{formatSenderLine(from, orgName)}
         </h1>
         <form className="rp-password-card" onSubmit={handleSubmit}>
           <label className="rp-password-label" htmlFor="rp-password-input">{i18n.t('recipient.gate.passwordLabel')}</label>
@@ -266,7 +267,7 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
       {recipientLive}
       <h1 className="rp-heading">
         {orgLogoUrl !== null && <img className="rp-org-logo" src={orgLogoUrl} alt="" />}
-        {i18n.t('recipient.active.fromHeading')}{from}{orgName !== null && ` · ${orgName}`}
+        {i18n.t('recipient.active.fromHeading')}{formatSenderLine(from, orgName)}
       </h1>
       {/* Note as plain-text blockquote — no markdown (TA-8.2); overflow-wrap handles long unbroken URLs. */}
       {note && note.trim() !== '' && (
