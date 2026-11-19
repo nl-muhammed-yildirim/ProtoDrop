@@ -259,5 +259,17 @@
   "admin.erasures.retry": "Erneut versuchen",
   "admin.erasures.prev": "Zurück",
   "admin.erasures.next": "Weiter",
-  "admin.erasures.loading": "Löschungen werden geladen…"
+  "admin.erasures.loading": "Löschungen werden geladen…",
+  "files.analytics.toggle": "Downloads",
+  "files.analytics.total": "Downloads gesamt",
+  "files.analytics.topCountry": "Top-Land",
+  "files.analytics.topBrowser": "Top-Browser",
+  "files.analytics.empty": "Noch keine Downloads.",
+  "files.analytics.proRequired": "Pro-Tarif erforderlich",
+  "files.analytics.seePlans": "Tarife ansehen",
+  "files.analytics.unknownCountry": "Unbekannt",
+  "files.analytics.otherBrowser": "Andere",
+  "files.analytics.error": "Download-Statistiken konnten nicht geladen werden.",
+  "files.analytics.loading": "Downloads werden geladen…",
+  "files.analytics.chartLabel": "Downloads pro Tag"
 }

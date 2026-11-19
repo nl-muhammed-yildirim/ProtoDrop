@@ -91,7 +91,7 @@ public sealed class GetFileDownloadUrlHandler : IRequestHandler<GetFileDownloadU
         // TA-7.2 step 4: the atomic cap check — store-owned (guarded increment + idempotent flip). The handler never
         // pre-reads DownloadsCount: a stale read would race; only the UPDATE's rowsAffected is authoritative.
         var record = await _store.RecordSingleFileDownloadAsync(
-            transfer.Id, fileId, IpHash(request.ClientIp), UaHash(request.UserAgent), cancellationToken);
+            transfer.Id, fileId, IpHash(request.ClientIp), UaHash(request.UserAgent), wa.domain.Analytics.BrowserFamily.FromUserAgent(request.UserAgent), cancellationToken);
         if (record.Outcome == SingleFileDownloadOutcome.CapReached)
             return new FileDownloadResult(FileDownloadState.DownloadLimit, SenderEmail: transfer.SenderEmail);
 

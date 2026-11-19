@@ -107,7 +107,7 @@ public sealed class GetDownloadAllUrlHandler : IRequestHandler<GetDownloadAllUrl
         {
             // TA-7.2 step 4: the atomic cap check — store-owned (guarded increment + idempotent flip).
             var record = await _store.RecordZipDownloadAsync(
-                transfer.Id, IpHash(request.ClientIp), UaHash(request.UserAgent), cancellationToken);
+                transfer.Id, IpHash(request.ClientIp), UaHash(request.UserAgent), wa.domain.Analytics.BrowserFamily.FromUserAgent(request.UserAgent), cancellationToken);
             if (record.Outcome == SingleFileDownloadOutcome.CapReached)
                 return new DownloadAllResult(DownloadAllState.DownloadLimit, SenderEmail: transfer.SenderEmail);
 

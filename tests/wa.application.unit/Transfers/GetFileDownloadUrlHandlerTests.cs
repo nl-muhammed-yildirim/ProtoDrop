@@ -72,6 +72,24 @@ public class GetFileDownloadUrlHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Ok_PassesUserAgentFamily_NotRawUa()
+    {
+        const string chromeUa = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+        var fileId = Guid.NewGuid();
+        _store.SetupActive(files: [new PublicFileItem(fileId, "a.txt", 10)], maxDownloads: 5, downloadsCount: 0);
+
+        var result = await _handler.Handle(
+            new GetFileDownloadUrlQuery("abcdefgh", fileId.ToString("n"), ClientIp: "1.2.3.4", UserAgent: chromeUa), CancellationToken.None);
+
+        Assert.Equal(FileDownloadState.Ok, result.State);
+        var rec = Assert.Single(_store.Records);
+        Assert.Equal("Chrome", rec.UserAgentFamily);
+        Assert.NotEqual(chromeUa, rec.IpHash);
+        Assert.NotEqual(chromeUa, rec.UaHash);
+        Assert.NotEqual(chromeUa, rec.UserAgentFamily);
+    }
+
+    [Fact]
     public async Task Handle_Ok_NullClientIpAndUserAgent_RecordNullHashes()
     {
         _store.SetupActive(files: [new PublicFileItem(Guid.NewGuid(), "a.txt", 10)], maxDownloads: 5, downloadsCount: 0);
@@ -283,20 +301,20 @@ public class GetFileDownloadUrlHandlerTests
         public SingleFileDownloadOutcome RecordOutcome { get; set; } = SingleFileDownloadOutcome.Recorded;
 
         /// <summary>The (transferId, fileId, ipHash, uaHash) tuples the handler passed to RecordSingleFileDownloadAsync — asserted, not faked.</summary>
-        public List<(Guid TransferId, Guid FileId, string? IpHash, string? UaHash)> Records { get; } = [];
+        public List<(Guid TransferId, Guid FileId, string? IpHash, string? UaHash, string? UserAgentFamily)> Records { get; } = [];
 
         public Task<(Transfer?, IReadOnlyList<PublicFileItem>)> GetByLinkIdAsync(string linkId, CancellationToken ct) =>
             linkId.Length == 8 && Transfer is not null
                 ? Task.FromResult<(Transfer?, IReadOnlyList<PublicFileItem>)>((Transfer, Files ?? []))
                 : Task.FromResult<(Transfer?, IReadOnlyList<PublicFileItem>)>((null, []));
 
-        public Task<SingleFileDownloadResult> RecordSingleFileDownloadAsync(Guid transferId, Guid fileId, string? ipHash, string? uaHash, CancellationToken ct)
+        public Task<SingleFileDownloadResult> RecordSingleFileDownloadAsync(Guid transferId, Guid fileId, string? ipHash, string? uaHash, string? userAgentFamily, CancellationToken ct)
         {
-            Records.Add((transferId, fileId, ipHash, uaHash));
+            Records.Add((transferId, fileId, ipHash, uaHash, userAgentFamily));
             return Task.FromResult(new SingleFileDownloadResult(RecordOutcome));
         }
 
-        public Task<SingleFileDownloadResult> RecordZipDownloadAsync(Guid transferId, string? ipHash, string? uaHash, CancellationToken ct) =>
+        public Task<SingleFileDownloadResult> RecordZipDownloadAsync(Guid transferId, string? ipHash, string? uaHash, string? userAgentFamily, CancellationToken ct) =>
             Task.FromResult(new SingleFileDownloadResult(RecordOutcome)); // not called by this handler (T-004-02 is a separate endpoint)
 
         public void SetupActive(IReadOnlyList<PublicFileItem> files, int maxDownloads, int downloadsCount, string? passwordHash = null) =>

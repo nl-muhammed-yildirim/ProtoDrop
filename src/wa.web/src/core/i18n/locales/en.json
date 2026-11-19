@@ -259,5 +259,17 @@
   "admin.erasures.retry": "Try again",
   "admin.erasures.prev": "Previous",
   "admin.erasures.next": "Next",
-  "admin.erasures.loading": "Loading erasures…"
+  "admin.erasures.loading": "Loading erasures…",
+  "files.analytics.toggle": "Downloads",
+  "files.analytics.total": "Total downloads",
+  "files.analytics.topCountry": "Top country",
+  "files.analytics.topBrowser": "Top browser",
+  "files.analytics.empty": "No downloads yet.",
+  "files.analytics.proRequired": "Pro plan required",
+  "files.analytics.seePlans": "See plans",
+  "files.analytics.unknownCountry": "Unknown",
+  "files.analytics.otherBrowser": "Other",
+  "files.analytics.error": "Download statistics could not be loaded.",
+  "files.analytics.loading": "Loading downloads…",
+  "files.analytics.chartLabel": "Downloads per day"
 }

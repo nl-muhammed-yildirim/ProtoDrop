@@ -546,10 +546,10 @@ public class GetPublicTransferHandlerTests
             return Task.FromResult<(Transfer?, IReadOnlyList<PublicFileItem>)>((Transfer, Files ?? []));
         }
 
-        public Task<SingleFileDownloadResult> RecordSingleFileDownloadAsync(Guid transferId, Guid fileId, string? ipHash, string? uaHash, CancellationToken ct) =>
+        public Task<SingleFileDownloadResult> RecordSingleFileDownloadAsync(Guid transferId, Guid fileId, string? ipHash, string? uaHash, string? userAgentFamily, CancellationToken ct) =>
             Task.FromException<SingleFileDownloadResult>(new NotSupportedException("Not used by GetPublicTransferHandler (T-014); T-003-06's handler tests carry their own stub."));
 
-        public Task<SingleFileDownloadResult> RecordZipDownloadAsync(Guid transferId, string? ipHash, string? uaHash, CancellationToken ct) =>
+        public Task<SingleFileDownloadResult> RecordZipDownloadAsync(Guid transferId, string? ipHash, string? uaHash, string? userAgentFamily, CancellationToken ct) =>
             Task.FromException<SingleFileDownloadResult>(new NotSupportedException("Not used by GetPublicTransferHandler (T-014); T-004-02's handler tests carry their own stub."));
 
         public void SetupActive(IReadOnlyList<PublicFileItem> files, int maxDownloads, int downloadsCount, string? passwordHash) =>

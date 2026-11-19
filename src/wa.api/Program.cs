@@ -74,6 +74,8 @@ builder.Services.AddSingleton<wa.application.UseCases.Transfers.ITransferStore>(
 builder.Services.AddSingleton<wa.application.UseCases.Transfers.ISendStore>(sp => new wa.infrastructure.Persistence.SendStore(sp.GetRequiredService<WaDbContext>(), sp.GetRequiredService<wa.application.Ports.IBlobStore>()));
 // T-014 (TA-4.2#4): recipient-page handler's DB surface — thin adapter over the adapter-owned WaDbContext.
 builder.Services.AddSingleton<wa.application.UseCases.Transfers.IPublicTransferStore>(sp => new wa.infrastructure.Persistence.PublicTransferStore(sp.GetRequiredService<WaDbContext>()));
+// US-023-01 (F-PRF-003): download analytics read port (GET /transfers/{id}/analytics).
+builder.Services.AddSingleton<wa.application.UseCases.Transfers.ITransferAnalyticsStore>(sp => new wa.infrastructure.Persistence.TransferAnalyticsStore(sp.GetRequiredService<WaDbContext>()));
 // US-021-01: sender branding read port (org name beside the sender on the recipient page).
 builder.Services.AddSingleton<wa.application.UseCases.Transfers.ISenderBrandingStore>(sp => new wa.infrastructure.Persistence.SenderBrandingStore(sp.GetRequiredService<WaDbContext>()));
 // US-021-04: org logo path write port (DELETE /auth/me/logo).
@@ -1225,6 +1227,25 @@ app.MapGet("/api/v1/transfers/{id}", async (Guid id, HttpContext ctx, ISender se
     }, statusCode: 200);
 });
 
+// US-023-01 (TA-4.2#24, FR-023-1/5): GET /api/v1/transfers/{id}/analytics — owner, Pro+ (403), phase gate (404 FEATURE_DISABLED).
+app.MapGet("/api/v1/transfers/{id}/analytics", async (Guid id, HttpContext ctx, ISender sender, CancellationToken ct) =>
+{
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+    wa.domain.Analytics.TransferAnalytics? r;
+    try { r = await sender.Send(new GetTransferAnalyticsQuery(id, userId), ct); }
+    catch (AnalyticsForbiddenException ex) { throw new BusinessException(ProblemCodes.Forbidden, ex.Message); }
+    if (r is null) throw new BusinessException(ProblemCodes.NotFound, "Transfer not found.");
+    // AC-023-2: aggregates only — no IpHash / UaHash / raw IP / raw UA in the body.
+    return Results.Json(new
+    {
+        total = r.Total,
+        daily = r.Daily.Select(d => new { date = d.Day.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), count = d.Count }),
+        countries = r.Countries.Select(c => new { code = c.Key, count = c.Count }),
+        browsers = r.Browsers.Select(b => new { family = b.Key, count = b.Count })
+    }, statusCode: 200);
+}).RequireFeature(FeatureGates.Analytics);
+
 // T-009-04 (TA-4.2#17 / FR-009-3): DELETE /api/v1/transfers/{id} — owner delete, soft-delete + refcount path.
 app.MapDelete("/api/v1/transfers/{id}", async (Guid id, HttpContext ctx, ISender sender, CancellationToken ct) =>
 {
@@ -1456,7 +1477,7 @@ app.MapGet("/api/v1/billing/plan", async (HttpContext ctx, ISender sender, Cance
         storage = new { usedBytes = r.StorageUsedBytes, allowedBytes = r.StorageAllowedBytes },
         activeTransfers = new { used = r.ActiveTransfersUsed, allowed = r.ActiveTransfersAllowed },
         limits = new { maxTransferSize = r.MaxTransferSize, maxSingleFile = r.MaxSingleFile },
-        features = new { scheduling = r.Scheduling },   // US-022-01 (FR-022-3, D-6)
+        features = new { scheduling = r.Scheduling, analytics = r.Analytics },   // US-022-01 (FR-022-3, D-6)
         scheduleWindow = new { minMinutes = wa.domain.Transfers.ScheduleWindow.MinMinutes, maxDays = wa.domain.Transfers.ScheduleWindow.MaxDays }   // US-022-03 (FR-022-2)
     });
 });

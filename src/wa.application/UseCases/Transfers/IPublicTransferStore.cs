@@ -21,6 +21,7 @@ public interface IPublicTransferStore
         Guid fileId,
         string? ipHash,
         string? uaHash,
+        string? userAgentFamily,
         CancellationToken ct);
 
     /// <summary>
@@ -33,6 +34,7 @@ public interface IPublicTransferStore
         Guid transferId,
         string? ipHash,
         string? uaHash,
+        string? userAgentFamily,
         CancellationToken ct);
 }
 

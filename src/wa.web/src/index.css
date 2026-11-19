@@ -1219,6 +1219,57 @@ main:has(.sl) .dz {
   border-bottom: 1px solid var(--border);
 }
 
+/* US-023-01 (F-PRF-003): inline Downloads panel under a My Files row — tokens only. */
+.mf-dl-row {
+  list-style: none;
+  padding: 12px 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.mf-dl-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.mf-dl-chart {
+  width: 100%;
+  max-width: 480px;
+  height: 60px;
+  border-bottom: 1px solid var(--border);
+}
+
+.mf-dl-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mf-dl-chip {
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+}
+
+.mf-dl-chip strong { color: var(--fg); font-weight: 600; }
+
+.mf-dl-pro {
+  padding: 12px 16px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+}
+
+.mf-dl-empty {
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--fg-muted);
+}
+
 .mf-name {
   flex: 1;
   min-width: 0; /* allow ellipsis inside a flex item */

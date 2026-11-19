@@ -259,5 +259,17 @@
   "admin.erasures.retry": "Tentar novamente",
   "admin.erasures.prev": "Anterior",
   "admin.erasures.next": "Seguinte",
-  "admin.erasures.loading": "A carregar eliminações…"
+  "admin.erasures.loading": "A carregar eliminações…",
+  "files.analytics.toggle": "Transferências",
+  "files.analytics.total": "Total de transferências",
+  "files.analytics.topCountry": "País principal",
+  "files.analytics.topBrowser": "Navegador principal",
+  "files.analytics.empty": "Ainda não há transferências.",
+  "files.analytics.proRequired": "Plano Pro necessário",
+  "files.analytics.seePlans": "Ver planos",
+  "files.analytics.unknownCountry": "Desconhecido",
+  "files.analytics.otherBrowser": "Outro",
+  "files.analytics.error": "Não foi possível carregar as estatísticas de transferências.",
+  "files.analytics.loading": "A carregar transferências…",
+  "files.analytics.chartLabel": "Transferências por dia"
 }
