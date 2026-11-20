@@ -41,5 +41,10 @@ Per task found in `Ready`:
 
 Do not start coding while the item is still `Ready`, do not leave it `In progress` once coding is done, and do not move it to `In review` before its commit + PR exist — the column IS the workflow state. If a run dies mid-task, re-set `In progress` before re-dispatching (it already was) or set back to `Backlog` only when escalating.
 
+### Multiple Ready items at once
+- **Several READY blocks in one wake** → process them sequentially in ascending issue number: each task runs its full cycle through `In review` before the next starts (only one Coder subagent at a time — VRAM rule).
+- **A new READY block arrives while another task is already in flight** (an item is already `In progress`, or a claimed block still appears in the watchdog's current output) → do NOT start the newcomer; leave it in `Ready`. It self-wakes later: when the in-flight task moves to Done/Backlog, its block disappears from the watchdog output and that shrinkage fires the next wake with only the remaining block — start the leftover then.
+- **Claim guard (race between concurrent wakes):** before starting a task, check whether any item is already `In progress` on the board (`python scripts/board-status.py list`). If one exists and it isn't yours, wait — end the turn; the next change will re-wake you. Set your own item to `In progress` as early as possible (immediately after verifying the plan file exists) so a concurrent session sees the claim.
+
 ## Extension
 - Before Codegraph extension execution, run auto compaction beforehand.
