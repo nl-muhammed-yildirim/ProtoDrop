@@ -65,14 +65,24 @@ def main() -> None:
     as_json = "--json" in sys.argv[1:]
     tok = gh_token()
 
-    q = """{ node(id: %s) { ... on ProjectV2 { items(first: 100) { nodes { id type
-      status: fieldValueByName(name: "Status") { __typename
-        ... on ProjectV2ItemFieldSingleSelectValue { name } }
-      content { __typename ... on Issue { number title url } } } } } } }""" % json.dumps(BOARD_ID)
+    nodes = []
+    after = None
+    while True:
+        q = ("""{ node(id: %s) { ... on ProjectV2 { items(first: 100, after: %s) {
+          pageInfo { hasNextPage endCursor }
+          nodes { id type
+            status: fieldValueByName(name: "Status") { __typename
+              ... on ProjectV2ItemFieldSingleSelectValue { name } }
+            content { __typename ... on Issue { number title url } } } } } } }""") % (
+            json.dumps(BOARD_ID), json.dumps(after))
+        page = gql(tok, q)["data"]["node"]["items"]
+        nodes.extend(page["nodes"])
+        if not page["pageInfo"]["hasNextPage"]:
+            break
+        after = page["pageInfo"]["endCursor"]
 
-    data = gql(tok, q)["data"]["node"]
     ready = [
-        n for n in data["items"]["nodes"]
+        n for n in nodes
         if (n.get("status") or {}).get("name") == "Ready"
         and (n.get("content") or {}).get("__typename") == "Issue"
     ]
