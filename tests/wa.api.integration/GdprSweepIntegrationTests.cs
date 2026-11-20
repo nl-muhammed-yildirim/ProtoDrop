@@ -59,8 +59,16 @@ public class GdprSweepIntegrationTests : IAsyncLifetime
     {
         _db.Set<Transfer>().Add(new Transfer
         {
-            Id = Guid.NewGuid(), LinkId = link, OwnerAppUserId = owner, Status = status, ExpiresAtUtc = DateTime.UtcNow.AddDays(3),
-            MaxDownloads = 10, SenderName = "S", TotalBytes = 100, FileCount = 0, CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
+            Id = Guid.NewGuid(),
+            LinkId = link,
+            OwnerAppUserId = owner,
+            Status = status,
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(3),
+            MaxDownloads = 10,
+            SenderName = "S",
+            TotalBytes = 100,
+            FileCount = 0,
+            CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
         });
         await _db.SaveChangesAsync();
     }

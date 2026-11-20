@@ -19,4 +19,8 @@ public static class PiiTransforms
         using var hmac = new HMACSHA256(hmacKey);
         return Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(ip))).ToLowerInvariant();
     }
+
+    /// <summary>User-Agent → lowercase HMAC-SHA256 hex (64 chars) keyed by the SAME key as <see cref="IpAddress"/> (TA-9.3/TA-9.4) —
+    /// matches the DownloadEvent.UaHash column comment (HMAC(UA)).</summary>
+    public static string UserAgent(string userAgent, byte[] hmacKey) => IpAddress(userAgent, hmacKey);
 }

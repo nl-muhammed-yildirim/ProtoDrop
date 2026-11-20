@@ -3,10 +3,12 @@ using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using wa.application.Events;
+using wa.application.Limits;
 using wa.application.Ports;
 using wa.application.Telemetry;
 using wa.domain;
 using wa.domain.Telemetry;
+using wa.domain.Transfers;
 
 namespace wa.application.UseCases.Transfers;
 
@@ -24,6 +26,8 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
     private readonly WaTelemetryReporter _telemetry;
     private readonly IConfiguration _config;
     private readonly ILogger<SendNotificationEmailsHandler> _logger;
+    private readonly ISenderBrandingStore _branding;
+    private readonly IFeaturesProvider _features;
 
     public SendNotificationEmailsHandler(
         IEmailStore store,
@@ -33,8 +37,12 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
         EventDeduplicator deduplicator,
         WaTelemetryReporter telemetry,
         IConfiguration config,
-        ILogger<SendNotificationEmailsHandler> logger)
+        ILogger<SendNotificationEmailsHandler> logger,
+        ISenderBrandingStore branding,
+        IFeaturesProvider features)
     {
+        _branding = branding;
+        _features = features;
         _store = store;
         _emailSender = emailSender;
         _templateRenderer = templateRenderer;
@@ -75,6 +83,14 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
             return;
         }
 
+        // 3b. US-022-04 (FR-022-4, D-1): a scheduled transfer may notify only while its DB status is Active. Runs before dedup so a
+        // skipped delivery is not recorded as seen; returns (no throw) so the message completes. The timer re-emits transfer.created on flip.
+        if (!ScheduledSend.MayNotify(context.Status, context.ScheduledSendAtUtc))
+        {
+            _logger.LogInformation("f-email: transfer {TransferId} is not due for notification, skipping", transferId);
+            return;
+        }
+
         // 4. Dedup: if already seen → return (fast-path skip).
         if (_deduplicator.AlreadySeen(envelope.EventId))
         {
@@ -96,8 +112,10 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
         var expiryDays = (int)Math.Ceiling((context.ExpiresAtUtc - DateTime.UtcNow).TotalDays);
         var publicOrigin = _config["Wa:Url:Public"] ?? "http://localhost:5173";
         var ctaUrl = $"{publicOrigin}/t/{context.LinkId}";
+        // F-PRF-001 US-021-02 (D-1): org resolved once at dispatch; the rendered email is the send-time snapshot. Never logged (D-6).
+        var orgName = await SenderBranding.ResolveOrgNameAsync(_branding, _features, context.OwnerAppUserId, ct);
         var templateData = new TemplateData(
-            context.SenderName,
+            SenderBranding.ComposeEmailSenderLine(context.SenderName, orgName),
             context.Files,
             ctaUrl,
             expiryDays);

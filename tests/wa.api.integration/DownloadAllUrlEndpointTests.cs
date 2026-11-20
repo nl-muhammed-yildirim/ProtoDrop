@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Azure.Storage;
 using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.Hosting;
@@ -135,6 +136,37 @@ public class DownloadAllUrlEndpointTests : IAsyncLifetime
         Assert.Single(rows);
         Assert.Null(rows[0].FileId); // fileId is null for download-all (TA-3.2: NULL = download-all)
     }
+
+    // ---- US-023-03 (FR-023-4, TA-9.4): the write path persists only hashes + browser family — never the raw UA / IP ----
+
+    [Fact]
+    public async Task Mint_PersistsOnlyHashesAndFamily_NoRawIpOrUa_DownloadAll()
+    {
+        const string chromeUa = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+        var transferId = await SeedTransferAsync(status: 1, linkId: "d5w7f2q8", maxDownloads: 5);
+        var fileId = Guid.NewGuid();
+        await SeedFileItemsAsync(transferId, [(fileId, "pii.txt", 10L)]);
+        await UploadZipBlobAsync(transferId, [1, 2, 3]);
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/public/transfers/d5w7f2q8/download-all-url");
+        request.Headers.UserAgent.ParseAdd(chromeUa);
+        using var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var freshDb = FreshDb();
+        var row = Assert.Single(await freshDb.Set<DownloadEvent>().AsNoTracking().Where(e => e.TransferId == transferId).ToListAsync());
+
+        // TA-9.4: UaHash = HMAC-SHA256(UA) keyed with Wa:Jwt:Secret (same key as IpHash).
+        Assert.Equal(wa.domain.Telemetry.PiiTransforms.UserAgent(chromeUa, Encoding.UTF8.GetBytes("test-jwt-secret")), row.UaHash);
+        Assert.Equal("Chrome", row.UserAgentFamily);
+        // TestServer has no remote IP -> null; if one is ever present it must be the 64-hex HMAC, never an IP literal.
+        Assert.True(row.IpHash is null || Regex.IsMatch(row.IpHash, "^[0-9a-f]{64}$"), "IpHash must be null or a 64-hex digest");
+        Assert.Null(row.Country); // US-023-01 DECISION-1: no country source yet
+        foreach (var v in new[] { row.IpHash, row.UaHash, row.UserAgentFamily, row.Country })
+            Assert.False(v is not null && v.Contains("Mozilla", StringComparison.OrdinalIgnoreCase), "raw UA must never be stored");
+        Assert.Null(row.FileId);
+    }
+
 
     // ---- Exit check 3: Cap reached → Status=3 flip + MAX_DOWNLOADS_REACHED (410); further mints keep failing idempotently ----
 

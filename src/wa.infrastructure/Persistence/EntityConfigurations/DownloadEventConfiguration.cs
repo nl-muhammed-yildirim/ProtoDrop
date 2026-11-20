@@ -21,5 +21,6 @@ public sealed class DownloadEventConfiguration : IEntityTypeConfiguration<Downlo
         b.Property(e => e.IpHash).HasColumnType("VARCHAR(64)");
         b.Property(e => e.Country).HasColumnType("CHAR(2)");
         b.Property(e => e.UaHash).HasColumnType("VARCHAR(64)");
+        b.Property(e => e.UserAgentFamily).HasColumnType("VARCHAR(64)");   // F-PRF-003 (D-5): BrowserFamily at write time, never the raw UA
     }
 }

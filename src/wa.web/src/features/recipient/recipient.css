@@ -21,6 +21,16 @@
   text-align: center;
 }
 
+/* F-PRF-001: optional org logo beside the From heading (slot filled by US-021-04). */
+.rp-org-logo {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  vertical-align: middle;
+  margin-inline-end: 8px;
+}
+
 /* Error state — centered muted card; the dedicated terminal screens live in .rp-terminal below (T-003-03). */
 .rp-error {
   color: var(--fg);
@@ -122,6 +132,14 @@
 
 /* T-004-04 (FR-004-4): over-cap note under the file list - same muted small copy as the hint. */
 .rp-cap-note {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: var(--fs-small);
+  text-align: center;
+}
+
+/* F-PRF-002 US-022-02 (FR-022-6): pre-due line above the file list - same muted small copy as .rp-cap-note. */
+.rp-scheduled-note {
   margin: 0;
   color: var(--fg-muted);
   font-size: var(--fs-small);

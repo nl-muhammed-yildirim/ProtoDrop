@@ -68,10 +68,36 @@ public class GetPlanUsageHandlerTests
         Assert.Equal(20, r.ActiveTransfersAllowed);
     }
 
-    private sealed class StubPlanContext(string code, LimitsRecord limits) : IPlanContextAccessor
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Handle_Scheduling_MirrorsPlanContextFeature(bool scheduling)
+    {
+        var handler = new GetPlanUsageHandler(
+            new StubPlanContext("pro", Limits(107374182400L, 100), new PlanFeatures { Scheduling = scheduling }), new StubTransferStore());
+
+        var r = await handler.Handle(new GetPlanUsageQuery(UserId), default);
+
+        Assert.Equal(scheduling, r.Scheduling);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Handle_Analytics_MirrorsPlanContextFeature(bool analytics)
+    {
+        var handler = new GetPlanUsageHandler(
+            new StubPlanContext("pro", Limits(107374182400L, 100), new PlanFeatures { Analytics = analytics }), new StubTransferStore());
+
+        var r = await handler.Handle(new GetPlanUsageQuery(UserId), default);
+
+        Assert.Equal(analytics, r.Analytics);
+    }
+
+    private sealed class StubPlanContext(string code, LimitsRecord limits, PlanFeatures? features = null) : IPlanContextAccessor
     {
         public Task<PlanContext> GetAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult(new PlanContext(code, limits, new PlanFeatures()));
+            Task.FromResult(new PlanContext(code, limits, features ?? new PlanFeatures()));
     }
 
     private sealed class StubTransferStore : ITransferStore

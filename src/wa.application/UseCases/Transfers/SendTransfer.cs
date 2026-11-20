@@ -20,7 +20,8 @@ public sealed record SendTransferCommand(
     string? Note,
     IReadOnlyList<string> Emails,
     string? Password = null,
-    Guid? OwnerAppUserId = null) : IRequest<SendTransferResult?>;   // T-008-08 (FR-008-7): session owner at send time — guest → null
+    Guid? OwnerAppUserId = null,   // T-008-08 (FR-008-7): session owner at send time — guest → null
+    DateTime? ScheduledSendAtUtc = null) : IRequest<SendTransferResult?>;   // US-022-01 (FR-022-4): UTC due time; null = send now
 
 /// <summary>POST /api/v1/transfers/{id}/send result (TA-4.2#3 response shape).</summary>
 public sealed record SendTransferResult(
@@ -30,7 +31,8 @@ public sealed record SendTransferResult(
     DateTime ExpiresAtUtc,
     long TotalBytes,
     int FileCount,
-    IReadOnlyList<string> Recipients);
+    IReadOnlyList<string> Recipients,
+    DateTime? ScheduledSendAtUtc = null);
 
 /// <summary>
 /// T-002-04: minimal DB surface the send handler needs.
@@ -106,7 +108,8 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
             throw new InvalidOperationException($"Transfer {transfer.Id} already sent (status={transfer.Status}).");
 
         // 3. Limits of the session user's current plan at send time — never a literal (TA-3.4, FR-020-2).
-        var limits = (await _planContext.GetAsync(cancellationToken)).Limits;
+        var plan = await _planContext.GetAsync(cancellationToken);
+        var limits = plan.Limits;
 
         // 3b. T-007-04 / AC-007-1: send-time re-check — a flag may have changed since finalize; checks precede mutation.
         //     Strict > : exactly-at-limit passes (inclusive cap, boundary pinned in unit tests).
@@ -121,6 +124,16 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
             if (activeCount >= limits.ActiveTransfersMax)
                 throw new ActiveTransfersExceededException(activeCount, limits.ActiveTransfersMax);
         }
+
+        // 3d. US-022-01 (FR-022-3): scheduling is a Pro+ feature (plan row AND global gate) — checked before any mutation.
+        //     Guests resolve to the Free plan → forbidden.
+        if (request.ScheduledSendAtUtc is not null && !plan.Features.Scheduling)
+            throw new ScheduleForbiddenException();
+
+        // 3e. US-022-03 (FR-022-2): window re-validated against SERVER time (client clock skew defense), inclusive, before mutation.
+        var now = DateTime.UtcNow;
+        if (request.ScheduledSendAtUtc is { } due && !ScheduleWindow.Contains(due, now))
+            throw new ScheduleOutOfWindowException();
 
         // 4. Parse recipients: split on [\r\n,;\s]+, trim, drop empties, validate per-address, lowercase, dedupe, cap.
         var addresses = new List<string>();
@@ -142,9 +155,10 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
             throw new TransferValidationException($"Maximum {limits.MaxEmails} recipients allowed.");
 
         // 5. Stamp send-time limits once (FR-018-4: retention + download cap; live rows never re-resolve), then activate.
-        var now = DateTime.UtcNow;
         SendTimeLimits.Stamp(transfer, limits, now);
-        transfer.Status = 1;
+        // US-022-01 (FR-022-4/7): ExpiresAt was stamped at send time by SendTimeLimits.Stamp above; a scheduled transfer is live now (Status 5).
+        transfer.ScheduledSendAtUtc = request.ScheduledSendAtUtc;
+        transfer.Status = request.ScheduledSendAtUtc is null ? TransferStatus.Active : TransferStatus.Scheduled;
 
         // T-008-08 (FR-008-7): send-time attribution — the session user id IS the owner (guest → null).
         // Unconditional overwrite is deliberate: a guest-created draft sent while signed in becomes attributed,
@@ -217,11 +231,12 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
         return new SendTransferResult(
             transfer.Id,
             transfer.LinkId,
-            1, // Active
+            transfer.Status,
             transfer.ExpiresAtUtc,
             transfer.TotalBytes,
             transfer.FileCount,
-            addresses);
+            addresses,
+            transfer.ScheduledSendAtUtc);
     }
 
     /// <summary>Derives the correlation Guid from the W3C trace-id (32 hex = 16 bytes). Falls back to a fresh Guid outside a request.</summary>
@@ -272,6 +287,20 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
 public sealed class TransferValidationException : Exception
 {
     public TransferValidationException(string message) : base(message) { }
+}
+
+/// <summary>US-022-01 (FR-022-3): the sender's plan (or the global feature.scheduling gate) does not allow scheduling.
+/// The endpoint maps it to 403 FORBIDDEN, keeping the closed code list intact.</summary>
+public sealed class ScheduleForbiddenException : Exception
+{
+    public ScheduleForbiddenException() : base("Pro plan required.") { }
+}
+
+/// <summary>US-022-03 (FR-022-2): scheduledSendAt is outside now+5 min .. now+14 days (server time).
+/// The endpoint maps it to 422 SCHEDULE_OUT_OF_WINDOW.</summary>
+public sealed class ScheduleOutOfWindowException : Exception
+{
+    public ScheduleOutOfWindowException() : base(ScheduleWindow.OutOfWindowMessage) { }
 }
 
 /// <summary>

@@ -1,6 +1,6 @@
 # US-021-03 — Keep my own name in front
 
-**Feature:** F-PRF-001 — Custom "From" Branding | **Status:** pending
+**Feature:** F-PRF-001 — Custom "From" Branding | **Status:** done (2026-11-19)
 
 ---
 

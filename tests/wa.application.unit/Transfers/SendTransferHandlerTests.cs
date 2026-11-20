@@ -203,13 +203,16 @@ public class SendTransferHandlerTests
     public async Task Handle_TotalAtExactMaxTransferSize_SendsSuccessfully()
     {
         // Inclusive boundary: exactly-at-limit passes the re-check (> is strict).
-        var limits = new StubLimitsProvider { Record = new LimitsRecord
+        var limits = new StubLimitsProvider
         {
-            MaxEmails = 20,
-            RetentionDays = 30,
-            MaxTransferSize = 1000,
-            MaxSingleFile = 1000
-        } };
+            Record = new LimitsRecord
+            {
+                MaxEmails = 20,
+                RetentionDays = 30,
+                MaxTransferSize = 1000,
+                MaxSingleFile = 1000
+            }
+        };
         var handler = NewHandler(limits);
 
         var transferId = Guid.NewGuid();
@@ -273,7 +276,7 @@ public class SendTransferHandlerTests
 
         await _handler.Handle(new SendTransferCommand(transferId, null, null, null, []), CancellationToken.None);
 
-        Assert.Empty(_telemetryLogger.Entries.Where(e => e.RenderedText.StartsWith("storage_bytes_active")));
+        Assert.DoesNotContain(_telemetryLogger.Entries, e => e.RenderedText.StartsWith("storage_bytes_active"));
         Assert.Empty(_meterStore.Calls);
     }
 
@@ -286,7 +289,7 @@ public class SendTransferHandlerTests
         var result = await _handler.Handle(new SendTransferCommand(Guid.NewGuid(), null, null, null, []), CancellationToken.None);
 
         Assert.Null(result);
-        Assert.Empty(_telemetryLogger.Entries.Where(e => e.RenderedText.StartsWith("storage_bytes_active")));
+        Assert.DoesNotContain(_telemetryLogger.Entries, e => e.RenderedText.StartsWith("storage_bytes_active"));
     }
 
     [Fact]
@@ -810,11 +813,154 @@ public class SendTransferHandlerTests
         Assert.Equal(1, result!.Status);
     }
 
+    // ---- US-022-01 (F-PRF-002): schedule at create ----
+
+    private static object? PayloadField(EventEnvelope envelope, string name) =>
+        envelope.Payload!.GetType().GetProperty(name)!.GetValue(envelope.Payload);
+
+    private SendTransferHandler ProHandler() =>
+        NewHandler(new StubLimitsProvider { Features = new PlanFeatures { Scheduling = true } });
+
+    [Fact]
+    public async Task Send_Scheduled_ProPlan_StoresUtcAndStatusScheduled()
+    {
+        var transferId = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+        var due = DateTime.UtcNow.AddHours(2);
+
+        var result = await ProHandler().Handle(
+            new SendTransferCommand(transferId, null, null, null, [], null, Guid.NewGuid(), due), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(TransferStatus.Scheduled, _store.Transfer!.Status);
+        Assert.Equal(due, _store.Transfer.ScheduledSendAtUtc);
+        Assert.Equal(5, result!.Status);
+        Assert.Equal(due, result.ScheduledSendAtUtc);
+    }
+
+    [Fact]
+    public async Task Send_Scheduled_EmitsTransferCreatedNow_WithScheduledSendAt()
+    {
+        var transferId = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+        var due = DateTime.UtcNow.AddHours(3);
+
+        await ProHandler().Handle(
+            new SendTransferCommand(transferId, null, null, null, ["a@x.com"], null, Guid.NewGuid(), due), CancellationToken.None);
+
+        var envelope = Assert.Single(_eventPublisher.Published);
+        Assert.Equal(EventType.TransferCreated, envelope.Type);
+        Assert.Equal(due, PayloadField(envelope, "scheduledSendAt"));
+    }
+
+    [Fact]
+    public async Task Send_Scheduled_ExpiresAtFromCreation_NotFromDue()
+    {
+        var transferId = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+        var before = DateTime.UtcNow;
+
+        await ProHandler().Handle(
+            new SendTransferCommand(transferId, null, null, null, [], null, Guid.NewGuid(), before.AddDays(10)), CancellationToken.None);
+
+        var after = DateTime.UtcNow;
+        var retention = TimeSpan.FromDays(30); // StubLimitsProvider RetentionDays
+        Assert.InRange(_store.Transfer!.ExpiresAtUtc, before + retention, after + retention);
+    }
+
+    [Fact]
+    public async Task Send_Scheduled_PlanWithoutScheduling_ThrowsScheduleForbidden_NoWrite()
+    {
+        var transferId = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+
+        await Assert.ThrowsAsync<ScheduleForbiddenException>(() => _handler.Handle(
+            new SendTransferCommand(transferId, null, null, null, ["a@x.com"], null, null, DateTime.UtcNow.AddHours(2)), CancellationToken.None));
+
+        Assert.Equal(0, _store.SaveSendCalls);
+        Assert.Empty(_eventPublisher.Published);
+        Assert.Equal(0, _store.Transfer!.Status);
+    }
+
+    // ---- US-022-03 (FR-022-2): schedule window, server time ----
+
+    private async Task AssertOutOfWindowNoWrite(DateTime due, string messagePart)
+    {
+        var transferId = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+
+        var ex = await Assert.ThrowsAsync<ScheduleOutOfWindowException>(() => ProHandler().Handle(
+            new SendTransferCommand(transferId, null, null, null, ["a@x.com"], null, Guid.NewGuid(), due), CancellationToken.None));
+
+        Assert.Contains(messagePart, ex.Message);
+        Assert.Equal(0, _store.SaveSendCalls);
+        Assert.Empty(_eventPublisher.Published);
+        Assert.Equal(0, _store.Transfer!.Status);
+    }
+
+    [Fact]
+    public Task Send_Scheduled_PlusTwoMinutes_ThrowsOutOfWindow_NoWrite() =>
+        AssertOutOfWindowNoWrite(DateTime.UtcNow.AddMinutes(2), "5 minutes");
+
+    [Fact]
+    public Task Send_Scheduled_PlusThirtyDays_ThrowsOutOfWindow_NoWrite() =>
+        AssertOutOfWindowNoWrite(DateTime.UtcNow.AddDays(30), "14 days");
+
+    [Fact]
+    public Task Send_Scheduled_InPast_ThrowsOutOfWindow() =>
+        AssertOutOfWindowNoWrite(DateTime.UtcNow.AddHours(-1), "5 minutes");
+
+    [Theory]
+    [InlineData(true)]    // +5 min 30 s
+    [InlineData(false)]   // +14 d -30 s
+    public async Task Send_Scheduled_JustInsideWindow_Accepted(bool nearMin)
+    {
+        var transferId = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+        var due = nearMin
+            ? DateTime.UtcNow + wa.domain.Transfers.ScheduleWindow.Min + TimeSpan.FromSeconds(30)
+            : DateTime.UtcNow + wa.domain.Transfers.ScheduleWindow.Max - TimeSpan.FromSeconds(30);
+
+        var result = await ProHandler().Handle(
+            new SendTransferCommand(transferId, null, null, null, [], null, Guid.NewGuid(), due), CancellationToken.None);
+
+        Assert.Equal(5, result!.Status);
+    }
+
+    [Fact]
+    public async Task Send_Scheduled_FreePlanAndOutOfWindow_ForbiddenWins()
+    {
+        var transferId = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+
+        await Assert.ThrowsAsync<ScheduleForbiddenException>(() => _handler.Handle(
+            new SendTransferCommand(transferId, null, null, null, ["a@x.com"], null, null, DateTime.UtcNow.AddDays(30)), CancellationToken.None));
+
+        Assert.Equal(0, _store.SaveSendCalls);
+    }
+
+    [Fact]
+    public async Task Send_NoSchedule_StaysActive_ScheduledSendAtNull()
+    {
+        var transferId = Guid.NewGuid();
+        _store.Transfer = NewDraftTransfer(transferId);
+
+        var result = await ProHandler().Handle(
+            new SendTransferCommand(transferId, null, null, null, []), CancellationToken.None);
+
+        Assert.Equal(1, result!.Status);
+        Assert.Null(result.ScheduledSendAtUtc);
+        Assert.Null(_store.Transfer!.ScheduledSendAtUtc);
+        var envelope = Assert.Single(_eventPublisher.Published);
+        Assert.Null(PayloadField(envelope, "scheduledSendAt"));
+    }
+
     // ---- Stubs ----
 
     private sealed class StubSendStore : ISendStore
     {
         public Transfer? Transfer { get; set; }
+        public int SaveSendCalls { get; private set; }
         public List<EmailRecipient> Recipients { get; } = [];
         // T-010-01 (row 3): the three new ISendStore members — no-op fakes for the send-path tests.
         public Dictionary<Guid, string[]> RecipientAddressesById { get; } = [];
@@ -826,6 +972,7 @@ public class SendTransferHandlerTests
 
         public Task SaveSendAsync(Transfer transfer, IReadOnlyList<EmailRecipient> recipients, CancellationToken ct)
         {
+            SaveSendCalls++;
             Recipients.AddRange(recipients);
             return Task.CompletedTask;
         }
@@ -857,8 +1004,10 @@ public class SendTransferHandlerTests
             ActiveTransfersMax = 20           // US-020-02: Free value (Part 2) — 0 would trip the owned-send active-transfers check
         };
 
+        public PlanFeatures Features { get; set; } = new();   // US-022-01: Scheduling defaults false (Free/guest)
+
         public Task<PlanContext> GetAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult(new PlanContext(ILimitsProvider.GuestPlanCode, Record, new PlanFeatures()));
+            Task.FromResult(new PlanContext(ILimitsProvider.GuestPlanCode, Record, Features));
     }
 
     private sealed class StubEventPublisher : IEventPublisher

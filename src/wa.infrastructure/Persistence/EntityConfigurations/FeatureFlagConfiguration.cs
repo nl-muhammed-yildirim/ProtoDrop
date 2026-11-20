@@ -20,7 +20,7 @@ public sealed class FeatureFlagConfiguration : IEntityTypeConfiguration<FeatureF
         b.Property(f => f.Value).HasColumnType("NVARCHAR(MAX)").IsRequired();
         b.Property(f => f.Description).HasColumnType("NVARCHAR(500)");
 
-        // T-052-04 seeds (FR-052-4): 12 feature.* gates (default false per D-14) + 3 x 14 limits.<plan>.* keys.
+        // T-052-04 seeds (FR-052-4): 12 feature.* gates (default false per D-14) + 3 x 15 limits.<plan>.* keys.
         b.HasData(
             Gate("feature.ads", "Free-tier ads on/off (D-14: off at MVP launch)"),
             Gate("feature.albums", "Albums global gate (Phase 2c)"),
@@ -41,6 +41,7 @@ public sealed class FeatureFlagConfiguration : IEntityTypeConfiguration<FeatureF
             Limit("limits.business.graceDays", "3"),
             Limit("limits.business.maxDownloads", "-1"),
             Limit("limits.business.maxEmails", "500"),
+            Limit("limits.business.maxLogoSize", "1048576"),
             Limit("limits.business.maxSingleFile", "107374182400"),
             Limit("limits.business.maxTransferSize", "107374182400"),
             Limit("limits.business.maxZipSize", "9223372036854775807"),
@@ -49,12 +50,13 @@ public sealed class FeatureFlagConfiguration : IEntityTypeConfiguration<FeatureF
             Limit("limits.business.ssoScim", "true"),
             Limit("limits.business.storageQuota", "1099511627776"),
             Limit("limits.free.activeTransfersMax", "20"),
-            Limit("limits.free.ads", "false"),
+            Limit("limits.free.ads", "true"),
             Limit("limits.free.analytics", "false"),
             Limit("limits.free.branding", "false"),
             Limit("limits.free.graceDays", "3"),
             Limit("limits.free.maxDownloads", "100"),
             Limit("limits.free.maxEmails", "20"),
+            Limit("limits.free.maxLogoSize", "1048576"),
             Limit("limits.free.maxSingleFile", "5368709120"),
             Limit("limits.free.maxTransferSize", "5368709120"),
             Limit("limits.free.maxZipSize", "4294967296"),
@@ -70,6 +72,7 @@ public sealed class FeatureFlagConfiguration : IEntityTypeConfiguration<FeatureF
             Limit("limits.pro.graceDays", "3"),
             Limit("limits.pro.maxDownloads", "1000"),
             Limit("limits.pro.maxEmails", "100"),
+            Limit("limits.pro.maxLogoSize", "1048576"),
             Limit("limits.pro.maxSingleFile", "10737418240"),
             Limit("limits.pro.maxTransferSize", "10737418240"),
             Limit("limits.pro.maxZipSize", "9223372036854775807"),
@@ -80,8 +83,8 @@ public sealed class FeatureFlagConfiguration : IEntityTypeConfiguration<FeatureF
     }
 
     private static FeatureFlag Gate(string key, string description) => new()
-        { Key = key, Value = "false", Description = description, UpdatedAtUtc = SeedUtc };
+    { Key = key, Value = "false", Description = description, UpdatedAtUtc = SeedUtc };
 
     private static FeatureFlag Limit(string key, string value) => new()
-        { Key = key, Value = value, Description = "Plan limits override (TA-3.4); values per Open-Decisions Part 2", UpdatedAtUtc = SeedUtc };
+    { Key = key, Value = value, Description = "Plan limits override (TA-3.4); values per Open-Decisions Part 2", UpdatedAtUtc = SeedUtc };
 }

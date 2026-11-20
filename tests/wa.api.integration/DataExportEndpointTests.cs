@@ -49,7 +49,12 @@ public class DataExportEndpointTests : IAsyncLifetime
         _userId = Guid.NewGuid();
         _db.Set<AppUser>().Add(new AppUser
         {
-            Id = _userId, Email = "export-user@x.com", DisplayName = "Export User", PlanId = planId, Theme = "system", CreatedAtUtc = DateTime.UtcNow
+            Id = _userId,
+            Email = "export-user@x.com",
+            DisplayName = "Export User",
+            PlanId = planId,
+            Theme = "system",
+            CreatedAtUtc = DateTime.UtcNow
         });
         await _db.SaveChangesAsync();
     }
@@ -91,7 +96,10 @@ public class DataExportEndpointTests : IAsyncLifetime
     {
         var row = new DataExport
         {
-            Id = Guid.NewGuid(), AppUserId = _userId, State = state, CreatedAtUtc = DateTime.UtcNow.AddMinutes(-10),
+            Id = Guid.NewGuid(),
+            AppUserId = _userId,
+            State = state,
+            CreatedAtUtc = DateTime.UtcNow.AddMinutes(-10),
             BlobPath = state == DataExportState.Ready ? $"exports/{_userId:N}/x.zip" : null,
             ReadyAtUtc = state == DataExportState.Ready ? DateTime.UtcNow.AddMinutes(-5) : null,
         };

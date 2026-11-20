@@ -53,8 +53,10 @@ else
 // T-055-02 (TA-3.5 topology, §5.2 config): blob store + one-time container bootstrap. GR#7 — no "is this the fake?" branch; the adapter is picked by its §5.2 config values only.
 var blobAccountUrl = builder.Configuration["Wa:Blob:AccountUrl"];
 var blobAccountKey = builder.Configuration["Wa:Blob:AccountKey"];
-builder.Services.AddSingleton<wa.application.Ports.IBlobStore>(sp => new AzureBlobStore(
+builder.Services.AddSingleton(sp => new AzureBlobStore(
     new Uri(blobAccountUrl!), blobAccountKey!, sp.GetRequiredService<ILogger<AzureBlobStore>>()));
+builder.Services.AddSingleton<wa.application.Ports.IBlobStore>(sp => sp.GetRequiredService<AzureBlobStore>());
+builder.Services.AddSingleton<wa.application.Ports.IBlobContentWriter>(sp => sp.GetRequiredService<AzureBlobStore>()); // US-021-04: logo upload with Content-Type
 // BlobContainerBootstrap (TA-3.5) needs a raw client for service-level properties; account name via the adapter's helper.
 builder.Services.AddSingleton(new BlobServiceClient(
     new Uri(blobAccountUrl!),
@@ -72,6 +74,14 @@ builder.Services.AddSingleton<wa.application.UseCases.Transfers.ITransferStore>(
 builder.Services.AddSingleton<wa.application.UseCases.Transfers.ISendStore>(sp => new wa.infrastructure.Persistence.SendStore(sp.GetRequiredService<WaDbContext>(), sp.GetRequiredService<wa.application.Ports.IBlobStore>()));
 // T-014 (TA-4.2#4): recipient-page handler's DB surface — thin adapter over the adapter-owned WaDbContext.
 builder.Services.AddSingleton<wa.application.UseCases.Transfers.IPublicTransferStore>(sp => new wa.infrastructure.Persistence.PublicTransferStore(sp.GetRequiredService<WaDbContext>()));
+// US-023-01 (F-PRF-003): download analytics read port (GET /transfers/{id}/analytics).
+builder.Services.AddSingleton<wa.application.UseCases.Transfers.ITransferAnalyticsStore>(sp => new wa.infrastructure.Persistence.TransferAnalyticsStore(sp.GetRequiredService<WaDbContext>()));
+// US-021-01: sender branding read port (org name beside the sender on the recipient page).
+builder.Services.AddSingleton<wa.application.UseCases.Transfers.ISenderBrandingStore>(sp => new wa.infrastructure.Persistence.SenderBrandingStore(sp.GetRequiredService<WaDbContext>()));
+// US-021-04: org logo path write port (DELETE /auth/me/logo).
+builder.Services.AddSingleton<wa.application.UseCases.Auth.IOrgLogoStore>(sp => new wa.infrastructure.Persistence.OrgLogoStore(sp.GetRequiredService<WaDbContext>()));
+// F-PRF-001: org name write port (PATCH /auth/me orgName).
+builder.Services.AddSingleton<wa.application.UseCases.Auth.IOrgNameStore>(sp => new wa.infrastructure.Persistence.OrgNameStore(sp.GetRequiredService<WaDbContext>()));
 // T-002-02 (TA-4.1.5): generic HTTP idempotency store — used by IdempotencyMiddleware for finalize + send endpoints.
 builder.Services.AddSingleton<IIdempotencyStore>(sp => new wa.infrastructure.Persistence.IdempotencyStore(sp.GetRequiredService<WaDbContext>()));
 // T-011-02 (FR-011-5 / TA-3.2): audit write helper — one AuditLog row + one admin.action domain event per mutation.
@@ -109,6 +119,7 @@ builder.Services.AddScoped<IPlanContextAccessor>(sp => sp.GetRequiredService<Pla
 var sasMinter = new DraftBlobSasMinter(new Uri(blobAccountUrl!), blobAccountKey!);
 builder.Services.AddSingleton<IBlobSasMinter>(sasMinter);
 builder.Services.AddSingleton<IExportSasMinter>(sasMinter); // US-047-01: export download SAS (TA-3.6)
+builder.Services.AddSingleton<IOrgLogoSasMinter>(sasMinter); // US-021-04: org logo read SAS (TA-3.6)
 builder.Services.AddSingleton<wa.application.UseCases.DataExport.IDataExportStore>(sp => new wa.infrastructure.Persistence.DataExportStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
 // TA-9.5 second line (T-056-03): AspNetCoreRateLimit frozen at 5.0.0, in-memory store — per-instance state is correct at M0 scale; a distributed store would be an ADR change.
 builder.Services.AddMemoryCache(); // the package's MemoryCache* stores need IMemoryCache, which this app does not register by default (DI validation caught it)
@@ -312,12 +323,31 @@ app.MapPost("/api/v1/transfers/{id}/send", async (Guid id, HttpContext httpConte
     var note = root.TryGetProperty("note", out var n) ? n.GetString() : null;
     var password = root.TryGetProperty("password", out var pw) ? pw.GetString() : null;
 
+    // US-022-01 (D-3): optional scheduledSendAt — ISO-8601 with offset; absent/null = send now; anything else → 400 VALIDATION.
+    DateTimeOffset? scheduledSendAt = null;
+    if (root.TryGetProperty("scheduledSendAt", out var sa) && sa.ValueKind != System.Text.Json.JsonValueKind.Null)
+    {
+        if (sa.ValueKind != System.Text.Json.JsonValueKind.String || !sa.TryGetDateTimeOffset(out var parsedSchedule))
+            throw new BusinessException(ProblemCodes.Validation, "scheduledSendAt must be an ISO 8601 date-time with an offset.");
+        scheduledSendAt = parsedSchedule;
+    }
+
     try
     {
-        var result = await sender.Send(new SendTransferCommand(id, senderName, senderEmail, note, emails, password, ownerAppUserId), ct);
+        var result = await sender.Send(new SendTransferCommand(id, senderName, senderEmail, note, emails, password, ownerAppUserId, scheduledSendAt?.UtcDateTime), ct);
         if (result is null)
             throw new BusinessException(ProblemCodes.NotFound, "Transfer not found.");
-        return Results.Json(new { id = result.TransferId.ToString("n"), linkId = result.LinkId, status = "Active", expiresAt = result.ExpiresAtUtc, totalBytes = result.TotalBytes, fileCount = result.FileCount, recipients = result.Recipients }, statusCode: 201);
+        return Results.Json(new { id = result.TransferId.ToString("n"), linkId = result.LinkId, status = result.Status == wa.domain.TransferStatus.Scheduled ? "Scheduled" : "Active", expiresAt = result.ExpiresAtUtc, totalBytes = result.TotalBytes, fileCount = result.FileCount, recipients = result.Recipients, scheduledSendAt = result.ScheduledSendAtUtc }, statusCode: 201);
+    }
+    catch (wa.application.UseCases.Transfers.ScheduleForbiddenException ex)
+    {
+        // US-022-01 (FR-022-3): plan/gate does not allow scheduling → 403 FORBIDDEN (closed list unchanged).
+        throw new BusinessException(ProblemCodes.Forbidden, ex.Message);
+    }
+    catch (wa.application.UseCases.Transfers.ScheduleOutOfWindowException ex)
+    {
+        // US-022-03 (FR-022-2): scheduledSendAt outside now+5 min .. now+14 days (server time) → 422 SCHEDULE_OUT_OF_WINDOW.
+        throw new BusinessException(ProblemCodes.ScheduleOutOfWindow, ex.Message);
     }
     catch (TransferSizeExceededException ex)
     {
@@ -389,9 +419,16 @@ app.MapGet("/api/v1/public/transfers/{linkId}", async (string linkId, HttpReques
     {
         PublicTransferState.Active => Results.Json(new
         {
-            from = result.From, note = result.Note,
+            from = result.From,
+            note = result.Note,
             files = result.Files!.Select(f => new { fileId = f.FileId.ToString("n"), name = f.Name, sizeBytes = f.SizeBytes }),
-            hasDownloadAll = result.HasDownloadAll, downloadsLeft = result.DownloadsLeft, passwordRequired = result.PasswordRequired
+            hasDownloadAll = result.HasDownloadAll,
+            downloadsLeft = result.DownloadsLeft,
+            passwordRequired = result.PasswordRequired,
+            orgName = result.OrgName,
+            orgLogoUrl = result.OrgLogoUrl,
+            scheduledSendAt = result.ScheduledSendAtUtc is { } due ? AsUtc(due) : (DateTime?)null,
+            adsEnabled = result.AdsEnabled
         }), // TA-4.2#4 exact wire shape — property names pinned at the single construction site (same style as endpoints 1–3)
 
         // D8: status pin = 410 for both terminal expired shapes; the unknown case overrides to 404 below (FR-003-9: same body, different status line only).
@@ -1037,7 +1074,8 @@ app.MapGet("/api/v1/auth/me", async (HttpContext ctx, ISender sender, Cancellati
             ["email"] = result.Email,
             ["displayName"] = result.DisplayName,
             ["theme"] = result.Theme,
-            ["planCode"] = result.PlanCode
+            ["planCode"] = result.PlanCode,
+            ["orgName"] = result.OrgName! // F-PRF-001 (FR-021-1): null when unset; the profile page reads it
         };
         if (roleField is not null)
             meBody["role"] = roleField;
@@ -1059,15 +1097,21 @@ app.MapPatch("/api/v1/auth/me", async (UpdateProfileRequest req, HttpContext ctx
     try
     {
         // Single construction site (TA-4.2a): UserId from the session cookie — NOT in the JSON body.
-        var result = await sender.Send(new UpdateProfileCommand(userId, req.DisplayName, req.Theme), ct);
+        var result = await sender.Send(new UpdateProfileCommand(userId, req.DisplayName, req.Theme, req.OrgName), ct);
         return Results.Json(new
         {
             userId = result.UserId.ToString("n"),
             email = result.Email,
             displayName = result.DisplayName,
             theme = result.Theme,
-            planCode = result.PlanCode
+            planCode = result.PlanCode,
+            orgName = result.OrgName
         }, statusCode: 200);
+    }
+    catch (OrgLogoRejectedException ex)
+    {
+        // Free plan setting an org name (branding is Pro) -> same 403 FORBIDDEN as the logo upload.
+        throw new BusinessException(ex.Code, ex.Message, ex);
     }
     catch (MeProfileException ex) when (ex.Message == ProblemCodes.TitleOf(ProblemCodes.NotFound))
     {
@@ -1078,7 +1122,10 @@ app.MapPatch("/api/v1/auth/me", async (UpdateProfileRequest req, HttpContext ctx
     {
         // Validation family (invalid theme / too-long name / empty PATCH) → BusinessException(Validation, ...) —
         // inner-exception-preservation pattern from T-008-01 fix round.
-        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex)
+        {
+            Errors = ex.Field is null ? null : [new ProblemFieldError(ex.Field, ex.Message)]
+        };
     }
 });
 
@@ -1117,7 +1164,7 @@ app.MapGet("/api/v1/transfers", async (HttpContext ctx, HttpRequest request, ISe
         }
 
     // T-009-02 (US-009-02): optional ?status=all|active|expired (case-insensitive; absent → all).
-    // Resolved byte set threaded into the query — null = no status predicate (all), {1} = active, {2,3} = expired.
+    // Resolved byte set threaded into the query — null = no status predicate (all), {1,5} = active (Active + Scheduled), {2,3} = expired.
     static IReadOnlyCollection<byte>? ResolveStatusFilter(HttpRequest request)
     {
         var raw = request.Query["status"].FirstOrDefault();
@@ -1125,7 +1172,7 @@ app.MapGet("/api/v1/transfers", async (HttpContext ctx, HttpRequest request, ISe
         return raw.Trim().ToLowerInvariant() switch
         {
             "all" => null,
-            "active" => new byte[] { 1 },
+            "active" => new byte[] { 1, wa.domain.TransferStatus.Scheduled }, // F-PRF-002: Scheduled (5) rows are live, so "active" shows them
             "expired" => new byte[] { 2, 3 }, // US-009-02: Status IN (2,3) — download-limit included
             _ => throw new BusinessException(ProblemCodes.Validation, "status must be one of all / active / expired.")
         };
@@ -1185,6 +1232,28 @@ app.MapGet("/api/v1/transfers/{id}", async (Guid id, HttpContext ctx, ISender se
     }, statusCode: 200);
 });
 
+// US-023-01 (TA-4.2#24, FR-023-1/5): GET /api/v1/transfers/{id}/analytics — owner, Pro+ (403), phase gate (404 FEATURE_DISABLED).
+app.MapGet("/api/v1/transfers/{id}/analytics", async (Guid id, HttpContext ctx, ISender sender, CancellationToken ct) =>
+{
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+    wa.domain.Analytics.TransferAnalytics? r;
+    try { r = await sender.Send(new GetTransferAnalyticsQuery(id, userId), ct); }
+    catch (AnalyticsForbiddenException ex) { throw new BusinessException(ProblemCodes.Forbidden, ex.Message); }
+    if (r is null) throw new BusinessException(ProblemCodes.NotFound, "Transfer not found.");
+    // AC-023-2: aggregates only — no IpHash / UaHash / raw IP / raw UA in the body.
+    return Results.Json(new
+    {
+        total = r.Total,
+        daily = r.Daily.Select(d => new { date = d.Day.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), count = d.Count }),
+        countries = r.Countries.Select(c => new { code = c.Key, count = c.Count }),
+        browsers = r.Browsers.Select(b => new { family = b.Key, count = b.Count }),
+        files = r.Files.Files.Select(f => new { fileId = f.FileId, name = f.Name, count = f.Count }),
+        downloadAll = r.Files.DownloadAll,
+        topFiles = r.Files.Top.Select(f => new { fileId = f.FileId, name = f.Name, count = f.Count })
+    }, statusCode: 200);
+}).RequireFeature(FeatureGates.Analytics);
+
 // T-009-04 (TA-4.2#17 / FR-009-3): DELETE /api/v1/transfers/{id} — owner delete, soft-delete + refcount path.
 app.MapDelete("/api/v1/transfers/{id}", async (Guid id, HttpContext ctx, ISender sender, CancellationToken ct) =>
 {
@@ -1221,6 +1290,64 @@ app.MapDelete("/api/v1/auth/me", async (HttpContext ctx, ISender sender, Cancell
         return Results.Json(ProblemWriter.Build(404, ProblemCodes.NotFound, ProblemCodes.TitleOf(ProblemCodes.NotFound)), statusCode: 404);
     }
 });
+
+// US-021-04 (FR-021-3 / AC-021-5): DELETE /api/v1/auth/me/logo — remove the session user's org logo (idempotent; not plan-gated).
+app.MapDelete("/api/v1/auth/me/logo", async (HttpContext ctx, ISender sender, CancellationToken ct) =>
+{
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+
+    try
+    {
+        await sender.Send(new RemoveOrgLogoCommand(userId), ct);
+        return Results.NoContent();
+    }
+    catch (MeProfileException ex) when (ex.Message == ProblemCodes.TitleOf(ProblemCodes.NotFound))
+    {
+        return Results.Json(ProblemWriter.Build(404, ProblemCodes.NotFound, ProblemCodes.TitleOf(ProblemCodes.NotFound)), statusCode: 404);
+    }
+});
+
+// US-021-04 (FR-021-3..5): PUT /api/v1/auth/me/logo — raw image body; the handler bounds the read, sniffs the content and stores it.
+app.MapPut("/api/v1/auth/me/logo", async (HttpContext ctx, ISender sender, CancellationToken ct) =>
+{
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+
+    try
+    {
+        var view = await sender.Send(new UploadOrgLogoCommand(userId, ctx.Request.Body), ct);
+        return Results.Json(ToLogoBody(view), statusCode: 200);
+    }
+    catch (OrgLogoRejectedException ex)
+    {
+        throw new BusinessException(ex.Code, ex.Message, ex);
+    }
+    catch (MeProfileException ex) when (ex.Message == ProblemCodes.TitleOf(ProblemCodes.NotFound))
+    {
+        return Results.Json(ProblemWriter.Build(404, ProblemCodes.NotFound, ProblemCodes.TitleOf(ProblemCodes.NotFound)), statusCode: 404);
+    }
+});
+
+// US-021-04 (D-B5): GET /api/v1/auth/me/logo — owner view { logoUrl, maxLogoSize, brandingEnabled }.
+app.MapGet("/api/v1/auth/me/logo", async (HttpContext ctx, ISender sender, CancellationToken ct) =>
+{
+    if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
+        return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
+
+    try
+    {
+        var view = await sender.Send(new GetOrgLogoQuery(userId), ct);
+        return Results.Json(ToLogoBody(view), statusCode: 200);
+    }
+    catch (MeProfileException ex) when (ex.Message == ProblemCodes.TitleOf(ProblemCodes.NotFound))
+    {
+        return Results.Json(ProblemWriter.Build(404, ProblemCodes.NotFound, ProblemCodes.TitleOf(ProblemCodes.NotFound)), statusCode: 404);
+    }
+});
+
+static object ToLogoBody(OrgLogoView view) =>
+    new { logoUrl = view.LogoUrl?.ToString(), maxLogoSize = view.MaxLogoSize, brandingEnabled = view.BrandingEnabled };
 
 // US-047-01 (FR-047-1/2/4): POST /api/v1/auth/me/export — request a GDPR data export (gated by feature.dataExport); 202 + processing view.
 app.MapPost("/api/v1/auth/me/export", async (HttpContext ctx, ISender sender, CancellationToken ct) =>
@@ -1357,7 +1484,9 @@ app.MapGet("/api/v1/billing/plan", async (HttpContext ctx, ISender sender, Cance
         planCode = r.PlanCode,
         storage = new { usedBytes = r.StorageUsedBytes, allowedBytes = r.StorageAllowedBytes },
         activeTransfers = new { used = r.ActiveTransfersUsed, allowed = r.ActiveTransfersAllowed },
-        limits = new { maxTransferSize = r.MaxTransferSize, maxSingleFile = r.MaxSingleFile }
+        limits = new { maxTransferSize = r.MaxTransferSize, maxSingleFile = r.MaxSingleFile },
+        features = new { scheduling = r.Scheduling, analytics = r.Analytics },   // US-022-01 (FR-022-3, D-6)
+        scheduleWindow = new { minMinutes = wa.domain.Transfers.ScheduleWindow.MinMinutes, maxDays = wa.domain.Transfers.ScheduleWindow.MaxDays }   // US-022-03 (FR-022-2)
     });
 });
 

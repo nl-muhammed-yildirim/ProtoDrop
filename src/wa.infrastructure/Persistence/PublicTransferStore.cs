@@ -46,6 +46,7 @@ public sealed class PublicTransferStore : IPublicTransferStore
         Guid fileId,
         string? ipHash,
         string? uaHash,
+        string? userAgentFamily,
         CancellationToken ct)
     {
         // TA-7.2 step 4: the guard runs in the UPDATE itself — rowsAffected==1 iff the download is within cap at execution time.
@@ -56,9 +57,9 @@ public sealed class PublicTransferStore : IPublicTransferStore
         if (rowsAffected is not 1)
         {
             // US-005-03 technical note literal: idempotent flip — Status=3 + ExpiredAtUtc set when it flips (grace clock starts),
-            // WHERE Id=@id AND Status=1 so concurrent racers all write the same value.
+            // WHERE Id=@id AND Status IN (1,5) so concurrent racers all write the same value.
             _ = await _db.Database.ExecuteSqlRawAsync(
-                "UPDATE [Transfer] SET [Status]=3, [ExpiredAtUtc]=COALESCE([ExpiredAtUtc], GETUTCDATE()) WHERE [Id] = {0} AND [Status] = 1",
+                "UPDATE [Transfer] SET [Status]=3, [ExpiredAtUtc]=COALESCE([ExpiredAtUtc], GETUTCDATE()) WHERE [Id] = {0} AND [Status] IN (1, 5)",
                 [transferId], ct);
 
             // The raw-SQL UPDATE bypasses the change tracker: detach any tracked copy so later SaveChanges can't resurrect the old
@@ -75,6 +76,7 @@ public sealed class PublicTransferStore : IPublicTransferStore
             FileId = fileId,
             IpHash = ipHash,
             UaHash = uaHash,
+            UserAgentFamily = userAgentFamily,
             CreatedAtUtc = DateTime.UtcNow
         });
         await _db.SaveChangesAsync(ct);
@@ -92,6 +94,7 @@ public sealed class PublicTransferStore : IPublicTransferStore
         Guid transferId,
         string? ipHash,
         string? uaHash,
+        string? userAgentFamily,
         CancellationToken ct)
     {
         // TA-7.2 step 4: the guard runs in the UPDATE itself — rowsAffected==1 iff the download is within cap at execution time.
@@ -102,9 +105,9 @@ public sealed class PublicTransferStore : IPublicTransferStore
         if (rowsAffected is not 1)
         {
             // US-005-03 technical note literal: idempotent flip — Status=3 + ExpiredAtUtc set when it flips (grace clock starts),
-            // WHERE Id=@id AND Status=1 so concurrent racers all write the same value.
+            // WHERE Id=@id AND Status IN (1,5) so concurrent racers all write the same value.
             _ = await _db.Database.ExecuteSqlRawAsync(
-                "UPDATE [Transfer] SET [Status]=3, [ExpiredAtUtc]=COALESCE([ExpiredAtUtc], GETUTCDATE()) WHERE [Id] = {0} AND [Status] = 1",
+                "UPDATE [Transfer] SET [Status]=3, [ExpiredAtUtc]=COALESCE([ExpiredAtUtc], GETUTCDATE()) WHERE [Id] = {0} AND [Status] IN (1, 5)",
                 [transferId], ct);
 
             // The raw-SQL UPDATE bypasses the change tracker: detach any tracked copy so later SaveChanges can't resurrect the old
@@ -122,6 +125,7 @@ public sealed class PublicTransferStore : IPublicTransferStore
             FileId = null, // download-all
             IpHash = ipHash,
             UaHash = uaHash,
+            UserAgentFamily = userAgentFamily,
             CreatedAtUtc = DateTime.UtcNow
         });
         await _db.SaveChangesAsync(ct);

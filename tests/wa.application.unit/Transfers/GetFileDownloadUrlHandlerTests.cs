@@ -60,7 +60,8 @@ public class GetFileDownloadUrlHandlerTests
         Assert.Equal(_store.Transfer!.Id, rec.TransferId);
         Assert.Equal(fileId, rec.FileId);
         Assert.Equal(PiiTransforms.IpAddress("1.2.3.4", Encoding.UTF8.GetBytes(UnitTestKey)), rec.IpHash); // IpSlot semantics — non-null when ClientIp given
-        Assert.Equal(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("ua-xyz"))).ToLowerInvariant(), rec.UaHash); // exactly 64 hex chars
+        Assert.Equal(PiiTransforms.UserAgent("ua-xyz", Encoding.UTF8.GetBytes(UnitTestKey)), rec.UaHash); // HMAC keyed like IpHash, exactly 64 hex chars
+        Assert.NotEqual(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("ua-xyz"))).ToLowerInvariant(), rec.UaHash); // no longer the unkeyed SHA-256
 
         // ExpiresAt ≈ now + 30 min (the minter's own fixed window — the handler just reports it).
         Assert.NotNull(result.Url);
@@ -69,6 +70,24 @@ public class GetFileDownloadUrlHandlerTests
 
         // download_started emitted at mint time (MVP: no client pipeline observes download_completed — documented deviation).
         Assert.Contains(_telemetryLogger.RenderedTexts, e => e == TelemetryEvents.DownloadStarted);
+    }
+
+    [Fact]
+    public async Task Handle_Ok_PassesUserAgentFamily_NotRawUa()
+    {
+        const string chromeUa = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+        var fileId = Guid.NewGuid();
+        _store.SetupActive(files: [new PublicFileItem(fileId, "a.txt", 10)], maxDownloads: 5, downloadsCount: 0);
+
+        var result = await _handler.Handle(
+            new GetFileDownloadUrlQuery("abcdefgh", fileId.ToString("n"), ClientIp: "1.2.3.4", UserAgent: chromeUa), CancellationToken.None);
+
+        Assert.Equal(FileDownloadState.Ok, result.State);
+        var rec = Assert.Single(_store.Records);
+        Assert.Equal("Chrome", rec.UserAgentFamily);
+        Assert.NotEqual(chromeUa, rec.IpHash);
+        Assert.NotEqual(chromeUa, rec.UaHash);
+        Assert.NotEqual(chromeUa, rec.UserAgentFamily);
     }
 
     [Fact]
@@ -283,20 +302,20 @@ public class GetFileDownloadUrlHandlerTests
         public SingleFileDownloadOutcome RecordOutcome { get; set; } = SingleFileDownloadOutcome.Recorded;
 
         /// <summary>The (transferId, fileId, ipHash, uaHash) tuples the handler passed to RecordSingleFileDownloadAsync — asserted, not faked.</summary>
-        public List<(Guid TransferId, Guid FileId, string? IpHash, string? UaHash)> Records { get; } = [];
+        public List<(Guid TransferId, Guid FileId, string? IpHash, string? UaHash, string? UserAgentFamily)> Records { get; } = [];
 
         public Task<(Transfer?, IReadOnlyList<PublicFileItem>)> GetByLinkIdAsync(string linkId, CancellationToken ct) =>
             linkId.Length == 8 && Transfer is not null
                 ? Task.FromResult<(Transfer?, IReadOnlyList<PublicFileItem>)>((Transfer, Files ?? []))
                 : Task.FromResult<(Transfer?, IReadOnlyList<PublicFileItem>)>((null, []));
 
-        public Task<SingleFileDownloadResult> RecordSingleFileDownloadAsync(Guid transferId, Guid fileId, string? ipHash, string? uaHash, CancellationToken ct)
+        public Task<SingleFileDownloadResult> RecordSingleFileDownloadAsync(Guid transferId, Guid fileId, string? ipHash, string? uaHash, string? userAgentFamily, CancellationToken ct)
         {
-            Records.Add((transferId, fileId, ipHash, uaHash));
+            Records.Add((transferId, fileId, ipHash, uaHash, userAgentFamily));
             return Task.FromResult(new SingleFileDownloadResult(RecordOutcome));
         }
 
-        public Task<SingleFileDownloadResult> RecordZipDownloadAsync(Guid transferId, string? ipHash, string? uaHash, CancellationToken ct) =>
+        public Task<SingleFileDownloadResult> RecordZipDownloadAsync(Guid transferId, string? ipHash, string? uaHash, string? userAgentFamily, CancellationToken ct) =>
             Task.FromResult(new SingleFileDownloadResult(RecordOutcome)); // not called by this handler (T-004-02 is a separate endpoint)
 
         public void SetupActive(IReadOnlyList<PublicFileItem> files, int maxDownloads, int downloadsCount, string? passwordHash = null) =>

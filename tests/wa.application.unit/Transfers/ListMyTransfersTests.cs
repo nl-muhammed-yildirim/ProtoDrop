@@ -25,7 +25,9 @@ public class ListMyTransfersTests
         for (int i = 0; i < 30; i++)
             store.Transfers.Add(new Transfer
             {
-                Id = Guid.NewGuid(), OwnerAppUserId = OwnerId, Status = 1,
+                Id = Guid.NewGuid(),
+                OwnerAppUserId = OwnerId,
+                Status = 1,
                 CreatedAtUtc = BaseUtc.AddSeconds(i * 60)
             });
 
@@ -48,7 +50,9 @@ public class ListMyTransfersTests
         for (int i = 0; i < 30; i++)
             store.Transfers.Add(new Transfer
             {
-                Id = Guid.NewGuid(), OwnerAppUserId = OwnerId, Status = 1,
+                Id = Guid.NewGuid(),
+                OwnerAppUserId = OwnerId,
+                Status = 1,
                 CreatedAtUtc = BaseUtc.AddSeconds(i * 60)
             });
 
@@ -99,7 +103,8 @@ public class ListMyTransfersTests
         for (int i = 0; i < 9; i++)
             store.Transfers.Add(new Transfer
             {
-                Id = Guid.NewGuid(), OwnerAppUserId = OwnerId,
+                Id = Guid.NewGuid(),
+                OwnerAppUserId = OwnerId,
                 Status = (byte)(i < 5 ? 1 : (i % 2 == 0 ? 2 : 3)),
                 CreatedAtUtc = BaseUtc.AddSeconds(i * 60)
             });
@@ -122,7 +127,8 @@ public class ListMyTransfersTests
         for (int i = 0; i < 9; i++)
             store.Transfers.Add(new Transfer
             {
-                Id = Guid.NewGuid(), OwnerAppUserId = OwnerId,
+                Id = Guid.NewGuid(),
+                OwnerAppUserId = OwnerId,
                 Status = (byte)(i < 5 ? 1 : (i % 2 == 0 ? 2 : 3)),
                 CreatedAtUtc = BaseUtc.AddSeconds(i * 60)
             });
@@ -145,7 +151,8 @@ public class ListMyTransfersTests
         for (int i = 0; i < 9; i++)
             store.Transfers.Add(new Transfer
             {
-                Id = Guid.NewGuid(), OwnerAppUserId = OwnerId,
+                Id = Guid.NewGuid(),
+                OwnerAppUserId = OwnerId,
                 Status = (byte)(i < 5 ? 1 : (i % 2 == 0 ? 2 : 3)),
                 CreatedAtUtc = BaseUtc.AddSeconds(i * 60)
             });
@@ -170,7 +177,8 @@ public class ListMyTransfersTests
         for (int i = 0; i < 45; i++)
             store.Transfers.Add(new Transfer
             {
-                Id = Guid.NewGuid(), OwnerAppUserId = OwnerId,
+                Id = Guid.NewGuid(),
+                OwnerAppUserId = OwnerId,
                 Status = (byte)(i % 3 == 0 ? 2 : 1),
                 CreatedAtUtc = BaseUtc.AddSeconds(i * 60)
             });

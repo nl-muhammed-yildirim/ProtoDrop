@@ -48,14 +48,14 @@ public class SeedDataIntegrationTest : IAsyncLifetime
                 && p.PriceJson == expected.PriceJson);
     }
 
-    // ---- AC-052-2: all seeded keys present — 12 feature gates (false per D-14) + 42 limit keys ----
+    // ---- AC-052-2: all seeded keys present — 12 feature gates (false per D-14) + 45 limit keys ----
 
     [Fact]
     public async Task FeatureFlag_HasAllSeededKeys()
     {
         var flags = await _db.Set<FeatureFlag>().ToListAsync();
 
-        Assert.Equal(54, flags.Count); // 12 feature.* gates + 3 x 14 limits.<plan>.* keys (FR-052-4)
+        Assert.Equal(57, flags.Count); // 12 feature.* gates + 3 x 15 limits.<plan>.* keys (FR-052-4)
         Assert.Subset(flags.Select(f => f.Key).ToHashSet(), ExpectedKeys().ToHashSet());
     }
 
@@ -65,15 +65,15 @@ public class SeedDataIntegrationTest : IAsyncLifetime
         {
             Id = Guid.Parse("11111111-0000-4000-8000-000000000001"),
             Code = "free", Name = "Free", SortOrder = 1,
-            LimitsJson = "{\"maxTransferSize\":5368709120,\"maxSingleFile\":5368709120,\"maxZipSize\":4294967296,\"retentionDays\":7,\"graceDays\":3,\"maxDownloads\":100,\"maxEmails\":20,\"storageQuota\":5368709120,\"activeTransfersMax\":20}",
-            FeaturesJson = "{\"ads\":false,\"scheduling\":false,\"analytics\":false,\"branding\":false,\"sso_scim\":false}",
+            LimitsJson = "{\"maxTransferSize\":5368709120,\"maxSingleFile\":5368709120,\"maxZipSize\":4294967296,\"retentionDays\":7,\"graceDays\":3,\"maxDownloads\":100,\"maxEmails\":20,\"storageQuota\":5368709120,\"activeTransfersMax\":20,\"maxLogoSize\":1048576}",
+            FeaturesJson = "{\"ads\":true,\"scheduling\":false,\"analytics\":false,\"branding\":false,\"sso_scim\":false}",
             PriceJson = "{\"currency\":\"USD\",\"monthly\":{\"amount\":0,\"stripePriceId\":null},\"annual\":{\"amount\":0,\"stripePriceId\":null},\"perSeatMonthly\":null}"
         },
         new()
         {
             Id = Guid.Parse("11111111-0000-4000-8000-000000000002"),
             Code = "pro", Name = "Pro", SortOrder = 2,
-            LimitsJson = "{\"maxTransferSize\":10737418240,\"maxSingleFile\":10737418240,\"maxZipSize\":9223372036854775807,\"retentionDays\":30,\"graceDays\":3,\"maxDownloads\":1000,\"maxEmails\":100,\"storageQuota\":107374182400,\"activeTransfersMax\":200}",
+            LimitsJson = "{\"maxTransferSize\":10737418240,\"maxSingleFile\":10737418240,\"maxZipSize\":9223372036854775807,\"retentionDays\":30,\"graceDays\":3,\"maxDownloads\":1000,\"maxEmails\":100,\"storageQuota\":107374182400,\"activeTransfersMax\":200,\"maxLogoSize\":1048576}",
             FeaturesJson = "{\"ads\":false,\"scheduling\":true,\"analytics\":true,\"branding\":true,\"sso_scim\":false}",
             PriceJson = "{\"currency\":\"USD\",\"monthly\":{\"amount\":900,\"stripePriceId\":null},\"annual\":{\"amount\":9000,\"stripePriceId\":null},\"perSeatMonthly\":null}"
         },
@@ -81,7 +81,7 @@ public class SeedDataIntegrationTest : IAsyncLifetime
         {
             Id = Guid.Parse("11111111-0000-4000-8000-000000000003"),
             Code = "business", Name = "Business", SortOrder = 3,
-            LimitsJson = "{\"maxTransferSize\":107374182400,\"maxSingleFile\":107374182400,\"maxZipSize\":9223372036854775807,\"retentionDays\":90,\"graceDays\":3,\"maxDownloads\":-1,\"maxEmails\":500,\"storageQuota\":1099511627776,\"activeTransfersMax\":-1}",
+            LimitsJson = "{\"maxTransferSize\":107374182400,\"maxSingleFile\":107374182400,\"maxZipSize\":9223372036854775807,\"retentionDays\":90,\"graceDays\":3,\"maxDownloads\":-1,\"maxEmails\":500,\"storageQuota\":1099511627776,\"activeTransfersMax\":-1,\"maxLogoSize\":1048576}",
             FeaturesJson = "{\"ads\":false,\"scheduling\":true,\"analytics\":true,\"branding\":true,\"sso_scim\":true}",
             PriceJson = "{\"currency\":\"USD\",\"monthly\":{\"amount\":1900,\"stripePriceId\":null},\"annual\":{\"amount\":19000,\"stripePriceId\":null},\"perSeatMonthly\":1900}"
         }
@@ -99,7 +99,7 @@ public class SeedDataIntegrationTest : IAsyncLifetime
 
     private static readonly string[] LimitSuffixes =
     [
-        "activeTransfersMax", "ads", "analytics", "branding", "graceDays", "maxDownloads", "maxEmails",
+        "activeTransfersMax", "ads", "analytics", "branding", "graceDays", "maxDownloads", "maxEmails", "maxLogoSize",
         "maxSingleFile", "maxTransferSize", "maxZipSize", "retentionDays", "scheduling", "ssoScim", "storageQuota"
     ];
 }

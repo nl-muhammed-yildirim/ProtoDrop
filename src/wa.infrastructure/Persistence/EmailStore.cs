@@ -34,7 +34,10 @@ public sealed class EmailStore : IEmailStore
             transfer.SenderEmail,
             transfer.ExpiresAtUtc,
             transfer.LinkId,
-            files);
+            files,
+            transfer.OwnerAppUserId,
+            transfer.Status,
+            transfer.ScheduledSendAtUtc);
     }
 
     public async Task<IReadOnlyList<EmailRecipient>> GetRecipientsAsync(Guid transferId, CancellationToken ct)

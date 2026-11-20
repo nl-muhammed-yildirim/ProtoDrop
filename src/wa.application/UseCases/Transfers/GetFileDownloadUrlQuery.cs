@@ -91,7 +91,7 @@ public sealed class GetFileDownloadUrlHandler : IRequestHandler<GetFileDownloadU
         // TA-7.2 step 4: the atomic cap check — store-owned (guarded increment + idempotent flip). The handler never
         // pre-reads DownloadsCount: a stale read would race; only the UPDATE's rowsAffected is authoritative.
         var record = await _store.RecordSingleFileDownloadAsync(
-            transfer.Id, fileId, IpHash(request.ClientIp), UaHash(request.UserAgent), cancellationToken);
+            transfer.Id, fileId, IpHash(request.ClientIp), UaHash(request.UserAgent), wa.domain.Analytics.BrowserFamily.FromUserAgent(request.UserAgent), cancellationToken);
         if (record.Outcome == SingleFileDownloadOutcome.CapReached)
             return new FileDownloadResult(FileDownloadState.DownloadLimit, SenderEmail: transfer.SenderEmail);
 
@@ -110,9 +110,9 @@ public sealed class GetFileDownloadUrlHandler : IRequestHandler<GetFileDownloadU
     private string? IpHash(string? clientIp) =>
         string.IsNullOrEmpty(clientIp) ? null : _telemetry.IpSlot(clientIp);
 
-    /// <summary>TA-9.4: User-Agent → SHA-256 lowercase hex (exactly 64 chars — fits UaHash VARCHAR(64); null stays null).</summary>
-    private static string? UaHash(string? userAgent) =>
-        string.IsNullOrEmpty(userAgent) ? null : Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(userAgent))).ToLowerInvariant();
+    /// <summary>TA-9.4: User-Agent → HMAC-SHA256 lowercase hex keyed like IpHash (exactly 64 chars — fits UaHash VARCHAR(64); null stays null).</summary>
+    private string? UaHash(string? userAgent) =>
+        string.IsNullOrEmpty(userAgent) ? null : _telemetry.IpSlot(userAgent); // IpSlot IS the keyed HMAC-SHA256 hex slot (== PiiTransforms.UserAgent) — keeps the reporter's closed slot set unchanged
 
     /// <summary>RFC 5987: the original filename round-trips via resp-content-disposition — part of the string-to-sign.</summary>
     private static string BuildContentDisposition(string fileName) =>

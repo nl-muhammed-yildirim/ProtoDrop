@@ -142,6 +142,13 @@ interface RecipientState {
   downloadsLeft: number | null
   /** Gate UI is T-003-05 — the store's unlock() flips it via endpoint 4's ?t= token. */
   passwordRequired: boolean
+  /** F-PRF-001: sender's organization (null when absent or the sender's plan lacks Branding). */
+  orgName: string | null
+  orgLogoUrl: string | null
+  /** F-PRF-002 (FR-022-6): UTC ISO due time of a Scheduled transfer; null otherwise. */
+  scheduledSendAt: string | null
+  /** F-PRF-004 (FR-024-3): server-resolved; false on every non-active shape. */
+  adsEnabled: boolean
   /** T-003-03: Problem+JSON details verbatim — the screen's single line on terminal screens (TA-4.1.3). */
   terminalMessage: string | null
   /** T-003-05 (AC-003-2): true while endpoint 5 is in flight — the gate keeps rendering, submit disabled. */
@@ -203,6 +210,10 @@ const LOADING_SHAPE = {
   hasDownloadAll: false,
   downloadsLeft: null as number | null,
   passwordRequired: false,
+  orgName: null,
+  orgLogoUrl: null,
+  scheduledSendAt: null as string | null,
+  adsEnabled: false,
   terminalMessage: null as string | null,
   unlocking: false,
   unlockError: null as string | null,
@@ -272,6 +283,10 @@ export const useRecipientStore = create<RecipientState & RecipientActions>((set,
           hasDownloadAll: boolean
           downloadsLeft: number | null
           passwordRequired: boolean
+          orgName?: string | null
+          orgLogoUrl?: string | null
+          scheduledSendAt?: string | null
+          adsEnabled?: boolean
         }
         set({
           status: 'active',
@@ -281,6 +296,10 @@ export const useRecipientStore = create<RecipientState & RecipientActions>((set,
           hasDownloadAll: body.hasDownloadAll,
           downloadsLeft: body.downloadsLeft,
           passwordRequired: body.passwordRequired,
+          orgName: body.orgName ?? null,
+          orgLogoUrl: body.orgLogoUrl ?? null,
+          scheduledSendAt: body.scheduledSendAt ?? null,
+          adsEnabled: body.adsEnabled === true,
           terminalMessage: null,
           error: null,
         })

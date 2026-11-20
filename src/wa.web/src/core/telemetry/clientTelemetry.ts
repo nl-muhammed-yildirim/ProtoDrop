@@ -1,7 +1,7 @@
 /**
  * T-012-02 (TA-10.2, F-TRF-012): formalized client-side telemetry sink.
  *
- * Closed event list — exactly the four names below. Any other name FAILS FAST:
+ * Closed event list — exactly the names below. Any other name FAILS FAST:
  * - dev (import.meta.env.DEV): throws an Error
  * - prod (import.meta.env.PROD): dropped silently (never logged)
  *
@@ -19,6 +19,9 @@ export const CLIENT_TELEMETRY_EVENTS = [
   'upload_failed',
   'download_completed',
   'translation_missing',
+  // US-024-01 (F-PRF-004, TA-10.2): ad slot outcomes — props slotId, reason only
+  'ad_impression',
+  'ad_error',
 ] as const
 
 export type ClientTelemetryEvent = (typeof CLIENT_TELEMETRY_EVENTS)[number]

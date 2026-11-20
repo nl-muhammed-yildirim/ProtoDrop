@@ -246,13 +246,16 @@ public class FinalizeTransferHandlerTests
         var handler = new FinalizeTransferHandler(
             _store,
             _blobStore,
-            new StubLimitsProvider { Record = new LimitsRecord
+            new StubLimitsProvider
             {
-                MaxTransferSize = 5_368_709_120,
-                MaxSingleFile = 5_368_709_120,
-                StorageQuota = 5_368_709_120,
-                ActiveTransfersMax = 200
-            } },
+                Record = new LimitsRecord
+                {
+                    MaxTransferSize = 5_368_709_120,
+                    MaxSingleFile = 5_368_709_120,
+                    StorageQuota = 5_368_709_120,
+                    ActiveTransfersMax = 200
+                }
+            },
             new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?> { ["Wa:Url:Public"] = "http://localhost:5173" })
                 .Build(),
@@ -363,7 +366,7 @@ public class FinalizeTransferHandlerTests
         var result = await _handler.Handle(new FinalizeTransferCommand(draftId, "key-guest-meter", [file1]), CancellationToken.None);
 
         Assert.NotNull(result);
-        Assert.Empty(_logger.Entries.Where(e => e.RenderedText.StartsWith("storage_bytes_active")));
+        Assert.DoesNotContain(_logger.Entries, e => e.RenderedText.StartsWith("storage_bytes_active"));
     }
 
     [Fact]

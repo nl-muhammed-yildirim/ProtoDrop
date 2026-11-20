@@ -12,9 +12,9 @@ public class LimitsProviderTests
     private static readonly TimeSpan Ttl = TimeSpan.FromSeconds(30);
 
     // Part-2 constants, verbatim from the seed (T-052-04) — AC-053-1.
-    private const string FreeLimitsJson = """{"maxTransferSize":5368709120,"maxSingleFile":5368709120,"maxZipSize":4294967296,"retentionDays":7,"graceDays":3,"maxDownloads":100,"maxEmails":20,"storageQuota":5368709120,"activeTransfersMax":20}""";
-    private const string ProLimitsJson = """{"maxTransferSize":10737418240,"maxSingleFile":10737418240,"maxZipSize":9223372036854775807,"retentionDays":30,"graceDays":3,"maxDownloads":1000,"maxEmails":100,"storageQuota":107374182400,"activeTransfersMax":200}""";
-    private const string BusinessLimitsJson = """{"maxTransferSize":107374182400,"maxSingleFile":107374182400,"maxZipSize":9223372036854775807,"retentionDays":90,"graceDays":3,"maxDownloads":-1,"maxEmails":500,"storageQuota":1099511627776,"activeTransfersMax":-1}""";
+    private const string FreeLimitsJson = """{"maxTransferSize":5368709120,"maxSingleFile":5368709120,"maxZipSize":4294967296,"retentionDays":7,"graceDays":3,"maxDownloads":100,"maxEmails":20,"storageQuota":5368709120,"activeTransfersMax":20,"maxLogoSize":1048576}""";
+    private const string ProLimitsJson = """{"maxTransferSize":10737418240,"maxSingleFile":10737418240,"maxZipSize":9223372036854775807,"retentionDays":30,"graceDays":3,"maxDownloads":1000,"maxEmails":100,"storageQuota":107374182400,"activeTransfersMax":200,"maxLogoSize":1048576}""";
+    private const string BusinessLimitsJson = """{"maxTransferSize":107374182400,"maxSingleFile":107374182400,"maxZipSize":9223372036854775807,"retentionDays":90,"graceDays":3,"maxDownloads":-1,"maxEmails":500,"storageQuota":1099511627776,"activeTransfersMax":-1,"maxLogoSize":1048576}""";
 
     [Fact]
     public async Task Resolve_NoFlags_ReturnsExactSeedValues_PerPlan() // AC-053-1.
@@ -255,6 +255,18 @@ public class LimitsProviderTests
 
         Assert.True(pro.IsMaxDownloadsInfinite());
         Assert.True(pro.IsActiveTransfersMaxInfinite());
+    }
+
+    [Fact]
+    public async Task Resolve_MaxLogoSize_FromSeed_AndFlagOverridesIt() // US-021-04 (MAX_LOGO_SIZE): seeded per plan; a limits.<plan>.maxLogoSize flag overrides that plan only.
+    {
+        var seeded = await CreateProvider().Resolve("pro", CancellationToken.None);
+        Assert.Equal(1_048_576L, seeded.MaxLogoSize);
+
+        var provider = CreateProvider(rows: new[] { Flag("limits.pro.maxLogoSize", "2097152") });
+        Assert.Equal(2_097_152L, (await provider.Resolve("pro", CancellationToken.None)).MaxLogoSize);
+        Assert.Equal(1_048_576L, (await provider.Resolve("free", CancellationToken.None)).MaxLogoSize);
+        Assert.Equal(1_048_576L, (await provider.Resolve("business", CancellationToken.None)).MaxLogoSize);
     }
 
     // ── builders ──────────────────────────────────────────────────────────────

@@ -67,7 +67,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # jsdom 30 -> undici 8 requires Node >= 22 (vitest loads undici via jsdom).
+          node-version: 22
           cache: npm
           cache-dependency-path: src/wa.web/package-lock.json
       - working-directory: src/wa.web

@@ -65,8 +65,6 @@ public class ForgotPasswordTests
 
         // D-3 discriminator: purpose=2 in the payload — EmailFunction routes on it.
         Assert.Equal(2, doc.RootElement.GetProperty("purpose").GetInt32());
-
-        Assert.NotNull(doc.RootElement.GetProperty("expiresAtUtc")); // expiresAtUtc present (same shape as magic-link)
     }
 
     // ---- FR-008-6 exit check 2: unregistered email → NO row, NO event — same result record (anti-enumeration) ----

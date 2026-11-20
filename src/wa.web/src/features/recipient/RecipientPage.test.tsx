@@ -8,6 +8,7 @@ import { useUploadEngine } from '../../core/upload/UploadEngine'
 import { useRecipientStore } from './RecipientStore'
 import { matchLinkPath } from './recipientRoute'
 import { growthTelemetryLog } from './growthTelemetry'
+import { formatScheduledWhen } from './scheduledLine'
 
 ;(globalThis as unknown as Record<string, boolean>).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -21,6 +22,9 @@ interface PublicTransferBody {
   hasDownloadAll: boolean
   downloadsLeft: number | null
   passwordRequired: boolean
+  orgName?: string | null
+  orgLogoUrl?: string | null
+  scheduledSendAt?: string | null
 }
 
 // Live roots are tracked so afterEach can unmount them — React 18 warns on store updates hitting
@@ -1360,3 +1364,161 @@ describe('RecipientPage (T-003-08 — mobile sticky bar, store-driven DOM)', () 
   })
 })
 
+describe('RecipientPage (F-PRF-001 US-021-01 — org branding in the From heading)', () => {
+  const isGatedActive = (): boolean => useRecipientStore.getState().status === 'active' && useRecipientStore.getState().passwordRequired === true
+
+  beforeEach(() => {
+    window.history.pushState('', '', `/t/${LINK_ID}`)
+  })
+
+  afterEach(() => {
+    for (const root of roots.splice(0)) act(() => { root.unmount() })
+    useRecipientStore.getState().reset()
+    window.history.replaceState(null, '', '/')
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('appends " · {orgName}" and renders no logo when only the name is present (AC-021-1, EC-021-4)', async () => {
+    stubFetch(200, activeBody({ from: 'Anna K.', orgName: 'Studio Nova', orgLogoUrl: null }))
+
+    const host = await renderApp(isActive)
+
+    expect(host.querySelector('.rp-heading')?.textContent).toBe('From: Anna K. · Studio Nova')
+    expect(host.querySelector('.rp-org-logo')).toBeNull()
+    host.remove()
+  })
+
+  it('shows plain "From: {name}" with no separator when orgName is null (AC-021-3)', async () => {
+    stubFetch(200, activeBody({ from: 'Anna K.', orgName: null, orgLogoUrl: null }))
+
+    const host = await renderApp(isActive)
+
+    expect(host.querySelector('.rp-heading')?.textContent).toBe('From: Anna K.')
+    expect(host.querySelector('.rp-heading')?.textContent).not.toContain('·')
+    host.remove()
+  })
+
+  it('renders the logo img inside the heading when orgLogoUrl is set (D-5 slot)', async () => {
+    stubFetch(200, activeBody({ from: 'Anna K.', orgName: 'Studio Nova', orgLogoUrl: 'https://logo.example/l.png' }))
+
+    const host = await renderApp(isActive)
+
+    const imgs = host.querySelectorAll('.rp-heading .rp-org-logo')
+    expect(imgs).toHaveLength(1)
+    expect(imgs[0].getAttribute('src')).toBe('https://logo.example/l.png')
+    host.remove()
+  })
+
+  it('shows the org on the password gate heading too', async () => {
+    stubFetch(200, activeBody({ from: 'Anna K.', passwordRequired: true, orgName: 'Studio Nova' }))
+
+    const host = await renderApp(isGatedActive)
+
+    expect(host.querySelector('.rp-heading')?.textContent).toBe('From: Anna K. · Studio Nova')
+    host.remove()
+  })
+
+  it('shows person first, org second (AC-021-2)', async () => {
+    stubFetch(200, activeBody({ from: 'Anna', orgName: 'Studio Nova' }))
+
+    const host = await renderApp(isActive)
+
+    expect(host.querySelector('.rp-heading')?.textContent).toBe('From: Anna · Studio Nova')
+    host.remove()
+  })
+
+  it('drops the separator when the person name is blank', async () => {
+    stubFetch(200, activeBody({ from: '', orgName: 'Studio Nova' }))
+
+    const host = await renderApp(isActive)
+
+    expect(host.querySelector('.rp-heading')?.textContent).toBe('From: Studio Nova')
+    expect(host.querySelector('.rp-heading')?.textContent).not.toContain('·')
+    host.remove()
+  })
+
+  it('falls back to Anonymous when both parts are blank', async () => {
+    stubFetch(200, activeBody({ from: '', orgName: null }))
+
+    const host = await renderApp(isActive)
+
+    expect(host.querySelector('.rp-heading')?.textContent).toBe('From: Anonymous')
+    host.remove()
+  })
+
+  it('uses the same composition on the gate heading', async () => {
+    stubFetch(200, activeBody({ from: '', passwordRequired: true, orgName: 'Studio Nova' }))
+
+    const host = await renderApp(isGatedActive)
+
+    expect(host.querySelector('.rp-heading')?.textContent).toBe('From: Studio Nova')
+    host.remove()
+  })
+})
+
+describe('RecipientPage (F-PRF-002 US-022-02 — pre-due line)', () => {
+  const isGatedActive = (): boolean => useRecipientStore.getState().status === 'active' && useRecipientStore.getState().passwordRequired === true
+  const hoursFromNow = (h: number): string => new Date(Date.now() + h * 3_600_000).toISOString()
+
+  beforeEach(() => {
+    window.history.pushState('', '', `/t/${LINK_ID}`)
+  })
+
+  afterEach(() => {
+    for (const root of roots.splice(0)) act(() => { root.unmount() })
+    useRecipientStore.getState().reset()
+    window.history.replaceState(null, '', '/')
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('future due: shows the line with the locale-formatted time, no "!", downloads stay available (FR-022-6)', async () => {
+    const iso = hoursFromNow(2)
+    stubFetch(200, activeBody({ scheduledSendAt: iso }))
+
+    const host = await renderApp(isActive)
+
+    const line = host.querySelector('.rp-scheduled-note')
+    expect(line?.textContent).toBe(`Files are ready — email goes out at ${formatScheduledWhen(iso)}`)
+    expect(line?.textContent).not.toContain('!')
+    const downloads = Array.from(host.querySelectorAll('.rp-download')) as HTMLButtonElement[]
+    expect(downloads.length).toBeGreaterThan(0)
+    expect(downloads.every((b) => !b.disabled)).toBe(true)
+    expect(host.textContent).toContain('Download all')
+    host.remove()
+  })
+
+  it('past due: no line, file list still rendered', async () => {
+    stubFetch(200, activeBody({ scheduledSendAt: hoursFromNow(-2) }))
+
+    const host = await renderApp(isActive)
+
+    expect(host.querySelector('.rp-scheduled-note')).toBeNull()
+    expect(host.querySelectorAll('.rp-row').length).toBe(2)
+    host.remove()
+  })
+
+  it('null or absent scheduledSendAt: no line', async () => {
+    stubFetch(200, activeBody({ scheduledSendAt: null }))
+    const hostNull = await renderApp(isActive)
+    expect(hostNull.querySelector('.rp-scheduled-note')).toBeNull()
+    hostNull.remove()
+    for (const root of roots.splice(0)) act(() => { root.unmount() })
+    useRecipientStore.getState().reset()
+
+    stubFetch(200, activeBody())
+    const hostAbsent = await renderApp(isActive)
+    expect(hostAbsent.querySelector('.rp-scheduled-note')).toBeNull()
+    hostAbsent.remove()
+  })
+
+  it('password gate + future due: gate card only, no line', async () => {
+    stubFetch(200, activeBody({ passwordRequired: true, scheduledSendAt: hoursFromNow(2) }))
+
+    const host = await renderApp(isGatedActive)
+
+    expect(host.querySelector('.rp-scheduled-note')).toBeNull()
+    host.remove()
+  })
+})

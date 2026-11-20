@@ -68,6 +68,24 @@ public class WorkerServicesTests
     }
 
     [Fact]
+    public void ActivateScheduledTransfersHandler_Resolves() // US-022-04: f-expire schedule sub-step is composed
+    {
+        using var sp = Build(InMemory(BaseSettings()));
+
+        Assert.NotNull(sp.GetRequiredService<wa.application.UseCases.Transfers.ActivateScheduledTransfersHandler>());
+    }
+
+    [Fact]
+    public void SendNotificationEmailsHandler_Resolves() // US-021-02: f-email branding deps are composed
+    {
+        var settings = BaseSettings();
+        settings["Wa:Email:Sender"] = "log";
+        using var sp = Build(InMemory(settings));
+
+        Assert.NotNull(sp.GetRequiredService<wa.application.UseCases.Transfers.SendNotificationEmailsHandler>());
+    }
+
+    [Fact]
     public void GdprSweepHandler_Resolves() // US-047-02: f-gdpr-sweep is composed
     {
         using var sp = Build(InMemory(BaseSettings()));

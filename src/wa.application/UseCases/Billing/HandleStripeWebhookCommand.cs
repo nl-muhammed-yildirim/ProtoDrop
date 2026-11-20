@@ -42,7 +42,7 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
 
     private const string CanceledStatus = "canceled";
 
-    private const string InvoicePaymentFailed ="invoice.payment_failed";
+    private const string InvoicePaymentFailed = "invoice.payment_failed";
     private const string InvoicePaid = "invoice.paid";
 
     private readonly IStripeBillingStore _store;

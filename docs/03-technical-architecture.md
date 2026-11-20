@@ -242,6 +242,8 @@ CREATE TABLE dbo.AppUser (
     PasswordHash   VARCHAR(256)   NULL,  -- PBKDF2 (ASP.NET Identity PasswordHasher)
     PlanId         UNIQUEIDENTIFIER NOT NULL CONSTRAINT FK_AppUser_Plan REFERENCES dbo.Plan(Id),
     Theme          VARCHAR(16)    NOT NULL CONSTRAINT DF_AppUser_Theme DEFAULT 'system',
+    OrgName        NVARCHAR(60)   NULL,   -- F-PRF-001 (FR-021-5)
+    OrgLogoBlobPath VARCHAR(400)  NULL,   -- F-PRF-001 (avatars/{userId:N}/logo, TA-3.5)
     CreatedAtUtc   DATETIME2      NOT NULL,
     DeletedAtUtc   DATETIME2      NULL
 );
@@ -414,8 +416,9 @@ CREATE TABLE dbo.IdempotencyKey (
 | `transfers/{transferId}/files/{fileId}` | with transfer (job) | API (server-side blob copy on finalize) |
 | `transfers/{transferId}/all.zip` | with transfer (job) | zip function |
 | `avatars/{userId}` (P1) | with user | API |
+| `avatars/{userId:N}/logo` (F-PRF-001, `avatars` container) | with user; deleted with account (F-TRF-008-6); **no lifecycle rule** | API |
 
-- One storage account, two containers: `staging`, `transfers`. Container-level **lifecycle rules**: `staging/*` delete 24 h; `transfers/*` delete 30 d (safety net only — jobs are primary, F-TRF-005-8).
+- One storage account, three containers: `staging`, `transfers`, `avatars` (F-PRF-001, no lifecycle rule). Container-level **lifecycle rules**: `staging/*` delete 24 h; `transfers/*` delete 30 d (safety net only — jobs are primary, F-TRF-005-8).
 - `transfers` container: versioning OFF, GRS in prod, soft-delete 14 d ON.
 
 ### TA-3.6 SAS strategy
@@ -425,6 +428,7 @@ CREATE TABLE dbo.IdempotencyKey (
 | Draft upload (per file) | Blob resource (per file URL from API) | `cwr` (create, write, read) | 2 h |
 | Recipient single file | Blob resource | `r` | 30 min |
 | Recipient zip | Blob resource | `r` | 30 min |
+| Org logo read (F-PRF-001) | Blob resource `avatars/{userId:N}/logo` | `r`, inline `Content-Disposition` | 30 min |
 
 - Version 2024 SAS, signed with **Key Vault–stored account key** (managed identity user-delegation is a P2 optimization).
 - SAS URLs are always `https://{acct}.blob.core.windows.net/...?sig=...`; browser holds them only in memory + `sessionStorage` for the unlock session.
@@ -465,7 +469,7 @@ CREATE TABLE dbo.IdempotencyKey (
 ```
 
 Machine `code` values (all of them, no others in MVP):
-`VALIDATION`, `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `TRANSFER_NOT_FINALIZED`, `TRANSFER_SIZE_EXCEEDED`, `STORAGE_QUOTA_EXCEEDED`, `MAX_DOWNLOADS_REACHED`, `WRONG_PASSWORD`, `TRANSFER_EXPIRED`, `TRANSFER_DELETED`, `FILES_GONE`, `IDEMPOTENCY_CONFLICT`, `RATE_LIMITED`, `STRIPE_WEBHOOK_MISMATCH`, `EMAIL_UNSUBSCRIBED`, `BILLING_UNAVAILABLE`, `LINK_EXPIRED`, `ACTIVE_TRANSFERS_EXCEEDED`, `INTERNAL`.
+`VALIDATION`, `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `TRANSFER_NOT_FINALIZED`, `TRANSFER_SIZE_EXCEEDED`, `STORAGE_QUOTA_EXCEEDED`, `MAX_DOWNLOADS_REACHED`, `WRONG_PASSWORD`, `TRANSFER_EXPIRED`, `TRANSFER_DELETED`, `FILES_GONE`, `IDEMPOTENCY_CONFLICT`, `RATE_LIMITED`, `STRIPE_WEBHOOK_MISMATCH`, `EMAIL_UNSUBSCRIBED`, `BILLING_UNAVAILABLE`, `LINK_EXPIRED`, `ACTIVE_TRANSFERS_EXCEEDED`, `LOGO_TOO_LARGE`, `LOGO_TYPE_INVALID`, `INTERNAL`.
 
 **TA-4.1.4 Pagination** — cursor: `?cursor={base64(created_at:id)}&limit=25`; response includes `nextCursor` (null when done).
 
@@ -482,7 +486,7 @@ Machine `code` values (all of them, no others in MVP):
 | 1 | `POST /api/v1/transfers/draft` | none (cookie ok) | create draft, get per-file SAS | `upload_started` |
 | 2 | `POST /api/v1/transfers/draft/{draftId}/finalize` | same | commit staged blobs → Transfer | `transfer.created` (if sent) / metrics |
 | 3 | `POST /api/v1/transfers/{id}/send` | cookie (or draft-owner token) | set emails/password/note/schedule | `transfer.created` |
-| 4 | `GET /api/v1/public/transfers/{linkId}` | none | recipient metadata | `transfer_page_viewed` |
+| 4 | `GET /api/v1/public/transfers/{linkId}` | none | recipient metadata; + `orgName`, `orgLogoUrl` (F-PRF-001) | `transfer_page_viewed` |
 | 5 | `POST /api/v1/public/transfers/{linkId}/unlock` | none | password → JWT | `password_correct/wrong` |
 | 6 | `GET /api/v1/public/transfers/{linkId}/files/{fileId}/download-url?t=` | JWT | mint 30-min SAS | `download_started` |
 | 7 | `GET /api/v1/public/transfers/{linkId}/download-all-url?t=` | JWT | mint zip SAS (202 if generating) | `download_started` |
@@ -491,7 +495,7 @@ Machine `code` values (all of them, no others in MVP):
 | 10 | `POST /api/v1/auth/magic-link/redeem` | none | token → session | `login_success` |
 | 11 | `POST /api/v1/auth/forgot-password` | none | magic link email | metrics |
 | 12 | `POST /api/v1/auth/logout` | cookie | clear session | metrics |
-| 13 | `GET /api/v1/auth/me` · `PATCH /api/v1/auth/me` · `DELETE /api/v1/auth/me` | cookie | profile (name, theme; GDPR delete) | `account_deleted` |
+| 13 | `GET /api/v1/auth/me` · `PATCH /api/v1/auth/me` · `DELETE /api/v1/auth/me` · `GET /api/v1/auth/me/logo` · `PUT /api/v1/auth/me/logo` · `DELETE /api/v1/auth/me/logo` | cookie | profile (name, theme; GDPR delete). `PATCH` body gains `orgName` (absent = unchanged; null/blank = clear; max 60; no CR/LF; Pro+ only to set). Logo (F-PRF-001): `GET` owner view; `PUT` raw body, content-sniffed PNG/JPEG/WebP/SVG, size <= `MAX_LOGO_SIZE`, Pro+; `DELETE` idempotent | `account_deleted` |
 | 14 | `GET /api/v1/transfers?status=&cursor=` | cookie | My Files | — |
 | 15 | `GET /api/v1/transfers/{id}` | owner | detail | — |
 | 16 | `POST /api/v1/transfers/{id}/resend` | owner | pre-filled new draft (BlobRef share) | metrics |
@@ -794,7 +798,7 @@ Admin endpoints reject non-admins with `FORBIDDEN`.
 - TLS 1.2+ (Front Door auto-terminate).
 - SQL: VNet + PIP (managed identity auth); firewall = Front Door service tag + VPN IP.
 - Blob: **no public network access**; all via SAS (browser) or managed identity (workers).
-- CORS per TA-4.1.6. CSP on `index.html`: `default-src 'self'; script-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src 'self' {api} {blobacct}.blob.core.windows.net`.
+- CORS per TA-4.1.6. CSP on `index.html`: `default-src 'self'; script-src 'self'; img-src 'self' data: {acct}.blob.core.windows.net; style-src 'self' 'unsafe-inline'; connect-src 'self' {api} {blobacct}.blob.core.windows.net`. F-PRF-001 adds the blob account host to `img-src` (org logo via 30-min read SAS). Note: no CSP header is emitted by code yet; this is spec text only.
 - Rate limits (Front Door WAF, by IP): `/api/v1/auth/*` 10/min; `/api/v1/transfers/draft` 10/min; `/api/v1/public/*` 30/min; admin 60/min. API in-memory `AspNetCoreRateLimit` as second layer for `/auth` (5/min per IP).
 
 ### TA-9.6 Threat notes (design mitigations)
@@ -804,6 +808,7 @@ Admin endpoints reject non-admins with `FORBIDDEN`.
 - **Replay of finalize**: idempotency key (TA-4.1.5).
 - **Zip DoS**: `MAX_ZIP_SIZE` cap + function timeout + 4-way concurrency.
 - **Admin bootstrap**: seed via migration (email list in config), documented runbook.
+- **SVG logo (F-PRF-001, EC-021-3, accepted risk)**: logos may be SVG. Served with `Content-Disposition: inline` and rendered only via `<img>`, so scripts do not run; scripts inside an SVG could run only on the cookie-less blob origin.
 
 ---
 
@@ -816,7 +821,7 @@ Admin endpoints reject non-admins with `FORBIDDEN`.
 
 ### TA-10.2 Telemetry contract (only these; names are code)
 
-**Events** (App Insights, custom): `upload_started`, `upload_completed` (bytes, durationMs, retries), `upload_failed`, `growth_cta_shown`, `growth_cta_clicked`, `transfer_page_viewed`, `transfer_not_found`, `password_correct`, `password_wrong`, `download_started`, `download_completed`, `zip_generated`, `zip_failed`, `email_sent`, `email_failed`, `user_created`, `login_success`, `login_failed`, `account_deleted`, `plan_changed`, `translation_missing`, `admin_action`, `dlq_count`.
+**Events** (App Insights, custom): `upload_started`, `upload_completed` (bytes, durationMs, retries), `upload_failed`, `growth_cta_shown`, `growth_cta_clicked`, `transfer_page_viewed`, `transfer_not_found`, `password_correct`, `password_wrong`, `download_started`, `download_completed`, `zip_generated`, `zip_failed`, `email_sent`, `email_failed`, `user_created`, `login_success`, `login_failed`, `account_deleted`, `plan_changed`, `translation_missing`, `admin_action`, `dlq_count`, `branding_logo_missing` (F-PRF-001, property-free), `ad_impression`, `ad_error` (F-PRF-004, client-only; props slotId, reason).
 
 **Metrics** (custom): `upload.success_rate` (5-min), `link_to_download_seconds`, `expiry_job_lag_seconds`, `email_failures_1h`, `active_transfers`, `storage_bytes_active`, `api.requests{status}`.
 

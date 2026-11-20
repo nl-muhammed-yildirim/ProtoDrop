@@ -3,11 +3,14 @@ import type { FormEvent, MouseEvent } from 'react'
 
 import { formatBytes } from '../../core/upload/formatBytes'
 import i18n from '../../core/i18n/init'
+import { RecipientAdPlacement } from './ads/RecipientAdPlacement'
 import ErrorScreen from '../errors/ErrorScreen'
 import { useAriaLive } from '../../core/ui/useAriaLive'
 import { toastRole } from '../../core/ui/toastRole'
 import { trackGrowthCta } from './growthTelemetry'
 import { useRecipientStore } from './RecipientStore'
+import { formatScheduledWhen, isPreDue } from './scheduledLine'
+import { formatSenderLine } from './senderLine'
 
 // T-004-03: failure toast auto-dismiss (App.tsx 5 s toast precedent).
 const TOAST_DISMISS_MS = 5000
@@ -44,12 +47,16 @@ interface RecipientPageProps {
 export function RecipientPage({ linkId }: RecipientPageProps) {
   const status = useRecipientStore((s) => s.status)
   const from = useRecipientStore((s) => s.from)
+  const orgName = useRecipientStore((s) => s.orgName)
+  const orgLogoUrl = useRecipientStore((s) => s.orgLogoUrl)
+  const scheduledSendAt = useRecipientStore((s) => s.scheduledSendAt)
   const note = useRecipientStore((s) => s.note)
   const files = useRecipientStore((s) => s.files)
   const hasDownloadAll = useRecipientStore((s) => s.hasDownloadAll)
   const downloadsLeft = useRecipientStore((s) => s.downloadsLeft)
   const terminalMessage = useRecipientStore((s) => s.terminalMessage)
   const passwordRequired = useRecipientStore((s) => s.passwordRequired)
+  const adsEnabled = useRecipientStore((s) => s.adsEnabled)
   const unlocking = useRecipientStore((s) => s.unlocking)
   const unlockError = useRecipientStore((s) => s.unlockError)
   // T-003-06: per-row download indicator (UI notes: subtle progress/indicator; no page-level blocking UI).
@@ -207,7 +214,10 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
     // No note, no file list, no sizes, nothing to enumerate or leak (byte-leak audit in RecipientPage.test.tsx).
     return (
       <section className="rp rp-gate" aria-label={i18n.t('recipient.gate.sectionAria', { name: from })}>
-        <h1 className="rp-heading">{i18n.t('recipient.gate.fromHeading')}{from}</h1>
+        <h1 className="rp-heading">
+          {orgLogoUrl !== null && <img className="rp-org-logo" src={orgLogoUrl} alt="" />}
+          {i18n.t('recipient.gate.fromHeading')}{formatSenderLine(from, orgName)}
+        </h1>
         <form className="rp-password-card" onSubmit={handleSubmit}>
           <label className="rp-password-label" htmlFor="rp-password-input">{i18n.t('recipient.gate.passwordLabel')}</label>
           <div className={`rp-password-row${unlockError ? ' rp-shake' : ''}`}>
@@ -259,10 +269,18 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
     <section className="rp" aria-label={i18n.t('recipient.active.sectionAria', { name: from })} ref={sectionRef} tabIndex={-1}>
       {/* T-016-02: hidden polite live region — downloads-left decrements + growth CTA; visually clipped, no layout impact. */}
       {recipientLive}
-      <h1 className="rp-heading">{i18n.t('recipient.active.fromHeading')}{from}</h1>
+      <h1 className="rp-heading">
+        {orgLogoUrl !== null && <img className="rp-org-logo" src={orgLogoUrl} alt="" />}
+        {i18n.t('recipient.active.fromHeading')}{formatSenderLine(from, orgName)}
+      </h1>
       {/* Note as plain-text blockquote — no markdown (TA-8.2); overflow-wrap handles long unbroken URLs. */}
       {note && note.trim() !== '' && (
         <blockquote className="rp-note">{note}</blockquote>
+      )}
+      {scheduledSendAt !== null && isPreDue(scheduledSendAt, Date.now()) && (
+        <p className="rp-scheduled-note">
+          {i18n.t('recipient.active.scheduledNote', { when: formatScheduledWhen(scheduledSendAt) })}
+        </p>
       )}
       <ul className="rp-list" aria-label={i18n.t('recipient.active.filesAria')}>
         {files.map((f) => (
@@ -313,6 +331,8 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
       {downloadsLeft !== null && downloadsLeft > 0 && (
         <p className="rp-downloads-left">{i18n.t('recipient.active.downloadsLeft', { count: downloadsLeft })}</p>
       )}
+      {/* US-024-01 (FR-024-4): one slot below the list, above the growth panel; the gate branch above never reaches here (AC-024-5). */}
+      {adsEnabled && <RecipientAdPlacement />}
       {/* T-003-07 (FR-003-7): growth panel — shown once per full download, below the file list; partials never render it. */}
       {growthPanelVisible && (
         <div className="rp-growth" role="region" aria-label={i18n.t('recipient.active.growthAria')}>

@@ -47,6 +47,12 @@ namespace wa.infrastructure.Persistence.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(false, "DF_AppUser_Conf");
 
+                    b.Property<string>("OrgLogoBlobPath")
+                        .HasColumnType("VARCHAR(400)");
+
+                    b.Property<string>("OrgName")
+                        .HasColumnType("NVARCHAR(60)");
+
                     b.Property<string>("PasswordHash")
                         .HasColumnType("VARCHAR(256)");
 
@@ -274,6 +280,9 @@ namespace wa.infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("UaHash")
+                        .HasColumnType("VARCHAR(64)");
+
+                    b.Property<string>("UserAgentFamily")
                         .HasColumnType("VARCHAR(64)");
 
                     b.HasKey("Id")
@@ -521,6 +530,13 @@ namespace wa.infrastructure.Persistence.Migrations
                         },
                         new
                         {
+                            Key = "limits.business.maxLogoSize",
+                            Description = "Plan limits override (TA-3.4); values per Open-Decisions Part 2",
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "1048576"
+                        },
+                        new
+                        {
                             Key = "limits.business.maxSingleFile",
                             Description = "Plan limits override (TA-3.4); values per Open-Decisions Part 2",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
@@ -580,7 +596,7 @@ namespace wa.infrastructure.Persistence.Migrations
                             Key = "limits.free.ads",
                             Description = "Plan limits override (TA-3.4); values per Open-Decisions Part 2",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Value = "false"
+                            Value = "true"
                         },
                         new
                         {
@@ -616,6 +632,13 @@ namespace wa.infrastructure.Persistence.Migrations
                             Description = "Plan limits override (TA-3.4); values per Open-Decisions Part 2",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Value = "20"
+                        },
+                        new
+                        {
+                            Key = "limits.free.maxLogoSize",
+                            Description = "Plan limits override (TA-3.4); values per Open-Decisions Part 2",
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "1048576"
                         },
                         new
                         {
@@ -714,6 +737,13 @@ namespace wa.infrastructure.Persistence.Migrations
                             Description = "Plan limits override (TA-3.4); values per Open-Decisions Part 2",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Value = "100"
+                        },
+                        new
+                        {
+                            Key = "limits.pro.maxLogoSize",
+                            Description = "Plan limits override (TA-3.4); values per Open-Decisions Part 2",
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "1048576"
                         },
                         new
                         {
@@ -895,8 +925,8 @@ namespace wa.infrastructure.Persistence.Migrations
                         {
                             Id = new Guid("11111111-0000-4000-8000-000000000001"),
                             Code = "free",
-                            FeaturesJson = "{\"ads\":false,\"scheduling\":false,\"analytics\":false,\"branding\":false,\"sso_scim\":false}",
-                            LimitsJson = "{\"maxTransferSize\":5368709120,\"maxSingleFile\":5368709120,\"maxZipSize\":4294967296,\"retentionDays\":7,\"graceDays\":3,\"maxDownloads\":100,\"maxEmails\":20,\"storageQuota\":5368709120,\"activeTransfersMax\":20}",
+                            FeaturesJson = "{\"ads\":true,\"scheduling\":false,\"analytics\":false,\"branding\":false,\"sso_scim\":false}",
+                            LimitsJson = "{\"maxTransferSize\":5368709120,\"maxSingleFile\":5368709120,\"maxZipSize\":4294967296,\"retentionDays\":7,\"graceDays\":3,\"maxDownloads\":100,\"maxEmails\":20,\"storageQuota\":5368709120,\"activeTransfersMax\":20,\"maxLogoSize\":1048576}",
                             Name = "Free",
                             PriceJson = "{\"currency\":\"USD\",\"monthly\":{\"amount\":0,\"stripePriceId\":null},\"annual\":{\"amount\":0,\"stripePriceId\":null},\"perSeatMonthly\":null}",
                             SortOrder = 1
@@ -906,7 +936,7 @@ namespace wa.infrastructure.Persistence.Migrations
                             Id = new Guid("11111111-0000-4000-8000-000000000002"),
                             Code = "pro",
                             FeaturesJson = "{\"ads\":false,\"scheduling\":true,\"analytics\":true,\"branding\":true,\"sso_scim\":false}",
-                            LimitsJson = "{\"maxTransferSize\":10737418240,\"maxSingleFile\":10737418240,\"maxZipSize\":9223372036854775807,\"retentionDays\":30,\"graceDays\":3,\"maxDownloads\":1000,\"maxEmails\":100,\"storageQuota\":107374182400,\"activeTransfersMax\":200}",
+                            LimitsJson = "{\"maxTransferSize\":10737418240,\"maxSingleFile\":10737418240,\"maxZipSize\":9223372036854775807,\"retentionDays\":30,\"graceDays\":3,\"maxDownloads\":1000,\"maxEmails\":100,\"storageQuota\":107374182400,\"activeTransfersMax\":200,\"maxLogoSize\":1048576}",
                             Name = "Pro",
                             PriceJson = "{\"currency\":\"USD\",\"monthly\":{\"amount\":900,\"stripePriceId\":null},\"annual\":{\"amount\":9000,\"stripePriceId\":null},\"perSeatMonthly\":null}",
                             SortOrder = 2
@@ -916,7 +946,7 @@ namespace wa.infrastructure.Persistence.Migrations
                             Id = new Guid("11111111-0000-4000-8000-000000000003"),
                             Code = "business",
                             FeaturesJson = "{\"ads\":false,\"scheduling\":true,\"analytics\":true,\"branding\":true,\"sso_scim\":true}",
-                            LimitsJson = "{\"maxTransferSize\":107374182400,\"maxSingleFile\":107374182400,\"maxZipSize\":9223372036854775807,\"retentionDays\":90,\"graceDays\":3,\"maxDownloads\":-1,\"maxEmails\":500,\"storageQuota\":1099511627776,\"activeTransfersMax\":-1}",
+                            LimitsJson = "{\"maxTransferSize\":107374182400,\"maxSingleFile\":107374182400,\"maxZipSize\":9223372036854775807,\"retentionDays\":90,\"graceDays\":3,\"maxDownloads\":-1,\"maxEmails\":500,\"storageQuota\":1099511627776,\"activeTransfersMax\":-1,\"maxLogoSize\":1048576}",
                             Name = "Business",
                             PriceJson = "{\"currency\":\"USD\",\"monthly\":{\"amount\":1900,\"stripePriceId\":null},\"annual\":{\"amount\":19000,\"stripePriceId\":null},\"perSeatMonthly\":1900}",
                             SortOrder = 3
@@ -1041,7 +1071,8 @@ namespace wa.infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<byte>("Status")
-                        .HasColumnType("TINYINT");
+                        .HasColumnType("TINYINT")
+                        .HasComment("0 Draft,1 Active,2 Expired,3 DownloadLimit,4 Deleted,5 Scheduled");
 
                     b.Property<Guid?>("SupersededBy")
                         .HasColumnType("uniqueidentifier");

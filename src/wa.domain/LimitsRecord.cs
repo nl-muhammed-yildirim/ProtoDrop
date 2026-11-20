@@ -41,6 +41,10 @@ public class LimitsRecord
     [JsonPropertyName("activeTransfersMax")]
     public int ActiveTransfersMax { get; set; }
 
+    /// <summary>MAX_LOGO_SIZE, bytes (US-021-04).</summary>
+    [JsonPropertyName("maxLogoSize")]
+    public long MaxLogoSize { get; set; }
+
     /// <summary>True when the plan's MAX_DOWNLOADS is unlimited (-1 sentinel, Part 2). Callers use this instead of raw -1 checks (T-007-01).</summary>
     public bool IsMaxDownloadsInfinite() => MaxDownloads < 0;
 

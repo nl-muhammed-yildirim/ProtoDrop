@@ -20,6 +20,7 @@ namespace wa.infrastructure.Blob;
 /// <item>recipient single file — permissions <c>r</c>, 30 min</item>
 /// <item>recipient zip — permissions <c>r</c>, 30 min</item>
 /// <item>data export zip (<c>exports</c> container) — permissions <c>r</c>, 24 h</item>
+/// <item>org logo (<c>avatars</c> container) — permissions <c>r</c>, 30 min, inline</item>
 /// </list>
 /// The frozen <c>Azure.Storage.Blobs</c> 12.29.2 <see cref="BlobSasBuilder"/>
 /// stamps its internal build date into the string-to-sign, so we take the SDK's
@@ -117,6 +118,17 @@ public sealed class BlobSasMinter
             expiresOn: _now().Add(ExportTtl),
             startsOn: null,
             respContentDisposition: ExportContentDisposition);
+
+    private const string LogoContentDisposition = "inline";
+
+    /// <summary>US-021-04 (TA-3.6 org-logo row): <c>avatars</c> container, permissions <c>r</c>, 30 min, no start bound, inline Content-Disposition.</summary>
+    public Uri MintOrgLogo(Guid userId)
+        => Mint(
+            BlobPaths.OrgLogo(userId),
+            permissions: "r",
+            expiresOn: _now().Add(RecipientTtl),
+            startsOn: null,
+            respContentDisposition: LogoContentDisposition);
 
     private Uri Mint(
         string path, string permissions, DateTimeOffset expiresOn, DateTimeOffset? startsOn, string? respContentDisposition)

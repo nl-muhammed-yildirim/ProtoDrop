@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import { formatBytes } from '../../core/upload/formatBytes'
@@ -6,6 +6,8 @@ import type { ListTransfersResponse, MyTransferRowDto } from './formatting'
 import { getTraceParent } from '../../core/traceparent'
 import i18n from '../../core/i18n/init'
 import { useFocusTrap } from '../../core/ui/useFocusTrap'
+import { loadFeatureGates, useFeatureGate } from '../../core/features/featureGates'
+import { DownloadsPanel, downloadsPanelId } from './DownloadsPanel'
 import {
   downloadsLabel,
   formatRemaining,
@@ -78,6 +80,9 @@ export function FilesPage({ onNewTransfer }: FilesPageProps) {
   // T-009-06: delete confirm modal — files-page-owned (the row list is what it guards).
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  // US-023-01 (D-7): one open Downloads panel at a time.
+  const analyticsOn = useFeatureGate('feature.analytics')
+  const [openAnalyticsId, setOpenAnalyticsId] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
   // T-016-03 (D-7): route-change focus — 'New transfer' is this page's primary action; focus it on mount.
@@ -139,6 +144,9 @@ export function FilesPage({ onNewTransfer }: FilesPageProps) {
       .catch(() => setError(i18n.t('files.error.loadFailed')))
       .finally(() => setLoading(false))
   }, [statusFilter])
+
+  // US-023-01 (FR-023-5, FR-044-7): the Downloads action exists only when feature.analytics is on (absent, never disabled).
+  useEffect(() => { void loadFeatureGates() }, [])
 
   function applyPage(data: ListTransfersResponse, index: number): void {
     setRows(data.items ?? [])
@@ -300,7 +308,8 @@ export function FilesPage({ onNewTransfer }: FilesPageProps) {
               const chip = statusChip(row.status)
               const remaining = formatRemaining(row.expiresAtUtc, nowMs)
               return (
-                <li key={row.id} className="mf-row">
+                <Fragment key={row.id}>
+                <li className="mf-row">
                   <span className="mf-name" title={row.name}>{row.name}</span>
                   <span className="mf-meta">
                     {row.fileCount === 1 ? i18n.t('files.row.oneFile') : i18n.t('files.row.filesMany', { count: row.fileCount })} · {formatBytes(row.totalBytes)} ·{' '}
@@ -313,9 +322,22 @@ export function FilesPage({ onNewTransfer }: FilesPageProps) {
                     <button type="button" className="au-ghost-btn" aria-label={i18n.t('files.action.copyLink')} onClick={() => void copyLink(row)}>{i18n.t('files.action.copy')}</button>
                     <button type="button" className="au-ghost-btn" aria-label={i18n.t('files.action.view')} onClick={() => viewLink(row)}>{i18n.t('files.action.view')}</button>
                     <button type="button" className="au-ghost-btn" aria-label={i18n.t('files.action.resend')} onClick={() => resend(row)}>{i18n.t('files.action.resend')}</button>
+                    {analyticsOn && (
+                      <button
+                        type="button"
+                        className="au-ghost-btn"
+                        aria-expanded={openAnalyticsId === row.id}
+                        aria-controls={openAnalyticsId === row.id ? downloadsPanelId(row.id) : undefined}
+                        onClick={() => setOpenAnalyticsId((cur) => (cur === row.id ? null : row.id))}
+                      >{i18n.t('files.analytics.toggle')}</button>
+                    )}
                     <button type="button" className="au-ghost-btn" aria-label={i18n.t('files.action.deleteRow')} onClick={() => openDelete(row)}>{i18n.t('files.action.deleteRow')}</button>
                   </div>
                 </li>
+                {analyticsOn && openAnalyticsId === row.id && (
+                  <li className="mf-dl-row"><DownloadsPanel transferId={row.id} status={row.status} /></li>
+                )}
+                </Fragment>
               )
             })}
           </ul>

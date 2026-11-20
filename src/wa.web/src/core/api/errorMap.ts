@@ -34,6 +34,9 @@ export function parseProblem(body: unknown): ProblemError | null {
 /** Wire code for the active-transfers cap (409, finalize + send; US-020-02). */
 export const ACTIVE_TRANSFERS_EXCEEDED = 'ACTIVE_TRANSFERS_EXCEEDED'
 
+/** Wire code for a scheduledSendAt outside the server's window (422, send; US-022-03). Handled inline by the link screen. */
+export const SCHEDULE_OUT_OF_WINDOW = 'SCHEDULE_OUT_OF_WINDOW'
+
 /**
  * Pulls the exact numbers out of the server's details text ("You have N active transfers (limit M). Upgrade to keep sending.").
  * Returns null when the text does not carry them — the UI then falls back to the number-free copy.
