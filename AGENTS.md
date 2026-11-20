@@ -28,5 +28,17 @@ Cycle per task: **architect (plan) → coder (develop) → reviewer (review)** �
 - Child sessions start blank — every spawn must carry full task context: T-xxx ID, scope + exit check from the backlog row, ACs/ECs list, relevant TA-* sections, and any plan or findings text.
 - One T-xxx task at a time in backlog order (first non-`done` row); no task crosses its backlog row silently — escalations surface to the user (`DECISION:` format per `docs/AGENT.md` §8).
 
+## Ready-column workflow (status transitions — user rule 2026-11-20)
+
+The task queue is the **@ProtoDrop Projects v2 board's `Ready` column**, not just the backlog file. Tooling: `scripts/board-ready.py` (lists Ready items; empty stdout = nothing ready) and `scripts/board-status.py` (`get <n>` / `set <n> "<status>"` / `list`). Exact status names are case-sensitive: **Backlog | Ready | In progress | In review | Done** — mutations use the option IDs in the script, never a name.
+
+Per task found in `Ready`:
+1. Read its plan from `docs/plans/` (the path is derived from the issue body by `board-ready.py`; verify it exists before starting).
+2. **Before** dispatching Coder: `python scripts/board-status.py set <n> "In progress"` — verify the printed status matches.
+3. Run the Coder cycle for that task only (one at a time; full context in its spawn).
+4. **After** Coder completes and commits: `python scripts/board-status.py set <n> "In review"`.
+
+Do not start coding while the item is still `Ready`, and do not leave it `In progress` once coding is done — the column IS the workflow state. If a run dies mid-task, re-set `In progress` before re-dispatching (it already was) or set back to `Backlog` only when escalating.
+
 ## Extension
 - Before Codegraph extension execution, run auto compaction beforehand.
