@@ -12,7 +12,12 @@ file so each task wakes the orchestrator exactly once per state change:
   STUCK_STALE_MINUTES -> STUCK IN PROGRESS line (a run likely died between the
   status change and commit+PR; verify git state / resume or reset to Backlog).
 - Entry whose issue moved on (Done/Backlog) or vanished from the board -> entry
-  dropped; the block's disappearance is the completion wake.
+  dropped, so if it re-enters Ready later it fires as a fresh READY block.
+
+Claimed items are otherwise QUIET: no line is printed while they sit in Ready
+or In progress under their claim window, so column moves by the orchestrator do
+NOT change this script's output between ticks (no double-wake). Wakes happen
+only on: new Ready item, STILL READY, or STUCK IN PROGRESS.
 
 Output is deterministic between ticks (elapsed times rounded to whole minutes,
 no wall-clock), which the monitor requires: unchanged output = agent skipped.
@@ -164,8 +169,9 @@ def main() -> None:
                         f"STILL READY #{num}: {title} — in the Ready column for "
                         f"{age_min} minutes; a previous run likely died before claiming it")
         elif status == "In progress":
-            # Only entries WE claimed print while in flight (external items that
-            # were already In progress when we started don't wake us).
+            # Claimed entries stay quiet while in flight (no re-wake on column
+            # moves); only staleness surfaces. Unclaimed In-progress items are
+            # someone else's work — don't touch them.
             if key not in state:
                 continue
             age_min = int((now - datetime.datetime.fromisoformat(
@@ -175,13 +181,9 @@ def main() -> None:
                     f"STUCK IN PROGRESS #{num}: {title} — left the Ready column "
                     f"{age_min} minutes ago but is still 'In progress'; a run likely "
                     f"died before commit+PR. Verify git state, resume or reset to Backlog.")
-            else:
-                lines += [f"IN PROGRESS (claimed) #{num}: {title}", ""]
         elif status in ("Done", "Backlog"):
             if key in state:
-                del state[key]  # moved on -> block disappears = completion wake
-        elif status == "In review":
-            pass  # keep the entry; it stays quiet until Done/Backlog drops it
+                del state[key]  # moved on -> drop the claim so a future Ready re-entry re-fires
 
     save_state(state)
     print("\n".join(lines))
