@@ -42,11 +42,11 @@ public class AdminGateRoleTests
     }
 
     [Fact]
-    public void UnknownRow_RoleAbsent()
+    public async Task UnknownRow_RoleAbsent()
     {
         // Session cookie valid but no AppUser row — Program.cs maps that to 404 NOT_FOUND before the body is built (T-008-06),
         // so pin only the role half: Resolve never runs over a null email → RoleField(null) → key absent.
-        var user = new StubAppUserStore("ada@example.com").GetByIdAsync(Guid.NewGuid(), CancellationToken.None).Result;
+        var user = await new StubAppUserStore("ada@example.com").GetByIdAsync(Guid.NewGuid(), CancellationToken.None);
 
         Assert.Null(user); // stub returns null for unknown ids — same contract as the real store (T-008-06 D-1)
     }
