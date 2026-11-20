@@ -53,7 +53,7 @@ public class UnlockTransferHandlerTests
         await _handler.Handle(new UnlockTransferCommand("abcdefgh", "hunter2"), CancellationToken.None);
 
         Assert.Single(_telemetryLogger.Entries, e => e.RenderedText == TelemetryEvents.PasswordCorrect);
-        Assert.Empty(_telemetryLogger.Entries.Where(e => e.RenderedText == TelemetryEvents.PasswordWrong)); // exactly one of the two closed names
+        Assert.DoesNotContain(_telemetryLogger.Entries, e => e.RenderedText == TelemetryEvents.PasswordWrong); // exactly one of the two closed names
     }
 
     [Fact]
@@ -93,7 +93,7 @@ public class UnlockTransferHandlerTests
         await _handler.Handle(new UnlockTransferCommand("abcdefgh", "not-the-password"), CancellationToken.None);
 
         Assert.Single(_telemetryLogger.Entries, e => e.RenderedText == TelemetryEvents.PasswordWrong);
-        Assert.Empty(_telemetryLogger.Entries.Where(e => e.RenderedText == TelemetryEvents.PasswordCorrect));
+        Assert.DoesNotContain(_telemetryLogger.Entries, e => e.RenderedText == TelemetryEvents.PasswordCorrect);
     }
 
     [Fact]

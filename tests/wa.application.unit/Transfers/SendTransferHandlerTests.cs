@@ -203,13 +203,16 @@ public class SendTransferHandlerTests
     public async Task Handle_TotalAtExactMaxTransferSize_SendsSuccessfully()
     {
         // Inclusive boundary: exactly-at-limit passes the re-check (> is strict).
-        var limits = new StubLimitsProvider { Record = new LimitsRecord
+        var limits = new StubLimitsProvider
         {
-            MaxEmails = 20,
-            RetentionDays = 30,
-            MaxTransferSize = 1000,
-            MaxSingleFile = 1000
-        } };
+            Record = new LimitsRecord
+            {
+                MaxEmails = 20,
+                RetentionDays = 30,
+                MaxTransferSize = 1000,
+                MaxSingleFile = 1000
+            }
+        };
         var handler = NewHandler(limits);
 
         var transferId = Guid.NewGuid();
@@ -273,7 +276,7 @@ public class SendTransferHandlerTests
 
         await _handler.Handle(new SendTransferCommand(transferId, null, null, null, []), CancellationToken.None);
 
-        Assert.Empty(_telemetryLogger.Entries.Where(e => e.RenderedText.StartsWith("storage_bytes_active")));
+        Assert.DoesNotContain(_telemetryLogger.Entries, e => e.RenderedText.StartsWith("storage_bytes_active"));
         Assert.Empty(_meterStore.Calls);
     }
 
@@ -286,7 +289,7 @@ public class SendTransferHandlerTests
         var result = await _handler.Handle(new SendTransferCommand(Guid.NewGuid(), null, null, null, []), CancellationToken.None);
 
         Assert.Null(result);
-        Assert.Empty(_telemetryLogger.Entries.Where(e => e.RenderedText.StartsWith("storage_bytes_active")));
+        Assert.DoesNotContain(_telemetryLogger.Entries, e => e.RenderedText.StartsWith("storage_bytes_active"));
     }
 
     [Fact]

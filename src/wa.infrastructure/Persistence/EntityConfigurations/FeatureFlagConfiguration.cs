@@ -83,8 +83,8 @@ public sealed class FeatureFlagConfiguration : IEntityTypeConfiguration<FeatureF
     }
 
     private static FeatureFlag Gate(string key, string description) => new()
-        { Key = key, Value = "false", Description = description, UpdatedAtUtc = SeedUtc };
+    { Key = key, Value = "false", Description = description, UpdatedAtUtc = SeedUtc };
 
     private static FeatureFlag Limit(string key, string value) => new()
-        { Key = key, Value = value, Description = "Plan limits override (TA-3.4); values per Open-Decisions Part 2", UpdatedAtUtc = SeedUtc };
+    { Key = key, Value = value, Description = "Plan limits override (TA-3.4); values per Open-Decisions Part 2", UpdatedAtUtc = SeedUtc };
 }

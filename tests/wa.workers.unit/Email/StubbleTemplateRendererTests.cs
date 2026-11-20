@@ -60,7 +60,7 @@ public class StubbleTemplateRendererTests : IDisposable
 
         // German number format: comma as decimal separator.
         Assert.True(textBody.Contains("report.pdf"), "Should contain file name");
-        
+
         // Find the size value after report.pdf
         var idx = textBody.IndexOf("report.pdf");
         var snippet = textBody.Substring(idx, Math.Min(30, textBody.Length - idx));
@@ -76,7 +76,7 @@ public class StubbleTemplateRendererTests : IDisposable
 
         // English number format: dot as decimal separator. 1536 bytes = 1.5 KB.
         Assert.True(textBody.Contains("report.pdf"), "Should contain file name");
-        
+
         var idx = textBody.IndexOf("report.pdf");
         var snippet = textBody.Substring(idx, Math.Min(30, textBody.Length - idx));
         Assert.True(snippet.Contains("1.5"), $"Expected '1.5' (English dot decimal) in '{snippet}'");

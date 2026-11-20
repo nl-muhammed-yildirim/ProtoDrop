@@ -253,14 +253,29 @@ public class ScheduledSendTimerIntegrationTests : IAsyncLifetime
         for (var i = 0; i < 200; i++)
             _db.Set<Transfer>().Add(new Transfer
             {
-                Id = Guid.NewGuid(), LinkId = $"ACT{i:D5}", Status = TransferStatus.Active, ExpiresAtUtc = T0.AddDays(7),
-                MaxDownloads = 100, SenderName = "A", TotalBytes = 1, FileCount = 1, CreatedAtUtc = T0.AddDays(-1)
+                Id = Guid.NewGuid(),
+                LinkId = $"ACT{i:D5}",
+                Status = TransferStatus.Active,
+                ExpiresAtUtc = T0.AddDays(7),
+                MaxDownloads = 100,
+                SenderName = "A",
+                TotalBytes = 1,
+                FileCount = 1,
+                CreatedAtUtc = T0.AddDays(-1)
             });
         for (var i = 0; i < 3; i++)
             _db.Set<Transfer>().Add(new Transfer
             {
-                Id = Guid.NewGuid(), LinkId = $"SCH{i:D5}", Status = TransferStatus.Scheduled, ScheduledSendAtUtc = T0.AddMinutes(-i - 1),
-                ExpiresAtUtc = T0.AddDays(7), MaxDownloads = 100, SenderName = "A", TotalBytes = 1, FileCount = 1, CreatedAtUtc = T0.AddDays(-1)
+                Id = Guid.NewGuid(),
+                LinkId = $"SCH{i:D5}",
+                Status = TransferStatus.Scheduled,
+                ScheduledSendAtUtc = T0.AddMinutes(-i - 1),
+                ExpiresAtUtc = T0.AddDays(7),
+                MaxDownloads = 100,
+                SenderName = "A",
+                TotalBytes = 1,
+                FileCount = 1,
+                CreatedAtUtc = T0.AddDays(-1)
             });
         await _db.SaveChangesAsync();
 

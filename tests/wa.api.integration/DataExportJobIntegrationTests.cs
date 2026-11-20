@@ -53,8 +53,16 @@ public class DataExportJobIntegrationTests : IAsyncLifetime
         var id = Guid.NewGuid();
         _db.Set<Transfer>().Add(new Transfer
         {
-            Id = id, LinkId = link, OwnerAppUserId = owner, Status = status, ExpiresAtUtc = DateTime.UtcNow.AddDays(3),
-            MaxDownloads = 10, SenderName = "S", TotalBytes = 100, FileCount = fileNames.Length, CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
+            Id = id,
+            LinkId = link,
+            OwnerAppUserId = owner,
+            Status = status,
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(3),
+            MaxDownloads = 10,
+            SenderName = "S",
+            TotalBytes = 100,
+            FileCount = fileNames.Length,
+            CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
         });
         for (var i = 0; i < fileNames.Length; i++)
         {

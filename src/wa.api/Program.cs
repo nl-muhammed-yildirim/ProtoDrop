@@ -419,10 +419,14 @@ app.MapGet("/api/v1/public/transfers/{linkId}", async (string linkId, HttpReques
     {
         PublicTransferState.Active => Results.Json(new
         {
-            from = result.From, note = result.Note,
+            from = result.From,
+            note = result.Note,
             files = result.Files!.Select(f => new { fileId = f.FileId.ToString("n"), name = f.Name, sizeBytes = f.SizeBytes }),
-            hasDownloadAll = result.HasDownloadAll, downloadsLeft = result.DownloadsLeft, passwordRequired = result.PasswordRequired,
-            orgName = result.OrgName, orgLogoUrl = result.OrgLogoUrl,
+            hasDownloadAll = result.HasDownloadAll,
+            downloadsLeft = result.DownloadsLeft,
+            passwordRequired = result.PasswordRequired,
+            orgName = result.OrgName,
+            orgLogoUrl = result.OrgLogoUrl,
             scheduledSendAt = result.ScheduledSendAtUtc is { } due ? AsUtc(due) : (DateTime?)null,
             adsEnabled = result.AdsEnabled
         }), // TA-4.2#4 exact wire shape — property names pinned at the single construction site (same style as endpoints 1–3)

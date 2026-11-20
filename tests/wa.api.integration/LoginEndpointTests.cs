@@ -163,7 +163,7 @@ public class LoginEndpointTests : IAsyncLifetime
     {
         var userId = await SeedAppUserAsync($"rolling-{Guid.NewGuid():N}@example.com", "password123");
         var nowSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        
+
         // ~10 d left: under the 15 d RenewRemainingDays threshold — the middleware MUST re-mint (FR-008-2).
         var nearExpirySeconds = nowSeconds + (10 * 86400);
         var shortLivedToken = Sign(userId, nearExpirySeconds);
