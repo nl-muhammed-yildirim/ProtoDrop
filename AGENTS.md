@@ -36,9 +36,10 @@ Per task found in `Ready`:
 1. Read its plan from `docs/plans/` (the path is derived from the issue body by `board-ready.py`; verify it exists before starting).
 2. **Before** dispatching Coder: `python scripts/board-status.py set <n> "In progress"` — verify the printed status matches.
 3. Run the Coder cycle for that task only (one at a time; full context in its spawn).
-4. **After** Coder completes and commits: `python scripts/board-status.py set <n> "In review"`.
+4. **Just before** setting the item to `In review`, the orchestrator (as director) commits the code (`feat: T-xxx {one line}`), pushes it, and creates a pull request from that commit — push via the headless recipe (user:token URL, helper disabled; no `gh` CLI PR creation needed) and open the PR with REST POST `/repos/<owner>/<repo>/pulls` using the gh token.
+5. Then `python scripts/board-status.py set <n> "In review"`.
 
-Do not start coding while the item is still `Ready`, and do not leave it `In progress` once coding is done — the column IS the workflow state. If a run dies mid-task, re-set `In progress` before re-dispatching (it already was) or set back to `Backlog` only when escalating.
+Do not start coding while the item is still `Ready`, do not leave it `In progress` once coding is done, and do not move it to `In review` before its commit + PR exist — the column IS the workflow state. If a run dies mid-task, re-set `In progress` before re-dispatching (it already was) or set back to `Backlog` only when escalating.
 
 ## Extension
 - Before Codegraph extension execution, run auto compaction beforehand.
