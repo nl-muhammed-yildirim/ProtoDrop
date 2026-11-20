@@ -12,7 +12,7 @@ function statusToResult(status: string | null): AdLoadResult | null {
 }
 
 export function createAdSenseLoader(config: AdConfig): AdLoader {
-  return async (container) => {
+  return async (container, signal) => {
     await loadAdScript(`${SCRIPT_BASE}?client=${encodeURIComponent(config.client)}`)
 
     const ins = document.createElement('ins')
@@ -30,20 +30,30 @@ export function createAdSenseLoader(config: AdConfig): AdLoader {
     const queue = (w.adsbygoogle = w.adsbygoogle ?? [])
     queue.push({})
 
-    return new Promise<AdLoadResult>((resolve) => {
+    return new Promise<AdLoadResult>((resolve, reject) => {
       const now = statusToResult(ins.getAttribute('data-ad-status'))
       if (now) {
         resolve(now)
         return
       }
+      if (signal?.aborted) {
+        reject(new DOMException('aborted', 'AbortError'))
+        return
+      }
+      const onAbort = () => {
+        observer.disconnect()
+        reject(new DOMException('aborted', 'AbortError'))
+      }
       const observer = new MutationObserver(() => {
         const result = statusToResult(ins.getAttribute('data-ad-status'))
         if (result) {
           observer.disconnect()
+          signal?.removeEventListener('abort', onAbort)
           resolve(result)
         }
       })
       observer.observe(ins, { attributes: true, attributeFilter: ['data-ad-status'] })
+      signal?.addEventListener('abort', onAbort, { once: true })
     })
   }
 }

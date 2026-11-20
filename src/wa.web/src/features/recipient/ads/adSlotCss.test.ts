@@ -32,7 +32,14 @@ describe('adSlot.css contract', () => {
 
   it('state rules', () => {
     expect(body(css, ".rp-ad[data-state='idle']")).toContain('display: none')
-    expect(body(css, ".rp-ad[data-state='loading']")).toContain('max-height: 100px')
+    // EC-024-1: loading reserve equals the filled height per breakpoint, so a fill never shifts layout.
+    const loading = body(css, ".rp-ad[data-state='loading']")
+    expect(loading).toContain('min-height: 90px')
+    expect(loading).toContain('max-height: 90px')
+    expect(body(css, ".rp-ad[data-state='filled']")).toContain('height: 90px')
+    const m = media(css, '(max-width: 640px)')
+    expect(m).toContain(".rp-ad[data-state='loading']")
+    expect(m.slice(m.indexOf(".rp-ad[data-state='loading']"))).toMatch(/min-height: 100px;\s*max-height: 100px/)
     const c = body(css, ".rp-ad[data-state='collapsed']")
     expect(c).toContain('height: 0')
     expect(c).toContain('pointer-events: none')

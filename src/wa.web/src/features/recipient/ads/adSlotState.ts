@@ -4,8 +4,8 @@ export type AdSlotEvent = 'start' | 'filled' | 'empty' | 'failed' | 'timeout'
 export type AdErrorReason = 'timeout' | 'script_error' | 'empty'
 export type AdLoadResult = 'filled' | 'empty'
 
-/** Provider port: fill `container`, resolve 'filled' | 'empty', or reject on failure. */
-export type AdLoader = (container: HTMLElement) => Promise<AdLoadResult>
+/** Provider port: fill `container`, resolve 'filled' | 'empty', or reject on failure. `signal` aborts on timeout/unmount. */
+export type AdLoader = (container: HTMLElement, signal?: AbortSignal) => Promise<AdLoadResult>
 
 export type AdSlotOutcome =
   | { slotId: string; kind: 'impression' }

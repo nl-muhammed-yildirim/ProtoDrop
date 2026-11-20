@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { createAdSenseLoader } from './adsenseLoader'
 import { resetAdScriptsForTest } from './loadAdScript'
@@ -70,6 +70,35 @@ describe('createAdSenseLoader', () => {
     await flush()
     container.querySelector('ins')!.setAttribute('data-ad-status', status)
     await expect(p).resolves.toBe(expected)
+  })
+
+  it('abort disconnects the MutationObserver and rejects (timeout/unmount cleanup)', async () => {
+    const disconnect = vi.spyOn(MutationObserver.prototype, 'disconnect')
+    const ctrl = new AbortController()
+    const container = mount()
+    const p = createAdSenseLoader(CONFIG)(container, ctrl.signal)
+    const settled = expect(p).rejects.toMatchObject({ name: 'AbortError' })
+    await flush()
+    scripts()[0].dispatchEvent(new Event('load'))
+    await flush()
+    expect(disconnect).not.toHaveBeenCalled()
+    ctrl.abort()
+    await settled
+    expect(disconnect).toHaveBeenCalledTimes(1)
+    disconnect.mockRestore()
+  })
+
+  it('an already-aborted signal rejects without leaving an observer', async () => {
+    const observe = vi.spyOn(MutationObserver.prototype, 'observe')
+    const ctrl = new AbortController()
+    ctrl.abort()
+    const p = createAdSenseLoader(CONFIG)(mount(), ctrl.signal)
+    const settled = expect(p).rejects.toMatchObject({ name: 'AbortError' })
+    await flush()
+    scripts()[0].dispatchEvent(new Event('load'))
+    await settled
+    expect(observe).not.toHaveBeenCalled()
+    observe.mockRestore()
   })
 
   it('script error rejects', async () => {

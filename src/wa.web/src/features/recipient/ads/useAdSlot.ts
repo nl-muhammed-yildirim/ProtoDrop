@@ -38,11 +38,13 @@ export function useAdSlot(
     let cancelled = false
     let settled = false
     let timer: ReturnType<typeof setTimeout> | undefined
+    const abort = new AbortController()
 
     const settle = (event: AdSlotEvent, reason?: AdErrorReason) => {
       if (cancelled || settled) return
       settled = true
       if (timer !== undefined) clearTimeout(timer)
+      if (event === 'timeout') abort.abort() // release the loader's observer
       dispatch(event)
       if (event === 'filled') {
         outcomeRef.current?.({ slotId: slotRef.current, kind: 'impression' })
@@ -61,7 +63,7 @@ export function useAdSlot(
         return
       }
       Promise.resolve()
-        .then(() => loadRef.current(el))
+        .then(() => loadRef.current(el, abort.signal))
         .then(
           (result) => (result === 'filled' ? settle('filled') : settle('empty', 'empty')),
           () => settle('failed', 'script_error'), // silent: no logging (AC-024-3)
@@ -71,6 +73,7 @@ export function useAdSlot(
     return () => {
       cancelled = true
       cancelFrame()
+      abort.abort()
       if (timer !== undefined) clearTimeout(timer)
     }
   }, [])

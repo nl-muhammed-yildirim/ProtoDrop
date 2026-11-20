@@ -331,9 +331,9 @@ export function RecipientPage({ linkId }: RecipientPageProps) {
       {downloadsLeft !== null && downloadsLeft > 0 && (
         <p className="rp-downloads-left">{i18n.t('recipient.active.downloadsLeft', { count: downloadsLeft })}</p>
       )}
-      {/* T-003-07 (FR-003-7): growth panel — shown once per full download, below the file list; partials never render it. */}
       {/* US-024-01 (FR-024-4): one slot below the list, above the growth panel; the gate branch above never reaches here (AC-024-5). */}
       {adsEnabled && <RecipientAdPlacement />}
+      {/* T-003-07 (FR-003-7): growth panel — shown once per full download, below the file list; partials never render it. */}
       {growthPanelVisible && (
         <div className="rp-growth" role="region" aria-label={i18n.t('recipient.active.growthAria')}>
           <p className="rp-growth-copy">{i18n.t('recipient.active.growthCopy')}</p>
