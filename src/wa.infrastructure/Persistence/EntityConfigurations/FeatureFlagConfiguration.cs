@@ -50,7 +50,7 @@ public sealed class FeatureFlagConfiguration : IEntityTypeConfiguration<FeatureF
             Limit("limits.business.ssoScim", "true"),
             Limit("limits.business.storageQuota", "1099511627776"),
             Limit("limits.free.activeTransfersMax", "20"),
-            Limit("limits.free.ads", "false"),
+            Limit("limits.free.ads", "true"),
             Limit("limits.free.analytics", "false"),
             Limit("limits.free.branding", "false"),
             Limit("limits.free.graceDays", "3"),

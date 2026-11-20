@@ -12,12 +12,12 @@ public class TelemetryEventsTests
     {
         var expected = new HashSet<string>(new[]
         {
-            // Events (TA-10.2 line 816, verbatim) — exactly these 24:
+            // Events (TA-10.2 line 816, verbatim) — exactly these 26:
             "upload_started", "upload_completed", "upload_failed", "transfer_page_viewed", "transfer_not_found",
             "password_correct", "password_wrong", "download_started", "download_completed", "zip_generated",
             "zip_failed", "email_sent", "email_failed", "user_created", "login_success", "login_failed",
             "account_deleted", "plan_changed", "translation_missing", "admin_action", "dlq_count",
-            "email.template_fallback", "template_render_error", "branding_logo_missing",
+            "email.template_fallback", "template_render_error", "branding_logo_missing", "ad_impression", "ad_error",
             // Metrics (TA-10.2 line 818, verbatim) — exactly these 7:
             "upload.success_rate", "link_to_download_seconds", "expiry_job_lag_seconds", "email_failures_1h",
             "active_transfers", "storage_bytes_active", "api.requests{status}"
@@ -29,19 +29,21 @@ public class TelemetryEventsTests
     }
 
     [Fact]
-    public void ConstMembers_AreExactlyTwentyFourEventsPlusSevenMetrics()
+    public void ConstMembers_AreExactlyTwentySixEventsPlusSevenMetrics()
     {
         var fields = typeof(TelemetryEvents).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
             .Where(f => f.IsLiteral) // consts only — no computed members slipping in
             .Select(f => (string)f.GetRawConstantValue()!)
             .ToList();
 
-        Assert.Equal(31, fields.Count); // 24 events + 7 metrics, nothing else
+        Assert.Equal(33, fields.Count); // 26 events + 7 metrics, nothing else
     }
 
     [Theory]
     [InlineData(TelemetryEvents.UploadStarted)]
     [InlineData(TelemetryEvents.DlqCount)]
+    [InlineData(TelemetryEvents.AdImpression)]
+    [InlineData(TelemetryEvents.AdError)]
     public void IsEvent_TrueForClosedSetEvents(string name) => Assert.True(TelemetryEvents.IsEvent(name));
 
     [Theory]

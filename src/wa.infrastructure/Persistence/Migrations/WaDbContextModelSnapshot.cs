@@ -596,7 +596,7 @@ namespace wa.infrastructure.Persistence.Migrations
                             Key = "limits.free.ads",
                             Description = "Plan limits override (TA-3.4); values per Open-Decisions Part 2",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Value = "false"
+                            Value = "true"
                         },
                         new
                         {
@@ -925,7 +925,7 @@ namespace wa.infrastructure.Persistence.Migrations
                         {
                             Id = new Guid("11111111-0000-4000-8000-000000000001"),
                             Code = "free",
-                            FeaturesJson = "{\"ads\":false,\"scheduling\":false,\"analytics\":false,\"branding\":false,\"sso_scim\":false}",
+                            FeaturesJson = "{\"ads\":true,\"scheduling\":false,\"analytics\":false,\"branding\":false,\"sso_scim\":false}",
                             LimitsJson = "{\"maxTransferSize\":5368709120,\"maxSingleFile\":5368709120,\"maxZipSize\":4294967296,\"retentionDays\":7,\"graceDays\":3,\"maxDownloads\":100,\"maxEmails\":20,\"storageQuota\":5368709120,\"activeTransfersMax\":20,\"maxLogoSize\":1048576}",
                             Name = "Free",
                             PriceJson = "{\"currency\":\"USD\",\"monthly\":{\"amount\":0,\"stripePriceId\":null},\"annual\":{\"amount\":0,\"stripePriceId\":null},\"perSeatMonthly\":null}",

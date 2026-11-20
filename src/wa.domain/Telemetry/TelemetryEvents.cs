@@ -1,7 +1,7 @@
 namespace wa.domain.Telemetry;
 
 /// <summary>
-/// The closed TA-10.2 telemetry contract — "names are code" (TA-10.2): exactly these 24 event names + 7 metric names, no others in M0.
+/// The closed TA-10.2 telemetry contract — "names are code" (TA-10.2): exactly these 26 event names + 7 metric names, no others in M0.
 /// Adding a member later is an architecture change (EC-056-4: it requires adding the name to TA-10.2 first). No renames — wire values are what App Insights queries by.
 /// </summary>
 public static class TelemetryEvents
@@ -32,6 +32,8 @@ public static class TelemetryEvents
     public const string EmailTemplateFallback = "email.template_fallback";
     public const string TemplateRenderError = "template_render_error";
     public const string BrandingLogoMissing = "branding_logo_missing"; // US-021-04 (EC-021-2): property-free
+    public const string AdImpression = "ad_impression"; // US-024-01 (F-PRF-004): client-only, props slotId
+    public const string AdError = "ad_error";           // US-024-01 (F-PRF-004): client-only, props slotId + reason
 
     // ---- Metrics (TA-10.2 line 818) — same pipeline, no separate metrics SDK ----
 
@@ -48,7 +50,8 @@ public static class TelemetryEvents
         UploadStarted, UploadCompleted, UploadFailed, TransferPageViewed, TransferNotFound, PasswordCorrect, PasswordWrong,
         DownloadStarted, DownloadCompleted, ZipGenerated, ZipFailed, EmailSent, EmailFailed, UserCreated, LoginSuccess,
         LoginFailed, AccountDeleted, PlanChanged, TranslationMissing, AdminAction, DlqCount,
-        EmailTemplateFallback, TemplateRenderError, BrandingLogoMissing
+        EmailTemplateFallback, TemplateRenderError, BrandingLogoMissing,
+        AdImpression, AdError
     ];
 
     private static readonly string[] Metrics =
@@ -56,7 +59,7 @@ public static class TelemetryEvents
         UploadSuccessRate, LinkToDownloadSeconds, ExpiryJobLagSeconds, EmailFailures1h, ActiveTransfers, StorageBytesActive, ApiRequestsByStatus
     ];
 
-    /// <summary>Every closed-set name — events then metrics (28 total). Used by the T-056-04 exit-check test to assert a 1:1 map against the TA-10.2 literals.</summary>
+    /// <summary>Every closed-set name — events then metrics (33 total). Used by the T-056-04 exit-check test to assert a 1:1 map against the TA-10.2 literals.</summary>
     public static IReadOnlyList<string> AllNames() => Events.Concat(Metrics).ToArray();
 
     /// <summary>true iff the name is a closed-set event (not a metric, not an ad-hoc string).</summary>

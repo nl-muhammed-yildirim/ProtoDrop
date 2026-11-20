@@ -33,7 +33,8 @@ public sealed record GetPublicTransferResult(
     string? SenderEmail = null,     // terminal bodies render it into Problem+JSON details (FR-003-8/9)
     string? OrgName = null,         // Active only — sender's org when their plan has Branding (F-PRF-001)
     string? OrgLogoUrl = null,      // Active only — 30-min inline read SAS when branding is on and the blob exists
-    DateTime? ScheduledSendAtUtc = null); // Active only — set only for Status Scheduled (F-PRF-002)
+    DateTime? ScheduledSendAtUtc = null, // Active only — set only for Status Scheduled (F-PRF-002)
+    bool AdsEnabled = false);       // Active only — FR-024-3
 
 /// <summary>
 /// T-014 (TA-4.2#4): recipient metadata for GET /api/v1/public/transfers/{linkId}. No auth, no cookie;
@@ -49,6 +50,8 @@ public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransfer
     private readonly IFeaturesProvider _features;
     private readonly IBlobStore _blobs;
     private readonly IOrgLogoSasMinter _logoMinter;
+    private readonly IUserPlanStore _users;
+    private readonly IFlagResolver _flags;
     private readonly ILogger<GetPublicTransferHandler> _logger;
 
     public GetPublicTransferHandler(
@@ -60,6 +63,8 @@ public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransfer
         IFeaturesProvider features,
         IBlobStore blobs,
         IOrgLogoSasMinter logoMinter,
+        IUserPlanStore users,
+        IFlagResolver flags,
         ILogger<GetPublicTransferHandler> logger)
     {
         _store = store;
@@ -70,6 +75,8 @@ public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransfer
         _features = features;
         _blobs = blobs;
         _logoMinter = logoMinter;
+        _users = users;
+        _flags = flags;
         _logger = logger;
     }
 
@@ -115,6 +122,8 @@ public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransfer
                 _telemetry.LogEvent(TelemetryEvents.BrandingLogoMissing); // EC-021-2: graceful fallback to the name-only header
         }
 
+        var adsEnabled = await RecipientAds.ResolveAsync(_flags, _users, _features, transfer.OwnerAppUserId, cancellationToken);
+
         return new GetPublicTransferResult(
             PublicTransferState.Active,
             From: transfer.SenderName,
@@ -126,7 +135,8 @@ public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransfer
             PasswordRequired: passwordRequired,
             OrgName: branding.OrgName,
             OrgLogoUrl: logoUrl,
-            ScheduledSendAtUtc: transfer.Status == wa.domain.TransferStatus.Scheduled ? transfer.ScheduledSendAtUtc : null);
+            ScheduledSendAtUtc: transfer.Status == wa.domain.TransferStatus.Scheduled ? transfer.ScheduledSendAtUtc : null,
+            AdsEnabled: adsEnabled);
     }
 
     /// <summary>8 chars from the LinkId charset (TA-9.6) — anything else is treated as unknown on purpose.</summary>

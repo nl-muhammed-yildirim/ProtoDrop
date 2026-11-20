@@ -230,7 +230,7 @@ public class PlanCatalogIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GatesOn_ProRowDrives_FreeStaysOff_RowAndGateEditsApplyWithoutDeploy()
+    public async Task GatesOn_ProRowDrives_FreeOnlyAds_RowAndGateEditsApplyWithoutDeploy()
     {
         foreach (var key in FeaturesProvider.GlobalGateKeys) await SetGate(key, "true");
         var free = await _db.Set<Plan>().AsNoTracking().SingleAsync(p => p.Id == FreeId);
@@ -240,7 +240,7 @@ public class PlanCatalogIntegrationTests : IAsyncLifetime
         var provider = NewFeaturesProvider(readDb);
 
         AssertSame(JsonSerializer.Deserialize<PlanFeatures>(pro.FeaturesJson)!, await provider.Resolve(pro.Code, CancellationToken.None));
-        AssertSame(new PlanFeatures(), await provider.Resolve(free.Code, CancellationToken.None));
+        AssertSame(new PlanFeatures { Ads = true }, await provider.Resolve(free.Code, CancellationToken.None)); // Free seed carries ads:true (AddFreeAdsEnabled)
 
         await SetGate(IFeaturesProvider.GlobalGatePrefix + "scheduling", "false");
         Assert.False((await provider.Resolve(pro.Code, CancellationToken.None)).Scheduling);

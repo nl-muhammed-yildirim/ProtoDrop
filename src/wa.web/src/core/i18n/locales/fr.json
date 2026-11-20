@@ -91,6 +91,7 @@
   "recipient.active.downloadButton": "Télécharger",
   "recipient.active.downloadAll": "Tout télécharger",
   "recipient.active.downloadsLeft": "Téléchargements restants : {{count}}",
+  "recipient.active.adLabel": "Publicité",
   "recipient.active.growthAria": "Envoyer quelque chose",
   "recipient.active.growthCopy": "Prêt à envoyer quelque chose de votre part ?",
   "recipient.active.growthCta": "Envoyer quelque chose",

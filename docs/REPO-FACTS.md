@@ -14,13 +14,13 @@
 `ACTIVE_TRANSFERS_EXCEEDED`, `FLAG_INVALID`, `FLAG_UNKNOWN`, `FEATURE_DISABLED`, `EXPORT_IN_FLIGHT`,
 `LOGO_TOO_LARGE`, `LOGO_TYPE_INVALID`, `INTERNAL`.
 
-### Telemetry (`src/wa.domain/Telemetry/TelemetryEvents.cs`) — **24 events + 7 metrics = 31 names** (TA-10.2, "names are code")
+### Telemetry (`src/wa.domain/Telemetry/TelemetryEvents.cs`) — **26 events + 7 metrics = 33 names** (TA-10.2, "names are code")
 Events: `upload_started`, `upload_completed`, `upload_failed`, `transfer_page_viewed`,
 `transfer_not_found`, `password_correct`, `password_wrong`, `download_started`,
 `download_completed`, `zip_generated`, `zip_failed`, `email_sent`, `email_failed`,
 `user_created`, `login_success`, `login_failed`, `account_deleted`, `plan_changed`,
 `translation_missing`, `admin_action`, `dlq_count`, `email.template_fallback`, `template_render_error`,
-`branding_logo_missing`.
+`branding_logo_missing`, `ad_impression`, `ad_error` (client-only, F-PRF-004).
 Metrics: `upload.success_rate`, `link_to_download_seconds`, `expiry_job_lag_seconds`,
 `email_failures_1h`, `active_transfers`, `storage_bytes_active`, `api.requests{status}`.
 

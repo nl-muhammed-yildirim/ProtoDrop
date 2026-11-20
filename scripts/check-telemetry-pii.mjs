@@ -58,7 +58,7 @@ const INGESTION_HOST = 'dc.services.visualstudio.com'
 /** Property names the WaTelemetryReporter templates carry (placeholders, exactly). */
 const SERVER_PROPS = new Set(['bytes', 'durationMs', 'retries', 'sizeBytes', 'seconds', 'count', 'linkId'])
 /** Prop keys passed to trackClientEvent today (exactly). */
-const CLIENT_PROPS = new Set(['fileId', 'retries', 'reason', 'bytes', 'durationMs', 'key', 'locale', 'source'])
+const CLIENT_PROPS = new Set(['fileId', 'retries', 'reason', 'bytes', 'durationMs', 'key', 'locale', 'source', 'slotId'])
 /** Reporter methods whose string parameter lands in a property — the argument must be slot-wrapped (TA-9.4). */
 const STRING_SLOT_METHODS = new Set(['TransferPageViewed'])
 /** The slot transforms themselves — their argument IS the raw value being hashed. */

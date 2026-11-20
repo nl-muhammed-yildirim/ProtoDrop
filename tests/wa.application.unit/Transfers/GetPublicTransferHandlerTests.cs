@@ -18,6 +18,8 @@ public class GetPublicTransferHandlerTests
     private readonly StubUnlockTokenMinter _minter;
     private readonly StubSenderBrandingStore _branding = new();
     private readonly StubLogoBlobs _blobs = new();
+    private readonly StubUserPlanStore _users = new();
+    private readonly StubFlagResolver _flags = new();
     private GetPublicTransferHandler _handler;
 
     public GetPublicTransferHandlerTests()
@@ -37,6 +39,8 @@ public class GetPublicTransferHandlerTests
         new StubFeaturesProvider(),
         _blobs,
         new StubLogoMinter(),
+        _users,
+        _flags,
         NullLogger<GetPublicTransferHandler>.Instance);
 
     // ---- Active: full metadata payload (exit check 3 / FR-003-5) ----
@@ -506,6 +510,54 @@ public class GetPublicTransferHandlerTests
         Assert.Equal(0, _branding.Calls);
     }
 
+    // ---- F-PRF-004 (FR-024-3): adsEnabled = feature.ads gate AND sender's current plan ----
+
+    [Fact]
+    public async Task Ads_GuestTransfer_FlagOn_AdsEnabledTrue()
+    {
+        _flags.Values[FeatureGates.Ads] = true;
+        _store.SetupStatus(status: 1, senderEmail: "alice@example.com");
+
+        var result = await _handler.Handle(new GetPublicTransferQuery("abcdefgh"), CancellationToken.None);
+
+        Assert.True(result.AdsEnabled);
+    }
+
+    [Fact]
+    public async Task Ads_ProOwner_FlagOn_AdsEnabledFalse() // AC-024-2
+    {
+        _flags.Values[FeatureGates.Ads] = true;
+        _users.PlanCode = "pro";
+        _store.SetupStatus(status: 1, senderEmail: "alice@example.com", ownerAppUserId: BrandingOwner);
+
+        var result = await _handler.Handle(new GetPublicTransferQuery("abcdefgh"), CancellationToken.None);
+
+        Assert.False(result.AdsEnabled);
+    }
+
+    [Fact]
+    public async Task Ads_FlagOff_AdsEnabledFalse() // AC-024-4 (default stub = no flag row → fail closed)
+    {
+        _users.PlanCode = "free";
+        _store.SetupStatus(status: 1, senderEmail: "alice@example.com", ownerAppUserId: BrandingOwner);
+
+        var result = await _handler.Handle(new GetPublicTransferQuery("abcdefgh"), CancellationToken.None);
+
+        Assert.False(result.AdsEnabled);
+    }
+
+    [Fact]
+    public async Task Ads_ExpiredTransfer_AdsEnabledFalse_FlagNotRead()
+    {
+        _flags.Values[FeatureGates.Ads] = true;
+        _store.SetupStatus(status: 2, senderEmail: "alice@example.com");
+
+        var result = await _handler.Handle(new GetPublicTransferQuery("abcdefgh"), CancellationToken.None);
+
+        Assert.False(result.AdsEnabled);
+        Assert.Equal(0, _flags.Calls);
+    }
+
     // ---- Stubs ----
 
     private sealed class StubLogoBlobs : IBlobStore
@@ -594,7 +646,27 @@ public class GetPublicTransferHandlerTests
     private sealed class StubFeaturesProvider : IFeaturesProvider
     {
         public Task<PlanFeatures> Resolve(string? planCode, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new PlanFeatures { Branding = planCode is "pro" or "business" });
+            Task.FromResult(new PlanFeatures { Branding = planCode is "pro" or "business", Ads = planCode is "free" }); // Ads: test data modelling the spec'd Free row (independent of the seed)
+    }
+
+    private sealed class StubFlagResolver : IFlagResolver
+    {
+        public Dictionary<string, object> Values { get; } = [];
+        public int Calls { get; private set; }
+
+        public Task<T> ResolveFlag<T>(string key, T defaultValue, CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            return Task.FromResult(Values.TryGetValue(key, out var v) && v is T typed ? typed : defaultValue);
+        }
+    }
+
+    private sealed class StubUserPlanStore : IUserPlanStore
+    {
+        public string? PlanCode { get; set; }
+        public int Calls { get; private set; }
+
+        public Task<string?> GetPlanCodeAsync(Guid userId, CancellationToken cancellationToken) { Calls++; return Task.FromResult(PlanCode); }
     }
 
     private static ILimitsProvider NewLimits(long maxZipSize, int maxDownloads = 100) => new StubLimitsProvider(maxZipSize, maxDownloads);

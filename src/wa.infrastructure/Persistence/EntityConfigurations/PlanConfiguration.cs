@@ -28,7 +28,7 @@ public sealed class PlanConfiguration : IEntityTypeConfiguration<Plan>
         b.HasData(
             new Plan { Id = Guid.Parse("11111111-0000-4000-8000-000000000001"), Code = "free", Name = "Free", SortOrder = 1,
                 LimitsJson = "{\"maxTransferSize\":5368709120,\"maxSingleFile\":5368709120,\"maxZipSize\":4294967296,\"retentionDays\":7,\"graceDays\":3,\"maxDownloads\":100,\"maxEmails\":20,\"storageQuota\":5368709120,\"activeTransfersMax\":20,\"maxLogoSize\":1048576}",
-                FeaturesJson = "{\"ads\":false,\"scheduling\":false,\"analytics\":false,\"branding\":false,\"sso_scim\":false}",
+                FeaturesJson = "{\"ads\":true,\"scheduling\":false,\"analytics\":false,\"branding\":false,\"sso_scim\":false}",
                 // Free is never checked out.
                 PriceJson = "{\"currency\":\"USD\",\"monthly\":{\"amount\":0,\"stripePriceId\":null},\"annual\":{\"amount\":0,\"stripePriceId\":null},\"perSeatMonthly\":null}" },
             new Plan { Id = Guid.Parse("11111111-0000-4000-8000-000000000002"), Code = "pro", Name = "Pro", SortOrder = 2,

@@ -112,7 +112,7 @@ public class WaTelemetryReporterTests
 
         // Closed-set gate: storage_bytes_active stays a metric (same pipeline), not an event.
         Assert.False(TelemetryEvents.IsEvent(TelemetryEvents.StorageBytesActive));
-        Assert.Equal(31, TelemetryEvents.AllNames().Count); // closed-set count — matches wa.domain.unit's ConstMembers pin (24 events + 7 metrics)
+        Assert.Equal(33, TelemetryEvents.AllNames().Count); // closed-set count — matches wa.domain.unit's ConstMembers pin (26 events + 7 metrics)
     }
 
     [Fact]
