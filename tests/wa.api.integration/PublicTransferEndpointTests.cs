@@ -43,6 +43,10 @@ public class PublicTransferEndpointTests : IAsyncLifetime
         _db = new WaDbContext(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(connString).Options);
         await _db.Database.MigrateAsync();
 
+        // Free row patched to Ads=true as TEST DATA modelling the spec'd Free row, so the flag-off assertion is meaningful (plan says yes, gate says no).
+        await _db.Set<Plan>().Where(p => p.Code == Plan.DefaultCode)
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.FeaturesJson, "{\"ads\":true,\"scheduling\":false,\"analytics\":false,\"branding\":false,\"sso_scim\":false}"));
+
         _client = new TestFactory().CreateClient();
     }
 
@@ -75,7 +79,7 @@ public class PublicTransferEndpointTests : IAsyncLifetime
         var root = doc.RootElement;
 
         // TA-4.2#4 exact wire shape — property names pinned at the single construction site (endpoints 1–3 style).
-        Assert.Equal(["from", "note", "files", "hasDownloadAll", "downloadsLeft", "passwordRequired", "orgName", "orgLogoUrl", "scheduledSendAt"],
+        Assert.Equal(["from", "note", "files", "hasDownloadAll", "downloadsLeft", "passwordRequired", "orgName", "orgLogoUrl", "scheduledSendAt", "adsEnabled"],
             root.EnumerateObject().Select(p => p.Name).ToArray());
 
         Assert.Equal("Alice", root.GetProperty("from").GetString());
@@ -100,6 +104,7 @@ public class PublicTransferEndpointTests : IAsyncLifetime
         Assert.Equal(JsonValueKind.Null, root.GetProperty("orgName").ValueKind); // guest-owned seed (US-021-01)
         Assert.Equal(JsonValueKind.Null, root.GetProperty("orgLogoUrl").ValueKind);
         Assert.Equal(JsonValueKind.Null, root.GetProperty("scheduledSendAt").ValueKind); // status-1 seed (F-PRF-002)
+        Assert.False(root.GetProperty("adsEnabled").GetBoolean()); // AC-024-4: feature.ads seeded "false" beats a Free row with ads:true
 
         // No SAS minted: zero DownloadEvent rows for this transfer and DownloadsCount unchanged (the endpoint never counts).
         Assert.Equal(0, await _db.Set<DownloadEvent>().CountAsync(e => e.TransferId == transferId));
