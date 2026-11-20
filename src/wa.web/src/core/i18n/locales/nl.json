@@ -91,6 +91,7 @@
   "recipient.active.downloadButton": "Downloaden",
   "recipient.active.downloadAll": "Alles downloaden",
   "recipient.active.downloadsLeft": "Downloads over: {{count}}",
+  "recipient.active.adLabel": "Advertentie",
   "recipient.active.growthAria": "Stuur iets",
   "recipient.active.growthCopy": "Klaar om iets van jezelf te sturen?",
   "recipient.active.growthCta": "Stuur iets",

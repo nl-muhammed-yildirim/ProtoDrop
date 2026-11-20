@@ -53,4 +53,10 @@ describe('adSlot.css contract', () => {
     expect(m).toContain('width: 320px')
     expect(m).toContain('height: 100px')
   })
+  it('US-024-01: the Ad label is an overlay that cannot take clicks', () => {
+    const l = body(css, '.rp-ad-label')
+    expect(l).toContain('position: absolute')
+    expect(l).toContain('pointer-events: none')
+    expect(l).toContain('font-size: var(--fs-tiny)')
+  })
 })

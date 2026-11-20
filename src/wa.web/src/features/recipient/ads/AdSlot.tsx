@@ -9,10 +9,12 @@ interface AdSlotProps {
   slotId: string
   load: AdLoader
   onOutcome?: (o: AdSlotOutcome) => void
+  /** US-024-01: localized "Ad" disclosure, shown only while filled (UI-Reference §5.3). */
+  label?: string
 }
 
 // US-024-03: renders no text/icon/role; fails invisibly (AC-024-3).
-export function AdSlot({ slotId, load, onOutcome }: AdSlotProps) {
+export function AdSlot({ slotId, load, onOutcome, label }: AdSlotProps) {
   const { state, containerRef } = useAdSlot(load, slotId, onOutcome)
   return (
     <div
@@ -21,6 +23,7 @@ export function AdSlot({ slotId, load, onOutcome }: AdSlotProps) {
       data-state={state}
       aria-hidden={state === 'filled' ? undefined : true}
     >
+      {state === 'filled' && label ? <span className="rp-ad-label">{label}</span> : null}
       <div className="rp-ad-unit" ref={containerRef} />
     </div>
   )

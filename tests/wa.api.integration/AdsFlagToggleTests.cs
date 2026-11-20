@@ -20,7 +20,7 @@ namespace wa.api.integration;
 /// F-PRF-004 US-024-04 (FR-024-3, AC-024-4, EC-024-4): the operator chain end to end — PUT /api/v1/admin/flags/feature.ads changes
 /// adsEnabled on GET /api/v1/public/transfers/{linkId} for free senders only, after the real 30 s flag cache, audit-logged
 /// (flag.set row + one admin.action envelope); invalid values are rejected and the old value stays live.
-/// The Free plan row is patched to ads:true as TEST DATA (the seed carries false for every plan — open decision, seeds untouched).
+/// The Free plan row carries ads:true from the AddFreeAdsEnabled seed migration.
 /// </summary>
 public class AdsFlagToggleTests : IAsyncLifetime
 {
@@ -70,10 +70,6 @@ public class AdsFlagToggleTests : IAsyncLifetime
             CreatedAtUtc = DateTime.UtcNow
         });
         await _db.SaveChangesAsync();
-
-        // TEST DATA: model the spec'd Free row (ads:true); feature.ads stays at its seed (false) unless a fact changes it.
-        await _db.Set<Plan>().Where(p => p.Code == Plan.DefaultCode)
-            .ExecuteUpdateAsync(s => s.SetProperty(p => p.FeaturesJson, "{\"ads\":true,\"scheduling\":false,\"analytics\":false,\"branding\":false,\"sso_scim\":false}"));
     }
 
     public async Task DisposeAsync()

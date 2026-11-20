@@ -43,10 +43,6 @@ public class PublicTransferEndpointTests : IAsyncLifetime
         _db = new WaDbContext(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(connString).Options);
         await _db.Database.MigrateAsync();
 
-        // Free row patched to Ads=true as TEST DATA modelling the spec'd Free row, so the flag-off assertion is meaningful (plan says yes, gate says no).
-        await _db.Set<Plan>().Where(p => p.Code == Plan.DefaultCode)
-            .ExecuteUpdateAsync(s => s.SetProperty(p => p.FeaturesJson, "{\"ads\":true,\"scheduling\":false,\"analytics\":false,\"branding\":false,\"sso_scim\":false}"));
-
         _client = new TestFactory().CreateClient();
     }
 

@@ -91,6 +91,7 @@
   "recipient.active.downloadButton": "Download",
   "recipient.active.downloadAll": "Download all",
   "recipient.active.downloadsLeft": "Downloads left: {{count}}",
+  "recipient.active.adLabel": "Ad",
   "recipient.active.growthAria": "Send something",
   "recipient.active.growthCopy": "Ready to send some of your own?",
   "recipient.active.growthCta": "Send something",

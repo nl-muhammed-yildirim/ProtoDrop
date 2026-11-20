@@ -184,4 +184,41 @@ describe('AdSlot', () => {
     })
     expect(slot(container).dataset.state).toBe('collapsed')
   })
+  it('US-024-01 label: shown only while filled; loading stays text-free', async () => {
+    const d = deferred()
+    const { container } = render(<AdSlot slotId="s1" load={d.load} label="Ad" />)
+    await frame()
+    expect(container.querySelector('.rp-ad-label')).toBeNull()
+    expect(container.textContent).toBe('')
+    await act(async () => {
+      d.resolve('filled')
+    })
+    const labels = container.querySelectorAll('.rp-ad-label')
+    expect(labels).toHaveLength(1)
+    expect(labels[0].textContent).toBe('Ad')
+    expect(container.querySelector('.rp-ad-unit')!.contains(labels[0])).toBe(false)
+  })
+
+  it('US-024-01 label: collapsed slot with a label stays silent', async () => {
+    const d = deferred()
+    const { container } = render(<AdSlot slotId="s1" load={d.load} label="Ad" />)
+    await frame()
+    await act(async () => {
+      d.resolve('empty')
+    })
+    expect(slot(container).dataset.state).toBe('collapsed')
+    expect(container.querySelector('.rp-ad-label')).toBeNull()
+    expectSilent(container)
+  })
+
+  it('US-024-01 label: no label prop -> filled slot stays text-free', async () => {
+    const d = deferred()
+    const { container } = render(<AdSlot slotId="s1" load={d.load} />)
+    await frame()
+    await act(async () => {
+      d.resolve('filled')
+    })
+    expect(slot(container).dataset.state).toBe('filled')
+    expectSilent(container)
+  })
 })

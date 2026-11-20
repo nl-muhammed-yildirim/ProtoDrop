@@ -52,7 +52,7 @@ These are the *current* values of the Limits Registry (TA-3.4 / Feature Plan App
 | `SCHEDULING` | false | true | true |
 | `BRANDING` | false | true | true |
 | `ANALYTICS` | false | true | true |
-| `ADS` | false (D-14) | false | false |
+| `ADS` | true (global feature.ads kill-switch false, D-14) | false | false |
 | `SSO_SCIM` | false | false | true |
 | `MAX_LOGO_SIZE` (Limits key `maxLogoSize`, F-PRF-001 FR-021-5) | 1048576 (1 MiB) | 1048576 (1 MiB) | 1048576 (1 MiB) |
 
@@ -139,3 +139,4 @@ No new packages; key from `Wa:Blob:AccountKey` (Key Vault unwrap = prod deploy c
 | 2026-11-19 | F-PRF-001 `ORG_NAME_MAX_LENGTH` placement | Domain constant next to the column (schema width, like `DisplayNameMaxLength`), not in the Limits Registry | Orchestrator decision, **pending user confirmation** | AI (orchestrator) |
 | 2026-11-19 | F-PRF-001 org-name write gate (review fix) | Server Pro gate: `PATCH /auth/me` `orgName` requires branding; clearing (null/blank) allowed on every plan | Review fix so a Free account cannot set an org name by calling the API directly | AI (review fix) |
 | 2026-11-18 | F-BIL-003 US-020-03 plan-screen read endpoint (AI, orchestrator) | Add `GET /api/v1/billing/plan` (`GetPlanUsageQuery`, cookie-gated) for usage + limits; `/auth/me` unchanged. Active count = `Status IN (1,3)` (story said `Status=1`, fixed to match enforcement) | Architect DECISION-1 option A: keeps the `/me` key set pinned and adds queries only on the plan screen. Open product question: Pro's Upgrade goes to the Billing Portal, but US-019-02 says hide Upgrade when subscribed | AI (orchestrator) |
+| 2026-11-20 | F-PRF-004 Free ads + ad telemetry | Free FeaturesJson ads:true via migration AddFreeAdsEnabled (feature.ads stays false); ad_impression/ad_error added to TA-10.2 (props slotId, reason) | US-024-01 architect decisions D1/D2 | you |

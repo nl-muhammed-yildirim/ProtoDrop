@@ -147,6 +147,8 @@ interface RecipientState {
   orgLogoUrl: string | null
   /** F-PRF-002 (FR-022-6): UTC ISO due time of a Scheduled transfer; null otherwise. */
   scheduledSendAt: string | null
+  /** F-PRF-004 (FR-024-3): server-resolved; false on every non-active shape. */
+  adsEnabled: boolean
   /** T-003-03: Problem+JSON details verbatim — the screen's single line on terminal screens (TA-4.1.3). */
   terminalMessage: string | null
   /** T-003-05 (AC-003-2): true while endpoint 5 is in flight — the gate keeps rendering, submit disabled. */
@@ -211,6 +213,7 @@ const LOADING_SHAPE = {
   orgName: null,
   orgLogoUrl: null,
   scheduledSendAt: null as string | null,
+  adsEnabled: false,
   terminalMessage: null as string | null,
   unlocking: false,
   unlockError: null as string | null,
@@ -283,6 +286,7 @@ export const useRecipientStore = create<RecipientState & RecipientActions>((set,
           orgName?: string | null
           orgLogoUrl?: string | null
           scheduledSendAt?: string | null
+          adsEnabled?: boolean
         }
         set({
           status: 'active',
@@ -295,6 +299,7 @@ export const useRecipientStore = create<RecipientState & RecipientActions>((set,
           orgName: body.orgName ?? null,
           orgLogoUrl: body.orgLogoUrl ?? null,
           scheduledSendAt: body.scheduledSendAt ?? null,
+          adsEnabled: body.adsEnabled === true,
           terminalMessage: null,
           error: null,
         })

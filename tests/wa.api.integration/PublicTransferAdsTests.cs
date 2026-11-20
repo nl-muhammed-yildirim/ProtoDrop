@@ -11,8 +11,8 @@ namespace wa.api.integration;
 
 /// <summary>
 /// F-PRF-004 US-024-02: adsEnabled on GET /api/v1/public/transfers/{linkId}. AC-024-2 (Pro/Business never get an ad).
-/// feature.ads is seeded off, so it is flipped BEFORE the first request (30 s flags cache). The free plan row is patched to
-/// Ads=true as TEST DATA modelling the spec'd Free row (the seed currently carries false for every plan — open decision).
+/// feature.ads is seeded off, so it is flipped BEFORE the first request (30 s flags cache). The Free plan row
+/// carries ads:true from the AddFreeAdsEnabled seed migration.
 /// </summary>
 public class PublicTransferAdsTests : IAsyncLifetime
 {
@@ -42,14 +42,11 @@ public class PublicTransferAdsTests : IAsyncLifetime
         _db = new WaDbContext(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(connString).Options);
         await _db.Database.MigrateAsync();
 
-        // Gate on + free row patched before the first request: the flags/plan caches would otherwise hold the seeded values for their TTL.
+        // Gate on before the first request: the flags/plan caches would otherwise hold the seeded values for their TTL.
         var flag = await _db.Set<FeatureFlag>().SingleAsync(f => f.Key == "feature.ads");
         flag.Value = "true";
         flag.UpdatedAtUtc = DateTime.UtcNow;
         await _db.SaveChangesAsync();
-
-        await _db.Set<Plan>().Where(p => p.Code == Plan.DefaultCode)
-            .ExecuteUpdateAsync(s => s.SetProperty(p => p.FeaturesJson, "{\"ads\":true,\"scheduling\":false,\"analytics\":false,\"branding\":false,\"sso_scim\":false}"));
 
         _client = new TestFactory().CreateClient();
     }

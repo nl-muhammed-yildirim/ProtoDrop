@@ -821,7 +821,7 @@ Admin endpoints reject non-admins with `FORBIDDEN`.
 
 ### TA-10.2 Telemetry contract (only these; names are code)
 
-**Events** (App Insights, custom): `upload_started`, `upload_completed` (bytes, durationMs, retries), `upload_failed`, `growth_cta_shown`, `growth_cta_clicked`, `transfer_page_viewed`, `transfer_not_found`, `password_correct`, `password_wrong`, `download_started`, `download_completed`, `zip_generated`, `zip_failed`, `email_sent`, `email_failed`, `user_created`, `login_success`, `login_failed`, `account_deleted`, `plan_changed`, `translation_missing`, `admin_action`, `dlq_count`, `branding_logo_missing` (F-PRF-001, property-free).
+**Events** (App Insights, custom): `upload_started`, `upload_completed` (bytes, durationMs, retries), `upload_failed`, `growth_cta_shown`, `growth_cta_clicked`, `transfer_page_viewed`, `transfer_not_found`, `password_correct`, `password_wrong`, `download_started`, `download_completed`, `zip_generated`, `zip_failed`, `email_sent`, `email_failed`, `user_created`, `login_success`, `login_failed`, `account_deleted`, `plan_changed`, `translation_missing`, `admin_action`, `dlq_count`, `branding_logo_missing` (F-PRF-001, property-free), `ad_impression`, `ad_error` (F-PRF-004, client-only; props slotId, reason).
 
 **Metrics** (custom): `upload.success_rate` (5-min), `link_to_download_seconds`, `expiry_job_lag_seconds`, `email_failures_1h`, `active_transfers`, `storage_bytes_active`, `api.requests{status}`.
 

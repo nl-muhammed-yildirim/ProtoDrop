@@ -91,6 +91,7 @@
   "recipient.active.downloadButton": "İndir",
   "recipient.active.downloadAll": "Tümünü indir",
   "recipient.active.downloadsLeft": "Kalan indirme: {{count}}",
+  "recipient.active.adLabel": "Reklam",
   "recipient.active.growthAria": "Bir şey gönder",
   "recipient.active.growthCopy": "Kendi dosyalarından birini göndermeye hazır mısın?",
   "recipient.active.growthCta": "Bir şey gönder",
