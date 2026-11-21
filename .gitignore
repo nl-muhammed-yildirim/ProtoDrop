@@ -20,3 +20,4 @@
 /_asar_extracted
 # local watchdog claim-state (board-watch.py) — not part of source
 /.hermes/board-watch-state.json
+/scripts/__pycache__
