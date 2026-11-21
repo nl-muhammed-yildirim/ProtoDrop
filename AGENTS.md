@@ -32,6 +32,8 @@ Cycle per task: **architect (plan) → coder (develop) → reviewer (review)** �
 
 The task queue is the **@ProtoDrop Projects v2 board's `Ready` column**, not just the backlog file. Tooling: `scripts/board-ready.py` (lists Ready items; empty stdout = nothing ready) and `scripts/board-status.py` (`get <n>` / `set <n> "<status>"` / `list`). Exact status names are case-sensitive: **Backlog | Ready | In progress | In review | Done** — mutations use the option IDs in the script, never a name.
 
+**How items reach `Ready` (user rule 2026-11-21):** Claude Code plans them — "start task <n>" runs the `protodrop-start` skill (Haiku reads the board issue → Opus Architect writes + commits `docs/plans/<ID>-plan.md` → Haiku appends ``**Plan:** `docs/plans/<ID>-plan.md` `` to the issue body and sets `Ready`). Hermes does not plan; it codes from that plan, and Claude reviews.
+
 Per task found in `Ready`:
 1. Read its plan from `docs/plans/` (the path is derived from the issue body by `board-ready.py`; verify it exists before starting).
 2. **Before** dispatching Coder: `python scripts/board-status.py set <n> "In progress"` — verify the printed status matches.
