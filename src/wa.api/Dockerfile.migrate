@@ -22,6 +22,7 @@ COPY src ./
 
 # --project points at the migrations assembly (wa.infrastructure); --startup-project boots wa.api's
 # DI/config so it reads ConnectionStrings__WaDb from env. WaDbContext lives in infrastructure.
-CMD ["dotnet", "ef", "database", "update", \
-     "--project", "wa.infrastructure/wa.infrastructure.csproj", \
-     "--startup-project", "wa.api/wa.api.csproj"]
+# --connection is passed explicitly: dotnet-ef prefers the design-time factory
+# (DesignTime/WaDbContextFactory, hardcoded Server=localhost — host-machine only) over the host,
+# and inside this container localhost != SQL. The flag overrides it with the compose env value.
+CMD ["sh", "-c", "dotnet ef database update --project wa.infrastructure/wa.infrastructure.csproj --startup-project wa.api/wa.api.csproj --connection \"$ConnectionStrings__WaDb\""]
