@@ -15,9 +15,9 @@
 ### Current process (user rule 2026-11-21): Claude = Architect + Reviewer, Hermes = Coder
 
 "**Start task <n>**" (issue number on the @ProtoDrop board, or a `US-xxx-yy` / `T-xxx-NN` id) → run the `/protodrop-start <n>` skill:
-1. **Haiku 5.5** — find the item on the GitHub Project board, read the issue in full, locate its local spec/story files, send it to the Architect.
-2. **Architect (Opus 5.5)** — plan it for the Coder, save `docs/plans/<ID>-plan.md` as usual (FILES FOR CODER, verify_plan.py, `docs:` plan commit).
-3. **Haiku 5.5** — verify the plan, add the plan path to the issue body, set the board status to **Ready** (Hermes picks it up from there — AGENTS.md "Ready-column workflow").
+1. **Haiku 5.5** — find the item on the GitHub Project board, read the issue in full, locate its local spec/story files, create the task branch `feature/<ID>` from `origin/develop`, send it to the Architect.
+2. **Architect (Opus 5.5)** — plan it for the Coder, save `docs/plans/<ID>-plan.md` as usual (FILES FOR CODER, verify_plan.py, `docs:` plan commit on the task branch).
+3. **Haiku 5.5** — verify the plan, add the plan path + branch to the issue body, set the board status to **Ready** (Hermes picks it up from there — AGENTS.md "Ready-column workflow").
 
 Review of Hermes' work stays with Claude (`reviewer`, Opus 5.5). The full Claude-only cycle below (`/protodrop-cycle`) is used only when the user asks for it.
 

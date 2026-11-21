@@ -1,6 +1,6 @@
 ---
 name: protodrop-start
-description: Start a ProtoDrop board task — find the GitHub Project (@ProtoDrop board) item by issue number or story/task id, read the issue, send it to the Opus Architect for planning, verify the plan, then move the board item to Ready for the Coder (Hermes). Use when the user says "start task <n>", "start this task <n>", "plan task <n>", or "/protodrop-start <n>".
+description: Start a ProtoDrop board task — find the GitHub Project (@ProtoDrop board) item by issue number or story/task id, read the issue, create the task branch from develop, send it to the Opus Architect for planning, verify the plan, then move the board item to Ready for the Coder (Hermes). Use when the user says "start task <n>", "start this task <n>", "plan task <n>", or "/protodrop-start <n>".
 model: claude-haiku-5-5
 argument-hint: "<issue number | US-xxx-yy | T-xxx-NN>"
 ---
@@ -11,9 +11,9 @@ Process rule (user, 2026-11-21): Claude Code is **Architect + Reviewer**; the Co
 
 | Phase | Who | Model |
 |---|---|---|
-| 1. Find the task on the board + read the issue | you (this skill) | Haiku 5.5 |
-| 2. Plan it for the Coder, save + commit the plan | `architect` subagent | Opus 5.5 |
-| 3. Verify the plan, link it in the issue, set status `Ready` | you (this skill) | Haiku 5.5 |
+| 1. Find the task on the board + read the issue, create the task branch from `develop` | you (this skill) | Haiku 5.5 |
+| 2. Plan it for the Coder, save + commit the plan (on the task branch) | `architect` subagent | Opus 5.5 |
+| 3. Verify the plan, link plan + branch in the issue, set status `Ready` | you (this skill) | Haiku 5.5 |
 
 You do NOT plan, write `src/`/`tests/`, or code. One task per invocation. Tooling (Bash, repo root `C:/Users/myild/source/repos/ProtoDrop`):
 
@@ -33,12 +33,21 @@ You do NOT plan, write `src/`/`tests/`, or code. One task per invocation. Toolin
 3. Read the issue in full: `"$GH" issue view <n> -R nl-muhammed-yildirim/ProtoDrop --json number,title,body,milestone,labels,url`. Capture title, milestone (= phase), feature id (`**Feature:** F-...` line), story id, AC/EC/FR ids, and the `## Links` section.
 4. Find the local spec files (Glob under `docs/features/<Phase>/<feature-id>/`, phase dirs contain spaces): the feature spec `.md`, the user-story file for this story, and any `T-xxx-NN-*.md` task files in the story folder.
 5. Plan path = `docs/plans/<story-or-task-id>-plan.md` (house naming, e.g. `docs/plans/US-024-03-plan.md`). If it already exists, tell the Architect to update it rather than start over.
-6. `git status --short` + current branch. Uncommitted changes in `docs/plans/` → surface to the user before spawning.
+6. `git status --short` + `git stash list`. Any uncommitted tracked change → stop and surface it to the user (switching branches would carry it along or fail). Untracked junk like `scripts/__pycache__/` is fine.
+7. **Create the task branch from `develop`** — name `feature/<story-or-task-id>` (e.g. `feature/US-024-03`):
+   ```bash
+   git fetch origin develop
+   git switch -c feature/<ID> origin/develop
+   ```
+   - Branch already exists locally → don't recreate: `git switch feature/<ID>`, then check `git merge-base --is-ancestor origin/develop HEAD`. Not based on the current develop → stop and ask the user (rebase or keep).
+   - Verify: `git branch --show-current` = `feature/<ID>` and `git merge-base HEAD origin/develop` = `git rev-parse origin/develop`.
+   - Leave this branch checked out at the end of the run: Hermes codes on it.
 
 ## Phase 2 — plan (spawn `architect`, Opus 5.5, wait for it)
 
 One `Agent` call, `subagent_type: "architect"`. The child starts blank — the prompt carries everything:
 - repo root; issue number + URL; story/task id; the **issue body verbatim**; milestone/phase; feature id;
+- the task branch `feature/<ID>` (already checked out, cut from `origin/develop`) — "commit on this branch; don't switch branches";
 - the local spec / story / task-file paths from step 4; AC/EC/FR ids; TA-* ids from the issue's Links;
 - the plan path from step 5, and: "write the plan with a `### FILES FOR CODER` table, run `python scripts/verify_plan.py <plan>`, commit ONLY the plan as `docs: <ID> plan — <title>`, end with your JSON block";
 - "the Coder is Hermes (local Qwen) — make FILES FOR CODER and the ordered steps explicit enough to execute verbatim";
@@ -48,20 +57,20 @@ One `Agent` call, `subagent_type: "architect"`. The child starts blank — the p
 
 Don't trust the self-report — check:
 1. Plan file exists on disk; `python scripts/verify_plan.py <plan>` is clean or CREATE-only drift (one DRIFT line per CREATE file is expected at plan time; anything else → send back to the architect once with the output).
-2. `git log -1 --format=%s` starts with `docs:` and `git show --stat HEAD` lists only the plan file.
+2. Still on `feature/<ID>`; `git log -1 --format=%s` starts with `docs:`; `git show --stat HEAD` lists only the plan file; `git log --oneline origin/develop..HEAD` shows only the plan commit.
 3. Spot-check 2 cited `file:line` references against live source.
 4. Architect returned `escalations` / `DECISION:` blocks → **STOP**: leave the item in `Backlog`, surface the DECISION blocks verbatim (`docs/AGENT.md` §8). Don't set Ready on an open question.
 5. Architect died / no plan twice → stop and tell the user (no orchestrator-written plans in this flow).
 
 Then:
-6. **Link the plan in the issue body** (Hermes' `board-ready.py` finds the plan by parsing the body): if the body has no `docs/plans/` path yet, append a line ``**Plan:** `docs/plans/<ID>-plan.md` (commit <short-sha>)`` — fetch the body to a scratch file, append, `"$GH" issue edit <n> -R nl-muhammed-yildirim/ProtoDrop --body-file <file>`. Never rewrite the rest of the body.
+6. **Link the plan and branch in the issue body** (Hermes' `board-ready.py` finds the plan by parsing the body): if the body has no `docs/plans/` path yet, append the lines ``**Plan:** `docs/plans/<ID>-plan.md` (commit <short-sha>)`` and ``**Branch:** `feature/<ID>` (from `develop`; PR targets `develop`)`` — fetch the body to a scratch file, append, `"$GH" issue edit <n> -R nl-muhammed-yildirim/ProtoDrop --body-file <file>`. Never rewrite the rest of the body.
 7. `python scripts/board-status.py set <n> "Ready"` — the script re-reads and exits non-zero on mismatch.
 8. `python scripts/board-ready.py` — confirm the item is listed with `plan file : docs/plans/<ID>-plan.md` (not `NOT FOUND`).
 
-No push, PR or merge in this flow — Hermes handles that after coding (AGENTS.md "Ready-column workflow").
+No push, PR or merge in this flow — Hermes handles that after coding (AGENTS.md "Ready-column workflow"), with the PR from `feature/<ID>` into `develop`.
 
 ## Report (end of run)
-1. **Task** — `#<n>` + story/task id + one-line scope.
+1. **Task** — `#<n>` + story/task id + one-line scope + branch `feature/<ID>` (base sha of `origin/develop`).
 2. **Plan** — path, commit sha, verify_plan result, design summary in 2–3 lines, FILES FOR CODER count.
 3. **Board** — status now `Ready` (verified) and the board-ready line; or why it stayed in `Backlog`.
 
