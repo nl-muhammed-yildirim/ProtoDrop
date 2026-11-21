@@ -8,7 +8,7 @@
 
 ## Description
 
-"Find the transfer where I sent the logo files to the agency" is the question the moment My Files grows past ten rows. F-XCT-002 adds one search box to **My Files** (and later the admin transfer list) that finds transfers by **file name, recipient email, and sender name** matching file name, recipient email and sender name (D-21 decided 2026-11-21: literal case-insensitive substring via EF string.Contains over FileItem.OriginalName / EmailRecipient.Address / Transfer.SenderName — owner-scoped; no new infrastructure, no second storage system), with a kill switch.
+"Find the transfer where I sent the logo files to the agency" is the question the moment My Files grows past ten rows. F-XCT-002 adds one search box to **My Files** (and later the admin transfer list) that finds transfers by **file name, recipient email, and sender name** — matching file name, recipient email and sender name via a literal case-insensitive substring (D-21 decided 2026-11-21: EF string.Contains over FileItem.OriginalName / EmailRecipient.Address / Transfer.SenderName — owner-scoped; no new infrastructure, no second storage system), with a kill switch.
 
 **Actors:** signed-in user (searching their own transfers), admin (searching all transfers).
 **Value:** discoverability of history without a new product surface; the admin's "which transfer is this complaint about?" becomes one keystroke.
@@ -19,10 +19,10 @@
 |---|---|
 | FR-045-1 | `GET /api/v1/transfers?status=&cursor=&q=` gains a `q` parameter (1..100 chars, trimmed). When `q` is present, the list is filtered to transfers whose `SenderName`, `EmailRecipient.Address`, or `TransferFile.FileName` matches. |
 | FR-045-2 | Matching is a **literal case-insensitive substring** (D-21 decided 2026-11-21): EF string.Contains over `FileItem.OriginalName`, `EmailRecipient.Address` and `Transfer.SenderName`, owner-scoped — no full-text index, no `SearchText` column, no schema change. Case/accents per the column's collation (CI_AS: case-insensitive, accent-sensitive — documented limitation EC-045-4). |
-| FR-045-3 | Results are ordered **by relevance** (`CONTAINSTABLE` rank) when `q` is present, else by existing `createdAtUtc DESC` + cursor. Cursor pagination (TA-4.2) is preserved: the cursor is an opaque `q|rank|id` token for search pages. |
+| FR-045-3 | Results are ordered **by relevance** — file match > recipient match > sender match (CASE-over-EXISTS rank predicate) when `q` is present, else by existing `createdAtUtc DESC` + cursor. Cursor pagination (TA-4.2) is preserved: the cursor is an opaque base64 token of `rank|createdAtUtc:O|id:N|term` (term last). |
 | FR-045-4 | **Free tier:** search is available to all plans (it's an index on existing rows, no new metering). **Admin:** `GET /api/v1/admin/transfers?q=` (endpoint 21) reuses the same search predicate over *all* transfers, with the admin cursor shape. |
 | FR-045-5 | **Gate:** the whole feature sits behind `feature.search` (F-XCT-001). Flag off → `q` parameter is ignored by the API (documented: no 404 on the list endpoint, so a stale SPA degrades to the unfiltered list) and the search box is not rendered. |
-| FR-045-6 | **Escaping:** `q` is user input against `CONTAINS` — values are wrapped/escaped so `*`, `~`, `"` in the query are literals, not full-text operators (prevents `*` matching everything). |
+| FR-045-6 | **Escaping:** `q` is a literal case-insensitive substring — there are no full-text operators to leak, so `*`, `~`, `"` in the query match literally by construction (no wrapping/escaping needed). |
 | FR-045-7 | **Scoping:** a signed-in user's `q` matches only their transfers (owner-scoped query — search never crosses owners); the admin search is explicitly all-transfers and marked as such. |
 | FR-045-8 | Telemetry: search is covered by existing events — the list endpoint emits no new event type; a searched list request is indistinguishable from any other list request in TA-10.2 (no closed-list drift). |
 
@@ -52,9 +52,9 @@ AC-045-3: Full-text operators are literals
 | ID | Case | Behavior |
 |---|---|---|
 | EC-045-1 | `q` with no matches | Empty list, "No transfers match '…'" — not an error |
-| EC-045-2 | Full-text index not yet built (fresh DB, first rows) | Rows committed after the index's initial fill are found immediately; the build window is < 1 min on seeded sizes (documented, not user-visible in practice) |
+| EC-045-2 | `q` on a fresh DB (first rows) | No index to build — the substring predicate scans existing rows directly; every committed row is found immediately (documented, not user-visible in practice). |
 | EC-045-3 | `q` longer than 100 chars | 400 `Q_TOO_LONG`; UI trims to the max before submit |
-| EC-045-4 | Diacritics ("café" vs. "cafe") | Collation-dependent exact match; documented limitation, no stemming (plan: "SQL `CONTAINS` first") |
+| EC-045-4 | Diacritics ("café" vs. "cafe") | Collation-dependent exact match (CI_AS: case-insensitive, accent-sensitive); documented limitation, no stemming — the substring is literal by construction (D-21 option B). |
 | EC-045-5 | Feature flag flipped off while a search request is in flight | Worst case: one list response used the search predicate; the next is the plain list — no partial state |
 | EC-045-6 | Same transfer matches on two fields (file + recipient) | Single result, no duplicate rows (matched by transfer id, rank = max of matching ranks) |
 
