@@ -7,6 +7,7 @@ import { getTraceParent } from '../../core/traceparent'
 import i18n from '../../core/i18n/init'
 import { useFocusTrap } from '../../core/ui/useFocusTrap'
 import { loadFeatureGates, useFeatureGate } from '../../core/features/featureGates'
+import { SEARCH_DEBOUNCE_MS, SEARCH_MAX_LENGTH, buildListUrl, normalizeQuery } from './search'
 import { DownloadsPanel, downloadsPanelId } from './DownloadsPanel'
 import {
   downloadsLabel,
@@ -68,7 +69,8 @@ function DeleteConfirmDialog({ targetRow, deleting, deleteError, onClose, onConf
  * + delete confirm modal (DangerZone.tsx structure mirrored — pf-modal-* classes reused). Success = 204
  * NoContent OR 404 with problem body code === 'NOT_FOUND' (EC-009-2); the row is removed locally and a
  * role=status toast "Transfer deleted." auto-dismisses in 5 s. Nothing is sent until Confirm — Cancel/
- * Escape close only.
+ * Escape close only. US-045-01: when feature.search is on, a debounced search box above the pills sends q
+ * to endpoint 14 (file name / recipient substring match); Clear resets to the full list.
  */
 export function FilesPage({ onNewTransfer }: FilesPageProps) {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'expired'>('all')
@@ -84,6 +86,20 @@ export function FilesPage({ onNewTransfer }: FilesPageProps) {
   const analyticsOn = useFeatureGate('feature.analytics')
   const [openAnalyticsId, setOpenAnalyticsId] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  // US-045-01 (FR-045-5): the search box exists only when feature.search is on; query debounces into committedQ.
+  const searchOn = useFeatureGate('feature.search')
+  const [query, setQuery] = useState('')
+  const [committedQ, setCommittedQ] = useState('')
+  const activeQ = searchOn ? committedQ : ''
+
+  // US-045-01 (UI notes): debounce — the fetch effect below keys on activeQ; typing alone never hits the server.
+  useEffect(() => {
+    const next = normalizeQuery(query)
+    if (next === committedQ) return
+    const id = window.setTimeout(() => setCommittedQ(next), SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(id)
+  }, [query, committedQ])
 
   // T-016-03 (D-7): route-change focus — 'New transfer' is this page's primary action; focus it on mount.
   const newTransferRef = useRef<HTMLButtonElement>(null)
@@ -112,6 +128,7 @@ export function FilesPage({ onNewTransfer }: FilesPageProps) {
   // cursorsRef[i] is the opaque cursor used to load page i+1; page 0 is always null.
   const cursorsRef = useRef<(string | null)[]>([null])
   const filterRef = useRef<'all' | 'active' | 'expired'>('all')
+  const qRef = useRef('')   // US-045-01: paging reads the committed term without re-running the fetch effect.
 
   // pageIndex/hasNext are mirrored to state purely to render the Prev/Next disabled states.
   const [pageIndex, setPageIndex] = useState(0)
@@ -123,27 +140,33 @@ export function FilesPage({ onNewTransfer }: FilesPageProps) {
     return () => window.clearInterval(id)
   }, [])
 
-  // Fetch page 0 on mount and whenever the pill changes (resets cursors + index — US-009-02 happy path 3).
+  // Fetch page 0 on mount and whenever the pill or committed query changes (resets cursors + index — US-009-02 happy path 3).
   useEffect(() => {
     filterRef.current = statusFilter
+    qRef.current = activeQ   // US-045-01: paging reads the committed term without re-running this effect.
     cursorsRef.current = [null]
     setLoading(true)
     setError(null)
 
+    let cancelled = false   // US-045-01 (UI notes): stale responses from a superseded fetch must not touch state.
+
     // limit 25 is the endpoint's default (TA-4.1.4) — do NOT send it; keep the query minimal like the rest of the client.
-    fetch(`${API_BASE}/transfers?status=${statusFilter}`, { credentials: 'include', headers: { traceparent: getTraceParent() } })
+    fetch(buildListUrl(API_BASE, statusFilter, activeQ, null), { credentials: 'include', headers: { traceparent: getTraceParent() } })
       .then(async (res) => {
         if (!res.ok) throw new Error(i18n.t('files.error.loadFailed'))
         return (await res.json()) as ListTransfersResponse
       })
       .then((data) => {
+        if (cancelled) return
         // Record page 1's nextCursor so Next can walk to it.
         cursorsRef.current[1] = data.nextCursor
         applyPage(data, 0)
       })
-      .catch(() => setError(i18n.t('files.error.loadFailed')))
-      .finally(() => setLoading(false))
-  }, [statusFilter])
+      .catch(() => { if (!cancelled) setError(i18n.t('files.error.loadFailed')) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+
+    return () => { cancelled = true }
+  }, [statusFilter, activeQ])
 
   // US-023-01 (FR-023-5, FR-044-7): the Downloads action exists only when feature.analytics is on (absent, never disabled).
   useEffect(() => { void loadFeatureGates() }, [])
@@ -160,8 +183,7 @@ export function FilesPage({ onNewTransfer }: FilesPageProps) {
     setLoading(true)
     setError(null)
 
-    let url = `${API_BASE}/transfers?status=${filterRef.current}`
-    if (cursor !== null) url += `&cursor=${encodeURIComponent(cursor)}`
+    const url = buildListUrl(API_BASE, filterRef.current, qRef.current, cursor)   // US-045-01: paging carries the committed term.
 
     try {
       const res = await fetch(url, { credentials: 'include', headers: { traceparent: getTraceParent() } })
@@ -188,6 +210,12 @@ export function FilesPage({ onNewTransfer }: FilesPageProps) {
   function closeDelete(): void {
     setDeleteTargetId(null)
     setDeleteError(null)
+  }
+
+  // US-045-01 (FR-045-5): clear the box AND reset committedQ so a fresh page-0 fetch runs without q.
+  function clearSearch(): void {
+    setQuery('')
+    setCommittedQ('')
   }
 
   /**
@@ -277,6 +305,18 @@ export function FilesPage({ onNewTransfer }: FilesPageProps) {
         <button type="button" className="mf-new-btn" ref={newTransferRef} onClick={onNewTransfer}>{i18n.t('files.page.newTransfer')}</button>
       </div>
 
+      {/* US-045-01 (FR-045-5): search toolbar — rendered only when feature.search is on. */}
+      {searchOn && (
+        <div className="mf-search" role="search">
+          <input type="search" className="mf-search-input" value={query} maxLength={SEARCH_MAX_LENGTH}
+            aria-label={i18n.t('files.search.label')} placeholder={i18n.t('files.search.placeholder')}
+            onChange={(e) => setQuery(e.target.value)} />
+          {query !== '' && (
+            <button type="button" className="mf-search-clear" aria-label={i18n.t('files.search.clear')} onClick={clearSearch}>×</button>
+          )}
+        </div>
+      )}
+
       <div className="mf-pills">
         {pills.map((p) => (
           <button
@@ -353,12 +393,20 @@ export function FilesPage({ onNewTransfer }: FilesPageProps) {
         </>
       )}
 
-      {/* FR-009-5 empty state: rows.length === 0 && !loading && !error */}
-      {!loading && !error && rows.length === 0 && (
+      {/* FR-009-5 empty state: rows.length === 0 && !loading && !error — US-045-01 adds activeQ === '' so a search miss shows the no-match block below. */}
+      {!loading && !error && rows.length === 0 && activeQ === '' && (
         <div className="mf-empty">
           <div className="mf-empty-icon" aria-hidden="true">📁</div>
           <p className="mf-empty-text">{i18n.t('files.empty.text')}</p>
           <button type="button" className="mf-new-btn mf-empty-cta" onClick={onNewTransfer}>{i18n.t('files.empty.cta')}</button>
+        </div>
+      )}
+
+      {/* US-045-01 (FR-045-2): no-match state — the committed term found nothing; Clear resets to the full list. */}
+      {!loading && !error && rows.length === 0 && activeQ !== '' && (
+        <div className="mf-empty">
+          <p className="mf-empty-text">{i18n.t('files.search.noMatch', { query: activeQ })}</p>
+          <button type="button" className="mf-pill" onClick={clearSearch}>{i18n.t('files.search.clear')}</button>
         </div>
       )}
 

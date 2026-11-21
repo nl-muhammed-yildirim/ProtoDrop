@@ -1,3 +1,4 @@
+using wa.application.Limits;
 using wa.application.UseCases.Admin;
 using wa.domain.Transfers;
 
@@ -9,12 +10,14 @@ namespace wa.application.unit.Admin;
 public class SearchTransfersQueryTests
 {
     private readonly StubSearchTransfersStore _store;
+    // US-045-01 (D7): flag off by default — every existing fact keeps the FR-011-3 legacy behaviour.
+    private readonly StubFlagResolver _flags = new();
     private readonly SearchTransfersQueryHandler _handler;
 
     public SearchTransfersQueryTests()
     {
         _store = new StubSearchTransfersStore();
-        _handler = new SearchTransfersQueryHandler(_store);
+        _handler = new SearchTransfersQueryHandler(_store, _flags);
     }
 
     // ---- Exit check: malformed cursor → CursorFormatException BEFORE the store call (400 VALIDATION before the query runs) ----
@@ -183,10 +186,13 @@ public class SearchTransfersQueryTests
         public DateTime? CapturedAfterUtc { get; private set; }
         public Guid? CapturedAfterIdExcluded { get; private set; }
         public int CapturedLimit { get; private set; }
+        // US-045-01 (FR-045-4): widened match flag — false under FR-011-3 legacy behaviour.
+        public bool CapturedMatchFilesAndSender { get; private set; }
         public (List<AdminTransferRow> Items, string? NextCursor) Data { get; set; } = (new List<AdminTransferRow>(), null);
 
         public Task<(List<AdminTransferRow> Items, string? NextCursor)> SearchAsync(
             string? q,
+            bool matchFilesAndSender,
             IReadOnlyCollection<byte>? statuses,
             long? minBytes,
             long? maxBytes,
@@ -199,6 +205,7 @@ public class SearchTransfersQueryTests
         {
             CallCount++;
             CapturedQ = q;
+            CapturedMatchFilesAndSender = matchFilesAndSender;
             CapturedStatuses = statuses;
             CapturedMinBytes = minBytes;
             CapturedMaxBytes = maxBytes;
@@ -209,5 +216,52 @@ public class SearchTransfersQueryTests
             CapturedLimit = limit;
             return Task.FromResult(Data);
         }
+    }
+
+    // ---- US-045-01 (FR-045-4 / D7): feature.search gate on admin q — flag off keeps FR-011-3 exactly; on → term rules + widened match ----
+
+    [Fact]
+    public async Task FlagOff_LegacyTrim_NoFileOrSenderMatch_LongQAllowed()
+    {
+        // 101-char q: legacy trim passes it through (no Q_TOO_LONG rule when the gate is off) and no file/sender widening.
+        var longQ = new string('a', SearchTerm.MaxLength + 1);
+
+        await _handler.Handle(new SearchTransfersQuery(longQ, null, null, null, null, null, null, 25), CancellationToken.None);
+
+        Assert.Equal(longQ.Trim(), _store.CapturedQ);
+        Assert.False(_store.CapturedMatchFilesAndSender);   // FR-011-3 unchanged — LinkId exact OR recipient substring only.
+    }
+
+    [Fact]
+    public async Task FlagOn_MatchFilesAndSenderTrue()
+    {
+        _flags.Values[FeatureGates.Search] = true;
+
+        await _handler.Handle(new SearchTransfersQuery("  financial ", null, null, null, null, null, null, 25), CancellationToken.None);
+
+        Assert.Equal("financial", _store.CapturedQ);          // FR-045-1 term rules (trim) apply when the gate is on.
+        Assert.True(_store.CapturedMatchFilesAndSender);      // widened file name / sender match (FR-045-4).
+    }
+
+    [Fact]
+    public async Task FlagOn_101CharQ_ThrowsSearchTermTooLong() =>
+        await RunFlagOnAsync(q: new string('a', SearchTerm.MaxLength + 1));   // EC-045-3 → endpoint maps to 400 Q_TOO_LONG.
+
+    private static async Task RunFlagOnAsync(string q)
+    {
+        var store = new StubSearchTransfersStore();
+        var flags = new StubFlagResolver() { Values = { [FeatureGates.Search] = true } };
+        await Assert.ThrowsAsync<SearchTermTooLongException>(async () =>
+            await new SearchTransfersQueryHandler(store, flags).Handle(new SearchTransfersQuery(q, null, null, null, null, null, null, 25), CancellationToken.None));
+
+        Assert.Equal(0, store.CallCount);   // the term rule fires before the store call.
+    }
+
+    private sealed class StubFlagResolver : IFlagResolver   // copied from GetPublicTransferHandlerTests (L652-662).
+    {
+        public Dictionary<string, object> Values { get; set; } = new();
+
+        public Task<T> ResolveFlag<T>(string key, T defaultValue, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Values.TryGetValue(key, out var v) && v is T typed ? typed : defaultValue);
     }
 }
