@@ -444,6 +444,42 @@ public class TransferSearchEndpointTests() : TransferSearchEndpointTestsBase(gat
         Assert.Contains(tB.ToString(), ids);
         Assert.All(body.GetProperty("items").EnumerateArray(), i => Assert.False(string.IsNullOrEmpty(i.GetProperty("ownerEmail").GetString())));
     }
+
+    [Fact]
+    public async Task Admin_Recipient_CrossesOwners_ShowsOwner() // AC-045-2: admin searches the exact recipient "a@b.com" across owners — every transfer sent to that address is listed, owner email populated (EmailRecipient.Address match)
+    {
+        var userA = await SeedUserAsync();
+        var tA = await SeedTransferAsync(userA);
+        await SeedFilesAsync(tA, "notes-a.txt");
+        await SeedRecipientAsync(tA, "a@b.com");
+
+        var userB = await SeedUserAsync();
+        var tB = await SeedTransferAsync(userB);
+        await SeedFilesAsync(tB, "notes-b.txt");
+        await SeedRecipientAsync(tB, "a@b.com");   // same recipient address, different owner — must also surface.
+
+        using var response = await GetAsync("/api/v1/admin/transfers?q=a%40b.com", AdminUserId);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await ReadJsonAsync(response);
+        var ids = body.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetString()).ToList();
+        Assert.Contains(tA.ToString(), ids);   // dashed Guid form on endpoint 21 (TA-4.2a n-form is rows-only).
+        Assert.Contains(tB.ToString(), ids);
+        Assert.All(body.GetProperty("items").EnumerateArray(), i => Assert.False(string.IsNullOrEmpty(i.GetProperty("ownerEmail").GetString())));
+    }
+
+    [Fact]
+    public async Task Admin_QTooLong_400() // EC-045-3 on endpoint 21: flag-on q over SearchTerm.MaxLength (100 chars) → 400 Q_TOO_LONG; exactly 100 is fine. Mirrors the gate-off FlagOff_LongQ_Ignored_200 contrast — here the gate is ON so the length check applies.
+    {
+        using (var longResponse = await GetAsync($"/api/v1/admin/transfers?q={new string('a', SearchTerm.MaxLength + 1)}", AdminUserId))
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, longResponse.StatusCode);
+            Assert.Equal("Q_TOO_LONG", (await ReadJsonAsync(longResponse)).GetProperty("code").GetString());
+        }
+
+        using var okResponse = await GetAsync($"/api/v1/admin/transfers?q={new string('a', SearchTerm.MaxLength)}", AdminUserId);
+        Assert.Equal(HttpStatusCode.OK, okResponse.StatusCode);
+    }
 }
 
 /// <summary>feature.search left at its seeded "false": q is ignored entirely on endpoint 14, and FR-011-3 stays exactly as it was.</summary>

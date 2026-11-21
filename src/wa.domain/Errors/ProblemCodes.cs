@@ -43,7 +43,7 @@ public static class ProblemCodes
     public const string LogoTypeInvalid = "LOGO_TYPE_INVALID";
     // US-022-03 (FR-022-2): scheduledSendAt outside now+5 min .. now+14 days (server time) — nothing written.
     public const string ScheduleOutOfWindow = "SCHEDULE_OUT_OF_WINDOW";
-    // US-045-01 (AC-045-3, EC-045-6): q longer than SearchTerm.MaxLength (100 chars) on endpoint 21 — nothing queried.
+    // US-045-01 (EC-045-3): q longer than SearchTerm.MaxLength (100 chars) on endpoints 14 and 21 — nothing queried.
     public const string QTooLong = "Q_TOO_LONG";
     public const string Internal = "INTERNAL";
 
@@ -75,7 +75,7 @@ public static class ProblemCodes
         [LogoTooLarge] = (422, "Logo too large"), // US-021-04 (AC-021-4)
         [LogoTypeInvalid] = (415, "Logo type not supported"), // US-021-04 (FR-021-5)
         [ScheduleOutOfWindow] = (422, "Schedule out of window"), // US-022-03 (FR-022-2): well-formed but out of range
-        [QTooLong] = (400, "Search query too long"), // US-045-01 (AC-045-3, EC-045-6): q over SearchTerm.MaxLength — nothing queried
+        [QTooLong] = (400, "Search query too long"), // US-045-01 (EC-045-3): q over SearchTerm.MaxLength — nothing queried
         [Internal] = (500, "Internal server error") // /health's component-unreachable variant writes an explicit 503 through the same writer
     };
 
