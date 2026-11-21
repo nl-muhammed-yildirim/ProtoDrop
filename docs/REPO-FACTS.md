@@ -6,13 +6,13 @@
 
 ## 1. Closed sets (counts are load-bearing — cite them, don't re-enumerate in plans)
 
-### ProblemCodes (`src/wa.domain/Errors/ProblemCodes.cs`) — **26 members**
+### ProblemCodes (`src/wa.domain/Errors/ProblemCodes.cs`) — **28 members**
 `VALIDATION`, `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `TRANSFER_NOT_FINALIZED`,
 `TRANSFER_SIZE_EXCEEDED`, `STORAGE_QUOTA_EXCEEDED`, `MAX_DOWNLOADS_REACHED`, `WRONG_PASSWORD`,
 `TRANSFER_EXPIRED`, `TRANSFER_DELETED`, `FILES_GONE`, `IDEMPOTENCY_CONFLICT`, `RATE_LIMITED`,
 `STRIPE_WEBHOOK_MISMATCH`, `EMAIL_UNSUBSCRIBED`, `LINK_EXPIRED`, `BILLING_UNAVAILABLE`,
 `ACTIVE_TRANSFERS_EXCEEDED`, `FLAG_INVALID`, `FLAG_UNKNOWN`, `FEATURE_DISABLED`, `EXPORT_IN_FLIGHT`,
-`LOGO_TOO_LARGE`, `LOGO_TYPE_INVALID`, `INTERNAL`.
+`LOGO_TOO_LARGE`, `LOGO_TYPE_INVALID`, `SCHEDULE_OUT_OF_WINDOW`, `Q_TOO_LONG`, `INTERNAL`.
 
 ### Telemetry (`src/wa.domain/Telemetry/TelemetryEvents.cs`) — **26 events + 7 metrics = 33 names** (TA-10.2, "names are code")
 Events: `upload_started`, `upload_completed`, `upload_failed`, `transfer_page_viewed`,

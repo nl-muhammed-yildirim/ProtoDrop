@@ -469,7 +469,7 @@ CREATE TABLE dbo.IdempotencyKey (
 ```
 
 Machine `code` values (all of them, no others in MVP):
-`VALIDATION`, `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `TRANSFER_NOT_FINALIZED`, `TRANSFER_SIZE_EXCEEDED`, `STORAGE_QUOTA_EXCEEDED`, `MAX_DOWNLOADS_REACHED`, `WRONG_PASSWORD`, `TRANSFER_EXPIRED`, `TRANSFER_DELETED`, `FILES_GONE`, `IDEMPOTENCY_CONFLICT`, `RATE_LIMITED`, `STRIPE_WEBHOOK_MISMATCH`, `EMAIL_UNSUBSCRIBED`, `BILLING_UNAVAILABLE`, `LINK_EXPIRED`, `ACTIVE_TRANSFERS_EXCEEDED`, `LOGO_TOO_LARGE`, `LOGO_TYPE_INVALID`, `INTERNAL`.
+`VALIDATION`, `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `TRANSFER_NOT_FINALIZED`, `TRANSFER_SIZE_EXCEEDED`, `STORAGE_QUOTA_EXCEEDED`, `MAX_DOWNLOADS_REACHED`, `WRONG_PASSWORD`, `TRANSFER_EXPIRED`, `TRANSFER_DELETED`, `FILES_GONE`, `IDEMPOTENCY_CONFLICT`, `RATE_LIMITED`, `STRIPE_WEBHOOK_MISMATCH`, `EMAIL_UNSUBSCRIBED`, `BILLING_UNAVAILABLE`, `LINK_EXPIRED`, `ACTIVE_TRANSFERS_EXCEEDED`, `FLAG_INVALID`, `FLAG_UNKNOWN`, `FEATURE_DISABLED`, `EXPORT_IN_FLIGHT`, `LOGO_TOO_LARGE`, `LOGO_TYPE_INVALID`, `SCHEDULE_OUT_OF_WINDOW`, `Q_TOO_LONG`, `INTERNAL`.
 
 **TA-4.1.4 Pagination** — cursor: `?cursor={base64(created_at:id)}&limit=25`; response includes `nextCursor` (null when done).
 
@@ -496,7 +496,7 @@ Machine `code` values (all of them, no others in MVP):
 | 11 | `POST /api/v1/auth/forgot-password` | none | magic link email | metrics |
 | 12 | `POST /api/v1/auth/logout` | cookie | clear session | metrics |
 | 13 | `GET /api/v1/auth/me` · `PATCH /api/v1/auth/me` · `DELETE /api/v1/auth/me` · `GET /api/v1/auth/me/logo` · `PUT /api/v1/auth/me/logo` · `DELETE /api/v1/auth/me/logo` | cookie | profile (name, theme; GDPR delete). `PATCH` body gains `orgName` (absent = unchanged; null/blank = clear; max 60; no CR/LF; Pro+ only to set). Logo (F-PRF-001): `GET` owner view; `PUT` raw body, content-sniffed PNG/JPEG/WebP/SVG, size <= `MAX_LOGO_SIZE`, Pro+; `DELETE` idempotent | `account_deleted` |
-| 14 | `GET /api/v1/transfers?status=&cursor=` | cookie | My Files | — |
+| 14 | `GET /api/v1/transfers?q=&status=&cursor=` | cookie | My Files (q: F-XCT-002, feature.search gate) | — |
 | 15 | `GET /api/v1/transfers/{id}` | owner | detail | — |
 | 16 | `POST /api/v1/transfers/{id}/resend` | owner | pre-filled new draft (BlobRef share) | metrics |
 | 17 | `DELETE /api/v1/transfers/{id}` | owner/admin | hard-delete (de-dup blobs) | `transfer_deleted` |

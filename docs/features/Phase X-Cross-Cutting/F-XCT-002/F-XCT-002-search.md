@@ -8,7 +8,7 @@
 
 ## Description
 
-"Find the transfer where I sent the logo files to the agency" is the question the moment My Files grows past ten rows. F-XCT-002 adds one search box to **My Files** (and later the admin transfer list) that finds transfers by **file name, recipient email, and sender name** using plain SQL full-text search first — no new infrastructure, no second storage system, and a kill switch.
+"Find the transfer where I sent the logo files to the agency" is the question the moment My Files grows past ten rows. F-XCT-002 adds one search box to **My Files** (and later the admin transfer list) that finds transfers by **file name, recipient email, and sender name** matching file name, recipient email and sender name (D-21 decided 2026-11-21: literal case-insensitive substring via EF string.Contains over FileItem.OriginalName / EmailRecipient.Address / Transfer.SenderName — owner-scoped; no new infrastructure, no second storage system), with a kill switch.
 
 **Actors:** signed-in user (searching their own transfers), admin (searching all transfers).
 **Value:** discoverability of history without a new product surface; the admin's "which transfer is this complaint about?" becomes one keystroke.
@@ -18,7 +18,7 @@
 | ID | Requirement |
 |---|---|
 | FR-045-1 | `GET /api/v1/transfers?status=&cursor=&q=` gains a `q` parameter (1..100 chars, trimmed). When `q` is present, the list is filtered to transfers whose `SenderName`, `EmailRecipient.Address`, or `TransferFile.FileName` matches. |
-| FR-045-2 | Matching uses **SQL Server full-text search first** (per plan §6): a full-text index on `TransferFile.FileName`, `EmailRecipient.Address`, and `Transfer.SenderName` (or a single `SearchText` computed column joining the three, indexed full-text). Plain `CONTAINS`/`CONTAINSTABLE` semantics; case/accents per the column's collation (`database_default` + `VARBINARY`-free — files and emails are ASCII-dominant, documented). |
+| FR-045-2 | Matching is a **literal case-insensitive substring** (D-21 decided 2026-11-21): EF string.Contains over `FileItem.OriginalName`, `EmailRecipient.Address` and `Transfer.SenderName`, owner-scoped — no full-text index, no `SearchText` column, no schema change. Case/accents per the column's collation (CI_AS: case-insensitive, accent-sensitive — documented limitation EC-045-4). |
 | FR-045-3 | Results are ordered **by relevance** (`CONTAINSTABLE` rank) when `q` is present, else by existing `createdAtUtc DESC` + cursor. Cursor pagination (TA-4.2) is preserved: the cursor is an opaque `q|rank|id` token for search pages. |
 | FR-045-4 | **Free tier:** search is available to all plans (it's an index on existing rows, no new metering). **Admin:** `GET /api/v1/admin/transfers?q=` (endpoint 21) reuses the same search predicate over *all* transfers, with the admin cursor shape. |
 | FR-045-5 | **Gate:** the whole feature sits behind `feature.search` (F-XCT-001). Flag off → `q` parameter is ignored by the API (documented: no 404 on the list endpoint, so a stale SPA degrades to the unfiltered list) and the search box is not rendered. |
@@ -67,16 +67,16 @@ AC-045-3: Full-text operators are literals
 
 ## Technical notes
 
-- Index: full-text index on a `SearchText` computed/persisted column = `SenderName + ' ' + recipient addresses + ' ' + file names`, maintained in the same transactions that create transfers/re-send (no new worker). `CONTAINSTABLE` + rank for ordering; transfer id de-dup.
-- Fallback rule (plan: "Azure Search if needed"): if full-text index maintenance becomes a bottleneck > 1k rps or multi-word relevance matters, add Azure Search as an optional writer — the endpoint contract (FR-045-1) is unchanged, so this is an ADR, not a feature change.
+- Index: none — D-21 (decided 2026-11-21) chose literal case-insensitive substring via EF string.Contains over FileItem.OriginalName / EmailRecipient.Address / Transfer.SenderName, owner-scoped; rank file > recipient > sender via a CASE predicate, transfer id de-dup by the single grouped query (no separate index maintenance).
+- Fallback rule (plan: "Azure Search if needed"): if substring matching becomes a bottleneck at scale or multi-word relevance matters, add Azure Search as an optional writer — the endpoint contract (FR-045-1) is unchanged, so this is an ADR, not a feature change.
 - `SearchTransfersQuery` (already in the Admin/ command list, TA-4.2) is extended with `q`; owner-scoped variant for endpoint 14.
-- Escaping: `q` → escaped literal in the `CONTAINS` expression; no user-controlled operators.
+- Escaping: `*`, `~`, `"` are literals by construction (plain substring — there are no full-text operators to leak); q is trimmed and capped at 100 chars (Q_TOO_LONG).
 - Gate: `ResolveFlag("feature.search")` on both list endpoints (single call, 30 s cache).
 
 ## Test plan
 
 - Unit: `q` escaping (wildcards as literals), max length, trim; relevance ordering over a fixture set (file/recipient/sender matches, multi-match de-dup).
-- Integration: full-text index present in Testcontainers migration (SQL 2022 supports full-text on the Developer edition — note if the local image differs: fall back to a `LIKE`-based fake for the unit layer); `?q=` happy + no-match + too-long + operator-literal; owner scoping (user A's search never returns user B's transfer); admin search crosses owners; flag off → `q` ignored.
+- Integration: stock SQL 2022 Testcontainers image (no Full-Text component — D-21's reason for option B); `?q=` happy + no-match + too-long + literal-wildcard (`*`, `~`, `"`); owner scoping (user A's search never returns user B's transfer); admin search crosses owners; flag off → box hidden and `?q=` does not filter (degrades to the plain list per US-044-02).
 - E2E: Playwright — create transfer with a distinctive file name → search finds it → clear search restores the list.
 - Exit check (T-066): "Search finds a transfer by file name and by recipient in dev; flag off hides the box."
 
