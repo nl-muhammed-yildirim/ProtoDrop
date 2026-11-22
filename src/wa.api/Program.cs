@@ -84,6 +84,8 @@ builder.Services.AddSingleton<wa.application.UseCases.Transfers.ISenderBrandingS
 builder.Services.AddSingleton<wa.application.UseCases.Auth.IOrgLogoStore>(sp => new wa.infrastructure.Persistence.OrgLogoStore(sp.GetRequiredService<WaDbContext>()));
 // F-PRF-001: org name write port (PATCH /auth/me orgName).
 builder.Services.AddSingleton<wa.application.UseCases.Auth.IOrgNameStore>(sp => new wa.infrastructure.Persistence.OrgNameStore(sp.GetRequiredService<WaDbContext>()));
+// F-XCT-003: AppUser.EmailNotificationsEnabled port (PATCH /auth/me emailNotifications).
+builder.Services.AddSingleton<wa.application.UseCases.EmailSettings.IEmailNotificationsStore>(sp => new wa.infrastructure.Persistence.EmailNotificationsStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
 // T-002-02 (TA-4.1.5): generic HTTP idempotency store — used by IdempotencyMiddleware for finalize + send endpoints.
 builder.Services.AddSingleton<IIdempotencyStore>(sp => new wa.infrastructure.Persistence.IdempotencyStore(sp.GetRequiredService<WaDbContext>()));
 // T-011-02 (FR-011-5 / TA-3.2): audit write helper — one AuditLog row + one admin.action domain event per mutation.
@@ -1082,7 +1084,8 @@ app.MapGet("/api/v1/auth/me", async (HttpContext ctx, ISender sender, Cancellati
             ["displayName"] = result.DisplayName,
             ["theme"] = result.Theme,
             ["planCode"] = result.PlanCode,
-            ["orgName"] = result.OrgName! // F-PRF-001 (FR-021-1): null when unset; the profile page reads it
+            ["orgName"] = result.OrgName!, // F-PRF-001 (FR-021-1): null when unset; the profile page reads it
+            ["emailNotifications"] = result.EmailNotifications // F-XCT-003 (FR-046-2): effective value, null → true
         };
         if (roleField is not null)
             meBody["role"] = roleField;
@@ -1096,15 +1099,19 @@ app.MapGet("/api/v1/auth/me", async (HttpContext ctx, ISender sender, Cancellati
 });
 
 // T-008-06 (FR-008-4 / TA-4.2#13): PATCH /api/v1/auth/me — partial update (only provided fields change).
-app.MapPatch("/api/v1/auth/me", async (UpdateProfileRequest req, HttpContext ctx, ISender sender, CancellationToken ct) =>
+app.MapPatch("/api/v1/auth/me", async (UpdateProfileRequest req, HttpContext ctx, ISender sender, IFlagResolver flags, CancellationToken ct) =>
 {
     if (ctx.Items[SessionMiddleware.SessionUserIdKey] is not Guid userId)
         return Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401);
 
+    // F-XCT-003 (FR-046-6): the setting is editable only while feature.emailSettings is on — same 404 as .RequireFeature.
+    if (req.EmailNotifications is not null && !await flags.ResolveFlag(FeatureGates.EmailSettings, FeatureGates.DefaultWhenAbsent, ct))
+        throw new BusinessException(ProblemCodes.FeatureDisabled, ProblemCodes.TitleOf(ProblemCodes.FeatureDisabled));
+
     try
     {
         // Single construction site (TA-4.2a): UserId from the session cookie — NOT in the JSON body.
-        var result = await sender.Send(new UpdateProfileCommand(userId, req.DisplayName, req.Theme, req.OrgName), ct);
+        var result = await sender.Send(new UpdateProfileCommand(userId, req.DisplayName, req.Theme, req.OrgName, req.EmailNotifications), ct);
         return Results.Json(new
         {
             userId = result.UserId.ToString("n"),
@@ -1112,7 +1119,8 @@ app.MapPatch("/api/v1/auth/me", async (UpdateProfileRequest req, HttpContext ctx
             displayName = result.DisplayName,
             theme = result.Theme,
             planCode = result.PlanCode,
-            orgName = result.OrgName
+            orgName = result.OrgName,
+            emailNotifications = result.EmailNotifications
         }, statusCode: 200);
     }
     catch (OrgLogoRejectedException ex)

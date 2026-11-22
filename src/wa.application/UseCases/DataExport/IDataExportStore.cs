@@ -44,7 +44,7 @@ public interface IDataExportJobStore
 public sealed record PurgeableExport(Guid Id, string BlobPath);
 
 /// <summary>profile.json source (FR-047-1).</summary>
-public sealed record ExportProfile(string Email, string DisplayName, string Theme, string PlanCode, DateTime CreatedAtUtc, string? OrgName = null);
+public sealed record ExportProfile(string Email, string DisplayName, string Theme, string PlanCode, DateTime CreatedAtUtc, string? OrgName = null, bool EmailNotifications = true); // F-XCT-003 (FR-046-1): effective column value — NULL → true
 
 /// <summary>One file's name and size in transfers.json.</summary>
 public sealed record ExportFile(string Name, long SizeBytes);

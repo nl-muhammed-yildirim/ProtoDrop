@@ -11,6 +11,7 @@ import { PLAN_PATH } from '../billing/planRoute'
 import { FeatureGate } from '../../core/features/FeatureGate'
 import DangerZone from './DangerZone'
 import DataExportSection from './DataExportSection'
+import EmailNotificationsSection from './EmailNotificationsSection'
 import OrgLogoSection from './OrgLogoSection'
 import OrgNameSection from './OrgNameSection'
 
@@ -131,6 +132,10 @@ export function ProfilePage({ profile, onSignedIn, onThemeChange, onDeleteAccoun
       {/* US-047-01: My data — GDPR export; absent unless feature.dataExport is on (AC-044-2 contract). */}
       <FeatureGate gate="feature.dataExport">
         <DataExportSection />
+      </FeatureGate>
+      {/* US-046-01 (F-XCT-003): Notification preferences — absent unless feature.emailSettings is on (AC-044-2 contract). */}
+      <FeatureGate gate="feature.emailSettings">
+        <EmailNotificationsSection />
       </FeatureGate>
       {/* Danger zone divider + slot — US-008-06's Delete account button + GDPR confirm modal (T-008-09 D-1/D-4). */}
       <hr className="pf-divider" />

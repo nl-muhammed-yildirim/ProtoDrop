@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using wa.application.Limits;
 using wa.application.Ports;
 using wa.application.Telemetry;
+using wa.application.UseCases.EmailSettings;
 using wa.domain;
 using wa.domain.Correlation;
 using wa.domain.Errors;
@@ -16,7 +17,7 @@ namespace wa.application.UseCases.Auth;
 public sealed record GetProfileCommand(Guid UserId) : IRequest<GetProfileResult>;
 
 /// <summary>T-008-06 (FR-008-4 / TA-4.2#13): PATCH /api/v1/auth/me — partial update (null = leave the field alone).</summary>
-public sealed record UpdateProfileCommand(Guid UserId, string? DisplayName, string? Theme, OrgNamePatch OrgName = default) : IRequest<GetProfileResult>;
+public sealed record UpdateProfileCommand(Guid UserId, string? DisplayName, string? Theme, OrgNamePatch OrgName = default, bool? EmailNotifications = null) : IRequest<GetProfileResult>;
 
 /// <summary>
 /// F-PRF-001 (FR-021-1 / TA-4.2#13): tri-state PATCH field. Absent from the body = <c>default</c> (<see cref="IsSet"/> false, unchanged);
@@ -54,8 +55,8 @@ public sealed class OrgNamePatchJsonConverter : JsonConverter<OrgNamePatch>
 public sealed record DeleteAccountCommand(Guid UserId) : IRequest<DeleteAccountResult>;
 
 /// <summary>T-008-06: wire record bound from the PATCH JSON body by Minimal API (TA-4.2a). The session supplies UserId — NOT in the body;
-/// constructed at Program.cs's single construction site as new UpdateProfileCommand(userId.Value, req.DisplayName, req.Theme, req.OrgName).</summary>
-public sealed record UpdateProfileRequest(string? DisplayName, string? Theme, OrgNamePatch OrgName = default);
+/// constructed at Program.cs's single construction site as new UpdateProfileCommand(userId.Value, req.DisplayName, req.Theme, req.OrgName, req.EmailNotifications).</summary>
+public sealed record UpdateProfileRequest(string? DisplayName, string? Theme, OrgNamePatch OrgName = default, bool? EmailNotifications = null);
 
 // Wire shape pinned at the endpoint's single construction site (TA-4.2a): identical to LoginResult minus SessionToken —
 // the cookie already carries the session, /auth/me does not re-mint one.
@@ -65,7 +66,8 @@ public sealed record GetProfileResult(
     string DisplayName,
     string Theme,
     string PlanCode,
-    string? OrgName = null);
+    string? OrgName = null,
+    bool EmailNotifications = true); // F-XCT-003 (FR-046-2): effective value — the column's NULL→true rule at both construction sites
 
 public sealed record DeleteAccountResult();
 
@@ -95,7 +97,7 @@ public sealed class MeProfileException : Exception
 
     /// <summary>PATCH with an all-null body → 400 VALIDATION (an empty PATCH is a silent no-op; reject it).</summary>
     public static MeProfileException ForEmptyPatch() =>
-        new("Provide at least one of displayName, theme or orgName.");
+        new("Provide at least one of displayName, theme, orgName or emailNotifications.");
 
     /// <summary>PATCH orgName longer than ORG_NAME_MAX_LENGTH (after trimming) or containing a line break → 400 VALIDATION (field orgName).</summary>
     public static MeProfileException ForInvalidOrgName() =>
@@ -126,7 +128,7 @@ public sealed class GetProfileHandler : IRequestHandler<GetProfileCommand, GetPr
         if (plan is null)
             throw MeProfileException.ForNotFound();
 
-        return new GetProfileResult(user.Id, user.Email, user.DisplayName, user.Theme, plan.Code, user.OrgName);
+        return new GetProfileResult(user.Id, user.Email, user.DisplayName, user.Theme, plan.Code, user.OrgName, AppUser.EmailNotificationsOn(user.EmailNotificationsEnabled));
     }
 }
 
@@ -140,6 +142,7 @@ public sealed class UpdateProfileHandler : IRequestHandler<UpdateProfileCommand,
     private readonly IPlansStore _plans;
     private readonly IOrgNameStore _orgNames;
     private readonly IPlanContextAccessor _plan;
+    private readonly IEmailNotificationsStore _emailNotifications;
 
     /// <summary>NVARCHAR(100) column width — TA-3.2 (verified in WaDbContextModelSnapshot). Single re-check site.</summary>
     public const int DisplayNameMaxLength = 100;
@@ -147,12 +150,13 @@ public sealed class UpdateProfileHandler : IRequestHandler<UpdateProfileCommand,
     /// <summary>The three closed theme values (spec + entity only — NOT in the frozen Open-Decisions-and-Constants registry).</summary>
     private static readonly string[] AllowedThemes = ["system", "light", "dark"];
 
-    public UpdateProfileHandler(IAppUserStore users, IPlansStore plans, IOrgNameStore orgNames, IPlanContextAccessor plan)
+    public UpdateProfileHandler(IAppUserStore users, IPlansStore plans, IOrgNameStore orgNames, IPlanContextAccessor plan, IEmailNotificationsStore emailNotifications)
     {
         _users = users;
         _plans = plans;
         _orgNames = orgNames;
         _plan = plan;
+        _emailNotifications = emailNotifications;
     }
 
     public async Task<GetProfileResult> Handle(UpdateProfileCommand request, CancellationToken cancellationToken)
@@ -163,7 +167,7 @@ public sealed class UpdateProfileHandler : IRequestHandler<UpdateProfileCommand,
             throw MeProfileException.ForNotFound();
 
         // 2. Empty PATCH → VALIDATION (an all-null body changes nothing; reject it rather than waste a round-trip).
-        if (request.DisplayName is null && request.Theme is null && !request.OrgName.IsSet)
+        if (request.DisplayName is null && request.Theme is null && !request.OrgName.IsSet && request.EmailNotifications is null)
             throw MeProfileException.ForEmptyPatch();
 
         // 3. theme validation (only when non-null): exactly system / light / dark → else VALIDATION.
@@ -200,6 +204,10 @@ public sealed class UpdateProfileHandler : IRequestHandler<UpdateProfileCommand,
         if (request.OrgName.IsSet)
             await _orgNames.SetOrgNameAsync(request.UserId, orgName, cancellationToken);
 
+        // F-XCT-003 (FR-046-2): additive — absent leaves the column alone; the flag gate lives at the endpoint (FR-046-6).
+        if (request.EmailNotifications is { } emailNotifications)
+            await _emailNotifications.SetAsync(request.UserId, emailNotifications, cancellationToken);
+
         // PATCH response is byte-shaped like GET's — client can re-render without a follow-up request.
         return await ResolveResult(request.UserId, cancellationToken);
     }
@@ -214,7 +222,7 @@ public sealed class UpdateProfileHandler : IRequestHandler<UpdateProfileCommand,
         if (plan is null)
             throw MeProfileException.ForNotFound();
 
-        return new GetProfileResult(user.Id, user.Email, user.DisplayName, user.Theme, plan.Code, user.OrgName);
+        return new GetProfileResult(user.Id, user.Email, user.DisplayName, user.Theme, plan.Code, user.OrgName, AppUser.EmailNotificationsOn(user.EmailNotificationsEnabled));
     }
 }
 

@@ -53,6 +53,14 @@ public class DataExportArchiveTests
     }
 
     [Fact]
+    public void Profile_EmailNotificationsFollowsSnapshot() // F-XCT-003 (FR-046-1): the effective column value — not a constant
+    {
+        var off = Profile() with { EmailNotifications = false };
+        var p = Read(DataExportArchive.Build(new ExportSnapshot(off, [])))["profile.json"];
+        Assert.False(p.GetProperty("emailNotifications").GetBoolean());
+    }
+
+    [Fact]
     public void FiveTransfers_AreAllListedWithFilesRecipientsAndNullSha()
     {
         var transfers = Enumerable.Range(0, 5).Select(i => new ExportTransfer(
