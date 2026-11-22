@@ -69,6 +69,8 @@ builder.Services.AddSingleton<IPlansStore>(sp => new PlansStore(sp.GetRequiredSe
 builder.Services.AddSingleton<IFlagsStore>(sp => new FlagsStore(sp.GetRequiredService<WaDbContext>()));
 // T-001-10 (TA-4.2#2): finalize handler's DB surface — thin adapter over the adapter-owned WaDbContext.
 builder.Services.AddSingleton<wa.application.UseCases.Transfers.ITransferStore>(sp => new wa.infrastructure.Persistence.TransferStore(sp.GetRequiredService<WaDbContext>()));
+// US-045-01 (FR-045-1/3/7): owner-scoped transfer search port — D-21 option B, literal substring match over FileItem.OriginalName / EmailRecipient.Address / Transfer.SenderName.
+builder.Services.AddSingleton<wa.application.UseCases.Transfers.ITransferSearchStore>(sp => new wa.infrastructure.Persistence.TransferSearchStore(sp.GetRequiredService<WaDbContext>())); // US-045-01
 // T-002-04 (TA-4.2#3): send handler's DB surface — thin adapter over the adapter-owned WaDbContext.
 // T-010-02: IBlobStore (the gate primitive, registered as a singleton at L53) — SendStore's FILES_GONE gate checks physical presence via ExistsAsync.
 builder.Services.AddSingleton<wa.application.UseCases.Transfers.ISendStore>(sp => new wa.infrastructure.Persistence.SendStore(sp.GetRequiredService<WaDbContext>(), sp.GetRequiredService<wa.application.Ports.IBlobStore>()));
@@ -693,6 +695,11 @@ app.MapGet("/api/v1/admin/transfers", async (HttpContext ctx, HttpRequest reques
         // T-011-04: handler validation (status vocabulary / range pairing) → 400 VALIDATION (existing closed-list member).
         throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
     }
+    catch (wa.domain.Transfers.SearchTermTooLongException ex)
+    {
+        // US-045-01 (EC-045-3): flag-on admin q over 100 chars → 400 Q_TOO_LONG.
+        throw new BusinessException(ProblemCodes.QTooLong, ex.Message, ex);
+    }
 });
 
 // T-011-06 (TA-4.2#22 / FR-011-2): admin users list — GET /api/v1/admin/users?q=&cursor=&limit=.
@@ -1152,8 +1159,10 @@ app.MapGet("/api/v1/transfers", async (HttpContext ctx, HttpRequest request, ISe
         throw new BusinessException(ProblemCodes.Validation, "limit must be a positive integer at most 25.");
 
     string? cursor = request.Query["cursor"].FirstOrDefault();
+    // US-045-01 (FR-045-1/5): a present q goes to SearchMyTransfersQuery, which owns the feature.search gate and the search cursor.
+    var rawQ = request.Query["q"].FirstOrDefault();
     // TA-4.1.4: decode base64("{createdAtUtc:O}:{id:N}") early so a malformed cursor → 400 VALIDATION (existing closed-list member).
-    if (!string.IsNullOrEmpty(cursor))
+    if (rawQ is null && !string.IsNullOrEmpty(cursor))
         try
         {
             _ = wa.domain.Transfers.CursorCodec.Decode(cursor);
@@ -1178,7 +1187,22 @@ app.MapGet("/api/v1/transfers", async (HttpContext ctx, HttpRequest request, ISe
         };
     }
 
-    var result = await sender.Send(new ListMyTransfersQuery(userId, cursor, parsedLimit, ResolveStatusFilter(request)), ct);
+    ListMyTransfersResult result;
+    try
+    {
+        // US-045-01: q present → SearchMyTransfersQuery (gate + search cursor inside); absent → the untouched plain list path.
+        result = rawQ is null
+            ? await sender.Send(new ListMyTransfersQuery(userId, cursor, parsedLimit, ResolveStatusFilter(request)), ct)
+            : await sender.Send(new SearchMyTransfersQuery(userId, rawQ, cursor, parsedLimit, ResolveStatusFilter(request)), ct);
+    }
+    catch (wa.domain.Transfers.CursorFormatException ex)
+    {
+        throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);    // TA-4.1.4: malformed / foreign search cursor
+    }
+    catch (wa.domain.Transfers.SearchTermTooLongException ex)
+    {
+        throw new BusinessException(ProblemCodes.QTooLong, ex.Message, ex);      // US-045-01 (EC-045-3)
+    }
     // TA-4.2a single-construction-site rule: 'n'-form id (signup/login style); opaque nextCursor as returned (null = last page).
     return Results.Json(new
     {

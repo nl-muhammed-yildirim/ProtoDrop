@@ -1,4 +1,5 @@
 using MediatR;
+using wa.application.Limits;
 using wa.domain.Transfers;
 
 namespace wa.application.UseCases.Admin;
@@ -33,19 +34,26 @@ public sealed class SearchTransfersValidationException : Exception
 
 /// <summary>
 /// T-011-04: handler — pure composition over ISearchTransfersStore.
-/// (1) q = Q?.Trim(); null/empty → null;
+/// (1) q: US-045-01 (FR-045-4) — with feature.search on, SearchTerm.Normalize (Q_TOO_LONG rule + widened file/sender match); off → legacy trim/null;
 /// (2) status vocabulary resolved here: all→null, draft→{0}, active→{1}, expired→{2}, download_limit→{3}, deleted→{4}; absent→null (all); unknown→BusinessException;
 /// (3) from/to and minBytes/maxBytes each require BOTH or NEITHER — exactly one present → BusinessException;
 /// (4) cursor decoded via CursorCodec.Decode (malformed → rethrow CursorFormatException; endpoint maps to 400 VALIDATION);
 /// (5) call store once with the resolved args + limit.
 /// </summary>
-public sealed class SearchTransfersQueryHandler(ISearchTransfersStore store) : IRequestHandler<SearchTransfersQuery, SearchTransfersResult>
+public sealed class SearchTransfersQueryHandler(ISearchTransfersStore store, IFlagResolver flags) : IRequestHandler<SearchTransfersQuery, SearchTransfersResult>
 {
     public async Task<SearchTransfersResult> Handle(SearchTransfersQuery request, CancellationToken cancellationToken)
     {
-        // (1) q: trim and null out empty/whitespace-only.
-        var q = request.Q?.Trim();
-        if (string.IsNullOrEmpty(q)) q = null;
+        // (1) q. US-045-01 (FR-045-4): with feature.search on, q follows the FR-045-1 term rules and also matches file + sender names.
+        var searchOn = await flags.ResolveFlag(FeatureGates.Search, FeatureGates.DefaultWhenAbsent, cancellationToken);
+        string? q;
+        if (searchOn)
+            q = SearchTerm.Normalize(request.Q);
+        else
+        {
+            q = request.Q?.Trim();                     // FR-011-3 legacy behaviour, unchanged when the gate is off
+            if (string.IsNullOrEmpty(q)) q = null;
+        }
 
         // (2) status vocabulary resolution.
         IReadOnlyCollection<byte>? statuses = ResolveStatus(request.Status);
@@ -66,9 +74,10 @@ public sealed class SearchTransfersQueryHandler(ISearchTransfersStore store) : I
             afterIdExcluded = id;
         }
 
-        // (5) call store once with resolved args + limit.
+        // (5) call store once with resolved args + limit. matchFilesAndSender = gate on → widened file/sender match (FR-045-4).
         var (items, nextCursor) = await store.SearchAsync(
             q,
+            searchOn,
             statuses,
             request.MinBytes,
             request.MaxBytes,

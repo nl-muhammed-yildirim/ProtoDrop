@@ -1,6 +1,6 @@
 # US-045-01 — Find a transfer by file name or recipient
 
-**Feature:** F-XCT-002 — Search (Transfers) | **Status:** pending
+**Feature:** F-XCT-002 — Search (Transfers) | **Status:** done (T-066, 2026-11-21)
 
 ---
 
@@ -57,8 +57,8 @@ And a q parameter in the URL does not filter the list
 
 ## Technical notes
 
-- Endpoint 14 (`GET /api/v1/transfers`) with `q`; full-text predicate on the `SearchText` column (FR-045-2), `CONTAINSTABLE` rank ordering, opaque search cursor.
-- De-dup by transfer id; owner scoping in the predicate (`OwnerAppUserId = @me`) so the index does the work and SQL does the ownership check.
+- Endpoint 14 (`GET /api/v1/transfers`) with `q`; matching is a literal case-insensitive substring (D-21, decided 2026-11-21) via EF `string.Contains` over `FileItem.OriginalName`, `EmailRecipient.Address` and `Transfer.SenderName`, owner-scoped — no full-text index, no `SearchText` column, no schema change.
+- Rank file > recipient > sender (CASE-over-EXISTS predicate), de-dup by transfer id; owner scoping in the predicate (`OwnerAppUserId = @me`). Opaque search cursor (base64 of `rank|createdAtUtc:O|id:N|term`, term last).
 
 ## Links
 

@@ -90,6 +90,13 @@ async function flush(): Promise<void> {
   await act(async () => { await Promise.resolve() })
 }
 
+// US-045-01: set the input's value through React's native setter so onChange fires (controlled-input idiom).
+function typeInto(input: HTMLInputElement, value: string): void {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+  setter.call(input, value)
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+}
+
 beforeEach(() => {
   installLocalStorageShim()
   clearSession()
@@ -729,6 +736,167 @@ describe('FilesPage Downloads action (US-023-01)', () => {
       await act(async () => { buttons[1].click() })
       expect(host.querySelector('.mf-dl-row')).toBeNull()
       expect(captured.calls.some((c) => c.includes('/analytics'))).toBe(false)
+    } finally {
+      cleanup()
+    }
+  })
+})
+
+// US-045-01 (FR-045-5, EC-045-1): the My Files search box — gated by feature.search, debounced at 300 ms.
+describe('FilesPage search (US-045-01)', () => {
+  const listResponder = (): Response => new Response(JSON.stringify({ items: makeRows(3, 1, 3600_000), nextCursor: null }), { status: 200 })
+
+  it('GateOff_NoSearchBox_NoQSent', async () => {
+    // Story AC-3 UI half: the gate is off (the /features read fails closed) — no box, and q= never appears on any URL.
+    const captured: { calls: string[] } = { calls: [] }
+    stubFetch(captured, listResponder)
+
+    const { host, cleanup } = renderAppAtFiles()
+    try {
+      await flush()
+      expect(host.querySelector('.mf-search-input')).toBeNull()   // the box is absent (never disabled).
+      expect(captured.calls.every((c) => !c.includes('q='))).toBe(true)
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('GateOn_Debounce300_SendsQ_ReplacesList', async () => {
+    const searchRows = [{ ...makeRows(1, 1, 3600_000)[0] as object, name: 'financial-report.pdf' }]
+    const captured: { calls: string[] } = { calls: [] }
+
+    vi.useFakeTimers()   // before rendering — the debounce timer must be fake from the first keystroke.
+    stubFetch(captured, (req) => {
+      if (req.url.endsWith('/features')) return new Response(JSON.stringify({ 'feature.search': true }), { status: 200 })
+      const url = new URL(req.url, 'http://localhost:8080')
+      if (url.searchParams.get('q') === 'financial') {
+        return new Response(JSON.stringify({ items: searchRows, nextCursor: null }), { status: 200 })   // the search result.
+      }
+      return listResponder()
+    })
+
+    const { host, cleanup } = renderAppAtFiles()
+    try {
+      await flush()
+      expect(host.querySelectorAll('.mf-row').length).toBe(3)   // the plain list before any typing — no q sent yet.
+
+      act(() => { typeInto(host.querySelector('.mf-search-input') as HTMLInputElement, 'financial') })
+
+      await act(async () => { vi.advanceTimersByTime(299) })
+      expect(captured.calls.filter((c) => c.includes('q=')).length).toBe(0)   // 300 ms debounce — nothing at t+299.
+
+      await act(async () => { vi.advanceTimersByTime(1) })   // the timer fires exactly at t+300.
+      await flush()
+
+      const qCalls = captured.calls.filter((c) => c.endsWith('/transfers?status=all&q=financial'))
+      expect(qCalls.length).toBe(1)   // EXACTLY ONE search fetch — typing alone never hit the server (UI notes).
+      expect(host.querySelectorAll('.mf-row').length).toBe(1)   // the list was REPLACED by the search rows.
+      expect((host.querySelector('.mf-name') as HTMLElement).getAttribute('title')).toBe('financial-report.pdf')
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('NoMatch_ShowsMessage_ClearSearchRestores', async () => {
+    // EC-045-1: a term with no match shows the interpolated copy; Clear resets to the full list.
+    const captured: { calls: string[] } = { calls: [] }
+
+    vi.useFakeTimers()
+    stubFetch(captured, (req) => {
+      if (req.url.endsWith('/features')) return new Response(JSON.stringify({ 'feature.search': true }), { status: 200 })
+      const url = new URL(req.url, 'http://localhost:8080')
+      if (url.searchParams.get('q') === 'logo') {
+        return new Response(JSON.stringify({ items: [], nextCursor: null }), { status: 200 })   // the no-match shape.
+      }
+      return listResponder()
+    })
+
+    const { host, cleanup } = renderAppAtFiles()
+    try {
+      await flush()
+      expect(host.querySelectorAll('.mf-row').length).toBe(3)   // full list before the search.
+
+      act(() => { typeInto(host.querySelector('.mf-search-input') as HTMLInputElement, 'logo') })
+      await act(async () => { vi.advanceTimersByTime(300) })    // the debounce window.
+      await flush()
+
+      expect(host.querySelectorAll('.mf-row').length).toBe(0)   // no rows for this term.
+      expect(host.textContent).toContain("No transfers match 'logo'.")   // EC-045-1 copy with the term interpolated (en bundle).
+
+      const clearBtn = host.querySelector('.mf-empty .mf-pill') as HTMLButtonElement
+      await act(async () => { clearBtn.click() })
+      await flush()
+
+      expect((host.querySelector('.mf-search-input') as HTMLInputElement).value).toBe('')   // the input is emptied.
+      expect(captured.calls.at(-1)!.includes('q=')).toBe(false)   // the next URL has no q=.
+      expect(host.querySelectorAll('.mf-row').length).toBe(3)     // and the rows come back (full list re-fetched without q).
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('ClearX_ResetsCursor', async () => {
+    const captured: { calls: string[] } = { calls: [] }
+
+    vi.useFakeTimers()
+    stubFetch(captured, (req) => {
+      if (req.url.endsWith('/features')) return new Response(JSON.stringify({ 'feature.search': true }), { status: 200 })
+      const url = new URL(req.url, 'http://localhost:8080')
+      if (url.searchParams.get('q') === 'logo' && url.searchParams.has('cursor')) {
+        return new Response(JSON.stringify({ items: makeRows(3, 1, 3600_000), nextCursor: null }), { status: 200 })   // page 2 of the search.
+      }
+      if (url.searchParams.get('q') === 'logo') {
+        return new Response(JSON.stringify({ items: makeRows(3, 1, 3600_000), nextCursor: 'CURSOR_PAGE2' }), { status: 200 })   // q=logo page 0 — carries a next cursor.
+      }
+      return listResponder()   // the plain list (no q).
+    })
+
+    const { host, cleanup } = renderAppAtFiles()
+    try {
+      await flush()
+
+      act(() => { typeInto(host.querySelector('.mf-search-input') as HTMLInputElement, 'logo') })
+      await act(async () => { vi.advanceTimersByTime(300) })   // the debounce window.
+      await flush()
+      expect(captured.calls.at(-1)).toContain('q=logo')        // the search fetch (page 0 of it).
+
+      const nextBtn = host.querySelectorAll('.mf-next')[0] as HTMLButtonElement
+      expect(nextBtn.disabled).toBe(false)   // a second page exists for this term.
+      await act(async () => { nextBtn.click() })
+      await flush()
+      const pagedUrl = captured.calls.at(-1)!
+      expect(pagedUrl).toContain('q=logo')            // paging carries the committed term...
+      expect(pagedUrl).toContain('cursor=CURSOR_PAGE2')   // ...and its cursor.
+
+      const clearBtn = host.querySelector('.mf-search-clear') as HTMLButtonElement
+      await act(async () => { clearBtn.click() })
+      await flush()
+      // The × resets query AND committedQ — the fetch effect re-runs with a fresh page-0 URL: exactly the plain list.
+      expect(captured.calls.at(-1)).toBe('http://localhost:8080/api/v1/transfers?status=all')
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('LongInput_TrimmedTo100BeforeSubmit', async () => {
+    const captured: { calls: string[] } = { calls: [] }
+
+    vi.useFakeTimers()
+    stubFetch(captured, (req) => {
+      if (req.url.endsWith('/features')) return new Response(JSON.stringify({ 'feature.search': true }), { status: 200 })
+      return listResponder()   // the rows don't matter — only the submitted q is asserted.
+    })
+
+    const { host, cleanup } = renderAppAtFiles()
+    try {
+      await flush()
+
+      act(() => { typeInto(host.querySelector('.mf-search-input') as HTMLInputElement, 'a'.repeat(150)) })   // over SearchTerm.MaxLength (100).
+      await act(async () => { vi.advanceTimersByTime(300) })   // the debounce window.
+      await flush()
+
+      const qCall = captured.calls.find((c) => c.includes('q='))!
+      expect(new URL(qCall, 'http://localhost:8080').searchParams.get('q')).toHaveLength(100)   // trimmed to 100 before submit — Q_TOO_LONG is a server-side backstop only.
     } finally {
       cleanup()
     }

@@ -8,6 +8,7 @@ namespace wa.application.UseCases.Admin;
 public interface ISearchTransfersStore
 {
     /// <param name="q">Trimmed search term (null = no q predicate). Matches LinkId exactly OR any EmailRecipient.Address substring.</param>
+    /// <param name="matchFilesAndSender">US-045-01 (FR-045-4): with feature.search on, also match FileItem.OriginalName / Transfer.SenderName substrings (literal, CI collation).</param>
     /// <param name="statuses">Status byte set (null = all statuses including deleted).</param>
     /// <param name="minBytes">Inclusive lower bound on TotalBytes (null = no bound).</param>
     /// <param name="maxBytes">Inclusive upper bound on TotalBytes (null = no bound).</param>
@@ -18,6 +19,7 @@ public interface ISearchTransfersStore
     /// <param name="limit">Page size (TA-4.1.4: 25 max).</param>
     Task<(List<AdminTransferRow> Items, string? NextCursor)> SearchAsync(
         string? q,
+        bool matchFilesAndSender,
         IReadOnlyCollection<byte>? statuses,
         long? minBytes,
         long? maxBytes,

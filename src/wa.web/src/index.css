@@ -1186,6 +1186,36 @@ main:has(.sl) .dz {
   border-color: transparent;
 }
 
+/* US-045-01 (FR-045-5): My Files search toolbar — rendered only when feature.search is on. */
+.mf-search {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  max-width: 480px;
+}
+
+.mf-search-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 12px;
+  font-size: var(--fs-body);
+  border: 1px solid var(--border);   /* copied from .mf-pill — identical declaration. */
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+}
+
+.mf-search-clear {
+  min-height: 44px;
+  min-width: 44px;
+  background: transparent;
+  color: inherit;
+  border: 1px solid var(--border);   /* copied from .mf-pill — identical declaration. */
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
 .mf-loading,
 .mf-error {
   color: var(--fg-muted);

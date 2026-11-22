@@ -24,6 +24,7 @@ public sealed class SearchTransfersStore : ISearchTransfersStore
     /// </summary>
     public async Task<(List<AdminTransferRow> Items, string? NextCursor)> SearchAsync(
         string? q,
+        bool matchFilesAndSender,
         IReadOnlyCollection<byte>? statuses,
         long? minBytes,
         long? maxBytes,
@@ -36,8 +37,11 @@ public sealed class SearchTransfersStore : ISearchTransfersStore
     {
         var rows = await _db.Set<Transfer>()
             .AsNoTracking()
-            // T-011-04 (DECISION): q predicate — LinkId exact OR any EmailRecipient.Address substring (EXISTS subquery).
-            .Where(t => q == null || t.LinkId == q || _db.Set<EmailRecipient>().Any(r => r.TransferId == t.Id && r.Address.Contains(q)))
+            // T-011-04 + US-045-01 (FR-045-4): LinkId exact OR recipient substring; with feature.search on also file name / sender substring (literal, CI collation).
+            .Where(t => q == null || t.LinkId == q
+                || _db.Set<EmailRecipient>().Any(r => r.TransferId == t.Id && r.Address.Contains(q))
+                || (matchFilesAndSender && (t.SenderName.Contains(q)
+                    || _db.Set<FileItem>().Any(f => f.TransferId == t.Id && f.OriginalName.Contains(q)))))
             // T-011-04: status predicate only when a byte set is given — null = all statuses including deleted (DECISION).
             .Where(t => statuses == null || statuses.Contains(t.Status))
             // T-011-04: size range — inclusive bounds, null = no bound.
