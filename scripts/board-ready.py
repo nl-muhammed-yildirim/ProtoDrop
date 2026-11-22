@@ -93,6 +93,8 @@ def main() -> None:
         issue = rest(tok, f"/repos/{REPO}/issues/{c['number']}")
         body = issue.get("body") or ""
         plan = find_plan_path(body)
+        review = next((l.strip()[len("**Review:**"):].strip().replace("`", "")
+                       for l in body.splitlines() if l.strip().startswith("**Review:**")), None)
         items.append({
             "issue": c["number"],
             "title": c["title"],
@@ -100,6 +102,7 @@ def main() -> None:
             "milestone": (issue.get("milestone") or {}).get("title"),
             "labels": [l["name"] for l in issue.get("labels", [])],
             "plan_file": plan,
+            "review": review,  # set on a fix round (Claude review found issues)
             "body_preview": body[:600],
         })
 
@@ -114,6 +117,8 @@ def main() -> None:
         print(f"READY #{it['issue']}: {it['title']}")
         print(f"  milestone : {it['milestone']}")
         print(f"  plan file : {it['plan_file'] or 'NOT FOUND — check issue body'}")
+        if it["review"]:
+            print(f"  review    : {it['review']}  [FIX ROUND]")
         print(f"  url       : {it['url']}")
         print(f"  spec      : {it['body_preview'].strip().splitlines()[0] if it['body_preview'] else ''}")
         print()

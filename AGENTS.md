@@ -34,11 +34,17 @@ The task queue is the **@ProtoDrop Projects v2 board's `Ready` column**, not jus
 
 **How items reach `Ready` (user rule 2026-11-21):** Claude Code plans them — "start task <n>" runs the `protodrop-start` skill (Haiku reads the board issue and creates the task branch `feature/<ID>` from `origin/develop` → Opus Architect writes + commits `docs/plans/<ID>-plan.md` on that branch → Haiku appends ``**Plan:** `docs/plans/<ID>-plan.md` `` and ``**Branch:** `feature/<ID>` `` to the issue body and sets `Ready`). Hermes does not plan; it codes from that plan **on the issue's `**Branch:**`** (check it out first; never branch again), opens the PR from that branch into `develop`, and Claude reviews.
 
+**After review (user rule 2026-11-22):** Claude reviews the PR (`protodrop-review` skill). Clean PASS → Claude merges the PR into `develop`, sets `Done` and closes the issue (Hermes gets one final wake when the block disappears — nothing to do but confirm). **Anything found** → Claude commits `docs/reviews/<ID>-review-r<N>.md` to the branch, comments on the PR, adds ``**Review:** `docs/reviews/<ID>-review-r<N>.md` (round <N>)`` to the issue body and sends the item back to `Ready`. The READY block then carries a `review :` line = **fix round**:
+1. Check out the issue's `**Branch:**` and pull it (`git merge --ff-only origin/feature/<ID>` — Claude's review commit is on it).
+2. Set `In progress`, then fix **every** finding in the review file (it is the contract for this round; the plan still applies). No scope beyond the findings.
+3. Per-task gate, commit `fix: <ID> review round <N> — <one line>`, push to the **same branch** — the existing PR updates; do NOT open a new PR.
+4. Set `In review`. Claude re-reviews and merges or sends back again.
+
 Per task found in `Ready`:
 1. Read its plan from `docs/plans/` (the path is derived from the issue body by `board-ready.py`; verify it exists before starting).
 2. **Before** dispatching Coder: `python scripts/board-status.py set <n> "In progress"` — verify the printed status matches.
 3. Run the Coder cycle for that task only (one at a time; full context in its spawn).
-4. **Just before** setting the item to `In review`, the orchestrator (as director) commits the code (`feat: T-xxx {one line}`), pushes it, and creates a pull request from that commit — push via the headless recipe (user:token URL, helper disabled; no `gh` CLI PR creation needed) and open the PR with REST POST `/repos/<owner>/<repo>/pulls` using the gh token.
+4. **Just before** setting the item to `In review` (first round only — a fix round pushes to the existing PR), the orchestrator (as director) commits the code (`feat: T-xxx {one line}`), pushes it, and creates a pull request from that commit — push via the headless recipe (user:token URL, helper disabled; no `gh` CLI PR creation needed) and open the PR with REST POST `/repos/<owner>/<repo>/pulls` using the gh token.
 5. Then `python scripts/board-status.py set <n> "In review"`.
 
 Do not start coding while the item is still `Ready`, do not leave it `In progress` once coding is done, and do not move it to `In review` before its commit + PR exist — the column IS the workflow state. If a run dies mid-task, re-set `In progress` before re-dispatching (it already was) or set back to `Backlog` only when escalating.

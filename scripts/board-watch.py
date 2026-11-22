@@ -22,6 +22,11 @@ wakes the agent when it changes, so stability is the contract:
   (completion signal: verify the PR + mark task done). 'In review' is NOT
   terminal — the block keeps re-emitting so setting In review causes no extra
   fire.
+- Review send-back (Claude found issues): Claude appends `**Review:** <file>
+  (round N)` to the issue body, sets Ready, THEN runs `release <n>`. The next
+  tick re-renders the block with a `review :` line -> output changes -> one
+  fix-round wake. (Release before Ready would drop the block while In review
+  and fire a false completion wake.)
 
 Wake lines carry no wall-clock or per-minute counters (only fixed thresholds),
 so output is deterministic between ticks. State lives in .hermes/board-watch-
@@ -92,6 +97,17 @@ def find_plan_path(body: str):
     return None
 
 
+def find_review_line(body: str):
+    """The issue body's `**Review:** docs/plans/<ID>-review.md (round N)` line (Claude's
+    send-back after a review with findings), as '<path> (round N)', or None.
+    It is part of the READY block, so a send-back to Ready re-renders a block that
+    differs byte-wise from the first-run block -> the monitor wakes Hermes for the fix round."""
+    for line in (body or "").splitlines():
+        if line.strip().startswith("**Review:**"):
+            return line.strip()[len("**Review:**"):].strip().replace("`", "")
+    return None
+
+
 def scan_board(tok: str):
     """Full paginated scan; returns {issue_number: (title, url, status_name)}."""
     by_num = {}
@@ -130,13 +146,17 @@ def save_state(state: dict) -> None:
         json.dump(state, f, indent=2)
 
 
-def render_block(num, title, url, milestone, plan):
-    return [
+def render_block(num, title, url, milestone, plan, review=None):
+    block = [
         f"READY #{num}: {title}",
         f"  milestone : {milestone}",
         f"  plan file : {plan or 'NOT FOUND — check issue body'}",
         f"  url       : {url}",
     ]
+    if review:
+        # Fix round: Claude's review found issues — fix them on the existing branch/PR.
+        block.append(f"  review    : {review}  [FIX ROUND — fix every finding, push to the same PR]")
+    return block
 
 
 def main() -> None:
@@ -175,7 +195,8 @@ def main() -> None:
                 block = render_block(
                     num, title, url,
                     (issue.get("milestone") or {}).get("title"),
-                    find_plan_path(issue.get("body") or ""))
+                    find_plan_path(issue.get("body") or ""),
+                    find_review_line(issue.get("body") or ""))
                 state[key] = {"claimed_at": now.isoformat(), "block": block}
             else:
                 block = entry["block"]  # saved lines -> byte-stable across ticks

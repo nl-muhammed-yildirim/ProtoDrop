@@ -19,7 +19,11 @@
 2. **Architect (Opus 5.5)** — plan it for the Coder, save `docs/plans/<ID>-plan.md` as usual (FILES FOR CODER, verify_plan.py, `docs:` plan commit on the task branch).
 3. **Haiku 5.5** — verify the plan, add the plan path + branch to the issue body, set the board status to **Ready** (Hermes picks it up from there — AGENTS.md "Ready-column workflow").
 
-Review of Hermes' work stays with Claude (`reviewer`, Opus 5.5). The full Claude-only cycle below (`/protodrop-cycle`) is used only when the user asks for it.
+"**Review task <n>**" (item in `In review`) → run the `/protodrop-review <n>` skill (user rule 2026-11-22): the `reviewer` (Opus 5.5) grades Hermes' PR `feature/<ID>` → `develop`.
+- **Clean PASS, zero findings, CI green** → merge the PR into `develop`, board `Done`, close the issue.
+- **Anything found (any severity)** → Hermes fixes it: commit `docs/reviews/<ID>-review-r<N>.md` on the branch, comment on the PR, add a `**Review:**` line to the issue body, set the item to `Ready` and then `python scripts/board-watch.py release <n>` (in that order) so Hermes wakes for a fix round. Re-review when it is back in `In review`. Claude never fixes the code itself.
+
+The full Claude-only cycle below (`/protodrop-cycle`) is used only when the user asks for it.
 
 Run a full Claude cycle: `/protodrop-cycle next` (or a task id, or `feature-end`).
 
