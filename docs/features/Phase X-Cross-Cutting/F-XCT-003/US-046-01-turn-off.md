@@ -1,6 +1,6 @@
 # US-046-01 — Turn off my notification emails
 
-**Feature:** F-XCT-003 — Email Settings (Notification Preferences) | **Status:** pending
+**Feature:** F-XCT-003 — Email Settings (Notification Preferences) | **Status:** done (2026-11-22, commit 7fa73fb / PR #706; T-067 slice 1 — US-046-02 remains for AC-046-3 end-to-end proof + FR-046-8 digest)
 
 ---
 
