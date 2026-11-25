@@ -22,21 +22,21 @@ namespace wa.workers;
 /// <summary>T-006-07: wa.workers DI composition; every setting is read through IConfiguration so Linux "Wa__X" app settings work (TA-13.1).</summary>
 public static class WorkerServices
 {
-    /// <summary>The database key constant; value <c>WaDb</c>.</summary>
+    /// <summary>Name of the connection string that points at the application database.</summary>
     public const string DbKey = "WaDb";
-    /// <summary>The blob account URL key constant; value <c>Wa:Blob:AccountUrl</c>.</summary>
+    /// <summary>Configuration key for the blob storage account URL.</summary>
     public const string BlobAccountUrlKey = "Wa:Blob:AccountUrl";
-    /// <summary>The blob account key key constant; value <c>Wa:Blob:AccountKey</c>.</summary>
+    /// <summary>Configuration key for the blob storage account key (a secret).</summary>
     public const string BlobAccountKeyKey = "Wa:Blob:AccountKey";
-    /// <summary>The JWT secret key constant; value <c>Wa:Jwt:Secret</c>.</summary>
+    /// <summary>Configuration key for the shared secret that keys the HMAC hashes of telemetry and tokens.</summary>
     public const string JwtSecretKey = "Wa:Jwt:Secret";
-    /// <summary>The service bus key constant; value <c>Wa:ServiceBus:ConnectionString</c>.</summary>
+    /// <summary>Configuration key for the Service Bus connection string; when it is missing the in-memory publisher is used.</summary>
     public const string ServiceBusKey = "Wa:ServiceBus:ConnectionString";
 
-    /// <summary>Adds the worker services.</summary>
-    /// <param name="services">The services.</param>
-    /// <param name="configuration">The configuration.</param>
-    /// <returns>The i service collection.</returns>
+    /// <summary>Registers every service the Azure Functions need: persistence, blob storage, event publishing, email, limits and the job handlers.</summary>
+    /// <param name="services">The service collection of the functions host.</param>
+    /// <param name="configuration">Configuration source, read through <c>IConfiguration</c> so both <c>Wa:X</c> and <c>Wa__X</c> forms work.</param>
+    /// <returns>The same <paramref name="services"/>, so calls can be chained.</returns>
     public static IServiceCollection AddWorkerServices(this IServiceCollection services, IConfiguration configuration)
     {
         var dbConnection = configuration[DbKey] ?? "";

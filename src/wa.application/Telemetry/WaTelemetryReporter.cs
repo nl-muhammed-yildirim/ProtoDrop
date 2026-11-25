@@ -19,7 +19,7 @@ public sealed class WaTelemetryReporter
     private readonly byte[] _hmacKey; // TA-9.4: UTF-8 of Wa:Jwt:Secret, wired in at Program.cs (the reporter stays config-free — the domain transforms take key bytes as parameters)
 
     /// <summary>Initializes a new instance of the <see cref="WaTelemetryReporter"/> class.</summary>
-    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="logger">Logger whose pipeline carries the telemetry events.</param>
     /// <param name="hmacKey">Secret key bytes for the IP and User-Agent hashes (UTF-8 of <c>Wa:Jwt:Secret</c>).</param>
     public WaTelemetryReporter(ILogger<WaTelemetryReporter> logger, byte[] hmacKey)
     {

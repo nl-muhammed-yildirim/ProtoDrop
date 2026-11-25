@@ -13,11 +13,11 @@ public sealed class CorrelationMiddleware
     private readonly RequestDelegate _next;
 
     /// <summary>Initializes a new instance of the <see cref="CorrelationMiddleware"/> class.</summary>
-    /// <param name="next">The next.</param>
+    /// <param name="next">Next middleware in the pipeline.</param>
     public CorrelationMiddleware(RequestDelegate next) => _next = next;
 
-    /// <summary>Invokes the operation.</summary>
-    /// <param name="httpContext">The HTTP context.</param>
+    /// <summary>Establishes the correlation context for the request, pushes the ids into the log context and echoes the <c>traceparent</c> header on the response.</summary>
+    /// <param name="httpContext">The current HTTP context.</param>
     public async Task InvokeAsync(HttpContext httpContext)
     {
         var traceparent = W3CTraceParser.Parse(httpContext.Request.Headers.TraceParent.ToString());

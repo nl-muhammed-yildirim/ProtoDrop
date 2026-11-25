@@ -15,16 +15,16 @@ public sealed class GlobalErrorMiddleware
     private readonly ILogger<GlobalErrorMiddleware> _logger;
 
     /// <summary>Initializes a new instance of the <see cref="GlobalErrorMiddleware"/> class.</summary>
-    /// <param name="next">The next.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="next">Next middleware in the pipeline.</param>
+    /// <param name="logger">Logger for failures; logs route templates and business codes, never raw paths or messages.</param>
     public GlobalErrorMiddleware(RequestDelegate next, ILogger<GlobalErrorMiddleware> logger)
     {
         _next = next;
         _logger = logger;
     }
 
-    /// <summary>Invokes the operation.</summary>
-    /// <param name="context">The context.</param>
+    /// <summary>Runs the rest of the pipeline and converts any exception, and any unknown-route 404 without a body, into a TA-4.1.3 Problem+JSON response.</summary>
+    /// <param name="context">The current HTTP context.</param>
     public async Task InvokeAsync(HttpContext context)
     {
         try

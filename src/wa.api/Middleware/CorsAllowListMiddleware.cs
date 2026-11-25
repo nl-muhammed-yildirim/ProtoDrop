@@ -16,8 +16,8 @@ public sealed class CorsAllowListMiddleware
     private readonly string[] _allowedOrigins;
 
     /// <summary>Initializes a new instance of the <see cref="CorsAllowListMiddleware"/> class.</summary>
-    /// <param name="next">The next.</param>
-    /// <param name="configuration">The configuration.</param>
+    /// <param name="next">Next middleware in the pipeline.</param>
+    /// <param name="configuration">Configuration source for the <c>Wa:Cors:AllowedOrigins</c> list.</param>
     public CorsAllowListMiddleware(RequestDelegate next, IConfiguration configuration)
     {
         _next = next;
@@ -28,8 +28,8 @@ public sealed class CorsAllowListMiddleware
             : configured.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
-    /// <summary>Invokes the operation.</summary>
-    /// <param name="context">The context.</param>
+    /// <summary>Adds CORS headers for allow-listed origins and answers their preflight requests; other requests pass through untouched.</summary>
+    /// <param name="context">The current HTTP context.</param>
     public async Task InvokeAsync(HttpContext context)
     {
         var origin = context.Request.Headers.Origin.ToString();

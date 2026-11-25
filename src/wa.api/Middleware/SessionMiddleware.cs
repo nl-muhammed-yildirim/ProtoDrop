@@ -10,7 +10,7 @@ namespace wa.api.Middleware;
 /// </summary>
 public sealed class SessionMiddleware
 {
-    /// <summary>The session user ID key constant; value <c>wa.session.userId</c>.</summary>
+    /// <summary>Key under which the middleware stores the session user id (a nullable <see cref="Guid"/>) in <c>HttpContext.Items</c>; absent or null for guests.</summary>
     public const string SessionUserIdKey = "wa.session.userId";
     private const string CookieName = "wa.session";
 
@@ -18,17 +18,17 @@ public sealed class SessionMiddleware
     private readonly ISessionTokenMinter _tokens; // production = SessionTokenService (minter + reader in one class so format can't drift)
 
     /// <summary>Initializes a new instance of the <see cref="SessionMiddleware"/> class.</summary>
-    /// <param name="next">The next.</param>
-    /// <param name="tokens">The tokens.</param>
-    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    /// <param name="next">Next middleware in the pipeline.</param>
+    /// <param name="tokens">Reads session cookies and decides when a cookie needs renewal.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="tokens"/> is null.</exception>
     public SessionMiddleware(RequestDelegate next, ISessionTokenMinter tokens)
     {
         _next = next;
         _tokens = tokens ?? throw new ArgumentNullException(nameof(tokens));
     }
 
-    /// <summary>Invokes the operation.</summary>
-    /// <param name="context">The context.</param>
+    /// <summary>Reads the session cookie, publishes the user id for later middleware and endpoints, and renews the cookie when it is close to expiry.</summary>
+    /// <param name="context">The current HTTP context.</param>
     public async Task InvokeAsync(HttpContext context)
     {
         var sessionCookie = context.Request.Cookies[CookieName];

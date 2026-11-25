@@ -23,9 +23,9 @@ public sealed class IdempotencyMiddleware
     private readonly ILogger<IdempotencyMiddleware> _logger;
 
     /// <summary>Initializes a new instance of the <see cref="IdempotencyMiddleware"/> class.</summary>
-    /// <param name="next">The next.</param>
-    /// <param name="store">The store.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="next">Next middleware in the pipeline.</param>
+    /// <param name="store">Store that holds replayable responses by idempotency key.</param>
+    /// <param name="logger">Logger for store failures (never logs the key or body).</param>
     public IdempotencyMiddleware(RequestDelegate next, IIdempotencyStore store, ILogger<IdempotencyMiddleware> logger)
     {
         _next = next;
@@ -33,8 +33,8 @@ public sealed class IdempotencyMiddleware
         _logger = logger;
     }
 
-    /// <summary>Invokes the operation.</summary>
-    /// <param name="context">The context.</param>
+    /// <summary>For finalize and send POSTs that carry an <c>Idempotency-Key</c>, replays the stored response of an earlier identical request, or stores the response of this one when it succeeds.</summary>
+    /// <param name="context">The current HTTP context.</param>
     public async Task InvokeAsync(HttpContext context)
     {
         // Only POST requests on idempotency-protected paths.

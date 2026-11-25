@@ -18,9 +18,9 @@ public class GdprSweepFunction
     private readonly IConfiguration _config;
 
     /// <summary>Initializes a new instance of the <see cref="GdprSweepFunction"/> class.</summary>
-    /// <param name="handler">The handler.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
-    /// <param name="config">The config.</param>
+    /// <param name="handler">Handler that erases telemetry of deleted accounts and marks their markers swept.</param>
+    /// <param name="logger">Logger for the job run (carries the generated correlation ids).</param>
+    /// <param name="config">Configuration source for the <c>Wa:Jobs:SignKey</c> that guards the HTTP trigger.</param>
     public GdprSweepFunction(SweepErasedTelemetryHandler handler, ILogger<GdprSweepFunction> logger, IConfiguration config)
     {
         _handler = handler;
@@ -28,9 +28,9 @@ public class GdprSweepFunction
         _config = config;
     }
 
-    /// <summary>Runs the operation.</summary>
-    /// <param name="context">The context.</param>
-    /// <param name="trigger">The trigger.</param>
+    /// <summary>Timer entry point (nightly at 02:00 UTC): runs one GDPR sweep pass under a freshly generated traceparent.</summary>
+    /// <param name="context">Function invocation context.</param>
+    /// <param name="trigger">Timer trigger metadata (schedule status); not used.</param>
     [Function("GdprSweep")]
     public async Task Run(
         FunctionContext context,
@@ -53,9 +53,9 @@ public class GdprSweepFunction
     }
 
     /// <summary>HTTP trigger for E2E manual invocation (outside the 02:00 timer).</summary>
-    /// <param name="context">The context.</param>
-    /// <param name="req">The req.</param>
-    /// <returns>The HTTP response data.</returns>
+    /// <param name="context">Function invocation context; supplies the cancellation token.</param>
+    /// <param name="req">The HTTP request; it must carry the <c>x-job-sign</c> header.</param>
+    /// <returns>200 with the number of markers swept, or a 401 problem when the signature is missing or wrong.</returns>
     [Function("GdprSweepHttp")]
     public async Task<HttpResponseData> RunHttp(
         FunctionContext context,

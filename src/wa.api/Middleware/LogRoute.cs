@@ -13,9 +13,9 @@ public static class LogRoute
     /// <summary>Logged when no endpoint matched — arbitrary paths can carry anything, so the raw path is dropped.</summary>
     public const string Unmatched = "(unmatched)";
 
-    /// <summary>The matched route template, or <see cref="Unmatched"/>.</summary>
-    /// <param name="context">The context.</param>
-    /// <returns>The resulting text.</returns>
+    /// <summary>Returns the matched route template, never the raw request path.</summary>
+    /// <param name="context">The current HTTP context.</param>
+    /// <returns>The route template, or <see cref="Unmatched"/> when no endpoint matched.</returns>
     public static string Of(HttpContext context) =>
         (context.GetEndpoint() as RouteEndpoint)?.RoutePattern.RawText ?? Unmatched;
 
@@ -23,11 +23,11 @@ public static class LogRoute
     /// Serilog request-logging properties (default template <c>HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed}</c>)
     /// with <c>RequestPath</c> = route template. The raw <paramref name="requestPath"/> is ignored on purpose (TA-9.4).
     /// </summary>
-    /// <param name="context">The context.</param>
-    /// <param name="requestPath">The request path.</param>
-    /// <param name="elapsedMs">The elapsed ms.</param>
-    /// <param name="statusCode">The status code.</param>
-    /// <returns>The matching log event property items.</returns>
+    /// <param name="context">The current HTTP context.</param>
+    /// <param name="requestPath">Raw request path supplied by Serilog; deliberately unused.</param>
+    /// <param name="elapsedMs">Request duration in milliseconds.</param>
+    /// <param name="statusCode">HTTP status code of the response.</param>
+    /// <returns>The method, route-template path, status and elapsed properties for the request log line.</returns>
     public static IEnumerable<LogEventProperty> RequestLogProperties(HttpContext context, string requestPath, double elapsedMs, int statusCode) =>
     [
         new LogEventProperty("RequestMethod", new ScalarValue(context.Request.Method)),
