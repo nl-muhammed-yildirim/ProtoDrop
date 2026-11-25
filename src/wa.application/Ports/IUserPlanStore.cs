@@ -4,7 +4,7 @@ namespace wa.application.Ports;
 public interface IUserPlanStore
 {
     /// <summary>Returns the code of the plan the user row points at (soft-deleted users included), or null when no such user row exists.</summary>
-    /// <param name="userId">Primary key of the user.</param>
+    /// <param name="userId">Id of the user whose plan code is wanted.</param>
     /// <param name="cancellationToken">Token that cancels the operation.</param>
     /// <returns>The plan code, or <see langword="null"/> when no user row exists.</returns>
     Task<string?> GetPlanCodeAsync(Guid userId, CancellationToken cancellationToken);

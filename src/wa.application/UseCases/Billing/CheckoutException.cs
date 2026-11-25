@@ -24,15 +24,15 @@ public sealed class CheckoutException : Exception
     /// <summary>Which failure occurred; the endpoint maps it to a problem response.</summary>
     public FailureCode Code { get; }
 
-    /// <summary>Creates the checkout exception for not found.</summary>
+    /// <summary>The signed-in user no longer exists; the endpoint maps this to 404 NOT_FOUND.</summary>
     /// <returns>An exception with <see cref="FailureCode.NotFound"/>.</returns>
     public static CheckoutException ForNotFound() => new(FailureCode.NotFound, "User not found.");
 
-    /// <summary>Creates the checkout exception for invalid plan.</summary>
+    /// <summary>The requested plan is unknown or free; the endpoint maps this to 400 VALIDATION.</summary>
     /// <returns>An exception with <see cref="FailureCode.InvalidPlan"/>.</returns>
     public static CheckoutException ForInvalidPlan() => new(FailureCode.InvalidPlan, "Choose a paid plan to upgrade to.");
 
-    /// <summary>Creates the checkout exception for already subscribed.</summary>
+    /// <summary>The user already pays for a plan and should use the billing portal; the endpoint maps this to 400 VALIDATION.</summary>
     /// <returns>An exception with <see cref="FailureCode.AlreadySubscribed"/>.</returns>
     public static CheckoutException ForAlreadySubscribed() => new(FailureCode.AlreadySubscribed, "Already on a paid plan — use Manage billing.");
 }

@@ -13,7 +13,7 @@ public interface IPlansStore
     Task<Plan> GetAsync(string planCode, CancellationToken cancellationToken);
 
     /// <summary>T-008-02: resolve a plan by its Id for LoginResult.PlanCode. Returns the row or null — never throws.</summary>
-    /// <param name="planId">Primary key of the plan.</param>
+    /// <param name="planId">Id of the plan to load.</param>
     /// <param name="cancellationToken">Token that cancels the operation.</param>
     /// <returns>The plan row, or <see langword="null"/> when no plan has that id.</returns>
     Task<Plan?> GetByIdAsync(Guid planId, CancellationToken cancellationToken);

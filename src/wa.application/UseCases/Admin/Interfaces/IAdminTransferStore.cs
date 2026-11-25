@@ -15,7 +15,7 @@ public interface IAdminTransferStore
     /// at src/wa.infrastructure/Persistence/TransferStore.cs:143 with the owner predicate removed).
     /// Returns null when the row is already-deleted or unknown.
     /// </summary>
-    /// <param name="id">Primary key of the transfer to delete.</param>
+    /// <param name="id">Id of the transfer to force-delete.</param>
     /// <param name="deletedAtUtc">UTC instant stored as the deletion time.</param>
     /// <param name="ct">Token that cancels the operation.</param>
     /// <returns>The link id and deletion time of the transfer, or <see langword="null"/> when it is unknown or already deleted.</returns>

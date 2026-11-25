@@ -28,7 +28,7 @@ public interface ISendStore
     Task SaveSendAsync(Transfer transfer, IReadOnlyList<EmailRecipient> recipients, CancellationToken ct);
 
     /// <summary>T-010-01: read all recipient email addresses stored for a transfer.</summary>
-    /// <param name="transferId">Transfer id.</param>
+    /// <param name="transferId">Id of the transfer whose recipient addresses are read.</param>
     /// <param name="ct">Token that cancels the operation.</param>
     /// <returns>The recipient addresses stored for the transfer; PII (TA-9.4).</returns>
     /// <remarks>
@@ -37,7 +37,7 @@ public interface ISendStore
     Task<IReadOnlyList<string>> GetRecipientAddressesAsync(Guid transferId, CancellationToken ct);
 
     /// <summary>T-010-01 (AC-010-1): list file item rows (metadata only, no EF entities) ordered by SortOrder.</summary>
-    /// <param name="transferId">Transfer id.</param>
+    /// <param name="transferId">Id of the transfer whose files are listed.</param>
     /// <param name="ct">Token that cancels the operation.</param>
     /// <returns>The file rows of the transfer, ordered by sort order.</returns>
     Task<IReadOnlyList<FileItemRow>> ListFileItemsByTransferAsync(Guid transferId, CancellationToken ct);

@@ -16,7 +16,7 @@ public sealed class StripeWebhookException : Exception
     /// <summary>True when the failure is transient and the endpoint should answer 500 so that Stripe redelivers the event.</summary>
     public bool Retryable { get; }
 
-    /// <summary>Creates the stripe webhook exception for malformed.</summary>
+    /// <summary>The webhook body is not valid Stripe JSON; Stripe must not retry it, and the endpoint maps this to 400 VALIDATION.</summary>
     /// <returns>A non-retryable exception that the endpoint maps to 400 VALIDATION.</returns>
     public static StripeWebhookException ForMalformed() =>
         new("Stripe webhook payload is malformed.", retryable: false);

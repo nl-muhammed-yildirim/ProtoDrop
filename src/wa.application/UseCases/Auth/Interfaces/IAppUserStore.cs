@@ -22,20 +22,20 @@ public interface IAppUserStore
     // T-008-06 (D-1): endpoint 13's three new store members.
 
     /// <summary>T-008-06: return the row for the session user id, or null when unknown OR soft-deleted (DeletedAtUtc != null) — endpoint 13 maps that to 404 NOT_FOUND.</summary>
-    /// <param name="userId">Primary key of the user.</param>
+    /// <param name="userId">Id of the user to read; soft-deleted users count as unknown.</param>
     /// <param name="ct">Token that cancels the operation.</param>
     /// <returns>The app user, or <see langword="null"/> when there is none.</returns>
     Task<AppUser?> GetByIdAsync(Guid userId, CancellationToken ct);
 
     /// <summary>T-008-06 (FR-008-4): partial profile update. null argument = leave the column alone; displayName is trimmed, and an empty result falls back to the email local part (US-008-04 alternative flow — never "From: (blank)").</summary>
-    /// <param name="userId">Primary key of the user.</param>
+    /// <param name="userId">Id of the user whose profile changes.</param>
     /// <param name="displayName">New display name, or null to keep the current one.</param>
     /// <param name="theme">New theme preference, or null to keep the current one.</param>
     /// <param name="ct">Token that cancels the operation.</param>
     Task UpdateProfileAsync(Guid userId, string? displayName, string? theme, CancellationToken ct);
 
     /// <summary>T-008-06 / FR-008-8: soft-delete the AppUser row and re-home its transfers in ONE transaction — returns false when the user id is unknown.</summary>
-    /// <param name="userId">Primary key of the user.</param>
+    /// <param name="userId">Id of the user to delete.</param>
     /// <param name="deletedAtUtc">UTC instant stored as the deletion time.</param>
     /// <param name="ct">Token that cancels the operation.</param>
     /// <returns><see langword="true"/> when the user was deleted; <see langword="false"/> when the user id is unknown.</returns>

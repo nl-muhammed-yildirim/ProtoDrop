@@ -26,8 +26,8 @@ public interface IAdminUserStore
     /// vanished in a race (mirror SoftDeleteWithReHomeAsync's bool contract). Limits take effect at the NEXT finalize
     /// (FR-BIL-001-4 "applies to new transfers") — no limit recompute here.
     /// </summary>
-    /// <param name="userId">Primary key of the user.</param>
-    /// <param name="newPlanId">Primary key of the plan to assign.</param>
+    /// <param name="userId">Id of the user whose plan is changed.</param>
+    /// <param name="newPlanId">Id of the plan to assign.</param>
     /// <param name="ct">Token that cancels the operation.</param>
     /// <returns><see langword="true"/> when the user was updated; <see langword="false"/> when the user row no longer exists.</returns>
     Task<bool> SetPlanIdAsync(Guid userId, Guid newPlanId, CancellationToken ct);

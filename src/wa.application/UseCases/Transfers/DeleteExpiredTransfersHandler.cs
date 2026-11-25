@@ -27,7 +27,7 @@ public sealed class DeleteExpiredTransfersHandler
     /// <param name="eventPublisher">Publishes the <c>transfer.deleted</c> event for each deleted transfer.</param>
     /// <param name="blobStore">Blob store used to remove the transfer's zip blob.</param>
     /// <param name="telemetry">Reporter for telemetry events.</param>
-    /// <param name="logger">Logger for diagnostics.</param>
+    /// <param name="logger">Logger for job progress and failures.</param>
     public DeleteExpiredTransfersHandler(
         IExpiryDeletionStore store,
         IEventPublisher eventPublisher,

@@ -27,7 +27,7 @@ public sealed class SignupHandler : IRequestHandler<SignupCommand, SignupResult>
     /// <param name="plans">Store used to resolve the default plan and the plan code.</param>
     /// <param name="telemetry">Reporter for the <c>user_created</c> and <c>login_success</c> events.</param>
     /// <param name="tokens">Mints the session token returned to the caller.</param>
-    /// <param name="logger">Logger for diagnostics.</param>
+    /// <param name="logger">Logger for sign-up warnings and failures.</param>
     public SignupHandler(
         IAppUserStore users,
         IPlansStore plans,

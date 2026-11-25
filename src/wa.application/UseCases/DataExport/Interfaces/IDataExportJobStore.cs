@@ -28,14 +28,14 @@ public interface IDataExportJobStore
     Task<ExportSnapshot?> ReadSnapshotAsync(Guid userId, CancellationToken ct);
 
     /// <summary>Processing → Ready with the blob path (only if still Processing).</summary>
-    /// <param name="id">Primary key of the export row.</param>
+    /// <param name="id">Id of the export row that finished.</param>
     /// <param name="blobPath">Blob path of the finished zip.</param>
     /// <param name="readyAtUtc">UTC instant stored as the completion time.</param>
     /// <param name="ct">Token that cancels the operation.</param>
     Task MarkReadyAsync(Guid id, string blobPath, DateTime readyAtUtc, CancellationToken ct);
 
     /// <summary>Processing → Failed (EC-047-2).</summary>
-    /// <param name="id">Primary key of the export row.</param>
+    /// <param name="id">Id of the export row that failed.</param>
     /// <param name="ct">Token that cancels the operation.</param>
     Task MarkFailedAsync(Guid id, CancellationToken ct);
 
@@ -47,7 +47,7 @@ public interface IDataExportJobStore
     Task<IReadOnlyList<PurgeableExport>> GetPurgeableAsync(DateTime readyBeforeUtc, int batchSize, CancellationToken ct);
 
     /// <summary>Deletes the export row after its blob was removed.</summary>
-    /// <param name="id">Primary key of the export row.</param>
+    /// <param name="id">Id of the export row to delete.</param>
     /// <param name="ct">Token that cancels the operation.</param>
     Task DeleteAsync(Guid id, CancellationToken ct);
 }

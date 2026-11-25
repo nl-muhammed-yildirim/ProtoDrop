@@ -31,7 +31,7 @@ public sealed class FinalizeTransferHandler : IRequestHandler<FinalizeTransferCo
     /// <param name="planContext">Accessor for the request's plan limits.</param>
     /// <param name="configuration">Configuration source for the public site URL used in the result.</param>
     /// <param name="telemetry">Reporter for the upload and storage telemetry.</param>
-    /// <param name="logger">Logger for diagnostics.</param>
+    /// <param name="logger">Logger for finalize warnings and failures.</param>
     public FinalizeTransferHandler(
         ITransferStore store,
         IBlobStore blobStore,

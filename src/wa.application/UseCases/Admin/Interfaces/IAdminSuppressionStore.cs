@@ -18,7 +18,7 @@ public interface IAdminSuppressionStore
     /// Null → handler passes through → endpoint 404 NOT_FOUND; returning the row lets the endpoint
     /// audit { email } from it (FR-011-5).
     /// </summary>
-    /// <param name="id">Primary key of the suppression row.</param>
+    /// <param name="id">Id of the suppression to remove.</param>
     /// <param name="ct">Token that cancels the operation.</param>
     /// <returns>The removed row, or <see langword="null"/> when no row has that id.</returns>
     Task<EmailSuppression?> RemoveByIdAsync(Guid id, CancellationToken ct);

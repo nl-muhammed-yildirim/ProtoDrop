@@ -6,12 +6,12 @@ namespace wa.application.UseCases.Transfers;
 public interface IEmailStore
 {
     /// <summary>Loads the transfer and its files in the shape the notification email needs.</summary>
-    /// <param name="transferId">Transfer id.</param>
+    /// <param name="transferId">Id of the transfer to notify recipients about.</param>
     /// <param name="ct">Token that cancels the operation.</param>
     /// <returns>The context, or <see langword="null"/> when the transfer does not exist.</returns>
     Task<EmailTransferContext?> GetTransferWithFilesAsync(Guid transferId, CancellationToken ct);
     /// <summary>Loads the recipients of a transfer, including those already notified.</summary>
-    /// <param name="transferId">Transfer id.</param>
+    /// <param name="transferId">Id of the transfer whose recipients are loaded.</param>
     /// <param name="ct">Token that cancels the operation.</param>
     /// <returns>The recipient rows; empty when the transfer has none.</returns>
     Task<IReadOnlyList<EmailRecipient>> GetRecipientsAsync(Guid transferId, CancellationToken ct);

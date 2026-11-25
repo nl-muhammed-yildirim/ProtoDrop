@@ -34,7 +34,7 @@ public sealed class GetDownloadAllUrlHandler : IRequestHandler<GetDownloadAllUrl
     /// <param name="tokens">Verifies the unlock token of password-protected transfers.</param>
     /// <param name="telemetry">Reporter whose PII slots hash the client IP and User-Agent.</param>
     /// <param name="config">Configuration source for the zip function URL and signing key.</param>
-    /// <param name="logger">Logger for diagnostics.</param>
+    /// <param name="logger">Logger for zip-trigger warnings and failures.</param>
     public GetDownloadAllUrlHandler(
         IPublicTransferStore store,
         IBlobSasMinter minter,

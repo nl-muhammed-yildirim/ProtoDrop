@@ -20,7 +20,7 @@ public interface IAuthTokenStore
     Task CreateAsync(AuthToken token, CancellationToken ct);
 
     /// <summary>Mark the row redeemed (first redeem wins — sets RedeemedAtUtc; single-use).</summary>
-    /// <param name="id">Primary key of the token row.</param>
+    /// <param name="id">Id of the token row to mark as redeemed.</param>
     /// <param name="redeemedAtUtc">UTC instant stored as the redemption time.</param>
     /// <param name="ct">Token that cancels the operation.</param>
     Task MarkRedeemedAsync(Guid id, DateTime redeemedAtUtc, CancellationToken ct);

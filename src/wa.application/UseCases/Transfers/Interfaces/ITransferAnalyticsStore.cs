@@ -8,13 +8,13 @@ public interface ITransferAnalyticsStore
 {
     /// <summary>Owner-scoped, non-deleted transfer or null (foreign / guest / deleted / unknown are one case).</summary>
     /// <param name="ownerId">The signed-in user.</param>
-    /// <param name="transferId">Transfer id.</param>
+    /// <param name="transferId">Id of the transfer to read.</param>
     /// <param name="ct">Token that cancels the operation.</param>
     /// <returns>The transfer facts, or <see langword="null"/> when it is not an existing transfer of this owner.</returns>
     Task<AnalyticsTransfer?> GetOwnedTransferAsync(Guid ownerId, Guid transferId, CancellationToken ct);
 
     /// <summary>Grouped counts of the transfer's DownloadEvents with CreatedAtUtc &gt;= sinceUtc (sequential queries on the singleton context).</summary>
-    /// <param name="transferId">Transfer id.</param>
+    /// <param name="transferId">Id of the transfer whose download events are aggregated.</param>
     /// <param name="sinceUtc">Only download events at or after this instant are counted.</param>
     /// <param name="ct">Token that cancels the operation.</param>
     /// <returns>Sparse per-day, per-country, per-browser and per-file counts.</returns>

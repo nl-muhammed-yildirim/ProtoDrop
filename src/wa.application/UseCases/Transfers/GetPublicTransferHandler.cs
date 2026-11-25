@@ -38,7 +38,7 @@ public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransfer
     /// <param name="logoMinter">Mints the inline read URL of the sender's logo.</param>
     /// <param name="users">Store used to resolve the sender's plan.</param>
     /// <param name="flags">Resolver for the ads feature gate.</param>
-    /// <param name="logger">Logger for diagnostics.</param>
+    /// <param name="logger">Logger for page-view warnings and failures.</param>
     public GetPublicTransferHandler(
         IPublicTransferStore store,
         ILimitsProvider limits,

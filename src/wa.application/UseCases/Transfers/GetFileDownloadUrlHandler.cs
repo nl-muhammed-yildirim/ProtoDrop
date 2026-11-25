@@ -27,7 +27,7 @@ public sealed class GetFileDownloadUrlHandler : IRequestHandler<GetFileDownloadU
     /// <param name="minter">Mints the 30-minute read URL of the file.</param>
     /// <param name="tokens">Verifies the unlock token of password-protected transfers.</param>
     /// <param name="telemetry">Reporter whose PII slots hash the client IP and User-Agent.</param>
-    /// <param name="logger">Logger for diagnostics.</param>
+    /// <param name="logger">Logger for download warnings and failures.</param>
     public GetFileDownloadUrlHandler(
         IPublicTransferStore store,
         IBlobSasMinter minter,

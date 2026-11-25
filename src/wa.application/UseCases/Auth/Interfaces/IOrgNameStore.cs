@@ -7,7 +7,7 @@ namespace wa.application.UseCases.Auth;
 public interface IOrgNameStore
 {
     /// <summary>Set (or clear, with null) the org name of a non-deleted user. A missing row is a no-op.</summary>
-    /// <param name="userId">Primary key of the user.</param>
+    /// <param name="userId">Id of the user whose organization name is set.</param>
     /// <param name="orgName">New organization name, or null to clear it.</param>
     /// <param name="ct">Token that cancels the operation.</param>
     Task SetOrgNameAsync(Guid userId, string? orgName, CancellationToken ct);

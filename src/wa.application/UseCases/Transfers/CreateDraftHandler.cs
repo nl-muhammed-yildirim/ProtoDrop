@@ -21,7 +21,7 @@ public sealed class CreateDraftHandler : IRequestHandler<CreateDraftCommand, Cre
     /// <param name="planContext">Accessor for the request's plan limits.</param>
     /// <param name="minter">Mints the staging upload URL of each file.</param>
     /// <param name="telemetry">Reporter for the <c>upload_started</c> event.</param>
-    /// <param name="logger">Logger for diagnostics.</param>
+    /// <param name="logger">Logger for rejected selections and failures.</param>
     public CreateDraftHandler(IPlanContextAccessor planContext, IBlobSasMinter minter, WaTelemetryReporter telemetry, ILogger<CreateDraftHandler> logger)
     {
         _planContext = planContext;

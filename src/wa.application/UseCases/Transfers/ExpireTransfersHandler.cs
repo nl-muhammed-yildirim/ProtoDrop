@@ -23,7 +23,7 @@ public sealed class ExpireTransfersHandler
     /// <param name="store">Store that claims the window and marks transfers expired.</param>
     /// <param name="eventPublisher">Publishes the <c>transfer.expired</c> event for each expired transfer.</param>
     /// <param name="telemetry">Reporter for the expiry-lag telemetry metric.</param>
-    /// <param name="logger">Logger for diagnostics.</param>
+    /// <param name="logger">Logger for job progress and failures.</param>
     public ExpireTransfersHandler(
         IExpiryStore store,
         IEventPublisher eventPublisher,

@@ -18,7 +18,7 @@ public sealed class DeleteOrphanBlobsHandler
     /// <summary>Initializes a new instance of the <see cref="DeleteOrphanBlobsHandler"/> class.</summary>
     /// <param name="store">Store that claims the window and lists blobs without references.</param>
     /// <param name="blobStore">Blob store the blobs are physically deleted from.</param>
-    /// <param name="logger">Logger for diagnostics.</param>
+    /// <param name="logger">Logger for job progress and failures.</param>
     public DeleteOrphanBlobsHandler(
         IBlobDeletionStore store,
         IBlobStore blobStore,
