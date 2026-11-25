@@ -3,15 +3,21 @@ namespace wa.domain;
 /// <summary>An application user. TA-3.2: dbo.AppUser.</summary>
 public class AppUser
 {
+    /// <summary>Gets or sets the ID of the app user.</summary>
     public Guid Id { get; set; }
     /// <summary>Stored lowercased.</summary>
     public string Email { get; set; } = null!;
+    /// <summary>Gets or sets a value indicating whether email confirmed applies to the app user.</summary>
     public bool EmailConfirmed { get; set; }
+    /// <summary>Gets or sets the display name of the app user.</summary>
     public string DisplayName { get; set; } = null!;
     /// <summary>PBKDF2 (ASP.NET Identity PasswordHasher).</summary>
     public string? PasswordHash { get; set; }
+    /// <summary>Gets or sets the plan ID of the app user.</summary>
     public Guid PlanId { get; set; }
+    /// <summary>Gets or sets the theme of the app user.</summary>
     public string Theme { get; set; } = null!;
+    /// <summary>Gets or sets the created at UTC of the app user.</summary>
     public DateTime CreatedAtUtc { get; set; }
     /// <summary>Soft-delete (TA-3.1).</summary>
     public DateTime? DeletedAtUtc { get; set; }
@@ -26,5 +32,7 @@ public class AppUser
     public bool? EmailNotificationsEnabled { get; set; }
 
     /// <summary>FR-046-2: the effective setting — null means on. The single NULL→true rule (GET, f-email gate).</summary>
+    /// <param name="stored">The stored.</param>
+    /// <returns><see langword="true"/> when notifications on; otherwise <see langword="false"/>.</returns>
     public static bool EmailNotificationsOn(bool? stored) => stored ?? true;
 }

@@ -24,6 +24,8 @@ public static class PlanDefinition
     private static readonly HashSet<string> UnlimitedSentinelProperties = [nameof(LimitsRecord.MaxDownloads), nameof(LimitsRecord.ActiveTransfersMax)];
 
     /// <summary>Returns every problem found (human-readable, naming the field); empty = valid.</summary>
+    /// <param name="plan">The plan.</param>
+    /// <returns>The matching text value items.</returns>
     public static IReadOnlyList<string> Validate(Plan plan)
     {
         var errors = new List<string>();

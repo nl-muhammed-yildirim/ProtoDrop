@@ -12,6 +12,7 @@ public sealed class EventTypeConverter : JsonConverter<EventType>
     private static readonly string[] WireNames = BuildWireNames();
     private static readonly Dictionary<string, EventType> ByWireName = BuildIndex();
 
+    /// <inheritdoc />
     public override EventType Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         var wireName = reader.GetString() ?? string.Empty;
@@ -19,8 +20,11 @@ public sealed class EventTypeConverter : JsonConverter<EventType>
     }
 
     /// <summary>The TA-5.3 wire name for a value (e.g. "transfer.created") — direct lookup, no serialization round-trip.</summary>
+    /// <param name="value">The value.</param>
+    /// <returns>The resulting text.</returns>
     public static string WireName(EventType value) => WireNames[(int)value];
 
+    /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, EventType value, JsonSerializerOptions options) =>
         writer.WriteStringValue(WireNames[(int)value]);
 

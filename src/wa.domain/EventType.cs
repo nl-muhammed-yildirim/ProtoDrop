@@ -11,44 +11,59 @@ namespace wa.domain;
 [JsonConverter(typeof(EventTypeConverter))]
 public enum EventType
 {
+    /// <summary>Transfer created.</summary>
     [JsonPropertyName("transfer.created")]
     TransferCreated,
 
+    /// <summary>Transfer expired.</summary>
     [JsonPropertyName("transfer.expired")]
     TransferExpired,
 
+    /// <summary>Transfer deleted.</summary>
     [JsonPropertyName("transfer.deleted")]
     TransferDeleted,
 
+    /// <summary>Email sent.</summary>
     [JsonPropertyName("email.sent")]
     EmailSent,
 
+    /// <summary>Email failed.</summary>
     [JsonPropertyName("email.failed")]
     EmailFailed,
 
+    /// <summary>Download completed.</summary>
     [JsonPropertyName("download.completed")]
     DownloadCompleted,
 
+    /// <summary>ZIP generated.</summary>
     [JsonPropertyName("zip.generated")]
     ZipGenerated,
 
+    /// <summary>User created.</summary>
     [JsonPropertyName("user.created")]
     UserCreated,
 
+    /// <summary>Account deleted.</summary>
     [JsonPropertyName("account.deleted")]
     AccountDeleted,
 
+    /// <summary>Plan changed.</summary>
     [JsonPropertyName("plan.changed")]
     PlanChanged,
 
+    /// <summary>Admin action.</summary>
     [JsonPropertyName("admin.action")]
     AdminAction,
 
-    // T-008-04 (TA-9.1): magic-link request — f-email worker sends the sign-in link. 12th member at M0 (D-6).
+    /// <summary>
+    /// T-008-04 (TA-9.1): magic-link request — f-email worker sends the sign-in link. 12th member at M0 (D-6).
+    /// </summary>
     [JsonPropertyName("auth.magic_link_requested")]
     MagicLinkRequested,
 
-    // US-019-04 (FR-019-7, D-3): billing email request — f-email worker sends billing_* emails. 13th member.
+    /// <summary>
+    /// US-019-04 (FR-019-7, D-3): billing email request — f-email worker sends billing_* emails. 13th member.
+    /// </summary>
     [JsonPropertyName("billing.email_requested")]
     BillingEmailRequested
 }

@@ -7,6 +7,9 @@ namespace wa.domain.Transfers;
 public static class CursorCodec
 {
     /// <summary>Encodes a cursor from the last row of a page.</summary>
+    /// <param name="createdAtUtc">The created at UTC.</param>
+    /// <param name="id">The identifier.</param>
+    /// <returns>The resulting text.</returns>
     public static string Encode(DateTime createdAtUtc, Guid id) =>
         Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{createdAtUtc:O}:{id:N}"));
 
@@ -14,6 +17,9 @@ public static class CursorCodec
     /// Decodes a cursor into (createdAtUtc, id). Throws <see cref="CursorFormatException"/> on any malformed input —
     /// the endpoint maps that to 400 VALIDATION (existing ProblemCodes member; no new closed-list entry).
     /// </summary>
+    /// <param name="cursor">The cursor.</param>
+    /// <returns>A tuple of the created at UTC, ID values.</returns>
+    /// <exception cref="CursorFormatException">Thrown when a cursor format failure is detected.</exception>
     public static (DateTime CreatedAtUtc, Guid Id) Decode(string cursor)
     {
         string? raw;

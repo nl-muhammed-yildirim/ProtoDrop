@@ -10,6 +10,9 @@ public static class SendTimeLimits
 {
     /// <summary>Stamps expiry and download cap onto a Draft. The -1 unlimited sentinel is copied as is. Does not change Status.</summary>
     /// <exception cref="InvalidOperationException">The transfer is not a Draft; nothing is written.</exception>
+    /// <param name="transfer">The transfer.</param>
+    /// <param name="limits">The limits.</param>
+    /// <param name="nowUtc">The now UTC.</param>
     public static void Stamp(Transfer transfer, LimitsRecord limits, DateTime nowUtc)
     {
         if (transfer.Status != 0)

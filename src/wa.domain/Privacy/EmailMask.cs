@@ -6,6 +6,9 @@ namespace wa.domain.Privacy;
 /// </summary>
 public static class EmailMask
 {
+    /// <summary>Masks the text value.</summary>
+    /// <param name="email">The email.</param>
+    /// <returns>The resulting text.</returns>
     public static string? Mask(string? email)
     {
         if (string.IsNullOrEmpty(email))

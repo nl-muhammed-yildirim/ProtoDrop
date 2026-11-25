@@ -5,7 +5,10 @@ public class FeatureFlag
 {
     /// <summary>Key (VARCHAR(100)) — primary key, e.g. <c>feature.ads</c>, <c>limits.pro.maxFiles</c>.</summary>
     public string Key { get; set; } = null!;
+    /// <summary>Gets or sets the value of the feature flag.</summary>
     public string Value { get; set; } = null!;
+    /// <summary>Gets or sets the description of the feature flag.</summary>
     public string? Description { get; set; }
+    /// <summary>Gets or sets the updated at UTC of the feature flag.</summary>
     public DateTime UpdatedAtUtc { get; set; }
 }

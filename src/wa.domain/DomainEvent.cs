@@ -12,14 +12,18 @@ public class DomainEvent
     /// <summary>The exact TA-5.2 serialized envelope (single source of truth for re-publish).</summary>
     public string EnvelopeJson { get; set; } = null!;
 
+    /// <summary>Gets or sets the correlation ID of the domain event.</summary>
     public Guid CorrelationId { get; set; }
 
+    /// <summary>Gets or sets the partition key of the domain event.</summary>
     public string? PartitionKey { get; set; }
 
+    /// <summary>Gets or sets the occurred at UTC of the domain event.</summary>
     public DateTime OccurredAtUtc { get; set; }
 
     /// <summary>false until a successful publish to the broker; re-publish picks up unpublished rows (EC-054-1).</summary>
     public bool IsPublished { get; set; }
 
+    /// <summary>Gets or sets the created at UTC of the domain event.</summary>
     public DateTime CreatedAtUtc { get; set; }
 }

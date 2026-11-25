@@ -8,11 +8,16 @@ public static class SearchTerm
 
     /// <summary>FR-045-3 / EC-045-6: relevance = max of the matched fields.</summary>
     public const int RankFileName = 3;
+    /// <summary>The rank recipient constant; value <c>2</c>.</summary>
     public const int RankRecipient = 2;
+    /// <summary>The rank sender constant; value <c>1</c>.</summary>
     public const int RankSender = 1;
 
     /// <summary>Trim; null/whitespace → null (no search). Over MaxLength after trim → SearchTermTooLongException (→ 400 Q_TOO_LONG).
     /// Characters are never interpreted: '*', '~', '"' stay literal (FR-045-6).</summary>
+    /// <param name="raw">The raw.</param>
+    /// <returns>The resulting text.</returns>
+    /// <exception cref="SearchTermTooLongException">Thrown when a search term too long failure is detected.</exception>
     public static string? Normalize(string? raw)
     {
         var term = raw?.Trim();
