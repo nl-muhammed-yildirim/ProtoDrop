@@ -46,7 +46,7 @@ public class ExpireFunction
         _config = config;
     }
 
-    /// <summary>Timer entry point (every 15 minutes): expires overdue transfers, then runs the scheduled-send, billing-email and billing-grace sub-steps; a failing sub-step does not stop the others.</summary>
+    /// <summary>Timer entry point (every 15 minutes): expires overdue transfers, then runs the scheduled-send, billing-email and billing-grace sub-steps in that order inside one try block; an exception in any step is logged and rethrown, so the remaining steps are skipped until the next run.</summary>
     /// <param name="context">Function invocation context.</param>
     /// <param name="trigger">Timer trigger metadata (schedule status); not used.</param>
     [Function("Expire")]

@@ -13,7 +13,7 @@ public sealed class CommunicationHubEmailSender : IEmailSender
     /// <summary>Initializes a new instance of the <see cref="CommunicationHubEmailSender"/> class.</summary>
     /// <param name="connectionString">Wa:CommunicationHub:Connection (TA-9.3, Key Vault secret).</param>
     /// <param name="fromAddress">Sender address of each message (Wa:Email:FromAddress).</param>
-    /// <param name="logger">Logger for send failures (never logs the message body or address).</param>
+    /// <param name="logger">Logger injected for the sender (currently unused).</param>
     public CommunicationHubEmailSender(string connectionString, string fromAddress, ILogger<CommunicationHubEmailSender> logger)
     {
         _emailClient = new Azure.Communication.Email.EmailClient(connectionString);

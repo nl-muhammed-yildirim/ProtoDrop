@@ -25,7 +25,7 @@ public sealed class IdempotencyMiddleware
     /// <summary>Initializes a new instance of the <see cref="IdempotencyMiddleware"/> class.</summary>
     /// <param name="next">Next middleware in the pipeline.</param>
     /// <param name="store">Store that holds replayable responses by idempotency key.</param>
-    /// <param name="logger">Logger for store failures (never logs the key or body).</param>
+    /// <param name="logger">Logger used only for the debug message written when a stored response is replayed (it logs the idempotency key and status code, never the body).</param>
     public IdempotencyMiddleware(RequestDelegate next, IIdempotencyStore store, ILogger<IdempotencyMiddleware> logger)
     {
         _next = next;

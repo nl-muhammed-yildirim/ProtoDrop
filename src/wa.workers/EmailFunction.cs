@@ -35,7 +35,7 @@ public class EmailFunction
     /// <param name="magicLinkHandler">Handler for sign-in link emails.</param>
     /// <param name="forgotPasswordHandler">Handler for password-reset emails.</param>
     /// <param name="billingHandler">Handler for billing emails.</param>
-    /// <param name="logger">Logger for dispatch decisions and failures (never logs addresses).</param>
+    /// <param name="logger">Logger for the correlation scope and dispatch failures (never logs addresses).</param>
     public EmailFunction(
         SendNotificationEmailsHandler notificationHandler,
         SendMagicLinkEmailHandler magicLinkHandler,

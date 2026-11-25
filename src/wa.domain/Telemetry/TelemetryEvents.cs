@@ -8,11 +8,11 @@ public static class TelemetryEvents
 {
     // ---- Events (TA-10.2 line 816) — only upload_completed carries contract-named properties: bytes, durationMs, retries ----
 
-    /// <summary>Event <c>upload_started</c>: a sender began uploading the first file of a transfer.</summary>
+    /// <summary>Event <c>upload_started</c>: a transfer draft was created and the staging upload URLs were issued, before any bytes are uploaded.</summary>
     public const string UploadStarted = "upload_started";
     /// <summary>Event <c>upload_completed</c>: all files of a transfer were uploaded; carries the contract properties bytes, durationMs and retries.</summary>
     public const string UploadCompleted = "upload_completed";
-    /// <summary>Event <c>upload_failed</c>: an upload ended in an error and the sender must retry.</summary>
+    /// <summary>Event <c>upload_failed</c> (client-emitted): an upload ended in an error and the sender must retry.</summary>
     public const string UploadFailed = "upload_failed";
     /// <summary>Event <c>transfer_page_viewed</c>: a recipient opened a transfer download page.</summary>
     public const string TransferPageViewed = "transfer_page_viewed";
@@ -24,7 +24,7 @@ public static class TelemetryEvents
     public const string PasswordWrong = "password_wrong";
     /// <summary>Event <c>download_started</c>: a recipient started downloading a file or the zip.</summary>
     public const string DownloadStarted = "download_started";
-    /// <summary>Event <c>download_completed</c>: a download request was served and counted against the transfer's download limit.</summary>
+    /// <summary>Event <c>download_completed</c> (client-emitted): the recipient's browser finished downloading a file; carries fileId, bytes and durationMs. The server cannot observe completion.</summary>
     public const string DownloadCompleted = "download_completed";
     /// <summary>Event <c>zip_generated</c>: the zip of a multi-file transfer was built successfully.</summary>
     public const string ZipGenerated = "zip_generated";

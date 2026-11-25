@@ -34,7 +34,7 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
     /// <param name="planContext">Accessor for the request's plan limits and features.</param>
     /// <param name="eventPublisher">Publishes the <c>transfer.created</c> event.</param>
     /// <param name="telemetry">Reporter for the storage telemetry metric.</param>
-    /// <param name="logger">Logger for diagnostics (never logs addresses).</param>
+    /// <param name="logger">Logger injected for the handler (currently unused).</param>
     /// <param name="users">Store used to resolve the signed-in sender's display name.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="users"/> is null.</exception>
     public SendTransferHandler(

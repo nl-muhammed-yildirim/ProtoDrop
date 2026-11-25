@@ -17,7 +17,7 @@ public class LimitsRecord
     [JsonPropertyName("maxZipSize")]
     public long MaxZipSize { get; set; }
 
-    /// <summary>RETENTION_DAYS.</summary>
+    /// <summary>RETENTION_DAYS: number of days a transfer stays available before it expires.</summary>
     [JsonPropertyName("retentionDays")]
     public int RetentionDays { get; set; }
 

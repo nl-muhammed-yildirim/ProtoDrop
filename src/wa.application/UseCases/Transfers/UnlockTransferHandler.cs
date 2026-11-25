@@ -22,7 +22,7 @@ public sealed class UnlockTransferHandler : IRequestHandler<UnlockTransferComman
     /// <param name="store">Store that reads the transfer by link id.</param>
     /// <param name="minter">Mints the unlock token returned on a correct password.</param>
     /// <param name="telemetry">Reporter for the <c>password_correct</c> and <c>password_wrong</c> events.</param>
-    /// <param name="logger">Logger for unlock warnings (never logs the password).</param>
+    /// <param name="logger">Logger injected for the handler (currently unused).</param>
     public UnlockTransferHandler(
         IPublicTransferStore store,
         IUnlockTokenMinter minter,
