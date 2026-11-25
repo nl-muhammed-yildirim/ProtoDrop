@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http;
 using wa.application.UseCases.Auth;
 
 namespace wa.api.Middleware;

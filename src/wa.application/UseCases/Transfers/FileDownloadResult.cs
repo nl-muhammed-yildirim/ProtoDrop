@@ -1,11 +1,3 @@
-using Microsoft.Extensions.Logging;
-using System.Security.Cryptography;
-using System.Text;
-using wa.application.Ports;
-using wa.application.Telemetry;
-using wa.domain.Telemetry;
-using wa.domain.ValueObjects;
-
 namespace wa.application.UseCases.Transfers;
 
 /// <summary>Result of GetFileDownloadUrlQuery — the endpoint maps this to HTTP; the handler stays pure CQRS (TA-4.2a).</summary>

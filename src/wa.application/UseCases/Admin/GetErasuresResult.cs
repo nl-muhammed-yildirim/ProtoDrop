@@ -1,6 +1,3 @@
-using wa.domain.Privacy;
-using wa.domain.Transfers;
-
 namespace wa.application.UseCases.Admin;
 
 /// <summary>One page of the admin erasure report.</summary>

@@ -1,6 +1,5 @@
 using MediatR;
 using Microsoft.Extensions.Logging;
-using System.Text;
 using wa.application.Ports;
 using wa.application.Telemetry;
 using wa.domain.Telemetry;

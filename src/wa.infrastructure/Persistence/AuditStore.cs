@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using wa.application.UseCases.Admin;
 using wa.domain;
 

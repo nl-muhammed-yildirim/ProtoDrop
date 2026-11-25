@@ -8,6 +8,7 @@ dotnet_diagnostic.CA1725.severity = none   # ct / b parameter abbreviations are 
 dotnet_diagnostic.CA1716.severity = none   # VB keyword clash only; no VB consumers
 dotnet_diagnostic.CA1711.severity = none   # IEmailEventHandler is a handler contract by design
 dotnet_diagnostic.CA2007.severity = none   # no SynchronizationContext in ASP.NET Core / Functions
+dotnet_diagnostic.IDE0005.severity = warning  # unnecessary usings; src-only because it needs GenerateDocumentationFile (tests would raise CS1591-class doc warnings)
 
 [wa.application/Telemetry/WaTelemetryReporter.cs]
 # The single telemetry exit (AC-056-4): templates are the TA-10.2 wire contract, LogEvent's template is the event name by design,

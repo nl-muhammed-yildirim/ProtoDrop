@@ -1,5 +1,3 @@
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing;
 using Serilog.Events;
 
 namespace wa.api.Middleware;

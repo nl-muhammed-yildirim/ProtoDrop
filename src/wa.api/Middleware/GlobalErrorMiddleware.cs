@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http;
 using wa.domain.Errors;
 
 namespace wa.api.Middleware;

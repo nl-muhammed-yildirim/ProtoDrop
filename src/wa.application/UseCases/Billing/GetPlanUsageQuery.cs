@@ -1,5 +1,4 @@
 using MediatR;
-using wa.application.UseCases.Transfers;
 
 namespace wa.application.UseCases.Billing;
 

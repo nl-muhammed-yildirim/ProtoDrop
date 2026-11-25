@@ -1,7 +1,4 @@
 using MediatR;
-using wa.application.Limits;
-using wa.application.Ports;
-using wa.domain.Errors;
 
 namespace wa.application.UseCases.Auth;
 

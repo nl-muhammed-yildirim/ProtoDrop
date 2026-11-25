@@ -1,11 +1,6 @@
-using System.Text.Json.Serialization;
 using MediatR;
-using wa.application.Limits;
 using wa.application.Ports;
-using wa.application.UseCases.EmailSettings;
 using wa.domain;
-using wa.domain.Errors;
-using wa.domain.Telemetry;
 
 namespace wa.application.UseCases.Auth;
 

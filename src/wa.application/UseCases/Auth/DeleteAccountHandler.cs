@@ -1,4 +1,3 @@
-using System.Text.Json.Serialization;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using wa.application.Ports;

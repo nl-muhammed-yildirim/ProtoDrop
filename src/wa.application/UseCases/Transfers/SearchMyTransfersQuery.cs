@@ -1,5 +1,4 @@
 using MediatR;
-using wa.domain.Transfers;
 
 namespace wa.application.UseCases.Transfers;
 

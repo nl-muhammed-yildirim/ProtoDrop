@@ -1,12 +1,3 @@
-using System.Security.Cryptography;
-using MediatR;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Logging;
-using wa.application.Ports;
-using wa.application.Telemetry;
-using wa.domain;
-using wa.domain.Telemetry;
-
 namespace wa.application.UseCases.Auth;
 
 /// <summary>

@@ -1,5 +1,4 @@
 using System.Globalization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Net.Http.Headers;
 
 namespace wa.api.Middleware;

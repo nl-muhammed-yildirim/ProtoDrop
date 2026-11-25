@@ -1,11 +1,3 @@
-using MediatR;
-using Microsoft.AspNetCore.Identity;
-using wa.application.Ports;
-using wa.application.Telemetry;
-using wa.domain;
-using wa.domain.Errors;
-using wa.domain.Telemetry;
-
 namespace wa.application.UseCases.Auth;
 
 /// <summary>

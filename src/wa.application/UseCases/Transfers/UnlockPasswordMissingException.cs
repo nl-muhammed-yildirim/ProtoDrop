@@ -1,8 +1,3 @@
-using Microsoft.Extensions.Logging;
-using wa.application.Telemetry;
-using wa.domain.Telemetry;
-using wa.domain.ValueObjects;
-
 namespace wa.application.UseCases.Transfers;
 
 /// <summary>

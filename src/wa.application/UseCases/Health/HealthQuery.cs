@@ -1,5 +1,4 @@
 using MediatR;
-using wa.application.Ports;
 
 namespace wa.application.UseCases.Health;
 

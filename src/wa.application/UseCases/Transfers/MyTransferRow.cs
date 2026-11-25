@@ -1,5 +1,3 @@
-using wa.domain.Transfers;
-
 namespace wa.application.UseCases.Transfers;
 
 /// <summary>One row of the My Files history list (US-009-01 happy-path payload — no extra round-trips per row).</summary>

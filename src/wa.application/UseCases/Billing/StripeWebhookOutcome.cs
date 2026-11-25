@@ -1,11 +1,3 @@
-using MediatR;
-using Microsoft.Extensions.Logging;
-using wa.application.Ports;
-using wa.application.Telemetry;
-using wa.domain;
-using wa.domain.Correlation;
-using wa.domain.Telemetry;
-
 namespace wa.application.UseCases.Billing;
 
 /// <summary>What happened to a verified Stripe webhook event; every outcome answers 2xx.</summary>
