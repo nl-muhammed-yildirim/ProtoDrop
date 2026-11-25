@@ -15,5 +15,9 @@ public interface IAdminTransferStore
     /// at src/wa.infrastructure/Persistence/TransferStore.cs:143 with the owner predicate removed).
     /// Returns null when the row is already-deleted or unknown.
     /// </summary>
+    /// <param name="id">The identifier.</param>
+    /// <param name="deletedAtUtc">The deleted at UTC.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>The mark delete result, or <see langword="null"/> when there is none.</returns>
     Task<MarkDeleteResult?> AdminMarkDeletedAsync(Guid id, DateTime deletedAtUtc, CancellationToken ct);
 }

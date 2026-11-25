@@ -9,6 +9,8 @@ namespace wa.application.UseCases.Admin;
 public interface IAdminSuppressionStore
 {
     /// <summary>List all suppression rows (no order contract — the handler orders CreatedAtUtc descending).</summary>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>The matching email suppression items.</returns>
     Task<IReadOnlyList<EmailSuppression>> ListAsync(CancellationToken ct);
 
     /// <summary>
@@ -16,5 +18,8 @@ public interface IAdminSuppressionStore
     /// Null → handler passes through → endpoint 404 NOT_FOUND; returning the row lets the endpoint
     /// audit { email } from it (FR-011-5).
     /// </summary>
+    /// <param name="id">The identifier.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>The email suppression, or <see langword="null"/> when there is none.</returns>
     Task<EmailSuppression?> RemoveByIdAsync(Guid id, CancellationToken ct);
 }

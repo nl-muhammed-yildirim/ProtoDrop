@@ -21,6 +21,12 @@ public sealed class DeleteAccountHandler : IRequestHandler<DeleteAccountCommand,
     private readonly IBlobStore _blobs;
     private readonly ILogger<DeleteAccountHandler>? _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="DeleteAccountHandler"/> class.</summary>
+    /// <param name="users">The users.</param>
+    /// <param name="eventPublisher">The event publisher.</param>
+    /// <param name="telemetry">The telemetry.</param>
+    /// <param name="blobs">The blobs.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
     public DeleteAccountHandler(IAppUserStore users, IEventPublisher eventPublisher, WaTelemetryReporter telemetry, IBlobStore blobs,
         ILogger<DeleteAccountHandler>? logger = null)
     {
@@ -31,6 +37,7 @@ public sealed class DeleteAccountHandler : IRequestHandler<DeleteAccountCommand,
         _blobs = blobs;
     }
 
+    /// <inheritdoc />
     public async Task<DeleteAccountResult> Handle(DeleteAccountCommand request, CancellationToken cancellationToken)
     {
         // 1. Existence gate: no row (unknown OR soft-deleted) → NOT_FOUND (404 at the endpoint).

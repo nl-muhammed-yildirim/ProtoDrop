@@ -28,6 +28,15 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
     private readonly ILogger<SendTransferHandler> _logger;
     private readonly IAppUserStore _users;   // T-008-08 (FR-008-7): resolve the display-name "From" default
 
+    /// <summary>Initializes a new instance of the <see cref="SendTransferHandler"/> class.</summary>
+    /// <param name="store">The store.</param>
+    /// <param name="transferStore">The transfer store.</param>
+    /// <param name="planContext">The plan context.</param>
+    /// <param name="eventPublisher">The event publisher.</param>
+    /// <param name="telemetry">The telemetry.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="users">The users.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public SendTransferHandler(
         ISendStore store,
         ITransferStore transferStore,
@@ -46,6 +55,7 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
         _users = users ?? throw new ArgumentNullException(nameof(users));
     }
 
+    /// <inheritdoc />
     public async Task<SendTransferResult?> Handle(SendTransferCommand request, CancellationToken cancellationToken)
     {
         // 1. Load transfer; null → endpoint maps to 404 NOT_FOUND.

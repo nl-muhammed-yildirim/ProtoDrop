@@ -7,6 +7,9 @@ namespace wa.application.Limits;
 /// 30 s TTL cache over <see cref="IFlagsStore"/> (FR-053-4). Every flag read goes through here — no direct store calls outside the caches.
 /// The host wires both caches with the same value from <c>Wa:Flags:TtlSeconds</c> (TA-3.4) — no literal in this class.
 /// </summary>
+/// <param name="flags">The flags of the flags cache.</param>
+/// <param name="ttl">The TTL of the flags cache.</param>
+/// <param name="clock">The clock of the flags cache.</param>
 public sealed class FlagsCache(IFlagsStore flags, TimeSpan ttl, Func<DateTimeOffset> clock)
 {
     private Entry? _entry;

@@ -23,6 +23,12 @@ public sealed class RedeemMagicLinkHandler : IRequestHandler<RedeemMagicLinkComm
     private readonly WaTelemetryReporter _telemetry;
     private readonly ISessionTokenMinter _minter;
 
+    /// <summary>Initializes a new instance of the <see cref="RedeemMagicLinkHandler"/> class.</summary>
+    /// <param name="tokens">The tokens.</param>
+    /// <param name="users">The users.</param>
+    /// <param name="plans">The plans.</param>
+    /// <param name="telemetry">The telemetry.</param>
+    /// <param name="minter">The minter.</param>
     public RedeemMagicLinkHandler(
         IAuthTokenStore tokens,
         IAppUserStore users,
@@ -37,6 +43,7 @@ public sealed class RedeemMagicLinkHandler : IRequestHandler<RedeemMagicLinkComm
         _minter = minter;
     }
 
+    /// <inheritdoc />
     public async Task<RedeemMagicLinkResult> Handle(RedeemMagicLinkCommand request, CancellationToken cancellationToken)
     {
         // 1. Validate token is non-empty and base64-decodable (TA-4.2a: malformed ≠ unknown hash — VALIDATION at endpoint).

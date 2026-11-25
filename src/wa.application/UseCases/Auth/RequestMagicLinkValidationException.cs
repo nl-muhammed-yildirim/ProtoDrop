@@ -14,6 +14,8 @@ public sealed class RequestMagicLinkValidationException : Exception
 {
     private RequestMagicLinkValidationException(string message) : base(message) { }
 
+    /// <summary>Creates the request magic link validation exception for invalid email.</summary>
+    /// <returns>The request magic link validation exception.</returns>
     public static RequestMagicLinkValidationException ForInvalidEmail() =>
         new("A valid email address is required."); // same text as signup (consistency)
 }

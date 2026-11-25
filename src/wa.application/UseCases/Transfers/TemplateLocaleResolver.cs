@@ -14,6 +14,8 @@ public static class TemplateLocaleResolver
     /// - If preferredLanguage is not in SupportedLocales → "en" (fallback)
     /// - Otherwise → preferredLanguage (lowercased, trimmed)
     /// </summary>
+    /// <param name="preferredLanguage">The preferred language.</param>
+    /// <returns>The resulting text.</returns>
     public static string Resolve(string? preferredLanguage)
     {
         if (string.IsNullOrWhiteSpace(preferredLanguage))
@@ -27,5 +29,9 @@ public static class TemplateLocaleResolver
     /// Check if a locale is supported (has both .html and .txt templates).
     /// Used for parity validation.
     /// </summary>
+    /// <param name="locale">The locale.</param>
+    /// <returns>
+    /// <see langword="true"/> when the is supported condition holds; otherwise <see langword="false"/>.
+    /// </returns>
     public static bool IsSupported(string locale) => SupportedLocales.Contains(locale);
 }

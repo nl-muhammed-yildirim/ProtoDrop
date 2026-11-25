@@ -8,4 +8,13 @@ using wa.domain.Telemetry;
 
 namespace wa.application.UseCases.Billing;
 
-public enum StripeWebhookOutcome { Applied, Duplicate, Ignored }
+/// <summary>Enumerates the stripe webhook outcome values.</summary>
+public enum StripeWebhookOutcome
+{
+    /// <summary>Applied.</summary>
+    Applied,
+    /// <summary>Duplicate.</summary>
+    Duplicate,
+    /// <summary>Ignored.</summary>
+    Ignored
+}

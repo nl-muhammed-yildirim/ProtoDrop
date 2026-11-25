@@ -24,6 +24,9 @@ public sealed class RequestMagicLinkHandler : IRequestHandler<RequestMagicLinkCo
     private readonly IAuthTokenStore _tokens;
     private readonly IEventPublisher _eventPublisher;
 
+    /// <summary>Initializes a new instance of the <see cref="RequestMagicLinkHandler"/> class.</summary>
+    /// <param name="tokens">The tokens.</param>
+    /// <param name="eventPublisher">The event publisher.</param>
     public RequestMagicLinkHandler(
         IAuthTokenStore tokens,
         IEventPublisher eventPublisher)
@@ -32,6 +35,7 @@ public sealed class RequestMagicLinkHandler : IRequestHandler<RequestMagicLinkCo
         _eventPublisher = eventPublisher;
     }
 
+    /// <inheritdoc />
     public async Task<RequestMagicLinkResult> Handle(RequestMagicLinkCommand request, CancellationToken cancellationToken)
     {
         // 1. Normalize + validate email (TA-4.2#8 style — same form as SignupHandler).

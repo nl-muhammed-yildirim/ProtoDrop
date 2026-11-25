@@ -15,12 +15,17 @@ public sealed class AuditWriter : IAuditWriter
     private readonly IAuditStore _store;
     private readonly IEventPublisher _eventPublisher;
 
+    /// <summary>Initializes a new instance of the <see cref="AuditWriter"/> class.</summary>
+    /// <param name="store">The store.</param>
+    /// <param name="eventPublisher">The event publisher.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public AuditWriter(IAuditStore store, IEventPublisher eventPublisher)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _eventPublisher = eventPublisher ?? throw new ArgumentNullException(nameof(eventPublisher));
     }
 
+    /// <inheritdoc />
     public async Task WriteAsync(string actorEmail, string action, string entityType, string? entityId, object? details, CancellationToken ct)
     {
         // 1. AuditLog row — columns verbatim (TA-3.2); Id is BIGINT IDENTITY server-gen; CreatedAtUtc = now.

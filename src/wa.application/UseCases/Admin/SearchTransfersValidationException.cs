@@ -9,5 +9,7 @@ namespace wa.application.UseCases.Admin;
 /// </summary>
 public sealed class SearchTransfersValidationException : Exception
 {
+    /// <summary>Initializes a new instance of the <see cref="SearchTransfersValidationException"/> class.</summary>
+    /// <param name="message">The message.</param>
     public SearchTransfersValidationException(string message) : base(message) { }
 }

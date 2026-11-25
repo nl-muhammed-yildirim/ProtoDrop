@@ -10,12 +10,16 @@ public sealed class ExportMyDataHandler : IRequestHandler<ExportMyDataCommand, D
     private readonly IAppUserStore _users;
     private readonly IDataExportStore _store;
 
+    /// <summary>Initializes a new instance of the <see cref="ExportMyDataHandler"/> class.</summary>
+    /// <param name="users">The users.</param>
+    /// <param name="store">The store.</param>
     public ExportMyDataHandler(IAppUserStore users, IDataExportStore store)
     {
         _users = users;
         _store = store;
     }
 
+    /// <inheritdoc />
     public async Task<DataExportView> Handle(ExportMyDataCommand request, CancellationToken cancellationToken)
     {
         var user = await _users.GetByIdAsync(request.UserId, cancellationToken);

@@ -20,6 +20,11 @@ public sealed class LoginHandler : IRequestHandler<LoginCommand, LoginResult>
     private readonly WaTelemetryReporter _telemetry;
     private readonly ISessionTokenMinter _tokens;
 
+    /// <summary>Initializes a new instance of the <see cref="LoginHandler"/> class.</summary>
+    /// <param name="users">The users.</param>
+    /// <param name="plans">The plans.</param>
+    /// <param name="telemetry">The telemetry.</param>
+    /// <param name="tokens">The tokens.</param>
     public LoginHandler(
         IAppUserStore users,
         IPlansStore plans,
@@ -32,6 +37,7 @@ public sealed class LoginHandler : IRequestHandler<LoginCommand, LoginResult>
         _tokens = tokens;
     }
 
+    /// <inheritdoc />
     public async Task<LoginResult> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
         var email = NormalizeEmail(request.Email);

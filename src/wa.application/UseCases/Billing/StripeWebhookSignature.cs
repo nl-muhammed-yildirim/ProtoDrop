@@ -13,6 +13,12 @@ public static class StripeWebhookSignature
     /// <summary>Stripe's documented default replay tolerance (also the Stripe.net default).</summary>
     private const int ToleranceSeconds = 300;
 
+    /// <summary>Determines whether the value is valid.</summary>
+    /// <param name="header">The header.</param>
+    /// <param name="payload">The payload.</param>
+    /// <param name="secret">The secret.</param>
+    /// <param name="nowUtc">The now UTC.</param>
+    /// <returns><see langword="true"/> when the is valid condition holds; otherwise <see langword="false"/>.</returns>
     public static bool IsValid(string? header, string payload, string? secret, DateTimeOffset nowUtc)
     {
         if (string.IsNullOrEmpty(secret) || string.IsNullOrWhiteSpace(header) || payload is null)

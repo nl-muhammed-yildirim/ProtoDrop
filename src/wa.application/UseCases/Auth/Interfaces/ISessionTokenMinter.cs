@@ -17,17 +17,24 @@ namespace wa.application.UseCases.Auth;
 public interface ISessionTokenMinter
 {
     /// <summary>Mint a 30-day session token for the given user id (TA-9.1).</summary>
+    /// <param name="userId">Identifier of the user.</param>
+    /// <returns>The resulting text.</returns>
     string Mint(Guid userId);
 
     /// <summary>
     /// TA-9.1 PARSE side: decode + verify the signed session token — returns the resolved user id + expiry, or null on
     /// missing/malformed/tampered/expired (TA-9.1: guest path). The SessionMiddleware is the single read site (T-008-02).
     /// </summary>
+    /// <param name="token">The token.</param>
+    /// <returns>The value tuple of identifier, or <see langword="null"/> when there is none.</returns>
     (Guid UserId, DateTime ExpUtc)? Parse(string? token);
 
     /// <summary>
     /// FR-008-2 / TA-9.1 30-day rolling: true when the token has less than RenewRemainingDays remaining — the middleware
     /// re-mints + re-signs at that threshold (the "refreshed on use" rule). Pure helper over frozen values — no I/O.
     /// </summary>
+    /// <param name="expUtc">The exp UTC.</param>
+    /// <param name="nowUtc">The now UTC.</param>
+    /// <returns><see langword="true"/> when the operation succeeded; otherwise <see langword="false"/>.</returns>
     bool NeedsRenewal(DateTime expUtc, DateTime nowUtc);
 }

@@ -4,8 +4,11 @@ using wa.domain.Transfers;
 
 namespace wa.application.UseCases.Admin;
 
+/// <summary>Handles <see cref="GetErasuresQuery"/> and produces <see cref="GetErasuresResult"/>.</summary>
+/// <param name="store">The store of the get erasures query handler.</param>
 public sealed class GetErasuresQueryHandler(IErasureReportStore store) : IRequestHandler<GetErasuresQuery, GetErasuresResult>
 {
+    /// <inheritdoc />
     public async Task<GetErasuresResult> Handle(GetErasuresQuery request, CancellationToken cancellationToken)
     {
         // Malformed cursor throws CursorFormatException; the endpoint maps it to 400 VALIDATION.

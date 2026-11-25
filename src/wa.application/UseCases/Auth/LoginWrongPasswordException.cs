@@ -16,6 +16,8 @@ public sealed class LoginWrongPasswordException : Exception
 {
     private LoginWrongPasswordException(string message) : base(message) { }
 
+    /// <summary>Creates the login wrong password exception for wrong password.</summary>
+    /// <returns>The login wrong password exception.</returns>
     public static LoginWrongPasswordException ForWrongPassword() =>
         new(ProblemCodes.TitleOf(ProblemCodes.WrongPassword)); // title from the closed table — never "user not found"
 }

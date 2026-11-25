@@ -12,11 +12,14 @@ public sealed class ListMyTransfersHandler : IRequestHandler<ListMyTransfersQuer
 {
     private readonly ITransferStore _transfers;
 
+    /// <summary>Initializes a new instance of the <see cref="ListMyTransfersHandler"/> class.</summary>
+    /// <param name="transfers">The transfers.</param>
     public ListMyTransfersHandler(ITransferStore transfers)
     {
         _transfers = transfers;
     }
 
+    /// <inheritdoc />
     public async Task<ListMyTransfersResult> Handle(ListMyTransfersQuery request, CancellationToken cancellationToken)
     {
         DateTime? afterUtc = null;

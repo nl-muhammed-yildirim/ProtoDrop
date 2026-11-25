@@ -6,6 +6,9 @@ using wa.domain;
 
 namespace wa.application.UseCases.Billing;
 
+/// <summary>
+/// Handles <see cref="CreateCheckoutSessionCommand"/> and produces <see cref="StripeCheckoutSession"/>.
+/// </summary>
 public sealed class CreateCheckoutSessionHandler : IRequestHandler<CreateCheckoutSessionCommand, StripeCheckoutSession>
 {
     private readonly IAppUserStore _users;
@@ -13,6 +16,12 @@ public sealed class CreateCheckoutSessionHandler : IRequestHandler<CreateCheckou
     private readonly IStripeCheckoutGateway _gateway;
     private readonly string _publicUrl;
 
+    /// <summary>Initializes a new instance of the <see cref="CreateCheckoutSessionHandler"/> class.</summary>
+    /// <param name="users">The users.</param>
+    /// <param name="plans">The plans.</param>
+    /// <param name="gateway">The gateway.</param>
+    /// <param name="configuration">The configuration.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public CreateCheckoutSessionHandler(IAppUserStore users, IPlansStore plans, IStripeCheckoutGateway gateway, IConfiguration configuration)
     {
         _users = users ?? throw new ArgumentNullException(nameof(users));
@@ -22,6 +31,7 @@ public sealed class CreateCheckoutSessionHandler : IRequestHandler<CreateCheckou
         _publicUrl = (configuration["Wa:Url:Public"] ?? "http://localhost:5173").TrimEnd('/');
     }
 
+    /// <inheritdoc />
     public async Task<StripeCheckoutSession> Handle(CreateCheckoutSessionCommand request, CancellationToken ct)
     {
         var user = await _users.GetByIdAsync(request.UserId, ct) ?? throw CheckoutException.ForNotFound();

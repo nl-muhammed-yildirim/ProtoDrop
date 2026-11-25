@@ -12,8 +12,11 @@ namespace wa.application.UseCases.Admin;
 /// (4) cursor decoded via CursorCodec.Decode (malformed → rethrow CursorFormatException; endpoint maps to 400 VALIDATION);
 /// (5) call store once with the resolved args + limit.
 /// </summary>
+/// <param name="store">The store of the search transfers query handler.</param>
+/// <param name="flags">The flags of the search transfers query handler.</param>
 public sealed class SearchTransfersQueryHandler(ISearchTransfersStore store, IFlagResolver flags) : IRequestHandler<SearchTransfersQuery, SearchTransfersResult>
 {
+    /// <inheritdoc />
     public async Task<SearchTransfersResult> Handle(SearchTransfersQuery request, CancellationToken cancellationToken)
     {
         // (1) q. US-045-01 (FR-045-4): with feature.search on, q follows the FR-045-1 term rules and also matches file + sender names.

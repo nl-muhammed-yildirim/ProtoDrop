@@ -5,6 +5,9 @@ namespace wa.application.UseCases.Admin;
 /// (single Entry? + injected clock, no IMemoryCache). Platform-wide: one entry, no keying.
 /// The host wires the TTL with TimeSpan.FromMinutes(5) — no literal in this class.
 /// </summary>
+/// <param name="store">The store of the overview snapshot cache.</param>
+/// <param name="ttl">The TTL of the overview snapshot cache.</param>
+/// <param name="clock">The clock of the overview snapshot cache.</param>
 public sealed class OverviewSnapshotCache(IOverviewStore store, TimeSpan ttl, Func<DateTimeOffset> clock)
 {
     private Entry? _entry;
@@ -12,6 +15,8 @@ public sealed class OverviewSnapshotCache(IOverviewStore store, TimeSpan ttl, Fu
     /// <summary>
     /// AC-011-1: second call within 5 min returns the cached snapshot (same timestamp). Staleness never exceeds the TTL.
     /// </summary>
+    /// <param name="cancellationToken">Token that cancels the operation.</param>
+    /// <returns>The overview snapshot.</returns>
     public async Task<OverviewSnapshot> GetAsync(CancellationToken cancellationToken)
     {
         if (_entry is not null && clock() - _entry.FetchedAtUtc < ttl)

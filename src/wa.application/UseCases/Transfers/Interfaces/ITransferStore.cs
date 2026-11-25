@@ -8,14 +8,34 @@ namespace wa.application.UseCases.Transfers;
 /// </summary>
 public interface ITransferStore
 {
+    /// <summary>Finds the idempotency key by idempotency key.</summary>
+    /// <param name="key">The key.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>The idempotency key, or <see langword="null"/> when there is none.</returns>
     Task<IdempotencyKey?> FindByIdempotencyKeyAsync(string key, CancellationToken ct);
+    /// <summary>Transfers the exists by link ID.</summary>
+    /// <param name="linkId">Identifier of the link.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns><see langword="true"/> when the operation succeeded; otherwise <see langword="false"/>.</returns>
     Task<bool> TransferExistsByLinkIdAsync(string linkId, CancellationToken ct);
+    /// <summary>Saves the finalize.</summary>
+    /// <param name="transfer">The transfer.</param>
+    /// <param name="blobRefs">The blob refs.</param>
+    /// <param name="fileItems">The file items.</param>
+    /// <param name="idempotencyKey">The idempotency key.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
     Task SaveFinalizeAsync(Transfer transfer, IReadOnlyList<BlobRef> blobRefs, IReadOnlyList<FileItem> fileItems, IdempotencyKey idempotencyKey, CancellationToken ct);
 
     /// <summary>SUM(TotalBytes) WHERE OwnerAppUserId=@ownerId AND Status IN (1,3). Returns 0 when no rows.</summary>
+    /// <param name="ownerId">Identifier of the owner.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>The resulting numeric value.</returns>
     Task<long> GetActiveStorageBytesAsync(Guid ownerId, CancellationToken ct);
 
     /// <summary>COUNT(*) WHERE OwnerAppUserId=@ownerId AND Status IN (1,3).</summary>
+    /// <param name="ownerId">Identifier of the owner.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>The resulting numeric value.</returns>
     Task<int> GetActiveTransferCountAsync(Guid ownerId, CancellationToken ct);
 
     /// <summary>
@@ -24,6 +44,13 @@ public interface ITransferStore
     /// taking @limit+1 to detect a further page; NextCursor is encoded from the last returned row (null when no next page).
     /// T-009-02 (US-009-02): optional statuses byte set — rows where Status IN the set (null = no status predicate / all).
     /// </summary>
+    /// <param name="ownerId">Identifier of the owner.</param>
+    /// <param name="afterUtc">The after UTC.</param>
+    /// <param name="afterIdExcluded">The after ID excluded.</param>
+    /// <param name="limit">The limit.</param>
+    /// <param name="statuses">The statuses.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>A tuple holding the items and next cursor values.</returns>
     Task<(List<MyTransferRow> Items, string? NextCursor)> ListByOwnerAsync(Guid ownerId, DateTime? afterUtc, Guid? afterIdExcluded, int limit, IReadOnlyCollection<byte>? statuses, CancellationToken ct);
 
     /// <summary>
@@ -31,6 +58,10 @@ public interface ITransferStore
     /// (both predicates in ONE query → foreign owner / guest / deleted are indistinguishable nulls), plus the files +
     /// recipients projections; null when no match. Three bounded queries total (AC-009-1: no extra round-trips per row).
     /// </summary>
+    /// <param name="ownerId">Identifier of the owner.</param>
+    /// <param name="id">The identifier.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>The get my transfer result, or <see langword="null"/> when there is none.</returns>
     Task<GetMyTransferResult?> GetByOwnerAsync(Guid ownerId, Guid id, CancellationToken ct);
 
     /// <summary>
@@ -43,5 +74,10 @@ public interface ITransferStore
     /// NOT a parameter (event-payload-only — US-011-02 admin reuse keeps this signature stable).
     /// Three bounded queries total per request (AC-009-1). Returns the non-null MarkDeleteResult when a row matched.
     /// </summary>
+    /// <param name="id">The identifier.</param>
+    /// <param name="ownerId">Identifier of the owner.</param>
+    /// <param name="deletedAtUtc">The deleted at UTC.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>The mark delete result, or <see langword="null"/> when there is none.</returns>
     Task<MarkDeleteResult?> MarkDeletedAsync(Guid id, Guid ownerId, DateTime deletedAtUtc, CancellationToken ct);
 }

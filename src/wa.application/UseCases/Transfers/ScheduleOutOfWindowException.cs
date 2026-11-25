@@ -15,5 +15,6 @@ namespace wa.application.UseCases.Transfers;
 /// The endpoint maps it to 422 SCHEDULE_OUT_OF_WINDOW.</summary>
 public sealed class ScheduleOutOfWindowException : Exception
 {
+    /// <summary>Initializes a new instance of the <see cref="ScheduleOutOfWindowException"/> class.</summary>
     public ScheduleOutOfWindowException() : base(ScheduleWindow.OutOfWindowMessage) { }
 }

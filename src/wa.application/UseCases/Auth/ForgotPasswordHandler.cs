@@ -25,6 +25,10 @@ public sealed class ForgotPasswordHandler : IRequestHandler<ForgotPasswordComman
     private readonly IAuthTokenStore _tokens;
     private readonly IEventPublisher _eventPublisher;
 
+    /// <summary>Initializes a new instance of the <see cref="ForgotPasswordHandler"/> class.</summary>
+    /// <param name="users">The users.</param>
+    /// <param name="tokens">The tokens.</param>
+    /// <param name="eventPublisher">The event publisher.</param>
     public ForgotPasswordHandler(
         IAppUserStore users,
         IAuthTokenStore tokens,
@@ -35,6 +39,7 @@ public sealed class ForgotPasswordHandler : IRequestHandler<ForgotPasswordComman
         _eventPublisher = eventPublisher;
     }
 
+    /// <inheritdoc />
     public async Task<ForgotPasswordResult> Handle(ForgotPasswordCommand request, CancellationToken cancellationToken)
     {
         // 1. Normalize + validate email (same form as RequestMagicLinkHandler/SignupHandler).

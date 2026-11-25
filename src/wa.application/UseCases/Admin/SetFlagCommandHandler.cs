@@ -15,12 +15,17 @@ public sealed class SetFlagCommandHandler : IRequestHandler<SetFlagCommand, SetF
     private readonly IAdminFlagStore _flags;
     private readonly IFlagsStore _store;
 
+    /// <summary>Initializes a new instance of the <see cref="SetFlagCommandHandler"/> class.</summary>
+    /// <param name="flags">The flags.</param>
+    /// <param name="store">The store.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public SetFlagCommandHandler(IAdminFlagStore flags, IFlagsStore store)
     {
         _flags = flags ?? throw new ArgumentNullException(nameof(flags));
         _store = store ?? throw new ArgumentNullException(nameof(store));
     }
 
+    /// <inheritdoc />
     public async Task<SetFlagResult> Handle(SetFlagCommand request, CancellationToken cancellationToken)
     {
         var value = request.Value.Trim();

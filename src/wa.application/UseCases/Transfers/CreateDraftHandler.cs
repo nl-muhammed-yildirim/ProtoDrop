@@ -17,6 +17,11 @@ public sealed class CreateDraftHandler : IRequestHandler<CreateDraftCommand, Cre
     private readonly WaTelemetryReporter _telemetry;
     private readonly ILogger<CreateDraftHandler> _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="CreateDraftHandler"/> class.</summary>
+    /// <param name="planContext">The plan context.</param>
+    /// <param name="minter">The minter.</param>
+    /// <param name="telemetry">The telemetry.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
     public CreateDraftHandler(IPlanContextAccessor planContext, IBlobSasMinter minter, WaTelemetryReporter telemetry, ILogger<CreateDraftHandler> logger)
     {
         _planContext = planContext;
@@ -25,6 +30,7 @@ public sealed class CreateDraftHandler : IRequestHandler<CreateDraftCommand, Cre
         _logger = logger;
     }
 
+    /// <inheritdoc />
     public async Task<CreateDraftResult> Handle(CreateDraftCommand request, CancellationToken cancellationToken)
     {
         var free = (await _planContext.GetAsync(cancellationToken)).Limits; // FR-020-1: the session's plan (guests resolve to Free via the accessor); DB failure / unknown plan propagate (AC-053-4, EC-053-3).

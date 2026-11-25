@@ -3,6 +3,8 @@ namespace wa.application.Ports;
 /// <summary>Typed failure for a plan code with no seeded row — surfaces as 500 INTERNAL until the EC-018-3 Problem code is decided (AC-053-4). Never null or an empty record.</summary>
 public sealed class PlanUnknownException : Exception
 {
+    /// <summary>Initializes a new instance of the <see cref="PlanUnknownException"/> class.</summary>
+    /// <param name="planCode">The plan code.</param>
     public PlanUnknownException(string planCode)
         : base($"No seeded plan with code '{planCode}'.") => PlanCode = planCode;
 

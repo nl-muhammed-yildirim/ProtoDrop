@@ -11,6 +11,10 @@ public sealed class GetOrgLogoHandler : IRequestHandler<GetOrgLogoQuery, OrgLogo
     private readonly IPlanContextAccessor _plan;
     private readonly IOrgLogoSasMinter _minter;
 
+    /// <summary>Initializes a new instance of the <see cref="GetOrgLogoHandler"/> class.</summary>
+    /// <param name="users">The users.</param>
+    /// <param name="plan">The plan.</param>
+    /// <param name="minter">The minter.</param>
     public GetOrgLogoHandler(IAppUserStore users, IPlanContextAccessor plan, IOrgLogoSasMinter minter)
     {
         _users = users;
@@ -18,6 +22,7 @@ public sealed class GetOrgLogoHandler : IRequestHandler<GetOrgLogoQuery, OrgLogo
         _minter = minter;
     }
 
+    /// <inheritdoc />
     public async Task<OrgLogoView> Handle(GetOrgLogoQuery request, CancellationToken cancellationToken)
     {
         var user = await _users.GetByIdAsync(request.UserId, cancellationToken);

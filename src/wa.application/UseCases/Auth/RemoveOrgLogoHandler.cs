@@ -15,6 +15,10 @@ public sealed class RemoveOrgLogoHandler : IRequestHandler<RemoveOrgLogoCommand,
     private readonly IOrgLogoStore _logos;
     private readonly IBlobStore _blobs;
 
+    /// <summary>Initializes a new instance of the <see cref="RemoveOrgLogoHandler"/> class.</summary>
+    /// <param name="users">The users.</param>
+    /// <param name="logos">The logos.</param>
+    /// <param name="blobs">The blobs.</param>
     public RemoveOrgLogoHandler(IAppUserStore users, IOrgLogoStore logos, IBlobStore blobs)
     {
         _users = users;
@@ -22,6 +26,7 @@ public sealed class RemoveOrgLogoHandler : IRequestHandler<RemoveOrgLogoCommand,
         _blobs = blobs;
     }
 
+    /// <inheritdoc />
     public async Task<Unit> Handle(RemoveOrgLogoCommand request, CancellationToken cancellationToken)
     {
         var user = await _users.GetByIdAsync(request.UserId, cancellationToken);

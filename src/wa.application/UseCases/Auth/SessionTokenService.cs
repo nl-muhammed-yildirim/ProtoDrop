@@ -8,6 +8,7 @@ using wa.domain.Telemetry;
 
 namespace wa.application.UseCases.Auth;
 
+/// <summary>Default implementation of <see cref="ISessionTokenMinter"/>.</summary>
 public sealed class SessionTokenService : ISessionTokenMinter
 {
     /// <summary>Frozen Session TTL — 30 days rolling (Open-Decisions-and-Constants.md Part 2, TA-9.1). Not a plan limit (TA-3.4).</summary>
@@ -22,12 +23,17 @@ public sealed class SessionTokenService : ISessionTokenMinter
     private readonly byte[] _key;
     private readonly Func<DateTimeOffset> _clock;
 
+    /// <summary>Initializes a new instance of the <see cref="SessionTokenService"/> class.</summary>
+    /// <param name="key">The key.</param>
+    /// <param name="clock">The clock.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public SessionTokenService(byte[] key, Func<DateTimeOffset> clock)
     {
         _key = key ?? throw new ArgumentNullException(nameof(key));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
     }
 
+    /// <inheritdoc />
     public string Mint(Guid userId)
     {
         var now = _clock();
@@ -36,6 +42,8 @@ public sealed class SessionTokenService : ISessionTokenMinter
     }
 
     /// <summary>TA-9.1 PARSE: Base64 decode → 3-segment split → HMAC-SHA256 over userId|exp with FixedTimeEquals; expired/null on tampered.</summary>
+    /// <param name="token">The token.</param>
+    /// <returns>The value tuple of identifier, or <see langword="null"/> when there is none.</returns>
     public (Guid UserId, DateTime ExpUtc)? Parse(string? token)
     {
         if (string.IsNullOrEmpty(token))
@@ -73,6 +81,9 @@ public sealed class SessionTokenService : ISessionTokenMinter
     }
 
     /// <summary>FR-008-2 rolling refresh: re-mint when remaining lifetime is under RenewRemainingDays (the frozen threshold).</summary>
+    /// <param name="expUtc">The exp UTC.</param>
+    /// <param name="nowUtc">The now UTC.</param>
+    /// <returns><see langword="true"/> when the operation succeeded; otherwise <see langword="false"/>.</returns>
     public bool NeedsRenewal(DateTime expUtc, DateTime nowUtc) =>
         expUtc - nowUtc <= TimeSpan.FromDays(RenewRemainingDays);
 

@@ -22,30 +22,43 @@ public static class BlobPaths
     /// <summary>
     /// TA-3.5 avatars row (US-021-04): the org logo of one user. Lifetime: with the user (deleted with the account); no lifecycle rule.
     /// </summary>
+    /// <param name="userId">Identifier of the user.</param>
+    /// <returns>The resulting text.</returns>
     public static string OrgLogo(Guid userId)
         => $"avatars/{userId:N}/logo";
 
     /// <summary>
     /// TA-3.5 staging row: a file staged against a draft — the browser uploads here as block blobs before finalize creates the transfer. Lifetime: 24 h lifecycle (safety net). The only path exercised at M0 (AC-055-3).
     /// </summary>
+    /// <param name="draftId">Identifier of the draft.</param>
+    /// <param name="fileId">Identifier of the file.</param>
+    /// <returns>The resulting text.</returns>
     public static string StagingFile(Guid draftId, Guid fileId)
         => $"staging/{draftId:N}/f/{fileId:N}";
 
     /// <summary>
     /// TA-3.5 transfer-file row: a file moved from staging into a transfer by the server-side blob copy on finalize (T-010). Lifetime: with the transfer (job).
     /// </summary>
+    /// <param name="transferId">Identifier of the transfer.</param>
+    /// <param name="fileId">Identifier of the file.</param>
+    /// <returns>The resulting text.</returns>
     public static string TransferFile(Guid transferId, Guid fileId)
         => $"transfers/{transferId:N}/files/{fileId:N}";
 
     /// <summary>
     /// TA-3.5 transfer-zip row: the whole-transfer zip produced by the zip function (T-017). Lifetime: with the transfer (job).
     /// </summary>
+    /// <param name="transferId">Identifier of the transfer.</param>
+    /// <returns>The resulting text.</returns>
     public static string TransferZip(Guid transferId)
         => $"transfers/{transferId:N}/all.zip";
 
     /// <summary>
     /// TA-3.5 data-export row (US-047-01): the GDPR export zip built by f-data-export. Lifetime: 7 days, purged by the same job.
     /// </summary>
+    /// <param name="userId">Identifier of the user.</param>
+    /// <param name="exportId">Identifier of the export.</param>
+    /// <returns>The resulting text.</returns>
     public static string DataExportZip(Guid userId, Guid exportId)
         => $"exports/{userId:N}/{exportId:N}.zip";
 }

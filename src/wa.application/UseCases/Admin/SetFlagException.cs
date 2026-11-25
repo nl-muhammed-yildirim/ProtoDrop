@@ -18,10 +18,12 @@ public sealed class SetFlagException : Exception
     public string Code { get; }
 
     /// <summary>Value fails the key's typed rules → 400 FLAG_INVALID (EC-044-1, EC-044-5).</summary>
+    /// <returns>The set flag exception.</returns>
     public static SetFlagException ForInvalid() =>
         new(ProblemCodes.FlagInvalid, ProblemCodes.TitleOf(ProblemCodes.FlagInvalid));
 
     /// <summary>No seeded row for the key → 404 FLAG_UNKNOWN (AC-044-3).</summary>
+    /// <returns>The set flag exception.</returns>
     public static SetFlagException ForUnknown() =>
         new(ProblemCodes.FlagUnknown, ProblemCodes.TitleOf(ProblemCodes.FlagUnknown));
 }

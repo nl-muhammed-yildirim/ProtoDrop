@@ -22,6 +22,12 @@ public sealed class SignupHandler : IRequestHandler<SignupCommand, SignupResult>
     private readonly ISessionTokenMinter _tokens;
     private readonly ILogger<SignupHandler> _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="SignupHandler"/> class.</summary>
+    /// <param name="users">The users.</param>
+    /// <param name="plans">The plans.</param>
+    /// <param name="telemetry">The telemetry.</param>
+    /// <param name="tokens">The tokens.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
     public SignupHandler(
         IAppUserStore users,
         IPlansStore plans,
@@ -36,6 +42,7 @@ public sealed class SignupHandler : IRequestHandler<SignupCommand, SignupResult>
         _logger = logger;
     }
 
+    /// <inheritdoc />
     public async Task<SignupResult> Handle(SignupCommand request, CancellationToken cancellationToken)
     {
         var email = NormalizeEmail(request.Email);

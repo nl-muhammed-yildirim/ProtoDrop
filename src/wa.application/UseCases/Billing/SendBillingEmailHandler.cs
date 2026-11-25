@@ -33,6 +33,13 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
 
     private const string GraceEndedSubject = "You're back on ProtoDrop Free";
 
+    /// <summary>Initializes a new instance of the <see cref="SendBillingEmailHandler"/> class.</summary>
+    /// <param name="emailSender">The email sender.</param>
+    /// <param name="eventPublisher">The event publisher.</param>
+    /// <param name="config">The config.</param>
+    /// <param name="telemetry">The telemetry.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="templateRoot">The template root.</param>
     public SendBillingEmailHandler(
         IEmailSender emailSender,
         IEventPublisher eventPublisher,
@@ -64,6 +71,7 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
             "Verify the workers csproj Content Include for Emails\\templates\\**\\*.");
     }
 
+    /// <inheritdoc />
     public async Task HandleAsync(EventEnvelope envelope, int attempt, int maxDeliveryCount, CancellationToken ct)
     {
         var payloadJson = JsonSerializer.Serialize(envelope.Payload);

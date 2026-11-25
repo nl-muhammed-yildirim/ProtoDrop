@@ -7,4 +7,5 @@ using wa.domain.Telemetry;
 namespace wa.application.UseCases.Transfers;
 
 /// <summary>POST /api/v1/transfers/draft request — the full staged-file selection (TA-4.2#1).</summary>
+/// <param name="Files">The files of the create draft command.</param>
 public sealed record CreateDraftCommand(IReadOnlyList<CreateDraftFile> Files) : IRequest<CreateDraftResult>;

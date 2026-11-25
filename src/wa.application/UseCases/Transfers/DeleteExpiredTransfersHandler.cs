@@ -22,6 +22,12 @@ public sealed class DeleteExpiredTransfersHandler
     private readonly WaTelemetryReporter _telemetry;
     private readonly ILogger<DeleteExpiredTransfersHandler> _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="DeleteExpiredTransfersHandler"/> class.</summary>
+    /// <param name="store">The store.</param>
+    /// <param name="eventPublisher">The event publisher.</param>
+    /// <param name="blobStore">The blob store.</param>
+    /// <param name="telemetry">The telemetry.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
     public DeleteExpiredTransfersHandler(
         IExpiryDeletionStore store,
         IEventPublisher eventPublisher,
@@ -37,6 +43,9 @@ public sealed class DeleteExpiredTransfersHandler
     }
 
     /// <summary>Run the deletion job. Returns the number of transfers deleted (0 if claim was lost or no rows).</summary>
+    /// <param name="nowUtc">The now UTC.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>The resulting numeric value.</returns>
     public async Task<int> RunAsync(DateTime nowUtc, CancellationToken ct)
     {
         // 1. Claim the window via JobRun composite PK.

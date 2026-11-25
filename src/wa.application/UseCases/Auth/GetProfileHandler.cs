@@ -15,12 +15,16 @@ public sealed class GetProfileHandler : IRequestHandler<GetProfileCommand, GetPr
     private readonly IAppUserStore _users;
     private readonly IPlansStore _plans;
 
+    /// <summary>Initializes a new instance of the <see cref="GetProfileHandler"/> class.</summary>
+    /// <param name="users">The users.</param>
+    /// <param name="plans">The plans.</param>
     public GetProfileHandler(IAppUserStore users, IPlansStore plans)
     {
         _users = users;
         _plans = plans;
     }
 
+    /// <inheritdoc />
     public async Task<GetProfileResult> Handle(GetProfileCommand request, CancellationToken cancellationToken)
     {
         // FR-008-4: no row (unknown OR soft-deleted) → the endpoint maps this to 404 NOT_FOUND (spec's literal pin).

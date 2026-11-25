@@ -14,6 +14,8 @@ public sealed class ForgotPasswordValidationException : Exception
 {
     private ForgotPasswordValidationException(string message) : base(message) { }
 
+    /// <summary>Creates the forgot password validation exception for invalid email.</summary>
+    /// <returns>The forgot password validation exception.</returns>
     public static ForgotPasswordValidationException ForInvalidEmail() =>
         new("A valid email address is required."); // same text as signup/magic-link (consistency)
 }

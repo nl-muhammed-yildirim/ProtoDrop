@@ -11,21 +11,36 @@ public interface IBlobStore
 {
     /// <summary>Upload a blob at its canonical path, overwriting any existing blob there.</summary>
     /// <param name="content">The stream to upload. Not disposed by this method — the caller owns it.</param>
+    /// <param name="path">The path.</param>
+    /// <param name="cancellationToken">Token that cancels the operation.</param>
     Task UploadAsync(string path, Stream content, CancellationToken cancellationToken = default);
 
     /// <summary>Download a blob at its canonical path; returns the exact bytes (AC-055-1).</summary>
     /// <returns>A stream with the blob content. The caller must dispose it.</returns>
+    /// <param name="path">The path.</param>
+    /// <param name="cancellationToken">Token that cancels the operation.</param>
     Task<Stream> DownloadAsync(string path, CancellationToken cancellationToken = default);
 
     /// <summary>Server-side copy of one blob to another within the same account (finalize's staging→transfers move). Returns only once the destination holds exactly the source bytes — callers may write DB rows referencing the destination afterwards.</summary>
+    /// <param name="sourcePath">The source path.</param>
+    /// <param name="destinationPath">The destination path.</param>
+    /// <param name="cancellationToken">Token that cancels the operation.</param>
     Task CopyAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken = default);
 
     /// <summary>The size in bytes of a blob at its canonical path — metadata read only, no content download (finalize's ±0 size check must not buffer multi-GB blobs).</summary>
+    /// <param name="path">The path.</param>
+    /// <param name="cancellationToken">Token that cancels the operation.</param>
+    /// <returns>The resulting numeric value.</returns>
     Task<long> GetSizeAsync(string path, CancellationToken cancellationToken = default);
 
     /// <summary>Check if a blob exists at its canonical path.</summary>
+    /// <param name="path">The path.</param>
+    /// <param name="cancellationToken">Token that cancels the operation.</param>
+    /// <returns><see langword="true"/> when the operation succeeded; otherwise <see langword="false"/>.</returns>
     Task<bool> ExistsAsync(string path, CancellationToken cancellationToken = default);
 
     /// <summary>Delete a blob at its canonical path (no-op if it doesn't exist).</summary>
+    /// <param name="path">The path.</param>
+    /// <param name="cancellationToken">Token that cancels the operation.</param>
     Task DeleteAsync(string path, CancellationToken cancellationToken = default);
 }

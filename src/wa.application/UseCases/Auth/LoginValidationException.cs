@@ -16,9 +16,13 @@ public sealed class LoginValidationException : Exception
 {
     private LoginValidationException(string message) : base(message) { }
 
+    /// <summary>Creates the login validation exception for short password.</summary>
+    /// <returns>The login validation exception.</returns>
     public static LoginValidationException ForShortPassword() =>
         new("Password must be at least 8 characters."); // FR-008-5: same text as signup (consistency)
 
+    /// <summary>Creates the login validation exception for invalid email.</summary>
+    /// <returns>The login validation exception.</returns>
     public static LoginValidationException ForInvalidEmail() =>
         new("A valid email address is required."); // same text as signup (consistency)
 }

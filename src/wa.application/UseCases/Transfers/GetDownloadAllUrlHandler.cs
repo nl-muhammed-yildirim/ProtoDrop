@@ -27,6 +27,14 @@ public sealed class GetDownloadAllUrlHandler : IRequestHandler<GetDownloadAllUrl
     private readonly IConfiguration _config;
     private readonly ILogger<GetDownloadAllUrlHandler> _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="GetDownloadAllUrlHandler"/> class.</summary>
+    /// <param name="store">The store.</param>
+    /// <param name="minter">The minter.</param>
+    /// <param name="blobStore">The blob store.</param>
+    /// <param name="tokens">The tokens.</param>
+    /// <param name="telemetry">The telemetry.</param>
+    /// <param name="config">The config.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
     public GetDownloadAllUrlHandler(
         IPublicTransferStore store,
         IBlobSasMinter minter,
@@ -45,6 +53,7 @@ public sealed class GetDownloadAllUrlHandler : IRequestHandler<GetDownloadAllUrl
         _logger = logger;
     }
 
+    /// <inheritdoc />
     public async Task<DownloadAllResult> Handle(GetDownloadAllUrlQuery request, CancellationToken cancellationToken)
     {
         var (transfer, _) = await _store.GetByLinkIdAsync(request.LinkId, cancellationToken);

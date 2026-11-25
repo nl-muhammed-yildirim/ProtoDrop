@@ -6,12 +6,14 @@ namespace wa.application.UseCases.Admin;
 /// <summary>
 /// T-011-06: handler — pure composition over IAdminUserStore.
 /// (1) q = Q?.Trim(); null/empty → null; else q.ToLowerInvariant() (AppUser.Email is stored lowercased —
-///      an uppercase q would miss without normalization);
+/// an uppercase q would miss without normalization);
 /// (2) cursor decoded via CursorCodec.Decode (malformed → rethrow CursorFormatException; endpoint maps to 400 VALIDATION);
 /// (3) call store once with the resolved args + limit.
 /// </summary>
+/// <param name="store">The store of the get users query handler.</param>
 public sealed class GetUsersQueryHandler(IAdminUserStore store) : IRequestHandler<GetUsersQuery, GetUsersResult>
 {
+    /// <inheritdoc />
     public async Task<GetUsersResult> Handle(GetUsersQuery request, CancellationToken cancellationToken)
     {
         // (1) q: trim and null out empty/whitespace-only; lowercase (stored-lowercase column).

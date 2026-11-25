@@ -15,6 +15,10 @@ public sealed class BuildDataExportsHandler
     private readonly IBlobStore _blobs;
     private readonly ILogger<BuildDataExportsHandler> _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="BuildDataExportsHandler"/> class.</summary>
+    /// <param name="store">The store.</param>
+    /// <param name="blobs">The blobs.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
     public BuildDataExportsHandler(IDataExportJobStore store, IBlobStore blobs, ILogger<BuildDataExportsHandler> logger)
     {
         _store = store;
@@ -23,6 +27,9 @@ public sealed class BuildDataExportsHandler
     }
 
     /// <summary>Runs one pass. Returns the number of exports built to ready (0 when the claim was lost).</summary>
+    /// <param name="nowUtc">The now UTC.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>The resulting numeric value.</returns>
     public async Task<int> RunAsync(DateTime nowUtc, CancellationToken ct)
     {
         var windowStart = TruncateTo5Min(nowUtc);
@@ -87,6 +94,8 @@ public sealed class BuildDataExportsHandler
     }
 
     /// <summary>Truncate a UTC DateTime to its 5-minute boundary (TA-6.1 JobRun window key).</summary>
+    /// <param name="utc">The UTC.</param>
+    /// <returns>The timestamp.</returns>
     public static DateTime TruncateTo5Min(DateTime utc) =>
         new(utc.Year, utc.Month, utc.Day, utc.Hour, (utc.Minute / 5) * 5, 0, DateTimeKind.Utc);
 }

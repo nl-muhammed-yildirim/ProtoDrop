@@ -19,6 +19,11 @@ public sealed class ExpireTransfersHandler
     private readonly WaTelemetryReporter _telemetry;
     private readonly ILogger<ExpireTransfersHandler> _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="ExpireTransfersHandler"/> class.</summary>
+    /// <param name="store">The store.</param>
+    /// <param name="eventPublisher">The event publisher.</param>
+    /// <param name="telemetry">The telemetry.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
     public ExpireTransfersHandler(
         IExpiryStore store,
         IEventPublisher eventPublisher,
@@ -32,6 +37,9 @@ public sealed class ExpireTransfersHandler
     }
 
     /// <summary>Run the expiry job. Returns the number of transfers expired (0 if claim was lost or no rows).</summary>
+    /// <param name="nowUtc">The now UTC.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>The resulting numeric value.</returns>
     public async Task<int> RunAsync(DateTime nowUtc, CancellationToken ct)
     {
         // 1. Claim the window via JobRun composite PK.
@@ -86,6 +94,8 @@ public sealed class ExpireTransfersHandler
     }
 
     /// <summary>Truncate a UTC DateTime to the nearest 15-minute boundary (TA-6.1 JobRun window key).</summary>
+    /// <param name="utc">The UTC.</param>
+    /// <returns>The timestamp.</returns>
     public static DateTime TruncateTo15Min(DateTime utc) =>
         new(utc.Year, utc.Month, utc.Day, utc.Hour, (utc.Minute / 15) * 15, 0, DateTimeKind.Utc);
 }

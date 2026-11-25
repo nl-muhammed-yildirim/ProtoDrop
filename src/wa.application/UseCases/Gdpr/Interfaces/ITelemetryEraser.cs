@@ -6,5 +6,9 @@ namespace wa.application.UseCases.Gdpr;
 /// </summary>
 public interface ITelemetryEraser
 {
+    /// <summary>Erases the user.</summary>
+    /// <param name="userId">Identifier of the user.</param>
+    /// <param name="sinceUtc">The since UTC.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
     Task EraseUserAsync(Guid userId, DateTime sinceUtc, CancellationToken ct);
 }

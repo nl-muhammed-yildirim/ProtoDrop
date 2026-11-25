@@ -16,6 +16,9 @@ public static class LogoContentSniffer
     private static ReadOnlySpan<byte> WebPTag => "WEBP"u8;
 
     /// <summary>The Content-Type stored with a sniffed logo (never the client's header).</summary>
+    /// <param name="type">The type.</param>
+    /// <returns>The resulting text.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when an argument is outside the allowed range.</exception>
     public static string ContentTypeOf(LogoImageType type) => type switch
     {
         LogoImageType.Png => "image/png",
@@ -25,6 +28,9 @@ public static class LogoContentSniffer
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
     };
 
+    /// <summary>Sniffs the logo image type.</summary>
+    /// <param name="head">The head.</param>
+    /// <returns>The logo image type, or <see langword="null"/> when there is none.</returns>
     public static LogoImageType? Sniff(ReadOnlySpan<byte> head)
     {
         if (head.StartsWith(PngMagic))

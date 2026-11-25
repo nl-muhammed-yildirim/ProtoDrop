@@ -14,6 +14,11 @@ public sealed class ResendTransferHandler : IRequestHandler<ResendTransferComman
     private readonly ITransferStore _transferStore;
     private readonly IPlanContextAccessor _planContext;
 
+    /// <summary>Initializes a new instance of the <see cref="ResendTransferHandler"/> class.</summary>
+    /// <param name="store">The store.</param>
+    /// <param name="transferStore">The transfer store.</param>
+    /// <param name="planContext">The plan context.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public ResendTransferHandler(
         ISendStore store,
         ITransferStore transferStore,
@@ -24,6 +29,7 @@ public sealed class ResendTransferHandler : IRequestHandler<ResendTransferComman
         _planContext = planContext ?? throw new ArgumentNullException(nameof(planContext));
     }
 
+    /// <inheritdoc />
     public async Task<ResendTransferResult?> Handle(ResendTransferCommand request, CancellationToken cancellationToken)
     {
         // 1. Load original — null result is the endpoint's 404 path.

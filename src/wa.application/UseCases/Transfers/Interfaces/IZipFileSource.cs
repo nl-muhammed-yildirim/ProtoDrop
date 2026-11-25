@@ -6,5 +6,8 @@ namespace wa.application.UseCases.Transfers;
 public interface IZipFileSource
 {
     /// <summary>Return (true, files ordered by SortOrder) or (false, empty) when no row matches.</summary>
+    /// <param name="transferId">Identifier of the transfer.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>A tuple holding the found and files values.</returns>
     Task<(bool Found, IReadOnlyList<PublicFileItem> Files)> GetFilesByTransferIdAsync(Guid transferId, CancellationToken ct);
 }

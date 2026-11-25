@@ -17,9 +17,13 @@ public sealed class SignupValidationException : Exception
 {
     private SignupValidationException(string message) : base(message) { }
 
+    /// <summary>Creates the signup validation exception for short password.</summary>
+    /// <returns>The signup validation exception.</returns>
     public static SignupValidationException ForShortPassword() =>
         new("Password must be at least 8 characters.");
 
+    /// <summary>Creates the signup validation exception for invalid email.</summary>
+    /// <returns>The signup validation exception.</returns>
     public static SignupValidationException ForInvalidEmail() =>
         new("A valid email address is required.");
 }

@@ -8,11 +8,15 @@ public sealed class RemoveSuppressionCommandHandler : IRequestHandler<RemoveSupp
 {
     private readonly IAdminSuppressionStore _store;
 
+    /// <summary>Initializes a new instance of the <see cref="RemoveSuppressionCommandHandler"/> class.</summary>
+    /// <param name="store">The store.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public RemoveSuppressionCommandHandler(IAdminSuppressionStore store)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
     }
 
+    /// <inheritdoc />
     public async Task<EmailSuppression?> Handle(RemoveSuppressionCommand request, CancellationToken cancellationToken)
     {
         // Null = unknown id (endpoint maps to 404 NOT_FOUND — mirrors T-011-05/07). No exception type needed (single case).

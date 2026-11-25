@@ -12,4 +12,20 @@ using wa.domain.ValueObjects;
 namespace wa.application.UseCases.Transfers;
 
 /// <summary>The download-all endpoint's state mapping (TA-4.2#7): terminal states + the auth gate + zip ready/generating.</summary>
-public enum DownloadAllState { Ok, Generating, Expired, DownloadLimit, NotFound, Unauthenticated, StorageUnavailable }
+public enum DownloadAllState
+{
+    /// <summary>Ok.</summary>
+    Ok,
+    /// <summary>Generating.</summary>
+    Generating,
+    /// <summary>Expired.</summary>
+    Expired,
+    /// <summary>Download limit.</summary>
+    DownloadLimit,
+    /// <summary>Not found.</summary>
+    NotFound,
+    /// <summary>Unauthenticated.</summary>
+    Unauthenticated,
+    /// <summary>Storage unavailable.</summary>
+    StorageUnavailable
+}

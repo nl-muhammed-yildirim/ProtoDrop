@@ -22,6 +22,12 @@ public sealed class GetFileDownloadUrlHandler : IRequestHandler<GetFileDownloadU
     private readonly WaTelemetryReporter _telemetry;
     private readonly ILogger<GetFileDownloadUrlHandler> _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="GetFileDownloadUrlHandler"/> class.</summary>
+    /// <param name="store">The store.</param>
+    /// <param name="minter">The minter.</param>
+    /// <param name="tokens">The tokens.</param>
+    /// <param name="telemetry">The telemetry.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
     public GetFileDownloadUrlHandler(
         IPublicTransferStore store,
         IBlobSasMinter minter,
@@ -36,6 +42,7 @@ public sealed class GetFileDownloadUrlHandler : IRequestHandler<GetFileDownloadU
         _logger = logger;
     }
 
+    /// <inheritdoc />
     public async Task<FileDownloadResult> Handle(GetFileDownloadUrlQuery request, CancellationToken cancellationToken)
     {
         var (transfer, files) = await _store.GetByLinkIdAsync(request.LinkId, cancellationToken);

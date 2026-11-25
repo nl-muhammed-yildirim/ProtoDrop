@@ -16,12 +16,17 @@ public sealed class DeleteTransferHandler : IRequestHandler<DeleteTransferComman
     private readonly ITransferStore _store;
     private readonly IEventPublisher _eventPublisher;
 
+    /// <summary>Initializes a new instance of the <see cref="DeleteTransferHandler"/> class.</summary>
+    /// <param name="store">The store.</param>
+    /// <param name="eventPublisher">The event publisher.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public DeleteTransferHandler(ITransferStore store, IEventPublisher eventPublisher)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _eventPublisher = eventPublisher ?? throw new ArgumentNullException(nameof(eventPublisher));
     }
 
+    /// <inheritdoc />
     public async Task<MarkDeleteResult?> Handle(DeleteTransferCommand request, CancellationToken cancellationToken)
     {
         // 1. Store: owner+not-deleted predicate in ONE query → null on no match (owner scope / already-deleted / unknown).

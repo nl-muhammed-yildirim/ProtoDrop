@@ -4,12 +4,17 @@ using wa.application.Ports;
 
 namespace wa.application.UseCases.Health;
 
+/// <summary>Handles <see cref="HealthQuery"/> and produces <see cref="HealthResult"/>.</summary>
 public sealed class HealthQueryHandler : IRequestHandler<HealthQuery, HealthResult>
 {
     private readonly IDbHealthProbe _db;
     private readonly ISbHealthProbe _sb;
     private readonly ILogger<HealthQueryHandler> _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="HealthQueryHandler"/> class.</summary>
+    /// <param name="db">The database.</param>
+    /// <param name="sb">The Service Bus.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
     public HealthQueryHandler(IDbHealthProbe db, ISbHealthProbe sb, ILogger<HealthQueryHandler> logger)
     {
         _db = db;
@@ -17,6 +22,7 @@ public sealed class HealthQueryHandler : IRequestHandler<HealthQuery, HealthResu
         _logger = logger;
     }
 
+    /// <inheritdoc />
     public async Task<HealthResult> Handle(HealthQuery request, CancellationToken cancellationToken)
     {
         try

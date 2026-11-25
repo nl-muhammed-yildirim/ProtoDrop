@@ -27,6 +27,18 @@ public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransfer
     private readonly IFlagResolver _flags;
     private readonly ILogger<GetPublicTransferHandler> _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="GetPublicTransferHandler"/> class.</summary>
+    /// <param name="store">The store.</param>
+    /// <param name="limits">The limits.</param>
+    /// <param name="telemetry">The telemetry.</param>
+    /// <param name="tokens">The tokens.</param>
+    /// <param name="branding">The branding.</param>
+    /// <param name="features">The features.</param>
+    /// <param name="blobs">The blobs.</param>
+    /// <param name="logoMinter">The logo minter.</param>
+    /// <param name="users">The users.</param>
+    /// <param name="flags">The flags.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
     public GetPublicTransferHandler(
         IPublicTransferStore store,
         ILimitsProvider limits,
@@ -53,6 +65,7 @@ public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransfer
         _logger = logger;
     }
 
+    /// <inheritdoc />
     public async Task<GetPublicTransferResult> Handle(GetPublicTransferQuery request, CancellationToken cancellationToken)
     {
         // TA-4.2#4 emits column: transfer_page_viewed on every load — the linkId hash, never the raw 8-char id (TA-9.4 style).

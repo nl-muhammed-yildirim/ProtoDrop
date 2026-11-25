@@ -16,5 +16,11 @@ public interface IAuditWriter
     /// Writes one AuditLog row + emits one admin.action event. details is serialized as plain JSON into DetailsJson
     /// (null when null); the event payload exposes exactly actor/action/entityType/entityId/details.
     /// </summary>
+    /// <param name="actorEmail">The actor email.</param>
+    /// <param name="action">The action.</param>
+    /// <param name="entityType">The entity type.</param>
+    /// <param name="entityId">Identifier of the entity.</param>
+    /// <param name="details">The details.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
     Task WriteAsync(string actorEmail, string action, string entityType, string? entityId, object? details, CancellationToken ct);
 }

@@ -5,4 +5,7 @@ namespace wa.application.UseCases.Transfers;
 /// no duplicated flat copy) and adds only the per-file rows + recipient addresses. Null from the handler = not found
 /// / foreign owner / guest / deleted — ONE indistinguishable case (endpoint maps null → 404 NOT_FOUND; no FORBIDDEN).
 /// </summary>
+/// <param name="Row">The row of the get my transfer result.</param>
+/// <param name="Files">The files of the get my transfer result.</param>
+/// <param name="Recipients">The recipients of the get my transfer result.</param>
 public sealed record GetMyTransferResult(MyTransferRow Row, IReadOnlyList<GetMyTransferFile> Files, IReadOnlyList<string> Recipients);

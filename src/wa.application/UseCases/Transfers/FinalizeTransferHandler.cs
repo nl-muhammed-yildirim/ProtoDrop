@@ -25,6 +25,13 @@ public sealed class FinalizeTransferHandler : IRequestHandler<FinalizeTransferCo
     private readonly WaTelemetryReporter _telemetry;
     private readonly ILogger<FinalizeTransferHandler> _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="FinalizeTransferHandler"/> class.</summary>
+    /// <param name="store">The store.</param>
+    /// <param name="blobStore">The blob store.</param>
+    /// <param name="planContext">The plan context.</param>
+    /// <param name="configuration">The configuration.</param>
+    /// <param name="telemetry">The telemetry.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
     public FinalizeTransferHandler(
         ITransferStore store,
         IBlobStore blobStore,
@@ -41,6 +48,7 @@ public sealed class FinalizeTransferHandler : IRequestHandler<FinalizeTransferCo
         _logger = logger;
     }
 
+    /// <inheritdoc />
     public async Task<FinalizeTransferResult?> Handle(FinalizeTransferCommand request, CancellationToken cancellationToken)
     {
         // 1. Idempotency check first (EC-002-1): if the key exists and is not expired, return the stored result.

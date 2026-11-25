@@ -10,5 +10,6 @@ namespace wa.application.UseCases.Transfers;
 /// </summary>
 public sealed class ResendForbiddenException : Exception
 {
+    /// <summary>Initializes a new instance of the <see cref="ResendForbiddenException"/> class.</summary>
     public ResendForbiddenException() : base("This transfer has no owner to re-send from.") { }
 }

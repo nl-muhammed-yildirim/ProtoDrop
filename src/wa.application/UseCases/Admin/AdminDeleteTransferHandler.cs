@@ -17,12 +17,17 @@ public sealed class AdminDeleteTransferHandler : IRequestHandler<AdminDeleteTran
     private readonly IAdminTransferStore _store;
     private readonly IEventPublisher _eventPublisher;
 
+    /// <summary>Initializes a new instance of the <see cref="AdminDeleteTransferHandler"/> class.</summary>
+    /// <param name="store">The store.</param>
+    /// <param name="eventPublisher">The event publisher.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public AdminDeleteTransferHandler(IAdminTransferStore store, IEventPublisher eventPublisher)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _eventPublisher = eventPublisher ?? throw new ArgumentNullException(nameof(eventPublisher));
     }
 
+    /// <inheritdoc />
     public async Task<MarkDeleteResult?> Handle(AdminDeleteTransferCommand request, CancellationToken cancellationToken)
     {
         // 1. Store: platform-scoped predicate (Id=@id AND Status != 4) in ONE query → null on no match.

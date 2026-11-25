@@ -10,5 +10,7 @@ namespace wa.application.UseCases.Admin;
 public interface IAuditStore
 {
     /// <summary>Inserts exactly one AuditLog row (ActorEmail, Action, EntityType, EntityId, DetailsJson verbatim; Id server-generated).</summary>
+    /// <param name="row">The row.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
     Task AddAsync(AuditLog row, CancellationToken ct);
 }

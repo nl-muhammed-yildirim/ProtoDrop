@@ -7,4 +7,5 @@ namespace wa.application.UseCases.Admin;
 /// T-011-09 (TA-4.2#24 / FR-011-5): DELETE /api/v1/admin/suppressions/{id:guid} — SuperAdmin-only write.
 /// Returns the REMOVED row or null (unknown id → endpoint maps to 404 NOT_FOUND via BusinessException).
 /// </summary>
+/// <param name="Id">Identifier of the remove suppression command.</param>
 public sealed record RemoveSuppressionCommand(Guid Id) : IRequest<EmailSuppression?>;

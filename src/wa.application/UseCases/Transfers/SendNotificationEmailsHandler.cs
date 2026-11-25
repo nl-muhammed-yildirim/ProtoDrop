@@ -29,6 +29,17 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
     private readonly ISenderBrandingStore _branding;
     private readonly IFeaturesProvider _features;
 
+    /// <summary>Initializes a new instance of the <see cref="SendNotificationEmailsHandler"/> class.</summary>
+    /// <param name="store">The store.</param>
+    /// <param name="emailSender">The email sender.</param>
+    /// <param name="templateRenderer">The template renderer.</param>
+    /// <param name="eventPublisher">The event publisher.</param>
+    /// <param name="deduplicator">The deduplicator.</param>
+    /// <param name="telemetry">The telemetry.</param>
+    /// <param name="config">The config.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="branding">The branding.</param>
+    /// <param name="features">The features.</param>
     public SendNotificationEmailsHandler(
         IEmailStore store,
         IEmailSender emailSender,
@@ -53,6 +64,7 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
         _logger = logger;
     }
 
+    /// <inheritdoc />
     public async Task HandleAsync(EventEnvelope envelope, int attempt, int maxDeliveryCount, CancellationToken ct)
     {
         // 1. Deserialize payload → transferId + emails[].

@@ -13,6 +13,11 @@ public sealed class SendBillingEmailsHandler
     private readonly IEventPublisher _events;
     private readonly ILogger<SendBillingEmailsHandler> _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="SendBillingEmailsHandler"/> class.</summary>
+    /// <param name="store">The store.</param>
+    /// <param name="events">The events.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public SendBillingEmailsHandler(IBillingSequenceStore store, IEventPublisher events, ILogger<SendBillingEmailsHandler> logger)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
@@ -21,6 +26,9 @@ public sealed class SendBillingEmailsHandler
     }
 
     /// <summary>Returns the number of emails queued.</summary>
+    /// <param name="nowUtc">The now UTC.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>The resulting numeric value.</returns>
     public async Task<int> RunAsync(DateTime nowUtc, CancellationToken ct)
     {
         var queued = 0;

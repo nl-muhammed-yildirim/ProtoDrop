@@ -13,6 +13,11 @@ namespace wa.application.UseCases.Transfers;
 /// on the file blob; the browser streams directly against storage (no server-side proxying). Token = the ?t= unlock JWT
 /// (T-003-04, TA-9.6#1); ClientIp/UserAgent are raw request values — transformed here via the reporter's PII slots (TA-9.4).
 /// </summary>
+/// <param name="LinkId">Identifier of the link of the get file download URL query.</param>
+/// <param name="FileId">Identifier of the file of the get file download URL query.</param>
+/// <param name="Token">The token of the get file download URL query.</param>
+/// <param name="ClientIp">The client IP of the get file download URL query.</param>
+/// <param name="UserAgent">The user agent of the get file download URL query.</param>
 public sealed record GetFileDownloadUrlQuery(
     string LinkId,
     string FileId,

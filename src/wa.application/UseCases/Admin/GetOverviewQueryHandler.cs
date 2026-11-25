@@ -3,8 +3,10 @@ using MediatR;
 namespace wa.application.UseCases.Admin;
 
 /// <summary>T-011-03: handler — returns the cached snapshot (no store call here; the cache owns the TTL).</summary>
+/// <param name="cache">The cache of the get overview query handler.</param>
 public sealed class GetOverviewQueryHandler(OverviewSnapshotCache cache) : IRequestHandler<GetOverviewQuery, GetOverviewResult>
 {
+    /// <inheritdoc />
     public async Task<GetOverviewResult> Handle(GetOverviewQuery request, CancellationToken cancellationToken)
     {
         var snapshot = await cache.GetAsync(cancellationToken);

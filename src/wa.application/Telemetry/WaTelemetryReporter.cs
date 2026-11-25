@@ -18,6 +18,9 @@ public sealed class WaTelemetryReporter
     private readonly ILogger<WaTelemetryReporter> _logger;
     private readonly byte[] _hmacKey; // TA-9.4: UTF-8 of Wa:Jwt:Secret, wired in at Program.cs (the reporter stays config-free — the domain transforms take key bytes as parameters)
 
+    /// <summary>Initializes a new instance of the <see cref="WaTelemetryReporter"/> class.</summary>
+    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="hmacKey">The HMAC key.</param>
     public WaTelemetryReporter(ILogger<WaTelemetryReporter> logger, byte[] hmacKey)
     {
         _logger = logger;
@@ -26,6 +29,8 @@ public sealed class WaTelemetryReporter
 
     /// <summary>Emit a closed-set event with no contract-named properties (the 20 property-free TA-10.2 events — e.g. upload_started, transfer_page_viewed).
     /// Throws <see cref="ArgumentException"/> for anything not in <see cref="TelemetryEvents.IsEvent"/>: ad-hoc names fail fast here, not silently later in App Insights (EC-056-4).</summary>
+    /// <param name="eventName">The event name.</param>
+    /// <exception cref="ArgumentException">Thrown when an argument is invalid.</exception>
     public void LogEvent(string eventName)
     {
         if (!TelemetryEvents.IsEvent(eventName))
@@ -35,14 +40,20 @@ public sealed class WaTelemetryReporter
     }
 
     /// <summary>Emit upload_completed with its three contract-named properties — the only event TA-10.2 names properties for (line 816).</summary>
+    /// <param name="bytes">The bytes.</param>
+    /// <param name="durationMs">The duration ms.</param>
+    /// <param name="retries">The retries.</param>
     public void UploadCompleted(long bytes, long durationMs, int retries) =>
         _logger.LogInformation("upload_completed {bytes} bytes in {durationMs} ms after {retries} retries", bytes, durationMs, retries);
 
     /// <summary>Emit zip_generated with its two properties — sizeBytes and durationMs (T-004-01).</summary>
+    /// <param name="sizeBytes">The size bytes.</param>
+    /// <param name="durationMs">The duration ms.</param>
     public void ZipGenerated(long sizeBytes, long durationMs) =>
         _logger.LogInformation("zip_generated {sizeBytes} bytes in {durationMs} ms", sizeBytes, durationMs);
 
     /// <summary>Emit expiry_job_lag_seconds metric (TA-10.2). Alert P1 at > 1800s (TA-10.3).</summary>
+    /// <param name="seconds">The seconds.</param>
     public void ExpiryJobLag(long seconds) =>
         _logger.LogInformation("expiry_job_lag_seconds {seconds}", seconds);
 
@@ -55,18 +66,24 @@ public sealed class WaTelemetryReporter
         _logger.LogInformation("forgot_password_requested {count}", 1);
 
     /// <summary>Emit storage_bytes_active metric (TA-10.2): the account's active-bytes read as FR-007-4 counts them, feeding the admin storage meter (F-TRF-011-2).</summary>
+    /// <param name="bytes">The bytes.</param>
     public void StorageBytesActive(long bytes) =>
         _logger.LogInformation("storage_bytes_active {bytes}", bytes);
 
     /// <summary>Emit transfer_page_viewed with its one property — the linkId hash (TA-9.4 style: never the raw 8-char id in telemetry; T-003-01). Template text keeps the exact TA-10.2 name first — App Insights queries by it.</summary>
+    /// <param name="linkIdHash">The link ID hash.</param>
     public void TransferPageViewed(string linkIdHash) =>
         _logger.LogInformation("transfer_page_viewed {linkId}", linkIdHash);
 
     // ---- TA-9.4 PII slots — "the reporter's property slots are where those transforms live" ----
 
     /// <summary>TA-9.4: file name → SHA-256 (deterministic). Call this before putting a file name into an event property.</summary>
+    /// <param name="fileName">The file name.</param>
+    /// <returns>The resulting text.</returns>
     public string FileNameSlot(string fileName) => PiiTransforms.FileName(fileName);
 
     /// <summary>TA-9.4: IP → HMAC-SHA256 keyed by Wa:Jwt:Secret bytes. Call this before putting a client IP into an event property (DownloadEvent is the raw-IP exception — TA-10.5).</summary>
+    /// <param name="ip">The IP.</param>
+    /// <returns>The resulting text.</returns>
     public string IpSlot(string ip) => PiiTransforms.IpAddress(ip, _hmacKey);
 }

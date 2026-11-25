@@ -12,4 +12,5 @@ using wa.domain.Telemetry;
 
 namespace wa.application.UseCases.Auth;
 
+/// <summary>Result of the delete account use case.</summary>
 public sealed record DeleteAccountResult();

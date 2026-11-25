@@ -9,4 +9,14 @@ using wa.domain.ValueObjects;
 namespace wa.application.UseCases.Transfers;
 
 /// <summary>The recipient page's state mapping (TA-4.2#4). NotFound covers missing rows + malformed linkIds + Status=4 Deleted — deliberately indistinguishable (FR-003-9).</summary>
-public enum PublicTransferState { Active, Expired, DownloadLimit, NotFound }
+public enum PublicTransferState
+{
+    /// <summary>Active.</summary>
+    Active,
+    /// <summary>Expired.</summary>
+    Expired,
+    /// <summary>Download limit.</summary>
+    DownloadLimit,
+    /// <summary>Not found.</summary>
+    NotFound
+}

@@ -6,4 +6,5 @@ using wa.domain.Correlation;
 namespace wa.application.UseCases.Auth;
 
 /// <summary>POST /api/v1/auth/magic-link request (TA-4.2#10). Body: { email }.</summary>
+/// <param name="Email">The email of the request magic link command.</param>
 public sealed record RequestMagicLinkCommand(string Email) : IRequest<RequestMagicLinkResult>;

@@ -26,6 +26,15 @@ public sealed class SendForgotPasswordEmailHandler : IEmailEventHandler
     private readonly ILogger<SendForgotPasswordEmailHandler> _logger;
     private readonly (string Html, string Txt) _templates;
 
+    /// <summary>Initializes a new instance of the <see cref="SendForgotPasswordEmailHandler"/> class.</summary>
+    /// <param name="emailSender">The email sender.</param>
+    /// <param name="eventPublisher">The event publisher.</param>
+    /// <param name="config">The config.</param>
+    /// <param name="telemetry">The telemetry.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the operation is not valid in the current state.
+    /// </exception>
     public SendForgotPasswordEmailHandler(
         IEmailSender emailSender,
         IEventPublisher eventPublisher,
@@ -51,6 +60,7 @@ public sealed class SendForgotPasswordEmailHandler : IEmailEventHandler
                 "Verify the workers csproj Content Include for Emails\\templates\\**\\*.");
     }
 
+    /// <inheritdoc />
     public async Task HandleAsync(EventEnvelope envelope, int attempt, int maxDeliveryCount, CancellationToken ct)
     {
         // 1. Extract email, raw token, and expiry from the payload (TA-9.1: only hash is persisted).

@@ -14,6 +14,10 @@ public sealed class OwnerNotificationGate
     private readonly IFlagResolver _flags;
     private readonly ILogger<OwnerNotificationGate> _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="OwnerNotificationGate"/> class.</summary>
+    /// <param name="store">The store.</param>
+    /// <param name="flags">The flags.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
     public OwnerNotificationGate(IEmailNotificationsStore store, IFlagResolver flags, ILogger<OwnerNotificationGate> logger)
     {
         _store = store;
@@ -22,6 +26,9 @@ public sealed class OwnerNotificationGate
     }
 
     /// <summary>True when the owner notification may be sent. Reads the column on every call (send time, no cache).</summary>
+    /// <param name="ownerAppUserId">Identifier of the owner app user.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns><see langword="true"/> when the operation succeeded; otherwise <see langword="false"/>.</returns>
     public async Task<bool> MaySendAsync(Guid? ownerAppUserId, CancellationToken ct)
     {
         if (ownerAppUserId is not { } ownerId)

@@ -9,6 +9,9 @@ namespace wa.application.UseCases.Transfers;
 public interface IPublicTransferStore
 {
     /// <summary>Return (transfer, files ordered by SortOrder) or (null, empty) when no row matches.</summary>
+    /// <param name="linkId">Identifier of the link.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>A tuple holding the transfer and files values.</returns>
     Task<(Transfer? Transfer, IReadOnlyList<PublicFileItem> Files)> GetByLinkIdAsync(string linkId, CancellationToken ct);
 
     /// <summary>
@@ -16,6 +19,13 @@ public interface IPublicTransferStore
     /// The increment + DownloadEvent insert are transactional; the status flip to 3 (DownloadLimit) happens idempotently
     /// when the cap is reached — no worker owns this transition (US-005-03 technical note).
     /// </summary>
+    /// <param name="transferId">Identifier of the transfer.</param>
+    /// <param name="fileId">Identifier of the file.</param>
+    /// <param name="ipHash">The IP hash.</param>
+    /// <param name="uaHash">The ua hash.</param>
+    /// <param name="userAgentFamily">The user agent family.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>The single file download result.</returns>
     Task<SingleFileDownloadResult> RecordSingleFileDownloadAsync(
         Guid transferId,
         Guid fileId,
@@ -30,6 +40,12 @@ public interface IPublicTransferStore
     /// The increment + DownloadEvent insert are transactional; the status flip to 3 (DownloadLimit) happens idempotently
     /// when the cap is reached — no worker owns this transition (US-005-03 technical note).
     /// </summary>
+    /// <param name="transferId">Identifier of the transfer.</param>
+    /// <param name="ipHash">The IP hash.</param>
+    /// <param name="uaHash">The ua hash.</param>
+    /// <param name="userAgentFamily">The user agent family.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>The single file download result.</returns>
     Task<SingleFileDownloadResult> RecordZipDownloadAsync(
         Guid transferId,
         string? ipHash,

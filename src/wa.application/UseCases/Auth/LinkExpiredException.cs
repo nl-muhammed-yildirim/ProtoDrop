@@ -15,6 +15,8 @@ public sealed class LinkExpiredException : Exception
 {
     private LinkExpiredException(string message) : base(message) { }
 
+    /// <summary>Creates the link expired exception for link expired.</summary>
+    /// <returns>The link expired exception.</returns>
     public static LinkExpiredException ForLinkExpired() =>
         new(ProblemCodes.TitleOf(ProblemCodes.LinkExpired)); // title from the closed table — never leaks which emails exist
 }

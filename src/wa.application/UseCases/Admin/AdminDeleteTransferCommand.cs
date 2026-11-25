@@ -8,4 +8,5 @@ namespace wa.application.UseCases.Admin;
 /// T-011-05 (TA-4.2#21 / FR-011-4): DELETE /api/v1/admin/transfers/{id} — SuperAdmin-only force-delete.
 /// Reason is pinned to "admin" at the construction site (endpoint 21).
 /// </summary>
+/// <param name="Id">Identifier of the admin delete transfer command.</param>
 public sealed record AdminDeleteTransferCommand(Guid Id) : IRequest<MarkDeleteResult?>;

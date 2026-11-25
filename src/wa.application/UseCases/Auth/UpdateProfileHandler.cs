@@ -27,6 +27,12 @@ public sealed class UpdateProfileHandler : IRequestHandler<UpdateProfileCommand,
     /// <summary>The three closed theme values (spec + entity only — NOT in the frozen Open-Decisions-and-Constants registry).</summary>
     private static readonly string[] AllowedThemes = ["system", "light", "dark"];
 
+    /// <summary>Initializes a new instance of the <see cref="UpdateProfileHandler"/> class.</summary>
+    /// <param name="users">The users.</param>
+    /// <param name="plans">The plans.</param>
+    /// <param name="orgNames">The org names.</param>
+    /// <param name="plan">The plan.</param>
+    /// <param name="emailNotifications">The email notifications.</param>
     public UpdateProfileHandler(IAppUserStore users, IPlansStore plans, IOrgNameStore orgNames, IPlanContextAccessor plan, IEmailNotificationsStore emailNotifications)
     {
         _users = users;
@@ -36,6 +42,7 @@ public sealed class UpdateProfileHandler : IRequestHandler<UpdateProfileCommand,
         _emailNotifications = emailNotifications;
     }
 
+    /// <inheritdoc />
     public async Task<GetProfileResult> Handle(UpdateProfileCommand request, CancellationToken cancellationToken)
     {
         // 1. Existence gate FIRST: PATCH against a dead cookie is NOT "invalid theme" — it's not-found (404 at the endpoint).

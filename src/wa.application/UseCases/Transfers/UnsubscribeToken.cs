@@ -11,6 +11,10 @@ namespace wa.application.UseCases.Transfers;
 public static class UnsubscribeToken
 {
     /// <summary>Create a token for the given address + senderEmail pair.</summary>
+    /// <param name="address">The address.</param>
+    /// <param name="senderEmail">The sender email.</param>
+    /// <param name="hmacKey">The HMAC key.</param>
+    /// <returns>The resulting text.</returns>
     public static string Create(string address, string senderEmail, byte[] hmacKey)
     {
         var payload = $"{address}|{senderEmail}";
@@ -21,6 +25,9 @@ public static class UnsubscribeToken
     }
 
     /// <summary>Verify a token and return the (address, senderEmail) pair. Returns null on tamper/parse failure.</summary>
+    /// <param name="token">The token.</param>
+    /// <param name="hmacKey">The HMAC key.</param>
+    /// <returns>The value tuple of text value, or <see langword="null"/> when there is none.</returns>
     public static (string Address, string SenderEmail)? Verify(string? token, byte[] hmacKey)
     {
         if (string.IsNullOrEmpty(token))

@@ -7,5 +7,6 @@ namespace wa.application.UseCases.Transfers;
 /// The endpoint maps it to 403 FORBIDDEN, keeping the closed code list intact.</summary>
 public sealed class AnalyticsForbiddenException : Exception
 {
+    /// <summary>Initializes a new instance of the <see cref="AnalyticsForbiddenException"/> class.</summary>
     public AnalyticsForbiddenException() : base("Pro plan required.") { }
 }

@@ -4,6 +4,7 @@ using System.Text.Json;
 
 namespace wa.application.UseCases.Transfers;
 
+/// <summary>Default implementation of <see cref="IUnlockTokenMinter"/>.</summary>
 public sealed class UnlockTokenService : IUnlockTokenMinter
 {
     /// <summary>TA-9.1 literal "exp: now+7d" — a security constant (token lifetime), not a plan limit, so it is NOT a Limits Registry entry (TA-3.4).</summary>
@@ -14,12 +15,17 @@ public sealed class UnlockTokenService : IUnlockTokenMinter
     private readonly byte[] _key;
     private readonly Func<DateTimeOffset> _clock;
 
+    /// <summary>Initializes a new instance of the <see cref="UnlockTokenService"/> class.</summary>
+    /// <param name="key">The key.</param>
+    /// <param name="clock">The clock.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public UnlockTokenService(byte[] key, Func<DateTimeOffset> clock)
     {
         _key = key ?? throw new ArgumentNullException(nameof(key));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
     }
 
+    /// <inheritdoc />
     public string Mint(string linkId)
     {
         var now = _clock();
@@ -37,6 +43,7 @@ public sealed class UnlockTokenService : IUnlockTokenMinter
         return signingInput + "." + Base64UrlEncode(EncodeHmac(signingInput));
     }
 
+    /// <inheritdoc />
     public bool Verify(string? token, string expectedSub)
     {
         if (string.IsNullOrEmpty(token))

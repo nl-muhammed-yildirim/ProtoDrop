@@ -10,12 +10,16 @@ public sealed class GetDataExportHandler : IRequestHandler<GetDataExportQuery, D
     private readonly IDataExportStore _store;
     private readonly IExportSasMinter _minter;
 
+    /// <summary>Initializes a new instance of the <see cref="GetDataExportHandler"/> class.</summary>
+    /// <param name="store">The store.</param>
+    /// <param name="minter">The minter.</param>
     public GetDataExportHandler(IDataExportStore store, IExportSasMinter minter)
     {
         _store = store;
         _minter = minter;
     }
 
+    /// <inheritdoc />
     public async Task<DataExportView?> Handle(GetDataExportQuery request, CancellationToken cancellationToken)
     {
         var row = await _store.GetLatestAsync(request.UserId, cancellationToken);

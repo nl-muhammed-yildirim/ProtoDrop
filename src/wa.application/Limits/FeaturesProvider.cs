@@ -16,6 +16,7 @@ public sealed class FeaturesProvider(PlansCache plans, FlagsCache flags) : IFeat
     /// <summary>The global gate keys this resolver reads (feature.ads … feature.ssoScim), derived from <see cref="PlanFeatures"/>.</summary>
     public static IReadOnlyList<string> GlobalGateKeys { get; } = Gates.Select(g => g.GateKey).ToArray();
 
+    /// <inheritdoc />
     public async Task<PlanFeatures> Resolve(string? planCode, CancellationToken cancellationToken = default)
     {
         var code = string.IsNullOrWhiteSpace(planCode) ? Plan.DefaultCode : planCode;

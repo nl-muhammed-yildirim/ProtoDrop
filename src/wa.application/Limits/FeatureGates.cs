@@ -6,11 +6,17 @@ namespace wa.application.Limits;
 /// </summary>
 public static class FeatureGates
 {
+    /// <summary>The search constant; value <c>feature.search</c>.</summary>
     public const string Search = "feature.search";
+    /// <summary>The data export constant; value <c>feature.dataExport</c>.</summary>
     public const string DataExport = "feature.dataExport";
+    /// <summary>The email settings constant; value <c>feature.emailSettings</c>.</summary>
     public const string EmailSettings = "feature.emailSettings";
+    /// <summary>The ads constant; value <c>feature.ads</c>.</summary>
     public const string Ads = "feature.ads";
+    /// <summary>The scheduling constant; value <c>feature.scheduling</c>.</summary>
     public const string Scheduling = "feature.scheduling";
+    /// <summary>The analytics constant; value <c>feature.analytics</c>.</summary>
     public const string Analytics = "feature.analytics";
 
     /// <summary>All six gates, in the story's order.</summary>

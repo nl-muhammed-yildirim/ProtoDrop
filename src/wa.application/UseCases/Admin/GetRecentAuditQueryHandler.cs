@@ -8,11 +8,15 @@ public sealed class GetRecentAuditQueryHandler : IRequestHandler<GetRecentAuditQ
 {
     private readonly IAuditReadStore _store;
 
+    /// <summary>Initializes a new instance of the <see cref="GetRecentAuditQueryHandler"/> class.</summary>
+    /// <param name="store">The store.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public GetRecentAuditQueryHandler(IAuditReadStore store)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
     }
 
+    /// <inheritdoc />
     public async Task<IReadOnlyList<AuditLog>> Handle(GetRecentAuditQuery request, CancellationToken cancellationToken)
     {
         // 50 = US-011-04 happy path 5's number (last 50 actions) — pinned as a literal, not a config value.

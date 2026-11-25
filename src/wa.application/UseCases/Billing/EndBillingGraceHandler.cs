@@ -16,6 +16,12 @@ public sealed class EndBillingGraceHandler
     private readonly WaTelemetryReporter _telemetry;
     private readonly ILogger<EndBillingGraceHandler> _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="EndBillingGraceHandler"/> class.</summary>
+    /// <param name="store">The store.</param>
+    /// <param name="events">The events.</param>
+    /// <param name="telemetry">The telemetry.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public EndBillingGraceHandler(
         IBillingGraceStore store, IEventPublisher events, WaTelemetryReporter telemetry, ILogger<EndBillingGraceHandler> logger)
     {
@@ -26,6 +32,9 @@ public sealed class EndBillingGraceHandler
     }
 
     /// <summary>Returns the number of users downgraded.</summary>
+    /// <param name="nowUtc">The now UTC.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>The resulting numeric value.</returns>
     public async Task<int> RunAsync(DateTime nowUtc, CancellationToken ct)
     {
         var downgraded = 0;

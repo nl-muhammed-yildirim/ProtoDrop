@@ -13,11 +13,16 @@ public sealed class StripeWebhookException : Exception
 {
     private StripeWebhookException(string message, bool retryable) : base(message) => Retryable = retryable;
 
+    /// <summary>Gets a value indicating whether retryable applies to the stripe webhook exception.</summary>
     public bool Retryable { get; }
 
+    /// <summary>Creates the stripe webhook exception for malformed.</summary>
+    /// <returns>The stripe webhook exception.</returns>
     public static StripeWebhookException ForMalformed() =>
         new("Stripe webhook payload is malformed.", retryable: false);
 
     /// <summary>Message carries Stripe ids only (TA-9.4).</summary>
+    /// <param name="message">The message.</param>
+    /// <returns>The stripe webhook exception.</returns>
     public static StripeWebhookException ForRetryable(string message) => new(message, retryable: true);
 }

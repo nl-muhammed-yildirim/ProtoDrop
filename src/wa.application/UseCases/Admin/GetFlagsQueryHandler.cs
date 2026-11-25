@@ -15,12 +15,17 @@ public sealed class GetFlagsQueryHandler : IRequestHandler<GetFlagsQuery, IReadO
     private readonly IFlagsStore _flags;
     private readonly PlansCache _plans;
 
+    /// <summary>Initializes a new instance of the <see cref="GetFlagsQueryHandler"/> class.</summary>
+    /// <param name="flags">The flags.</param>
+    /// <param name="plans">The plans.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public GetFlagsQueryHandler(IFlagsStore flags, PlansCache plans)
     {
         _flags = flags ?? throw new ArgumentNullException(nameof(flags));
         _plans = plans ?? throw new ArgumentNullException(nameof(plans));
     }
 
+    /// <inheritdoc />
     public async Task<IReadOnlyList<FlagView>> Handle(GetFlagsQuery request, CancellationToken cancellationToken)
     {
         var rows = (await _flags.GetAllAsync(cancellationToken)).OrderBy(f => f.Key, StringComparer.Ordinal).ToList();

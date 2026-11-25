@@ -15,6 +15,11 @@ public sealed class SetUserPlanCommandHandler : IRequestHandler<SetUserPlanComma
     private readonly IPlansStore _plans;
     private readonly IAdminUserStore _adminUsers;
 
+    /// <summary>Initializes a new instance of the <see cref="SetUserPlanCommandHandler"/> class.</summary>
+    /// <param name="users">The users.</param>
+    /// <param name="plans">The plans.</param>
+    /// <param name="adminUsers">The admin users.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public SetUserPlanCommandHandler(IAppUserStore users, IPlansStore plans, IAdminUserStore adminUsers)
     {
         _users = users ?? throw new ArgumentNullException(nameof(users));
@@ -22,6 +27,7 @@ public sealed class SetUserPlanCommandHandler : IRequestHandler<SetUserPlanComma
         _adminUsers = adminUsers ?? throw new ArgumentNullException(nameof(adminUsers));
     }
 
+    /// <inheritdoc />
     public async Task<SetUserPlanResult> Handle(SetUserPlanCommand request, CancellationToken cancellationToken)
     {
         // 1. Existence gate: no row (unknown OR soft-deleted) → NOT_FOUND (404 at the endpoint).

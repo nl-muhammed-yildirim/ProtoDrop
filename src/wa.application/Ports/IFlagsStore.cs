@@ -6,5 +6,7 @@ namespace wa.application.Ports;
 public interface IFlagsStore
 {
     /// <summary>Returns all seeded FeatureFlag rows (keys + string values, unfiltered).</summary>
+    /// <param name="cancellationToken">Token that cancels the operation.</param>
+    /// <returns>The matching feature flag items.</returns>
     Task<IReadOnlyList<FeatureFlag>> GetAllAsync(CancellationToken cancellationToken);
 }

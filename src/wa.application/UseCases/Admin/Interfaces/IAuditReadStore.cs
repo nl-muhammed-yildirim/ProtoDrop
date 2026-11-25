@@ -9,5 +9,8 @@ namespace wa.application.UseCases.Admin;
 public interface IAuditReadStore
 {
     /// <summary>Last count rows, newest first (no CreatedAtUtc tiebreak — Id is BIGINT IDENTITY).</summary>
+    /// <param name="count">The count.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>The matching audit log items.</returns>
     Task<IReadOnlyList<AuditLog>> GetRecentAsync(int count, CancellationToken ct);
 }

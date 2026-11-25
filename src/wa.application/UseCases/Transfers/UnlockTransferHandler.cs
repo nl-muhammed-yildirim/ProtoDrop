@@ -18,6 +18,11 @@ public sealed class UnlockTransferHandler : IRequestHandler<UnlockTransferComman
     private readonly WaTelemetryReporter _telemetry;
     private readonly ILogger<UnlockTransferHandler> _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="UnlockTransferHandler"/> class.</summary>
+    /// <param name="store">The store.</param>
+    /// <param name="minter">The minter.</param>
+    /// <param name="telemetry">The telemetry.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
     public UnlockTransferHandler(
         IPublicTransferStore store,
         IUnlockTokenMinter minter,
@@ -30,6 +35,7 @@ public sealed class UnlockTransferHandler : IRequestHandler<UnlockTransferComman
         _logger = logger;
     }
 
+    /// <inheritdoc />
     public async Task<UnlockTransferResult> Handle(UnlockTransferCommand request, CancellationToken cancellationToken)
     {
         // D1: null password (missing body/field) → VALIDATION via the application-level exception, BEFORE any DB access.

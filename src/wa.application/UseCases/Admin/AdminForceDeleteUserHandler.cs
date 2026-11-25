@@ -19,6 +19,12 @@ public sealed class AdminForceDeleteUserHandler : IRequestHandler<AdminForceDele
     private readonly IBlobStore _blobs;
     private readonly ILogger<AdminForceDeleteUserHandler>? _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="AdminForceDeleteUserHandler"/> class.</summary>
+    /// <param name="users">The users.</param>
+    /// <param name="eventPublisher">The event publisher.</param>
+    /// <param name="blobs">The blobs.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public AdminForceDeleteUserHandler(IAppUserStore users, IEventPublisher eventPublisher, IBlobStore blobs,
         ILogger<AdminForceDeleteUserHandler>? logger = null)
     {
@@ -28,6 +34,7 @@ public sealed class AdminForceDeleteUserHandler : IRequestHandler<AdminForceDele
         _eventPublisher = eventPublisher ?? throw new ArgumentNullException(nameof(eventPublisher));
     }
 
+    /// <inheritdoc />
     public async Task<AdminForceDeleteResult?> Handle(AdminForceDeleteUserCommand request, CancellationToken cancellationToken)
     {
         // 1. Existence gate: no row (unknown OR soft-deleted) → null (endpoint maps to 404 NOT_FOUND).

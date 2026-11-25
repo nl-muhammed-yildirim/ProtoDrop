@@ -22,6 +22,13 @@ public sealed class UploadOrgLogoHandler : IRequestHandler<UploadOrgLogoCommand,
     private readonly IOrgLogoStore _logos;
     private readonly IOrgLogoSasMinter _minter;
 
+    /// <summary>Initializes a new instance of the <see cref="UploadOrgLogoHandler"/> class.</summary>
+    /// <param name="users">The users.</param>
+    /// <param name="plan">The plan.</param>
+    /// <param name="writer">The writer.</param>
+    /// <param name="blobs">The blobs.</param>
+    /// <param name="logos">The logos.</param>
+    /// <param name="minter">The minter.</param>
     public UploadOrgLogoHandler(
         IAppUserStore users, IPlanContextAccessor plan, IBlobContentWriter writer,
         IBlobStore blobs, IOrgLogoStore logos, IOrgLogoSasMinter minter)
@@ -34,6 +41,7 @@ public sealed class UploadOrgLogoHandler : IRequestHandler<UploadOrgLogoCommand,
         _minter = minter;
     }
 
+    /// <inheritdoc />
     public async Task<OrgLogoView> Handle(UploadOrgLogoCommand request, CancellationToken cancellationToken)
     {
         var user = await _users.GetByIdAsync(request.UserId, cancellationToken);
