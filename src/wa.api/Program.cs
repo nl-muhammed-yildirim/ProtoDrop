@@ -5,6 +5,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using System.Runtime.CompilerServices;
 using wa.application.Limits;
 using wa.application.Ports;
 using wa.application.UseCases.Admin; // T-011-01: AdminRolePolicy (gate + role field)
@@ -443,7 +444,9 @@ app.MapGet("/api/v1/public/transfers/{linkId}", async (string linkId, HttpReques
             ProblemWriter.Build(410, ProblemCodes.MaxDownloadsReached, DownloadLimitDetails(result.SenderEmail)), statusCode: 410), // 409→410 explicit override (task doc status mapping)
 
         PublicTransferState.NotFound => Results.Json(
-            ProblemWriter.Build(404, ProblemCodes.TransferExpired, ExpiredDetails(null)), statusCode: 404) // FR-003-9: same body, different status line only
+            ProblemWriter.Build(404, ProblemCodes.TransferExpired, ExpiredDetails(null)), statusCode: 404), // FR-003-9: same body, different status line only
+
+        _ => throw new SwitchExpressionException(result.State)
     };
 });
 // FR-003-8/9 details text — the single string slot in the TA-4.1.3 Problem+JSON closed shape (the writer's signature has no per-field override).
@@ -486,7 +489,8 @@ app.MapPost("/api/v1/public/transfers/{linkId}/unlock", async (string linkId, Ht
             UnlockState.NotFound => Results.Json(ProblemWriter.Build(404, ProblemCodes.TransferExpired, ExpiredDetails(null)), statusCode: 404),
             // D6: status-before-password — terminal rows map to their canonical bodies regardless of credentials.
             UnlockState.Expired => Results.Json(ProblemWriter.Build(410, ProblemCodes.TransferExpired, ExpiredDetails(result.SenderEmail)), statusCode: 410),
-            UnlockState.DownloadLimit => Results.Json(ProblemWriter.Build(410, ProblemCodes.MaxDownloadsReached, DownloadLimitDetails(result.SenderEmail)), statusCode: 410)
+            UnlockState.DownloadLimit => Results.Json(ProblemWriter.Build(410, ProblemCodes.MaxDownloadsReached, DownloadLimitDetails(result.SenderEmail)), statusCode: 410),
+            _ => throw new SwitchExpressionException(result.State)
         };
     }
     catch (wa.application.UseCases.Transfers.UnlockPasswordMissingException vex)
@@ -517,7 +521,9 @@ app.MapGet("/api/v1/public/transfers/{linkId}/files/{fileId}/download-url", asyn
         FileDownloadState.DownloadLimit => Results.Json(ProblemWriter.Build(410, ProblemCodes.MaxDownloadsReached, DownloadLimitDetails(result.SenderEmail)), statusCode: 410),
 
         // TA-9.6#1: gated transfer minted without a valid ?t= → 401 UNAUTHENTICATED (never a file-list-shaped error).
-        FileDownloadState.Unauthenticated => Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401)
+        FileDownloadState.Unauthenticated => Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401),
+
+        _ => throw new SwitchExpressionException(result.State)
     };
 });
 
@@ -547,7 +553,9 @@ app.MapGet("/api/v1/public/transfers/{linkId}/download-all-url", async (string l
         DownloadAllState.Unauthenticated => Results.Json(ProblemWriter.Build(401, ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated)), statusCode: 401),
 
         // T-013-03 (FR-013-3): blob account down at mint time — 503 + code INTERNAL (no new closed-list code; TA-4.1.3's INTERNAL row).
-        DownloadAllState.StorageUnavailable => Results.Json(ProblemWriter.Build(503, ProblemCodes.Internal, "A required component is unreachable."), statusCode: 503)
+        DownloadAllState.StorageUnavailable => Results.Json(ProblemWriter.Build(503, ProblemCodes.Internal, "A required component is unreachable."), statusCode: 503),
+
+        _ => throw new SwitchExpressionException(result.State)
     };
 });
 

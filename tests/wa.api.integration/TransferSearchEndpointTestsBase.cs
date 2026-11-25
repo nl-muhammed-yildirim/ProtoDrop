@@ -46,7 +46,7 @@ public abstract class TransferSearchEndpointTestsBase(bool gateOn) : IAsyncLifet
         Environment.SetEnvironmentVariable("Wa__AdminEmails", AdminEmail);
         Environment.SetEnvironmentVariable("Wa__ServiceBus__ConnectionString", "Endpoint=" + accountUrl + ";SharedAccessKeyName=Dummy;SharedAccessKey=«redacted-secret»");
 
-        Sql = new MsSqlBuilder().WithImage("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        Sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
         await Sql.StartAsync();
         var connString = Sql.GetConnectionString();
         Environment.SetEnvironmentVariable("ConnectionStrings__WaDb", connString);

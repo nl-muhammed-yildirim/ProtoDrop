@@ -49,7 +49,7 @@ public class ResendSendDetachTests : IAsyncLifetime
         // TA-4.1.7 / EC-054-1: the outbox row commits via SbEventPublisher's own context BEFORE broker publish; a dummy connection string is deterministic.
         Environment.SetEnvironmentVariable("Wa__ServiceBus__ConnectionString", "Endpoint=" + accountUrl + ";SharedAccessKeyName=Dummy;SharedAccessKey=dummy");
 
-        _sql = new MsSqlBuilder().WithImage("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
         await _sql.StartAsync();
         _connString = _sql.GetConnectionString();
         Environment.SetEnvironmentVariable("ConnectionStrings__WaDb", _connString);

@@ -55,7 +55,9 @@ public sealed class LoginHandler : IRequestHandler<LoginCommand, LoginResult>
 
         // TA-9.1: PBKDF2-SHA256 via ASP.NET Identity PasswordHasher<string>, keyed by userId.ToString("n") — same keying as signup.
         var hasher = new PasswordHasher<string>();
-        if (hasher.VerifyHashedPassword(user.Id.ToString("n"), user.PasswordHash, request.Password) is not
+        // A magic-link-only account has no PasswordHash: nothing to verify, so it is a failed verify (same shape as no row — no 500, no leak).
+        if (user.PasswordHash is null
+            || hasher.VerifyHashedPassword(user.Id.ToString("n"), user.PasswordHash, request.Password) is not
             (PasswordVerificationResult.Success or PasswordVerificationResult.SuccessRehashNeeded))
         {
             _telemetry.LogEvent(TelemetryEvents.LoginFailed); // AC-008-1 / task §4: login_failed on the wrong-password path

@@ -209,7 +209,7 @@ public class AdminDeleteTransferCommandTests
                 }
             }
 
-            return Task.FromResult(new MarkDeleteResult(deletedAtUtc, t.LinkId));
+            return Task.FromResult<MarkDeleteResult?>(new MarkDeleteResult(deletedAtUtc, t.LinkId));
         }
     }
 }

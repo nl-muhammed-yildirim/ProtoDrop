@@ -56,7 +56,7 @@ public class LoginEndpointTests : IAsyncLifetime
         Environment.SetEnvironmentVariable("Wa__Url__Public", "http://localhost:5173");
 
         // Fresh SQL + migrations: seeds the free plan row (TA-3.4) and creates dbo.AppUser (T-052).
-        _sql = new MsSqlBuilder().WithImage("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
         await _sql.StartAsync();
         var connString = _sql.GetConnectionString();
         Environment.SetEnvironmentVariable("ConnectionStrings__WaDb", connString);

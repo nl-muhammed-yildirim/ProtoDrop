@@ -97,6 +97,22 @@ public class LoginHandlerTests
         Assert.Empty(_users.Created); // no row created on auth failure
     }
 
+    // ---- CHORE-code-style-2 DECISION-1: a magic-link-only account (no PasswordHash) is a failed verify, not a 500 ----
+
+    [Fact]
+    public async Task Login_AccountWithoutPassword_ThrowsWrongPassword_AndLogsLoginFailed()
+    {
+        var user = SeedRealAppUser(Guid.NewGuid());
+        user.PasswordHash = null;
+        _users.ExistingUser = user;
+
+        await Assert.ThrowsAsync<LoginWrongPasswordException>(async () =>
+            await _handler.Handle(new LoginCommand("real@example.com", "password123"), CancellationToken.None));
+
+        Assert.Single(_telemetryLogger.Entries, e => e.RenderedText == TelemetryEvents.LoginFailed);
+        Assert.Empty(_users.Created);
+    }
+
     // ---- EC-008-4 (no-leak): unknown email → same exception as wrong password, NOT "user not found" ----
 
     [Fact]

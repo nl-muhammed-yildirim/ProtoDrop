@@ -35,7 +35,7 @@ public class PublicTransferEndpointTests : IAsyncLifetime
         Environment.SetEnvironmentVariable("Wa__Jwt__Secret", "test-jwt-secret");
         Environment.SetEnvironmentVariable("Wa__Url__Public", "http://localhost:5173");
 
-        _sql = new MsSqlBuilder().WithImage("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
         await _sql.StartAsync();
         var connString = _sql.GetConnectionString();
         Environment.SetEnvironmentVariable("ConnectionStrings__WaDb", connString);
@@ -272,7 +272,7 @@ public class PublicTransferEndpointTests : IAsyncLifetime
         using var doc = JsonDocument.Parse(await response.Content.ReadAsByteArrayAsync());
         // GET returns files sorted by SortOrder ascending through the real adapter — not insertion order.
         Assert.Equal(["first-by-sort.txt", "second-by-sort.txt", "third-by-sort.txt"],
-            doc.RootElement.GetProperty("files").EnumerateArray().Select(f => f.GetProperty("name").GetString()).ToArray());
+            doc.RootElement.GetProperty("files").EnumerateArray().Select(f => f.GetProperty("name").GetString()!).ToArray());
     }
 
     // ---- F-TRF-003 test plan: Deleted → 404 + same shape as unknown (DECISION A: Status=4 maps to the unknown branch) ----

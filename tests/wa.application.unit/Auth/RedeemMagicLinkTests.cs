@@ -82,7 +82,7 @@ public class RedeemMagicLinkTests
         _users.ExistingUser = SeedRealAppUser(Guid.NewGuid(), planId);
         var tokenRow = SeedLiveToken("real@example.com");
 
-        var result = await _handler.Handle(new RedeemMagicLinkCommand(_tokens.Raw), CancellationToken.None);
+        var result = await _handler.Handle(new RedeemMagicLinkCommand(_tokens.Raw!), CancellationToken.None);
 
         Assert.NotNull(result); // D-4: result carries profile + SessionToken (minted by ISessionTokenMinter)
         Assert.False(string.IsNullOrWhiteSpace(result.SessionToken));

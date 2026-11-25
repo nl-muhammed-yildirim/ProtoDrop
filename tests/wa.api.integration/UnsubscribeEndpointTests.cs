@@ -51,7 +51,7 @@ public class UnsubscribeEndpointTests : IAsyncLifetime
         // Program.cs reads Wa:AdminEmails at host build — must be set before the first CreateClient below (TA-9.2 gate).
         Environment.SetEnvironmentVariable("Wa__AdminEmails", AdminEmail);
 
-        _sql = new MsSqlBuilder().WithImage("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
         await _sql.StartAsync();
         var connString = _sql.GetConnectionString();
         Environment.SetEnvironmentVariable("ConnectionStrings__WaDb", connString);

@@ -18,7 +18,7 @@ public class DeleteTransferPurgesAnalyticsTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        _container = new MsSqlBuilder().WithImage("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        _container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
         await _container.StartAsync();
         _connString = _container.GetConnectionString();
         _db = NewDb();

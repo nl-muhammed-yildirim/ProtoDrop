@@ -35,7 +35,7 @@ public class SendNotificationEmailsHandlerTests
             new byte[32]);
 
         var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string>
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Wa:Email:FromAddress"] = "no-reply@protodrop.com",
                 ["Wa:Url:Public"] = "https://protodrop.com"

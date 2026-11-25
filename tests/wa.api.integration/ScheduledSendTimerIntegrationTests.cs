@@ -34,7 +34,7 @@ public class ScheduledSendTimerIntegrationTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        _sql = new MsSqlBuilder().WithImage("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
         await _sql.StartAsync();
         _options = new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(_sql.GetConnectionString()).Options;
         _db = new WaDbContext(_options);
