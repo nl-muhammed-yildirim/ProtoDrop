@@ -23,6 +23,13 @@ public class ExpireFunction
     private readonly ILogger<ExpireFunction> _logger;
     private readonly IConfiguration _config;
 
+    /// <summary>Initializes a new instance of the <see cref="ExpireFunction"/> class.</summary>
+    /// <param name="handler">Handler that marks overdue transfers expired.</param>
+    /// <param name="scheduled">Handler that activates scheduled transfers that are due.</param>
+    /// <param name="billingEmails">Handler that queues the payment-failed reminder emails.</param>
+    /// <param name="billingGrace">Handler that downgrades users whose billing grace ended.</param>
+    /// <param name="logger">Logger for the job run (carries the generated correlation ids).</param>
+    /// <param name="config">Configuration source for the <c>Wa:Jobs:SignKey</c> that guards the HTTP trigger.</param>
     public ExpireFunction(
         ExpireTransfersHandler handler,
         ActivateScheduledTransfersHandler scheduled,
@@ -39,6 +46,9 @@ public class ExpireFunction
         _config = config;
     }
 
+    /// <summary>Timer entry point (every 15 minutes): expires overdue transfers, then runs the scheduled-send, billing-email and billing-grace sub-steps in that order inside one try block; an exception in any step is logged and rethrown, so the remaining steps are skipped until the next run.</summary>
+    /// <param name="context">Function invocation context.</param>
+    /// <param name="trigger">Timer trigger metadata (schedule status); not used.</param>
     [Function("Expire")]
     public async Task Run(
         FunctionContext context,
@@ -75,6 +85,9 @@ public class ExpireFunction
     }
 
     /// <summary>T-005-04: HTTP trigger for E2E manual invocation (accelerates the 15-min timer).</summary>
+    /// <param name="context">Function invocation context; supplies the cancellation token.</param>
+    /// <param name="req">The HTTP request; it must carry the <c>x-job-sign</c> header.</param>
+    /// <returns>200 with the counts of the steps that ran, or a 401 problem when the signature is missing or wrong.</returns>
     [Function("ExpireHttp")]
     public async Task<HttpResponseData> RunHttp(
         FunctionContext context,

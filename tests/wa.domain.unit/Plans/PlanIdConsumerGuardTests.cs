@@ -11,11 +11,12 @@ public class PlanIdConsumerGuardTests
 
     private static readonly string[] AllowList =
     [
-        "src/wa.application/UseCases/Admin/SetUserPlanCommand.cs", // admin plan write + audit
-        "src/wa.application/UseCases/Auth/Login.cs", // LoginResult.PlanCode identity
-        "src/wa.application/UseCases/Auth/MeProfile.cs", // profile DTO plan code
-        "src/wa.application/UseCases/Auth/RedeemMagicLink.cs", // login result plan code
-        "src/wa.application/UseCases/Billing/CreateCheckoutSessionCommand.cs" // already-on-plan check (identity, not a limit)
+        "src/wa.application/UseCases/Admin/SetUserPlanCommandHandler.cs", // admin plan write + audit
+        "src/wa.application/UseCases/Auth/LoginHandler.cs", // LoginResult.PlanCode identity
+        "src/wa.application/UseCases/Auth/GetProfileHandler.cs", // profile DTO plan code
+        "src/wa.application/UseCases/Auth/UpdateProfileHandler.cs", // profile DTO plan code
+        "src/wa.application/UseCases/Auth/RedeemMagicLinkHandler.cs", // login result plan code
+        "src/wa.application/UseCases/Billing/CreateCheckoutSessionHandler.cs" // already-on-plan check (identity, not a limit)
     ];
 
     [Fact]

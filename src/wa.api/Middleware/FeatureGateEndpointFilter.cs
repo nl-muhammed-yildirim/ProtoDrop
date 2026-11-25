@@ -11,6 +11,12 @@ namespace wa.api.Middleware;
 /// </summary>
 public static class FeatureGateEndpointFilter
 {
+    /// <summary>Adds an endpoint filter that answers 404 FEATURE_DISABLED while the given phase gate is off or absent.</summary>
+    /// <typeparam name="TBuilder">Endpoint convention builder type, returned for chaining.</typeparam>
+    /// <param name="builder">The endpoint or group the gate applies to.</param>
+    /// <param name="gateKey">One of the <see cref="FeatureGates"/> keys.</param>
+    /// <returns>The same <paramref name="builder"/>, so calls can be chained.</returns>
+    /// <exception cref="ArgumentException">Thrown at startup when <paramref name="gateKey"/> is not a known gate key.</exception>
     public static TBuilder RequireFeature<TBuilder>(this TBuilder builder, string gateKey) where TBuilder : IEndpointConventionBuilder
     {
         if (!FeatureGates.All.Contains(gateKey, StringComparer.Ordinal))

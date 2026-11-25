@@ -6,11 +6,17 @@ namespace wa.application.Limits;
 /// </summary>
 public static class FeatureGates
 {
+    /// <summary>Phase gate for transfer search (FR-045); the flag key is <c>feature.search</c>.</summary>
     public const string Search = "feature.search";
+    /// <summary>Phase gate for the GDPR data export (FR-047); the flag key is <c>feature.dataExport</c>.</summary>
     public const string DataExport = "feature.dataExport";
+    /// <summary>Phase gate for owner email-notification settings (FR-046); the flag key is <c>feature.emailSettings</c>.</summary>
     public const string EmailSettings = "feature.emailSettings";
+    /// <summary>Phase gate for advertising slots (F-PRF-004); the flag key is <c>feature.ads</c>.</summary>
     public const string Ads = "feature.ads";
+    /// <summary>Phase gate for scheduled sends (F-PRF-002); the flag key is <c>feature.scheduling</c>.</summary>
     public const string Scheduling = "feature.scheduling";
+    /// <summary>Phase gate for download analytics (F-PRF-003); the flag key is <c>feature.analytics</c>.</summary>
     public const string Analytics = "feature.analytics";
 
     /// <summary>All six gates, in the story's order.</summary>

@@ -17,7 +17,7 @@ public class LimitsRecord
     [JsonPropertyName("maxZipSize")]
     public long MaxZipSize { get; set; }
 
-    /// <summary>RETENTION_DAYS.</summary>
+    /// <summary>RETENTION_DAYS: number of days a transfer stays available before it expires.</summary>
     [JsonPropertyName("retentionDays")]
     public int RetentionDays { get; set; }
 
@@ -46,11 +46,14 @@ public class LimitsRecord
     public long MaxLogoSize { get; set; }
 
     /// <summary>True when the plan's MAX_DOWNLOADS is unlimited (-1 sentinel, Part 2). Callers use this instead of raw -1 checks (T-007-01).</summary>
+    /// <returns><see langword="true"/> when <see cref="MaxDownloads"/> is the unlimited sentinel; otherwise <see langword="false"/>.</returns>
     public bool IsMaxDownloadsInfinite() => MaxDownloads < 0;
 
     /// <summary>True when the plan's ACTIVE_TRANSFERS_MAX is unlimited (-1 sentinel, Part 2). Callers use this instead of raw -1 checks (T-007-01).</summary>
+    /// <returns><see langword="true"/> when <see cref="ActiveTransfersMax"/> is the unlimited sentinel; otherwise <see langword="false"/>.</returns>
     public bool IsActiveTransfersMaxInfinite() => ActiveTransfersMax < 0;
 
     /// <summary>True when the plan's MAX_ZIP_SIZE is unlimited (long.MaxValue sentinel, Part 2). Callers use this instead of raw long.MaxValue checks (T-007-01).</summary>
+    /// <returns><see langword="true"/> when <see cref="MaxZipSize"/> is the unlimited sentinel; otherwise <see langword="false"/>.</returns>
     public bool IsMaxZipSizeInfinite() => MaxZipSize == long.MaxValue;
 }

@@ -13,10 +13,15 @@ namespace wa.api.Middleware;
 /// </summary>
 public static class ProblemWriter
 {
-    /// <summary>TA-4.1.3 example format: base + lowercase machine code, e.g. <c>https://example.com/errors/transfer-size-exceeded</c>.</summary>
+    /// <summary>Prefix of the problem <c>type</c> URL; the lowercase machine code is appended, for example <c>https://example.com/errors/transfer-size-exceeded</c> (TA-4.1.3).</summary>
     public const string TypeBase = "https://example.com/errors/";
 
     /// <summary>Builds the Problem payload as a node tree with exact key order (JsonObject preserves insertion order).</summary>
+    /// <param name="status">HTTP status code.</param>
+    /// <param name="code">A closed TA-4.1.3 problem code.</param>
+    /// <param name="details">Human-readable explanation for the client.</param>
+    /// <param name="errors">Optional per-field errors, included only for validation-shaped responses.</param>
+    /// <returns>The problem body with its fields in the fixed TA-4.1.3 order.</returns>
     public static JsonObject Build(int status, string code, string details, IReadOnlyList<ProblemFieldError>? errors = null)
     {
         var payload = new JsonObject()
@@ -37,6 +42,11 @@ public static class ProblemWriter
     /// <summary>
     /// Writes the Problem response and commits it before writing a single body byte (Response.StartAsync). Kestrel flushes headers with the first bytes, so any header set after this method returns is lost — callers that must carry extra headers (e.g. Retry-After) set them on <c>context.Response.Headers</c> beforehand.
     /// </summary>
+    /// <param name="context">The current HTTP context.</param>
+    /// <param name="status">HTTP status code.</param>
+    /// <param name="code">A closed TA-4.1.3 problem code.</param>
+    /// <param name="details">Human-readable explanation for the client.</param>
+    /// <param name="errors">Optional per-field errors, included only for validation-shaped responses.</param>
     public static async Task WriteCompleteAsync(HttpContext context, int status, string code, string details, IReadOnlyList<ProblemFieldError>? errors = null)
     {
         var payload = Build(status, code, details, errors);
@@ -45,6 +55,12 @@ public static class ProblemWriter
         await context.Response.StartAsync(); // commits headers — everything set on Response.Headers up to now is locked in
         await JsonSerializer.SerializeAsync(context.Response.Body, payload);
     }
+    /// <summary>Writes the Problem+JSON body without committing the response first, so headers can still be added by the caller until the first body byte is flushed.</summary>
+    /// <param name="context">The current HTTP context.</param>
+    /// <param name="status">HTTP status code.</param>
+    /// <param name="code">A closed TA-4.1.3 problem code.</param>
+    /// <param name="details">Human-readable explanation for the client.</param>
+    /// <param name="errors">Optional per-field errors, included only for validation-shaped responses.</param>
     public static async Task WriteAsync(HttpContext context, int status, string code, string details, IReadOnlyList<ProblemFieldError>? errors = null)
     {
         var payload = Build(status, code, details, errors);

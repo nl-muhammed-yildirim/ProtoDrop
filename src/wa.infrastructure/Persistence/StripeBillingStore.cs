@@ -13,9 +13,13 @@ public sealed class StripeBillingStore : IStripeBillingStore
 {
     private readonly IDbContextFactory<WaDbContext> _factory;
 
+    /// <summary>Initializes a new instance of the <see cref="StripeBillingStore"/> class.</summary>
+    /// <param name="factory">Factory that creates a short-lived database context per call.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public StripeBillingStore(IDbContextFactory<WaDbContext> factory) =>
         _factory = factory ?? throw new ArgumentNullException(nameof(factory));
 
+    /// <inheritdoc />
     public async Task<Plan?> FindPlanByStripePriceIdAsync(string priceId, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);
@@ -30,6 +34,7 @@ public sealed class StripeBillingStore : IStripeBillingStore
         return null;
     }
 
+    /// <inheritdoc />
     public async Task<string?> FindStripeCustomerIdAsync(Guid userId, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);
@@ -40,6 +45,7 @@ public sealed class StripeBillingStore : IStripeBillingStore
             .FirstOrDefaultAsync(ct);
     }
 
+    /// <inheritdoc />
     public async Task<StripeApplyResult> ApplySubscriptionAsync(
         StripeSubscriptionChange change, Guid? targetPlanId, DateTime nowUtc, CancellationToken ct)
     {

@@ -16,18 +16,19 @@ public class PlanFeaturesConsumerGuardTests
     private static readonly string[] FeaturesProviderAllowList =
     [
         "src/wa.application/Limits/FeaturesProvider.cs", // definition
-        "src/wa.application/Limits/PlanContext.cs", // the single consumer of the viewer's plan
-        "src/wa.application/UseCases/Transfers/GetPublicTransferQuery.cs", // US-021-01: anonymous endpoint, features of the transfer SENDER's plan (no viewer PlanContext exists)
+        "src/wa.application/Limits/Interfaces/IFeaturesProvider.cs", // definition (interface)
+        "src/wa.application/Limits/PlanContextAccessor.cs", // the single consumer of the viewer's plan
+        "src/wa.application/UseCases/Transfers/GetPublicTransferHandler.cs", // US-021-01: anonymous endpoint, features of the transfer SENDER's plan (no viewer PlanContext exists)
         "src/wa.application/UseCases/Transfers/SenderBranding.cs", // US-021-02: sender's plan gates email branding (no viewer PlanContext in f-email)
         "src/wa.application/UseCases/Transfers/RecipientAds.cs", // US-024-02: anonymous recipient page — ad slot follows the SENDER's plan (EC-024-6), no viewer PlanContext
-        "src/wa.application/UseCases/Transfers/SendNotificationEmails.cs", // US-021-02: f-email handler passes the sender's features to SenderBranding
+        "src/wa.application/UseCases/Transfers/SendNotificationEmailsHandler.cs", // US-021-02: f-email handler passes the sender's features to SenderBranding
         "src/wa.workers/WorkerServices.cs", // US-021-02: worker DI wiring for the sender-plan features provider
         "src/wa.api/Program.cs" // DI wiring
     ];
 
     private static readonly string[] PlanCodeComparisonAllowList =
     [
-        "src/wa.application/UseCases/Billing/CreateCheckoutSessionCommand.cs", // checkout target / already-paid identity
+        "src/wa.application/UseCases/Billing/CreateCheckoutSessionHandler.cs", // checkout target / already-paid identity
         "src/wa.infrastructure/Persistence/BillingGraceStore.cs" // downgrade-to-free row lookup
     ];
 

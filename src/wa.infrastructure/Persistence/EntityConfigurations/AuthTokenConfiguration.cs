@@ -7,6 +7,7 @@ namespace wa.infrastructure.Persistence.EntityConfigurations;
 /// <summary>TA-3.2: dbo.AuthToken (magic links, single-use).</summary>
 public sealed class AuthTokenConfiguration : IEntityTypeConfiguration<AuthToken>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<AuthToken> b)
     {
         b.ToTable("AuthToken");

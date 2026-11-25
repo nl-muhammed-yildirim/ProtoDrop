@@ -6,6 +6,9 @@ namespace wa.domain.Privacy;
 /// </summary>
 public static class EmailMask
 {
+    /// <summary>Keeps the first character of the local part, replaces the rest of it with a fixed "****" (regardless of its length) and keeps the domain; an address with no at-sign or an empty local part becomes "****".</summary>
+    /// <param name="email">Full email address; may be null or empty.</param>
+    /// <returns>The masked address, or null when <paramref name="email"/> is null or empty.</returns>
     public static string? Mask(string? email)
     {
         if (string.IsNullOrEmpty(email))

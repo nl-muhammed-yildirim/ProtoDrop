@@ -24,6 +24,13 @@ public sealed class SendMagicLinkEmailHandler : IEmailEventHandler
     private readonly ILogger<SendMagicLinkEmailHandler> _logger;
     private readonly (string Html, string Txt) _templates;
 
+    /// <summary>Initializes a new instance of the <see cref="SendMagicLinkEmailHandler"/> class.</summary>
+    /// <param name="emailSender">Port that delivers the rendered email.</param>
+    /// <param name="eventPublisher">Publishes the <c>email.sent</c> and <c>email.failed</c> events.</param>
+    /// <param name="config">Configuration source for the public site URL and sender address.</param>
+    /// <param name="telemetry">Reporter for the email and dead-letter telemetry events.</param>
+    /// <param name="logger">Logger for payload problems and send failures.</param>
+    /// <exception cref="InvalidOperationException">Thrown when the magic-link templates are not found next to the worker binaries.</exception>
     public SendMagicLinkEmailHandler(
         IEmailSender emailSender,
         IEventPublisher eventPublisher,
@@ -49,6 +56,7 @@ public sealed class SendMagicLinkEmailHandler : IEmailEventHandler
                 "Verify the workers csproj Content Include for Emails\\templates\\**\\*.");
     }
 
+    /// <inheritdoc />
     public async Task HandleAsync(EventEnvelope envelope, int attempt, int maxDeliveryCount, CancellationToken ct)
     {
         // 1. Extract email, raw token, and expiry from the payload (TA-9.1: only hash is persisted).

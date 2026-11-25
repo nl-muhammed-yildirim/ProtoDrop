@@ -12,5 +12,6 @@ public static class CorrelationContext
     public static string CorrelationId => Current.Value?.CorrelationId ?? W3CTraceParser.NewTraceId()[..8];
 
     /// <summary>Called once per request by <c>CorrelationMiddleware</c>.</summary>
+    /// <param name="traceparent">The validated or freshly generated traceparent to expose for the rest of the current async flow.</param>
     public static void Set(TraceParent traceparent) => Current.Value = traceparent;
 }

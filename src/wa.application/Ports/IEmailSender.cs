@@ -1,16 +1,10 @@
 namespace wa.application.Ports;
 
-/// <summary>A rendered email ready to send (TA-6.7).</summary>
-public sealed record EmailMessage(
-    string To,
-    string Subject,
-    string HtmlBody,
-    string TextBody,
-    string From,
-    string? ReplyTo);
-
 /// <summary>Email sending port — implemented by CommunicationHubEmailSender (prod) or LogEmailSender (dev).</summary>
 public interface IEmailSender
 {
+    /// <summary>Hands one rendered email to the mail provider.</summary>
+    /// <param name="message">The fully rendered message to deliver.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
     Task SendAsync(EmailMessage message, CancellationToken ct);
 }

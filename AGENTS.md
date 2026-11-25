@@ -15,6 +15,10 @@ The four roles are defined in `.agents/agents/*.md`, each pinned to its local Ol
 
 Cycle per task: **architect (plan) → coder (develop) → reviewer (review)** — review FAIL or major+ finding routes back to coder; only a PASS lets the orchestrator mark the row `done` and update PROGRESS/backlog.
 
+## C# code style (enforced by the build since 2026-11-25)
+- One top-level type per file, file named after the type; interfaces in `wa.application/Ports/` or `<Area>/Interfaces/` (namespace unchanged).
+- Every public/internal type and member in `src/` needs meaningful XML docs (`<summary>`, `<param>`, `<returns>`, …). Missing/malformed docs (CS1591 etc.) are **build errors** via `src/Directory.Build.props`. Full rule: `docs/AGENT.md` §3 rule 10.
+
 ## Role separation (director vs writer)
 - **Only the Coder writes code and tests**: every file under `src/`, `tests/` (source + unit/integration/e2e tests) is written by a Coder subagent — never by the Orchestrator.
 - The Orchestrator is director + checker: it may edit docs (`docs/`, plans, PROGRESS, backlog), settings/config (Hermes config.yaml, Ollama Modelfiles, docker-compose, launchSettings.json), and plan markdown; it verifies diffs against the plan, runs gates, and makes the `docs:` commits.

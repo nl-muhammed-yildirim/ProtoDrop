@@ -7,6 +7,7 @@ namespace wa.infrastructure.Persistence.EntityConfigurations;
 /// <summary>TA-3.2: dbo.DownloadEvent + IX_DownEvent_T.</summary>
 public sealed class DownloadEventConfiguration : IEntityTypeConfiguration<DownloadEvent>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<DownloadEvent> b)
     {
         b.ToTable("DownloadEvent");

@@ -13,6 +13,12 @@ public static class StripeWebhookSignature
     /// <summary>Stripe's documented default replay tolerance (also the Stripe.net default).</summary>
     private const int ToleranceSeconds = 300;
 
+    /// <summary>Verifies a <c>Stripe-Signature</c> header against the raw body using HMAC-SHA256, accepting any matching <c>v1</c> signature within a 5-minute replay window.</summary>
+    /// <param name="header">Raw <c>Stripe-Signature</c> header value; may be null.</param>
+    /// <param name="payload">Raw request body exactly as received.</param>
+    /// <param name="secret">Webhook endpoint signing secret; may be null when unconfigured.</param>
+    /// <param name="nowUtc">Current time, used for the replay-tolerance check.</param>
+    /// <returns><see langword="true"/> when a signature matches and the timestamp is fresh; otherwise <see langword="false"/> (also for a missing header or secret).</returns>
     public static bool IsValid(string? header, string payload, string? secret, DateTimeOffset nowUtc)
     {
         if (string.IsNullOrEmpty(secret) || string.IsNullOrWhiteSpace(header) || payload is null)

@@ -6,21 +6,6 @@ using wa.domain.Correlation;
 namespace wa.application.UseCases.Admin;
 
 /// <summary>
-/// T-011-02 (FR-011-5 / TA-3.2 / TA-5.3): the audit write helper — one call writes exactly one AuditLog row
-/// (ActorEmail, Action, EntityType, EntityId, DetailsJson verbatim) AND emits exactly one admin.action domain
-/// event { actor, action, entityType, entityId, details } in the same request. Actor email is passed explicitly
-/// so commands stay thin (TA-4.2a). Reads (GETs) never call this — only mutations do.
-/// </summary>
-public interface IAuditWriter
-{
-    /// <summary>
-    /// Writes one AuditLog row + emits one admin.action event. details is serialized as plain JSON into DetailsJson
-    /// (null when null); the event payload exposes exactly actor/action/entityType/entityId/details.
-    /// </summary>
-    Task WriteAsync(string actorEmail, string action, string entityType, string? entityId, object? details, CancellationToken ct);
-}
-
-/// <summary>
 /// T-011-02: AuditWriter — the only implementation of IAuditWriter. Mirrors DeleteTransferCommand's event idiom
 /// (EventEnvelope { EventId=Guid.NewGuid(), Type, Version=1, OccurredAtUtc, CorrelationId, PartitionKey=row identity, Payload }
 /// then IEventPublisher.PublishAsync).
@@ -30,12 +15,17 @@ public sealed class AuditWriter : IAuditWriter
     private readonly IAuditStore _store;
     private readonly IEventPublisher _eventPublisher;
 
+    /// <summary>Initializes a new instance of the <see cref="AuditWriter"/> class.</summary>
+    /// <param name="store">Store that persists the audit log row.</param>
+    /// <param name="eventPublisher">Publishes the <c>admin.action</c> event.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="store"/> or <paramref name="eventPublisher"/> is null.</exception>
     public AuditWriter(IAuditStore store, IEventPublisher eventPublisher)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _eventPublisher = eventPublisher ?? throw new ArgumentNullException(nameof(eventPublisher));
     }
 
+    /// <inheritdoc />
     public async Task WriteAsync(string actorEmail, string action, string entityType, string? entityId, object? details, CancellationToken ct)
     {
         // 1. AuditLog row — columns verbatim (TA-3.2); Id is BIGINT IDENTITY server-gen; CreatedAtUtc = now.

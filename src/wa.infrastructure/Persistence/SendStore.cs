@@ -14,15 +14,20 @@ public sealed class SendStore : ISendStore
     private readonly WaDbContext _db;
     private readonly IBlobStore _blobs;   // T-010-02: the gate primitive — physical-presence checks via ExistsAsync.
 
+    /// <summary>Initializes a new instance of the <see cref="SendStore"/> class.</summary>
+    /// <param name="db">Database context that backs the store.</param>
+    /// <param name="blobs">Blob store used to check that re-sent files still physically exist.</param>
     public SendStore(WaDbContext db, IBlobStore blobs)
     {
         _db = db;
         _blobs = blobs;
     }
 
+    /// <inheritdoc />
     public Task<Transfer?> FindByIdAsync(Guid id, CancellationToken ct) =>
         _db.Set<Transfer>().FirstOrDefaultAsync(t => t.Id == id, ct);
 
+    /// <inheritdoc />
     public async Task SaveSendAsync(Transfer transfer, IReadOnlyList<EmailRecipient> recipients, CancellationToken ct)
     {
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
@@ -65,12 +70,14 @@ public sealed class SendStore : ISendStore
         await tx.CommitAsync(ct);
     }
 
+    /// <inheritdoc />
     public async Task<IReadOnlyList<string>> GetRecipientAddressesAsync(Guid transferId, CancellationToken ct) =>
         await _db.Set<EmailRecipient>()
             .Where(r => r.TransferId == transferId)
             .Select(r => r.Address)
             .ToListAsync(ct);
 
+    /// <inheritdoc />
     public async Task<IReadOnlyList<FileItemRow>> ListFileItemsByTransferAsync(Guid transferId, CancellationToken ct) =>
         await _db.Set<FileItem>()
             .AsNoTracking()
@@ -79,12 +86,16 @@ public sealed class SendStore : ISendStore
             .Select(f => new FileItemRow(f.Id, f.BlobRefId, f.OriginalName, f.SizeBytes, f.ContentType, f.SortOrder))
             .ToListAsync(ct);
 
-    /// <summary>
+    /// <inheritdoc />
+    /// <remarks>
     /// T-010-01 (AC-010-1): steps 5–8 in ONE transaction — insert the new draft Transfer + new FileItem rows, then a
     /// guarded atomic RefCount++ per shared blob (ExecuteUpdate with the guard in the WHERE, same style as
     /// PublicTransferStore.RecordSingleFileDownloadAsync; no data copy, ADR-009). rowsAffected &lt; 1 → InvalidOperationException.
     /// T-010-02 inserts its FILES_GONE gate at step 0 inside this same transaction (full rollback — AC-010-2).
-    /// </summary>
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the operation is not valid in the current state.
+    /// </exception>
     public async Task SaveResendAsync(Transfer draft, IReadOnlyList<FileItem> fileItems, IReadOnlyList<EmailRecipient> recipients, IReadOnlyList<BlobRef> sharedBlobRefs, CancellationToken ct)
     {
         await using var tx = await _db.Database.BeginTransactionAsync(ct);

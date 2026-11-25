@@ -12,12 +12,15 @@ public sealed class AuditReadStore : IAuditReadStore
 {
     private readonly WaDbContext _db;
 
+    /// <summary>Initializes a new instance of the <see cref="AuditReadStore"/> class.</summary>
+    /// <param name="db">Database context that backs the store.</param>
     public AuditReadStore(WaDbContext db) => _db = db;
 
-    /// <summary>
+    /// <inheritdoc />
+    /// <remarks>
     /// T-011-09 (TA-4.2#25): last count rows, newest first — Id is BIGINT IDENTITY so descending Id = newest first
     /// (no CreatedAtUtc tiebreak needed).
-    /// </summary>
+    /// </remarks>
     public async Task<IReadOnlyList<AuditLog>> GetRecentAsync(int count, CancellationToken ct)
     {
         return await _db.Set<AuditLog>()

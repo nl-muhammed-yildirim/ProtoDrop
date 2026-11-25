@@ -12,13 +12,16 @@ public sealed class AdminFlagStore : IAdminFlagStore
 {
     private readonly WaDbContext _db;
 
+    /// <summary>Initializes a new instance of the <see cref="AdminFlagStore"/> class.</summary>
+    /// <param name="db">Database context that backs the store.</param>
     public AdminFlagStore(WaDbContext db) => _db = db;
 
-    /// <summary>
+    /// <inheritdoc />
+    /// <remarks>
     /// T-011-08 (TA-4.2#23): single-key PK upsert — read the old row by Key, then ExecuteUpdateAsync
     /// Value + UpdatedAtUtc WHERE Key==key (last-write-wins, EC-011-1). No transaction (single-row update).
     /// Returns the OLD row (pre-update) so the handler can audit {old,new} — or null when no row for that key.
-    /// </summary>
+    /// </remarks>
     public async Task<FeatureFlag?> UpsertAsync(string key, string value, DateTime updatedAtUtc, CancellationToken ct)
     {
         // 1. Read the old row (AsNoTracking — no change tracking on this write path).

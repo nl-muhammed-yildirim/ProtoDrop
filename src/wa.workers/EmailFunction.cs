@@ -30,6 +30,12 @@ public class EmailFunction
     private readonly SendBillingEmailHandler _billingHandler;
     private readonly ILogger<EmailFunction> _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="EmailFunction"/> class.</summary>
+    /// <param name="notificationHandler">Handler for <c>transfer.created</c> recipient notifications.</param>
+    /// <param name="magicLinkHandler">Handler for sign-in link emails.</param>
+    /// <param name="forgotPasswordHandler">Handler for password-reset emails.</param>
+    /// <param name="billingHandler">Handler for billing emails.</param>
+    /// <param name="logger">Logger for the correlation scope and dispatch failures (never logs addresses).</param>
     public EmailFunction(
         SendNotificationEmailsHandler notificationHandler,
         SendMagicLinkEmailHandler magicLinkHandler,
@@ -44,6 +50,9 @@ public class EmailFunction
         _logger = logger;
     }
 
+    /// <summary>Service Bus entry point for the <c>email</c> subscription: deserializes the envelope and dispatches it to the handler for its event type, passing the delivery attempt so the last attempt can report a failure before the broker dead-letters the message.</summary>
+    /// <param name="context">Function invocation context; supplies the cancellation token.</param>
+    /// <param name="message">The received Service Bus message whose body is the serialized TA-5.2 envelope.</param>
     [Function("f-email")]
     public async Task Run(
         FunctionContext context,

@@ -12,20 +12,25 @@ public sealed class AuthTokenStore : IAuthTokenStore
 {
     private readonly WaDbContext _db;
 
+    /// <summary>Initializes a new instance of the <see cref="AuthTokenStore"/> class.</summary>
+    /// <param name="db">Database context that backs the store.</param>
     public AuthTokenStore(WaDbContext db) => _db = db;
 
-    /// <summary>TA-9.1: lookup by the SHA-256 hex token hash — single-use identity (UQ_AuthToken_Hash unique index).</summary>
+    /// <inheritdoc />
+    /// <remarks>TA-9.1: lookup by the SHA-256 hex token hash — single-use identity (UQ_AuthToken_Hash unique index).</remarks>
     public Task<AuthToken?> FindByHashAsync(string sha256Hex, CancellationToken ct) =>
         _db.Set<AuthToken>().FirstOrDefaultAsync(t => t.TokenHash == sha256Hex, ct);
 
-    /// <summary>Persist the new AuthToken row (hashed token + purpose + TTL).</summary>
+    /// <inheritdoc />
+    /// <remarks>Persist the new AuthToken row (hashed token + purpose + TTL).</remarks>
     public async Task CreateAsync(AuthToken token, CancellationToken ct)
     {
         _db.Set<AuthToken>().Add(token);
         await _db.SaveChangesAsync(ct);
     }
 
-    /// <summary>Mark the row redeemed — first redeem wins (single-use). No-op when the row is already redeemed.</summary>
+    /// <inheritdoc />
+    /// <remarks>Mark the row redeemed — first redeem wins (single-use). No-op when the row is already redeemed.</remarks>
     public async Task MarkRedeemedAsync(Guid id, DateTime redeemedAtUtc, CancellationToken ct)
     {
         var token = await _db.Set<AuthToken>().FirstOrDefaultAsync(t => t.Id == id, ct);

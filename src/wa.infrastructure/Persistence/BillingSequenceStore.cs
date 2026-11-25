@@ -17,9 +17,13 @@ public sealed class BillingSequenceStore : IBillingSequenceStore
 
     private readonly IDbContextFactory<WaDbContext> _factory;
 
+    /// <summary>Initializes a new instance of the <see cref="BillingSequenceStore"/> class.</summary>
+    /// <param name="factory">Factory that creates a short-lived database context per call.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public BillingSequenceStore(IDbContextFactory<WaDbContext> factory) =>
         _factory = factory ?? throw new ArgumentNullException(nameof(factory));
 
+    /// <inheritdoc />
     public async Task<PaymentFailedResult> StartPaymentFailedAsync(
         string eventId, string invoiceId, string stripeSubId, DateTime nowUtc, CancellationToken ct)
     {
@@ -77,6 +81,7 @@ public sealed class BillingSequenceStore : IBillingSequenceStore
         return new PaymentFailedResult(PaymentFailedOutcome.Started, subscription.Id, subscription.AppUserId, email);
     }
 
+    /// <inheritdoc />
     public async Task<InvoicePaidOutcome> CancelSequenceAsync(
         string eventId, string stripeSubId, DateTime nowUtc, CancellationToken ct)
     {
@@ -134,6 +139,7 @@ public sealed class BillingSequenceStore : IBillingSequenceStore
         return InvoicePaidOutcome.Cancelled;
     }
 
+    /// <inheritdoc />
     public async Task<IReadOnlyList<BillingSequenceRow>> GetOpenSequencesAsync(CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);
@@ -183,6 +189,7 @@ public sealed class BillingSequenceStore : IBillingSequenceStore
         return rows;
     }
 
+    /// <inheritdoc />
     public async Task<bool> TryClaimStepAsync(Guid subscriptionId, int step, DateTime anchorUtc, DateTime nowUtc, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);

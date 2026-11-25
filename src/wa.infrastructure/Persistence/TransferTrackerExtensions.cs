@@ -9,6 +9,9 @@ namespace wa.infrastructure.Persistence;
 /// </summary>
 internal static class TransferTrackerExtensions
 {
+    /// <summary>Removes every tracked entry of one transfer from the context's change tracker so that later reads see the row as the raw SQL left it.</summary>
+    /// <param name="db">Context whose change tracker is cleaned.</param>
+    /// <param name="transferId">Id of the transfer to detach.</param>
     public static void DetachTransfer(this WaDbContext db, Guid transferId)
     {
         // ChangeTracker.Entries (not Local): Local hides Deleted entries, so this also cleans one that is already Deleted.

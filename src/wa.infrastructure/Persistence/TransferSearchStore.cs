@@ -14,9 +14,12 @@ public sealed class TransferSearchStore : ITransferSearchStore
 {
     private readonly WaDbContext _db;
 
+    /// <summary>Initializes a new instance of the <see cref="TransferSearchStore"/> class.</summary>
+    /// <param name="db">Database context that backs the store.</param>
     public TransferSearchStore(WaDbContext db) => _db = db;
 
-    /// <summary>FR-045-1/3/7: one row per transfer (de-dup by construction — the rank is a CASE over EXISTS subqueries); search cursor bound to the term.</summary>
+    /// <inheritdoc />
+    /// <remarks>FR-045-1/3/7: one row per transfer (de-dup by construction — the rank is a CASE over EXISTS subqueries); search cursor bound to the term.</remarks>
     public async Task<(List<MyTransferRow> Items, string? NextCursor)> SearchByOwnerAsync(
         Guid ownerId, string term, IReadOnlyCollection<byte>? statuses,
         int? afterRank, DateTime? afterUtc, Guid? afterIdExcluded, int limit, CancellationToken ct)

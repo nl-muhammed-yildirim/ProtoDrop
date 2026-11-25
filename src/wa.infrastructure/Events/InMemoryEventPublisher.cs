@@ -12,13 +12,15 @@ namespace wa.infrastructure.Events;
 /// Expired entries are purged via an injectable clock — no unbounded growth, no real waits in tests.
 /// This is a test double, not a second implementation: production code never branches on "is this the fake?" — DI picks the adapter (TA-0.2 rule 7).
 /// </summary>
+/// <param name="ttl">How long a stored envelope is kept before it is purged.</param>
+/// <param name="clock">Time source (injected so tests can age entries without waiting).</param>
 public sealed class InMemoryEventPublisher(TimeSpan ttl, Func<DateTimeOffset> clock) : IEventPublisher
 {
     private const string TopicName = "core";
 
     private readonly ConcurrentDictionary<Guid, StoredEnvelope> _store = new();
 
-    /// <summary>DI ctor (TA-0.2 rule 7): real clock, 30-min in-process retention — mirrors the broker's 30-day topic retention scaled down to a process-lifetime fake.</summary>
+    /// <summary>DI constructor (TA-0.2 rule 7): uses the real clock and keeps envelopes for 30 minutes, a process-lifetime stand-in for the broker's topic retention.</summary>
     public InMemoryEventPublisher() : this(TimeSpan.FromMinutes(30), () => DateTimeOffset.UtcNow) { }
     /// <inheritdoc cref="IEventPublisher.PublishAsync"/> Dedup: a second publish of the same EventId is a no-op (one stored record, no double side effect).
     /// Note: synchronous body — <paramref name="cancellationToken"/> is accepted for interface parity but not observed; concurrent first-publish race on the same EventId is benign for this test double.
@@ -35,7 +37,9 @@ public sealed class InMemoryEventPublisher(TimeSpan ttl, Func<DateTimeOffset> cl
         return Task.FromResult(new DomainEventRecord { EventId = envelope.EventId, IsPublished = true });
     }
 
-    /// <summary>Returns stored envelopes for a topic in publish order (test round-trip support — AC-054-4 second Gherkin block).</summary>
+    /// <summary>Returns the stored envelopes of a topic in publish order, so tests can do publish and consume round trips without a broker (AC-054-4).</summary>
+    /// <param name="topic">Topic name; only <c>core</c> is used.</param>
+    /// <returns>The non-expired envelopes of the topic, oldest first.</returns>
     public IReadOnlyList<StoredEnvelope> GetByTopic(string topic)
     {
         PurgeExpired(clock());
@@ -50,5 +54,8 @@ public sealed class InMemoryEventPublisher(TimeSpan ttl, Func<DateTimeOffset> cl
     }
 
     /// <summary>A single stored event: its exact serialized TA-5.2 envelope + metadata for read-back and TTL checks.</summary>
+    /// <param name="Json">The exact serialized TA-5.2 envelope.</param>
+    /// <param name="Topic">Topic the envelope was published to.</param>
+    /// <param name="StoredAtUtc">Time the envelope was stored; used for ordering and expiry.</param>
     public sealed record StoredEnvelope(string Json, string Topic, DateTimeOffset StoredAtUtc);
 }

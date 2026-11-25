@@ -7,6 +7,7 @@ namespace wa.infrastructure.Persistence.EntityConfigurations;
 /// <summary>TA-3.2: dbo.StripeEvent (webhook idempotency — string PK on the Stripe event ID).</summary>
 public sealed class StripeEventConfiguration : IEntityTypeConfiguration<StripeEvent>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<StripeEvent> b)
     {
         b.ToTable("StripeEvent");

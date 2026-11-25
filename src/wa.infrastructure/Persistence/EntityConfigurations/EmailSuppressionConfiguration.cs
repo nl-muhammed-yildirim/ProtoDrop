@@ -7,6 +7,7 @@ namespace wa.infrastructure.Persistence.EntityConfigurations;
 /// <summary>TA-3.2: dbo.EmailSuppression.</summary>
 public sealed class EmailSuppressionConfiguration : IEntityTypeConfiguration<EmailSuppression>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<EmailSuppression> b)
     {
         b.ToTable("EmailSuppression");

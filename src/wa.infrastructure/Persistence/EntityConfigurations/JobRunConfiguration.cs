@@ -7,6 +7,7 @@ namespace wa.infrastructure.Persistence.EntityConfigurations;
 /// <summary>TA-3.2: dbo.JobRun — composite PK, no single-column key property.</summary>
 public sealed class JobRunConfiguration : IEntityTypeConfiguration<JobRun>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<JobRun> b)
     {
         b.ToTable("JobRun");

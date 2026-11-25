@@ -7,6 +7,7 @@ namespace wa.infrastructure.Persistence.EntityConfigurations;
 /// <summary>TA-3.2: dbo.Transfer + IX_Transfer_Expiry / IX_Transfer_Owner / IX_Transfer_Sched.</summary>
 public sealed class TransferConfiguration : IEntityTypeConfiguration<Transfer>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<Transfer> b)
     {
         b.ToTable("Transfer");

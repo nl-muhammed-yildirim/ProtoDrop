@@ -1,18 +1,11 @@
 namespace wa.application.Ports;
 
-/// <summary>A file entry for template rendering (name + size).</summary>
-public sealed record FileEntry(string Name, long SizeBytes);
-
-/// <summary>Data passed to the template renderer (TA-6.7).</summary>
-public sealed record TemplateData(
-    string SenderName,
-    IReadOnlyList<FileEntry> Files,
-    string CtaUrl,
-    int ExpiryDays,
-    string? UnsubscribeUrl = null);
-
 /// <summary>Template rendering port — implemented by StubbleTemplateRenderer. T-006-04: per-language rendering with locale parameter.</summary>
 public interface ITemplateRenderer
 {
+    /// <summary>Renders the email template for a locale, falling back to English when the locale has no template.</summary>
+    /// <param name="data">Values substituted into the template.</param>
+    /// <param name="locale">Language tag of the recipient, for example <c>en</c> or <c>nl</c>.</param>
+    /// <returns>The rendered subject, HTML body and plain-text body.</returns>
     (string Subject, string HtmlBody, string TextBody) Render(TemplateData data, string locale);
 }

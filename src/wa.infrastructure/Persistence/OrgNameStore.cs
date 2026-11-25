@@ -9,8 +9,11 @@ public sealed class OrgNameStore : IOrgNameStore
 {
     private readonly WaDbContext _db;
 
+    /// <summary>Initializes a new instance of the <see cref="OrgNameStore"/> class.</summary>
+    /// <param name="db">Database context that backs the store.</param>
     public OrgNameStore(WaDbContext db) => _db = db;
 
+    /// <inheritdoc />
     public async Task SetOrgNameAsync(Guid userId, string? orgName, CancellationToken ct)
     {
         await _db.Set<AppUser>()

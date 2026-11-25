@@ -10,10 +10,14 @@ public sealed class AppDbContextFactory : IDbContextFactory<WaDbContext>
 {
     private readonly DbContextOptions<WaDbContext> _options;
 
+    /// <summary>Initializes a new instance of the <see cref="AppDbContextFactory"/> class.</summary>
+    /// <param name="options">EF Core options shared by every context this factory creates.</param>
     public AppDbContextFactory(DbContextOptions<WaDbContext> options) => _options = options;
 
+    /// <inheritdoc />
     public WaDbContext CreateDbContext() => new(_options);
 
+    /// <inheritdoc />
     public Task<WaDbContext> CreateDbContextAsync(CancellationToken cancellationToken) =>
         Task.FromResult(new WaDbContext(_options));
 }

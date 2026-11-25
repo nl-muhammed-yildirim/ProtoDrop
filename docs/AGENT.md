@@ -38,6 +38,7 @@ See `Getting-Started-VS2026.md` for the full machine setup.
 7. Dependency rule: domain → application → infrastructure → (api, workers). EF/Azure never in domain.
 8. One MediatR `IRequest`/handler per use case; no `DbContext` in domain/use cases.
 9. Domain events via `IEventPublisher` — MediatR-free.
+10. **C# code style (CHORE-code-style, 2026-11-25):** exactly **one top-level type per file** (class/record/interface/struct/enum), file named after the type; nested types may stay nested. **Interfaces** live in `wa.application/Ports/` (ports) or an `Interfaces/` subfolder of their area (e.g. `UseCases/Transfers/Interfaces/`); namespaces do NOT follow the folder (IDE0130 silenced in `src/.editorconfig`). Every public/internal type and member in `src/` carries meaningful XML docs — `<summary>` (states intent, not the name), `<param>`, `<returns>`, `<typeparam>`/`<exception>` where relevant; `<inheritdoc />` on implementations. `src/Directory.Build.props` makes CS1570/1572/1573/1574/1587/1591 **build errors** — a missing doc fails the build. Tests are exempt from the doc rule, not from one-type-per-file.
 
 ## 4. Test gate (Definition of Done, per task)
 

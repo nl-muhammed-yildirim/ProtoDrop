@@ -7,6 +7,7 @@ namespace wa.infrastructure.Persistence.EntityConfigurations;
 /// <summary>TA-3.2: dbo.IdempotencyKey — string PK on the client-supplied Key (TA-4.1.5).</summary>
 public sealed class IdempotencyKeyConfiguration : IEntityTypeConfiguration<IdempotencyKey>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<IdempotencyKey> b)
     {
         b.ToTable("IdempotencyKey");

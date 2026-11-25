@@ -32,6 +32,10 @@ public static class FlagValueRules
     };
 
     /// <summary>True when <paramref name="key"/> is <c>limits.&lt;plan&gt;.&lt;field&gt;</c> with a known <see cref="LimitsRecord"/> field.</summary>
+    /// <param name="key">Flag key to test.</param>
+    /// <param name="planCode">Receives the plan segment when the key matches; otherwise empty.</param>
+    /// <param name="field">Receives the camelCase limit field name when the key matches; otherwise empty.</param>
+    /// <returns><see langword="true"/> when the key has the form <c>limits.{plan}.{field}</c> with a known field; otherwise <see langword="false"/>.</returns>
     public static bool TryGetLimitField(string key, out string planCode, out string field)
     {
         planCode = string.Empty;
@@ -47,10 +51,15 @@ public static class FlagValueRules
     }
 
     /// <summary>The wire type of a key: <see cref="IntegerType"/> for a known limit field, otherwise <see cref="BooleanType"/>.</summary>
+    /// <param name="key">Flag key to classify.</param>
+    /// <returns><see cref="IntegerType"/> or <see cref="BooleanType"/>.</returns>
     public static string TypeOf(string key) =>
         TryGetLimitField(key, out _, out _) ? IntegerType : BooleanType;
 
     /// <summary>True when <paramref name="value"/> is a valid raw value for <paramref name="key"/> (EC-044-1, EC-044-5).</summary>
+    /// <param name="key">Flag key the value is meant for.</param>
+    /// <param name="value">Raw text value from the admin request.</param>
+    /// <returns><see langword="true"/> when the value is <c>true</c>/<c>false</c> for a boolean key, or a positive integer (or -1 where unlimited is allowed) that fits the field for a limit key; otherwise <see langword="false"/>.</returns>
     public static bool IsValid(string key, string value)
     {
         if (value is null) return false;

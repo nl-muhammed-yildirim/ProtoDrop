@@ -11,8 +11,11 @@ public sealed class ZipFileSource : IZipFileSource
 {
     private readonly WaDbContext _db;
 
+    /// <summary>Initializes a new instance of the <see cref="ZipFileSource"/> class.</summary>
+    /// <param name="db">Database context that backs the store.</param>
     public ZipFileSource(WaDbContext db) => _db = db;
 
+    /// <inheritdoc />
     public async Task<(bool Found, IReadOnlyList<PublicFileItem> Files)> GetFilesByTransferIdAsync(Guid transferId, CancellationToken ct)
     {
         var transfer = await _db.Set<Transfer>().AsNoTracking().FirstOrDefaultAsync(t => t.Id == transferId, ct);

@@ -12,8 +12,11 @@ public sealed class ExpiryStore : IExpiryStore
 {
     private readonly WaDbContext _db;
 
+    /// <summary>Initializes a new instance of the <see cref="ExpiryStore"/> class.</summary>
+    /// <param name="db">Database context that backs the store.</param>
     public ExpiryStore(WaDbContext db) => _db = db;
 
+    /// <inheritdoc />
     public async Task<bool> TryClaimAsync(DateTime runWindowStartUtc, DateTime lockUntilUtc, CancellationToken ct)
     {
         try
@@ -31,6 +34,7 @@ public sealed class ExpiryStore : IExpiryStore
         }
     }
 
+    /// <inheritdoc />
     public async Task<IReadOnlyList<ExpiryBatchRow>> GetNextBatchAsync(DateTime cutoffUtc, int batchSize, CancellationToken ct)
     {
         return await _db.Set<Transfer>()
@@ -42,6 +46,7 @@ public sealed class ExpiryStore : IExpiryStore
             .ToListAsync(ct);
     }
 
+    /// <inheritdoc />
     public async Task<int> MarkExpiredAsync(IReadOnlyList<Guid> transferIds, DateTime expiredAtUtc, CancellationToken ct)
     {
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
@@ -54,6 +59,7 @@ public sealed class ExpiryStore : IExpiryStore
         return updated;
     }
 
+    /// <inheritdoc />
     public async Task CompleteClaimAsync(DateTime runWindowStartUtc, CancellationToken ct)
     {
         var jobRun = _db.Set<JobRun>().Find("expire", runWindowStartUtc);

@@ -7,11 +7,15 @@ public sealed class WaDbContextFactory : IDbContextFactory<WaDbContext>
 {
     private readonly DbContextOptions<WaDbContext> _options;
 
+    /// <summary>Initializes a new instance of the <see cref="WaDbContextFactory"/> class.</summary>
+    /// <param name="options">EF Core options shared by every context this factory creates.</param>
     public WaDbContextFactory(DbContextOptions<WaDbContext> options) => _options = options;
 
+    /// <inheritdoc />
     public Task<WaDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(new WaDbContext(_options));
 
-    // Sync overload required by EF Core 10's IDbContextFactory<T>.
+    /// <summary>Synchronous overload that EF Core 10 requires on <see cref="IDbContextFactory{TContext}"/>.</summary>
+    /// <returns>A new context over the shared options.</returns>
     public WaDbContext CreateDbContext() => new(_options);
 }

@@ -7,6 +7,7 @@ namespace wa.infrastructure.Persistence.EntityConfigurations;
 /// <summary>TA-3.2: dbo.BlobRef + IX_BlobRef_Cleanup (filtered).</summary>
 public sealed class BlobRefConfiguration : IEntityTypeConfiguration<BlobRef>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<BlobRef> b)
     {
         b.ToTable("BlobRef");

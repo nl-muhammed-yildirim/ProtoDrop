@@ -7,6 +7,7 @@ namespace wa.infrastructure.Persistence.EntityConfigurations;
 /// <summary>TA-3.2: dbo.FileItem + IX_FileItem_T.</summary>
 public sealed class FileItemConfiguration : IEntityTypeConfiguration<FileItem>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<FileItem> b)
     {
         b.ToTable("FileItem");

@@ -14,12 +14,15 @@ public sealed class AdminTransferStore : IAdminTransferStore
 {
     private readonly WaDbContext _db;
 
+    /// <summary>Initializes a new instance of the <see cref="AdminTransferStore"/> class.</summary>
+    /// <param name="db">Database context that backs the store.</param>
     public AdminTransferStore(WaDbContext db) => _db = db;
 
-    /// <summary>
+    /// <inheritdoc />
+    /// <remarks>
     /// T-011-05 (TA-4.2#21 / FR-011-4): admin force-delete — soft-delete only + RefCount decrement (mirrors
     /// TransferStore.MarkDeletedAsync with the owner predicate removed, three bounded queries total).
-    /// </summary>
+    /// </remarks>
     public async Task<MarkDeleteResult?> AdminMarkDeletedAsync(Guid id, DateTime deletedAtUtc, CancellationToken ct)
     {
         await using var tx = await _db.Database.BeginTransactionAsync(ct);

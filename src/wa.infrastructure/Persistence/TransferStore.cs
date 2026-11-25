@@ -13,19 +13,24 @@ public sealed class TransferStore : ITransferStore
 {
     private readonly WaDbContext _db;
 
+    /// <summary>Initializes a new instance of the <see cref="TransferStore"/> class.</summary>
+    /// <param name="db">Database context that backs the store.</param>
     public TransferStore(WaDbContext db) => _db = db;
 
+    /// <inheritdoc />
     public Task<IdempotencyKey?> FindByIdempotencyKeyAsync(string key, CancellationToken ct) =>
         _db.Set<IdempotencyKey>().FirstOrDefaultAsync(k => k.Key == key, ct);
 
+    /// <inheritdoc />
     public Task<bool> TransferExistsByLinkIdAsync(string linkId, CancellationToken ct) =>
         _db.Set<Transfer>().AnyAsync(t => t.LinkId == linkId, ct);
 
-    /// <summary>
+    /// <inheritdoc />
+    /// <remarks>
     /// T-010-04 (US-010-03 / AC-010-1): count UNIQUE BlobRefs — a re-send adds FileItem rows pointing at the same
     /// BlobRefId(s) without changing the original's Status, so summing Transfer.TotalBytes per row double-counts.
     /// Sum BlobRef.SizeBytes over distinct blob ids instead (three bounded queries; EF folds them to one subquery).
-    /// </summary>
+    /// </remarks>
     public async Task<long> GetActiveStorageBytesAsync(Guid ownerId, CancellationToken ct)
     {
         // (a) active transfer ids for this owner — Status IN (1,3,5): a Scheduled transfer is live and holds its blobs (US-022-01, D-5).
@@ -45,17 +50,19 @@ public sealed class TransferStore : ITransferStore
             .SumAsync(b => b.SizeBytes, ct);
     }
 
+    /// <inheritdoc />
     public async Task<int> GetActiveTransferCountAsync(Guid ownerId, CancellationToken ct) =>
         await _db.Set<Transfer>()
             .Where(t => t.OwnerAppUserId == ownerId && (t.Status == 1 || t.Status == 3 || t.Status == TransferStatus.Scheduled))
             .CountAsync(ct);
 
-    /// <summary>
+    /// <inheritdoc />
+    /// <remarks>
     /// T-009-01 (TA-4.1.4): owner-scoped My Files page. Single query — OrderByDescending(CreatedAtUtc) + cursor predicate
     /// (CreatedAtUtc &lt; @afterUtc OR (= AND Id &lt; @afterIdExcluded)) + Take(limit+1) for next-page detection; RecipientCount
     /// via scalar subquery over EmailRecipient (EF translates to a scalar subselect — no N+1); Name = first FileItem.OriginalName
     /// ordered by SortOrder then Id, or literal "Transfer" when the transfer has no files (no SelectMany per row).
-    /// </summary>
+    /// </remarks>
     public async Task<(List<MyTransferRow> Items, string? NextCursor)> ListByOwnerAsync(Guid ownerId, DateTime? afterUtc, Guid? afterIdExcluded, int limit, IReadOnlyCollection<byte>? statuses, CancellationToken ct)
     {
         var rows = await _db.Set<Transfer>()
@@ -99,13 +106,14 @@ public sealed class TransferStore : ITransferStore
         return (items, nextCursor);
     }
 
-    /// <summary>
+    /// <inheritdoc />
+    /// <remarks>
     /// T-009-03 (TA-4.2#15): owner-scoped My Files detail — three bounded queries total (AC-009-1: no per-row round-trips).
     /// Row predicate Id=@id AND OwnerAppUserId=@ownerId AND DeletedAtUtc==null in ONE query → foreign owner / guest-created
     /// / deleted / unknown id are all indistinguishable nulls (no FORBIDDEN path; enumeration-safe). Separate projections for
     /// files + recipients (PublicTransferStore.GetByLinkIdAsync idiom — no navigation from Transfer; golden rule 8: no EF
     /// entities in use cases), AsNoTracking throughout.
-    /// </summary>
+    /// </remarks>
     public async Task<GetMyTransferResult?> GetByOwnerAsync(Guid ownerId, Guid id, CancellationToken ct)
     {
         var t = await _db.Set<Transfer>()
@@ -136,10 +144,11 @@ public sealed class TransferStore : ITransferStore
             files, recipients);
     }
 
-    /// <summary>
+    /// <inheritdoc />
+    /// <remarks>
     /// T-009-04 (TA-4.2#17 / FR-009-3): owner delete — soft-delete only + RefCount decrement (mirrors
     /// ExpiryDeletionStore.DeleteTransfersAsync's idiom for a SINGLE transfer, three bounded queries total).
-    /// </summary>
+    /// </remarks>
     public async Task<MarkDeleteResult?> MarkDeletedAsync(Guid id, Guid ownerId, DateTime deletedAtUtc, CancellationToken ct)
     {
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
@@ -193,6 +202,7 @@ public sealed class TransferStore : ITransferStore
         return new MarkDeleteResult(deletedAtUtc, t.LinkId);
     }
 
+    /// <inheritdoc />
     public async Task SaveFinalizeAsync(Transfer transfer, IReadOnlyList<BlobRef> blobRefs, IReadOnlyList<FileItem> fileItems, IdempotencyKey idempotencyKey, CancellationToken ct)
     {
         await using var tx = await _db.Database.BeginTransactionAsync(ct);

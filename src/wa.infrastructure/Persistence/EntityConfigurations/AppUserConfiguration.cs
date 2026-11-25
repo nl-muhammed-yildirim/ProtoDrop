@@ -7,6 +7,7 @@ namespace wa.infrastructure.Persistence.EntityConfigurations;
 /// <summary>TA-3.2: dbo.AppUser.</summary>
 public sealed class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<AppUser> b)
     {
         b.ToTable("AppUser");

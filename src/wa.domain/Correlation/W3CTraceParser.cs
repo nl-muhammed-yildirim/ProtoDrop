@@ -10,10 +10,14 @@ public static class W3CTraceParser
     private const int ParentIdLength = 16; // 8 bytes hex
 
     /// <summary>Returns the validated trace-id (32 lowercase hex chars), or <c>null</c> when the header is absent/malformed/wrong-version.</summary>
+    /// <param name="traceparent">Raw <c>traceparent</c> header value; may be null or blank.</param>
+    /// <returns>The lowercase 32-hex trace-id, or null when the header is absent, malformed, of the wrong version or all zeros.</returns>
     public static string? ParseTraceId(string? traceparent)
         => Parse(traceparent)?.TraceId;
 
     /// <summary>Parses a W3C <c>traceparent</c> value. Returns the full 4-field form (version zero-padded to "00", lowercase), or <c>null</c>.</summary>
+    /// <param name="traceparent">Raw <c>traceparent</c> header value; may be null or blank.</param>
+    /// <returns>The normalized <see cref="TraceParent"/>, or null when the value is absent or invalid (never throws).</returns>
     public static TraceParent? Parse(string? traceparent)
     {
         if (string.IsNullOrWhiteSpace(traceparent))
@@ -33,24 +37,18 @@ public static class W3CTraceParser
     }
 
     /// <summary>Generates a fresh trace-id (16 random bytes) for requests without an inbound header.</summary>
+    /// <returns>A 32-character lowercase hex string (a GUID without dashes).</returns>
     public static string NewTraceId() => Guid.NewGuid().ToString("n");
 
     /// <summary>Generates a fresh valid W3C traceparent (version "00", new 32-hex trace-id, new 16-hex parent-id, flags "07") for surfaces without an inbound header.</summary>
+    /// <returns>A new, valid <see cref="TraceParent"/> with random trace and parent ids.</returns>
     public static TraceParent New() => new(SupportedVersion, NewTraceId(), Guid.NewGuid().ToString("n")[..ParentIdLength], "07");
 
     /// <summary>Returns true when the value is a valid W3C traceparent (version "00", 32-hex trace-id, 16-hex parent-id, 2-hex flags); false for null/empty/malformed/wrong-version/all-zero.</summary>
+    /// <param name="value">Candidate <c>traceparent</c> header value; may be null.</param>
+    /// <returns><see langword="true"/> when <paramref name="value"/> parses to a valid traceparent; otherwise <see langword="false"/>.</returns>
     public static bool IsValid(string? value) => Parse(value) is not null;
 
     private static bool IsAllHex(string s, int length) =>
         s.Length == length && s.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
-}
-
-/// <summary>A validated W3C traceparent (version 00).</summary>
-public sealed record TraceParent(string Version, string TraceId, string ParentId, string Flags)
-{
-    /// <summary>The full header value — kept separately for App Insights (TA-10.1).</summary>
-    public string ToHeader() => $"{Version}-{TraceId}-{ParentId}-{Flags}";
-
-    /// <summary>CorrelationId = first 8 hex of trace-id (TA-10.1) — exactly 8 chars, not the full trace-id.</summary>
-    public string CorrelationId => TraceId[..8];
 }

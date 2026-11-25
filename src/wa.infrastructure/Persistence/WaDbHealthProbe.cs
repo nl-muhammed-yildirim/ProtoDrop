@@ -17,6 +17,8 @@ public sealed class WaDbHealthProbe : IDbHealthProbe
     private readonly string _masterConnectionString;
     private readonly string _databaseName;
 
+    /// <summary>Initializes a new instance of the <see cref="WaDbHealthProbe"/> class.</summary>
+    /// <param name="configuration">Configuration source; supplies the <c>WaDb</c> connection string.</param>
     public WaDbHealthProbe(IConfiguration configuration)
     {
         var builder = new SqlConnectionStringBuilder(configuration.GetConnectionString("WaDb"))
@@ -29,6 +31,7 @@ public sealed class WaDbHealthProbe : IDbHealthProbe
         _masterConnectionString = builder.ConnectionString;
     }
 
+    /// <inheritdoc />
     public async Task PingAsync(CancellationToken cancellationToken)
     {
         await EnsureDatabaseAsync(cancellationToken);

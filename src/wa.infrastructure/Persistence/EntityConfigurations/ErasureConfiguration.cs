@@ -7,6 +7,7 @@ namespace wa.infrastructure.Persistence.EntityConfigurations;
 /// <summary>US-047-02: dbo.Erasure (account-deletion markers). No FK to AppUser — a later hard delete must not erase the erasure record.</summary>
 public sealed class ErasureConfiguration : IEntityTypeConfiguration<Erasure>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<Erasure> b)
     {
         b.ToTable("Erasure");

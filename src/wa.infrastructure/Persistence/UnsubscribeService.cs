@@ -5,9 +5,6 @@ using wa.application.UseCases.Transfers;
 
 namespace wa.infrastructure.Persistence;
 
-/// <summary>T-006-03 (FR-006-5): Unsubscribe result — Success or NotFound.</summary>
-public record UnsubscribeResult(bool Success);
-
 /// <summary>
 /// T-006-03 (FR-006-5, TA-6.7): Unsubscribe handler — verify token + insert EmailSuppression idempotently.
 /// Plain sealed class (no MediatR) following the T-006-01 pattern; called directly from Program.cs's MapGet.
@@ -18,6 +15,10 @@ public sealed class UnsubscribeService
     private readonly byte[] _hmacKey;
     private readonly ILogger<UnsubscribeService> _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="UnsubscribeService"/> class.</summary>
+    /// <param name="db">Database context that stores the suppression rows.</param>
+    /// <param name="hmacKey">Secret key bytes the unsubscribe tokens are signed with.</param>
+    /// <param name="logger">Logger for diagnostics (never logs the address).</param>
     public UnsubscribeService(WaDbContext db, byte[] hmacKey, ILogger<UnsubscribeService> logger)
     {
         _db = db;
@@ -29,6 +30,9 @@ public sealed class UnsubscribeService
     /// Verify the token and insert an EmailSuppression row (idempotent via UQ_ES unique constraint).
     /// EC-006-3: suppression created mid-batch can at most save or miss one email — documented, no lock needed.
     /// </summary>
+    /// <param name="token">Token taken from the unsubscribe link.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>A successful result when the suppression exists afterwards; a failed result when the token is invalid.</returns>
     public async Task<UnsubscribeResult> HandleAsync(string token, CancellationToken ct)
     {
         if (UnsubscribeToken.Verify(token, _hmacKey) is not (string Address, string SenderEmail))

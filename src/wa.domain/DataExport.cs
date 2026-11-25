@@ -3,6 +3,7 @@ namespace wa.domain;
 /// <summary>US-047-01 (FR-047-1/2): one GDPR data-export request. Table dbo.DataExport (TA-3.7 migration AddDataExport).</summary>
 public class DataExport
 {
+    /// <summary>Primary key of the export request.</summary>
     public Guid Id { get; set; }
     /// <summary>The requesting user. No FK: soft-deleted users keep their rows (EC-047-3).</summary>
     public Guid AppUserId { get; set; }
@@ -10,23 +11,8 @@ public class DataExport
     public byte State { get; set; }
     /// <summary>Canonical blob path of the zip once ready (BlobPaths.DataExportZip); null until then.</summary>
     public string? BlobPath { get; set; }
+    /// <summary>UTC instant the export was requested.</summary>
     public DateTime CreatedAtUtc { get; set; }
+    /// <summary>UTC instant the zip became downloadable; null while processing or after a failure.</summary>
     public DateTime? ReadyAtUtc { get; set; }
-}
-
-/// <summary>US-047-01: the three <see cref="DataExport.State"/> values and their wire names.</summary>
-public static class DataExportState
-{
-    public const byte Processing = 0;
-    public const byte Ready = 1;
-    public const byte Failed = 2;
-
-    /// <summary>The lowercase wire name of a state; throws for an unknown value.</summary>
-    public static string WireName(byte state) => state switch
-    {
-        Processing => "processing",
-        Ready => "ready",
-        Failed => "failed",
-        _ => throw new ArgumentOutOfRangeException(nameof(state), state, "Unknown data export state."),
-    };
 }

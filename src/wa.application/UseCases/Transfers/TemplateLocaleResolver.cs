@@ -14,6 +14,8 @@ public static class TemplateLocaleResolver
     /// - If preferredLanguage is not in SupportedLocales → "en" (fallback)
     /// - Otherwise → preferredLanguage (lowercased, trimmed)
     /// </summary>
+    /// <param name="preferredLanguage">Language tag stored for the recipient; may be null or blank.</param>
+    /// <returns>The lowercased, trimmed language when a template exists for it, otherwise <c>en</c>.</returns>
     public static string Resolve(string? preferredLanguage)
     {
         if (string.IsNullOrWhiteSpace(preferredLanguage))
@@ -27,5 +29,7 @@ public static class TemplateLocaleResolver
     /// Check if a locale is supported (has both .html and .txt templates).
     /// Used for parity validation.
     /// </summary>
+    /// <param name="locale">Lowercase language tag to test.</param>
+    /// <returns><see langword="true"/> when email templates exist for the locale; otherwise <see langword="false"/>.</returns>
     public static bool IsSupported(string locale) => SupportedLocales.Contains(locale);
 }

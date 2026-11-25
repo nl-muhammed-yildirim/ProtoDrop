@@ -7,6 +7,9 @@ namespace wa.domain.Transfers;
 public static class CursorCodec
 {
     /// <summary>Encodes a cursor from the last row of a page.</summary>
+    /// <param name="createdAtUtc">CreatedAtUtc of the last row on the page.</param>
+    /// <param name="id">Id of the last row on the page; breaks ties between equal timestamps.</param>
+    /// <returns>The opaque base64 cursor to hand to the client.</returns>
     public static string Encode(DateTime createdAtUtc, Guid id) =>
         Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{createdAtUtc:O}:{id:N}"));
 
@@ -14,6 +17,9 @@ public static class CursorCodec
     /// Decodes a cursor into (createdAtUtc, id). Throws <see cref="CursorFormatException"/> on any malformed input —
     /// the endpoint maps that to 400 VALIDATION (existing ProblemCodes member; no new closed-list entry).
     /// </summary>
+    /// <param name="cursor">Opaque cursor previously produced by <see cref="Encode"/>.</param>
+    /// <returns>The CreatedAtUtc and Id of the last row of the previous page.</returns>
+    /// <exception cref="CursorFormatException">Thrown when a cursor format failure is detected.</exception>
     public static (DateTime CreatedAtUtc, Guid Id) Decode(string cursor)
     {
         string? raw;
@@ -42,10 +48,4 @@ public static class CursorCodec
 
         return (createdAtUtc, id);
     }
-}
-
-/// <summary>T-009-01: a cursor failed to decode — the endpoint maps this to 400 VALIDATION via BusinessException.</summary>
-public sealed class CursorFormatException : Exception
-{
-    public CursorFormatException(string message) : base(message) { }
 }

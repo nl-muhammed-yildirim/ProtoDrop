@@ -12,9 +12,13 @@ public sealed class GdprSweepStore : IGdprSweepStore
 
     private readonly IDbContextFactory<WaDbContext> _factory;
 
+    /// <summary>Initializes a new instance of the <see cref="GdprSweepStore"/> class.</summary>
+    /// <param name="factory">Factory that creates a short-lived database context per call.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public GdprSweepStore(IDbContextFactory<WaDbContext> factory) =>
         _factory = factory ?? throw new ArgumentNullException(nameof(factory));
 
+    /// <inheritdoc />
     public async Task<bool> TryClaimAsync(DateTime windowStartUtc, DateTime lockUntilUtc, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);
@@ -31,6 +35,7 @@ public sealed class GdprSweepStore : IGdprSweepStore
         }
     }
 
+    /// <inheritdoc />
     public async Task CompleteClaimAsync(DateTime windowStartUtc, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);
@@ -42,6 +47,7 @@ public sealed class GdprSweepStore : IGdprSweepStore
         }
     }
 
+    /// <inheritdoc />
     public async Task<IReadOnlyList<Guid>> GetDueAsync(DateTime deletedBeforeUtc, int batchSize, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);
@@ -53,6 +59,7 @@ public sealed class GdprSweepStore : IGdprSweepStore
             .ToListAsync(ct);
     }
 
+    /// <inheritdoc />
     public async Task MarkSweptAsync(Guid userId, DateTime sweptAtUtc, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);

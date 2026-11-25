@@ -29,6 +29,14 @@ public class ZipFunction
     private readonly IConfiguration _config;
     private readonly ILogger<ZipFunction> _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="ZipFunction"/> class.</summary>
+    /// <param name="blobStore">Blob store that holds the files and receives the zip.</param>
+    /// <param name="sasMinter">Mints the read URLs used to stream each file into the zip.</param>
+    /// <param name="fileSource">Source of the transfer's file list.</param>
+    /// <param name="limits">Provider of the guest plan's limits, including the zip size cap.</param>
+    /// <param name="telemetry">Reporter for the <c>zip_generated</c> and <c>zip_failed</c> events.</param>
+    /// <param name="config">Configuration source for the <c>x-zip-sign</c> key.</param>
+    /// <param name="logger">Logger for the run (carries the correlation ids).</param>
     public ZipFunction(
         IBlobStore blobStore,
         IBlobSasMinter sasMinter,
@@ -47,6 +55,11 @@ public class ZipFunction
         _logger = logger;
     }
 
+    /// <summary>HTTP entry point <c>POST zip/{transferId}</c>: builds the zip of a transfer, streaming it to blob storage, and answers with the outcome. Requires a valid <c>x-zip-sign</c> header; an existing zip is reused.</summary>
+    /// <param name="context">Function invocation context.</param>
+    /// <param name="req">The HTTP request, which carries the <c>x-zip-sign</c> and optional <c>traceparent</c> headers.</param>
+    /// <param name="transferIdParam">Route value: id of the transfer to zip.</param>
+    /// <returns>A JSON response describing the result, or a problem response for a bad signature, unknown transfer or exceeded zip limit.</returns>
     [Function("Zip")]
     public async Task<HttpResponseData> Run(
         FunctionContext context,
@@ -162,9 +175,10 @@ public class ZipFunction
         }
     }
 
-    /// <summary>
-    /// FR-004-5: de-dup algorithm for zip entry names — deterministic, ordered by SortOrder.
-    /// </summary>
+    /// <summary>FR-004-5: de-dup algorithm for zip entry names — deterministic, ordered by SortOrder.</summary>
+    /// <param name="originalName">File name as uploaded.</param>
+    /// <param name="usedNames">Names already used in the zip; the chosen name is added to it.</param>
+    /// <returns>The original name, or the name with a counter suffix when it was already taken.</returns>
     public static string DeduplicateName(string originalName, HashSet<string> usedNames)
     {
         if (usedNames.Add(originalName)) return originalName;

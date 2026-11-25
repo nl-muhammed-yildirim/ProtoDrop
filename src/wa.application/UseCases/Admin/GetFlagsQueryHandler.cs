@@ -1,0 +1,88 @@
+using MediatR;
+using System.Globalization;
+using System.Text.Json;
+using wa.application.Limits;
+using wa.application.Ports;
+
+namespace wa.application.UseCases.Admin;
+
+/// <summary>
+/// T-011-08 / US-044-01: list all flag rows ordered by Key ascending (no paging). Flag rows come from IFlagsStore;
+/// plan defaults come through <see cref="PlansCache"/> (every plan read goes through the caches).
+/// </summary>
+public sealed class GetFlagsQueryHandler : IRequestHandler<GetFlagsQuery, IReadOnlyList<FlagView>>
+{
+    private readonly IFlagsStore _flags;
+    private readonly PlansCache _plans;
+
+    /// <summary>Initializes a new instance of the <see cref="GetFlagsQueryHandler"/> class.</summary>
+    /// <param name="flags">Store that lists all flag rows.</param>
+    /// <param name="plans">Cache used to read each limit's seeded plan default.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="flags"/> or <paramref name="plans"/> is null.</exception>
+    public GetFlagsQueryHandler(IFlagsStore flags, PlansCache plans)
+    {
+        _flags = flags ?? throw new ArgumentNullException(nameof(flags));
+        _plans = plans ?? throw new ArgumentNullException(nameof(plans));
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<FlagView>> Handle(GetFlagsQuery request, CancellationToken cancellationToken)
+    {
+        var rows = (await _flags.GetAllAsync(cancellationToken)).OrderBy(f => f.Key, StringComparer.Ordinal).ToList();
+
+        // Plan LimitsJson parsed once per plan per call; null = unknown plan or unparsable JSON.
+        var planDocs = new Dictionary<string, JsonDocument?>(StringComparer.Ordinal);
+        var result = new List<FlagView>(rows.Count);
+        try
+        {
+            foreach (var row in rows)
+            {
+                var type = FlagValueRules.TypeOf(row.Key);
+                string? planDefault = null;
+                if (type == FlagValueRules.IntegerType
+                    && FlagValueRules.TryGetLimitField(row.Key, out var planCode, out var field))
+                {
+                    if (!planDocs.TryGetValue(planCode, out var doc))
+                    {
+                        doc = await LoadAsync(planCode, cancellationToken);
+                        planDocs[planCode] = doc;
+                    }
+                    if (doc is not null && doc.RootElement.TryGetProperty(field, out var element))
+                        planDefault = element.GetRawText();
+                }
+                result.Add(new FlagView(row.Key, row.Value, row.UpdatedAtUtc, type, planDefault, IsOverridden(row.Value, planDefault), row.Description));
+            }
+        }
+        finally
+        {
+            foreach (var doc in planDocs.Values) doc?.Dispose();
+        }
+        return result;
+    }
+
+    private async Task<JsonDocument?> LoadAsync(string planCode, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var plan = await _plans.GetAsync(planCode, cancellationToken);
+            return JsonDocument.Parse(plan.LimitsJson);
+        }
+        catch (PlanUnknownException)
+        {
+            return null; // field is a limit but the plan has no seed row → no default to compare against
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static bool IsOverridden(string value, string? planDefault)
+    {
+        if (planDefault is null) return false;
+        if (long.TryParse(value, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var a)
+            && long.TryParse(planDefault, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var b))
+            return a != b;
+        return !string.Equals(value, planDefault, StringComparison.Ordinal);
+    }
+}

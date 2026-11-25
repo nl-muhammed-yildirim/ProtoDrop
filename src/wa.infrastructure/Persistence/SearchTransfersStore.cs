@@ -13,15 +13,18 @@ public sealed class SearchTransfersStore : ISearchTransfersStore
 {
     private readonly WaDbContext _db;
 
+    /// <summary>Initializes a new instance of the <see cref="SearchTransfersStore"/> class.</summary>
+    /// <param name="db">Database context that backs the store.</param>
     public SearchTransfersStore(WaDbContext db) => _db = db;
 
-    /// <summary>
+    /// <inheritdoc />
+    /// <remarks>
     /// T-011-04 (TA-4.2#21): single bounded query mirroring ListByOwnerAsync's shape — OrderByDescending(CreatedAtUtc).ThenByDescending(Id)
     /// + cursor predicate (CreatedAtUtc &lt; @afterUtc OR (= AND Id &lt; @afterIdExcluded)) + Take(limit+1) for next-page detection.
     /// q semantics (DECISION): OR in ONE predicate — t.LinkId == q OR EXISTS EmailRecipient Address LIKE %q% — satisfies both gherkin cases
     /// with one param and no shape sniffing. LinkId equality is case-insensitive via SQL Server CI collation (same idiom as TransferStore L22).
     /// Owner email via the OverviewStore subquery idiom (AppUser where Id == t.OwnerAppUserId, FirstOrDefault — null for guest transfers).
-    /// </summary>
+    /// </remarks>
     public async Task<(List<AdminTransferRow> Items, string? NextCursor)> SearchAsync(
         string? q,
         bool matchFilesAndSender,
