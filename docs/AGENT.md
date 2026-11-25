@@ -39,6 +39,7 @@ See `Getting-Started-VS2026.md` for the full machine setup.
 8. One MediatR `IRequest`/handler per use case; no `DbContext` in domain/use cases.
 9. Domain events via `IEventPublisher` — MediatR-free.
 10. **C# code style (CHORE-code-style, 2026-11-25):** exactly **one top-level type per file** (class/record/interface/struct/enum), file named after the type; nested types may stay nested. **Interfaces** live in `wa.application/Ports/` (ports) or an `Interfaces/` subfolder of their area (e.g. `UseCases/Transfers/Interfaces/`); namespaces do NOT follow the folder (IDE0130 silenced in `src/.editorconfig`). Every public/internal type and member in `src/` carries meaningful XML docs — `<summary>` (states intent, not the name), `<param>`, `<returns>`, `<typeparam>`/`<exception>` where relevant; `<inheritdoc />` on implementations. `src/Directory.Build.props` makes CS1570/1572/1573/1574/1587/1591 **build errors** — a missing doc fails the build. Tests are exempt from the doc rule, not from one-type-per-file.
+11. **C# quality gates (CHORE-code-style-2, 2026-11-25):** `TreatWarningsAsErrors` in `src/` and `tests/` (NuGet audit NU1901–1904 stay warnings) — any compiler/analyzer/style warning breaks the build. `AnalysisLevel` pinned to `10.0-recommended` (src only); rules switched off are listed with a reason in `src/.editorconfig`. `EnforceCodeStyleInBuild`: formatting/naming rules in the root `.editorconfig`, all analyzer config in `src/.editorconfig` (Docker builds copy only `src/`). Clock: inject `TimeProvider` (`GetUtcNow()` / `.UtcDateTime`) — never `DateTime.UtcNow`; tests use `ManualTimeProvider`. Logging: `[LoggerMessage]` as `private static partial void LogX(ILogger logger, …)` with a named `Message =` (the PII guard requires that shape; `WaTelemetryReporter` excepted). DI-only classes use primary constructors that keep `private readonly _x = x;` fields. API endpoints live in `src/wa.api/Endpoints/*Endpoints.cs`, DI in `src/wa.api/ApiServices.cs`; `Program.cs` is host wiring + middleware order + `Map*Endpoints` calls.
 
 ## 4. Test gate (Definition of Done, per task)
 
@@ -49,11 +50,12 @@ dotnet test tests/wa.domain.unit
 dotnet test tests/wa.application.unit
 dotnet test tests/wa.workers.unit       # Azure Functions (f-zip, f-email) unit tests — added to the gate 2026-11-17 (Phase 0 gap sweep)
 dotnet test tests/wa.api.integration     # Testcontainers: Docker must be running
+dotnet format src/wa.slnx --verify-no-changes   # CHORE-code-style-2: must leave the tree unchanged (CI job lint-dotnet)
 cd src/wa.web
 npm run lint && npm run test:run && npm run build   # T-017-03: `npm run lint` = eslint + scripts/check-tap-targets.mjs (44 px / 16 px floor at ≤640 px on P0 surfaces); `npm run test` is watch mode
 node ../../scripts/check-theme-tokens.mjs   # T-015-03 (FR-015-2): token-diff parity — all 14 tokens in :root/dark/light, dark ≠ light per token; CI job theme-check runs the same script from repo root.
 node ../../scripts/check-contrast.mjs       # T-016-06 (FR-016-4): WCAG contrast from tokens.css, both themes; gated core pairs ≥ 4.5:1; CI job contrast-check runs the same script from repo root.
-node ../../scripts/check-telemetry-pii.mjs && node ../../scripts/check-telemetry-pii.mjs selftest   # T-012-05 (EC-012-3): no raw email / unhashed PII / unknown property reaches a telemetry call (server reporter on any receiver + client trackClientEvent); R7 (T-012-06/07) also covers ILogger `.Log<Level>(` calls, incl. `.Path/.PathBase/.QueryString/.Message` member args. CI job pii-check runs both from repo root.
+node ../../scripts/check-telemetry-pii.mjs && node ../../scripts/check-telemetry-pii.mjs selftest   # T-012-05 (EC-012-3): no raw email / unhashed PII / unknown property reaches a telemetry call (server reporter on any receiver + client trackClientEvent); R7 (T-012-06/07) also covers ILogger `.Log<Level>(` calls, incl. `.Path/.PathBase/.QueryString/.Message` member args, and (CHORE-code-style-2) `[LoggerMessage]` templates, parameter names and call sites. CI job pii-check runs both from repo root.
 ```
 
 Plus, per task: the task's own **exit check** in `Milestone-Backlog.md`.

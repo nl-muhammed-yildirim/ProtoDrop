@@ -60,3 +60,10 @@ Harness-specific Hermes material (VRAM/single-model eviction, `delegate_task` pl
 - Headless push can hang on the Git Credential Manager helper-selector dialog; if a push stalls, ask the user to complete the dialog/sign-in, then verify with `git ls-remote origin <branch>`.
 - PR merge via REST returned 404 on this repo historically; merges were done by pushing a local `--no-ff` merge commit (`Merge pull request #N from <owner>/<branch>`) to the base ref. Always ask the user before pushing or merging.
 - Native Windows tools need `C:/Users/...` paths, not `/c/Users/...`.
+
+## Zero-warning build (CHORE-code-style-2, 2026-11-25)
+- `TreatWarningsAsErrors` is on in src + tests: any compiler, analyzer or style warning breaks the build and CI. Run `dotnet format src/wa.slnx` before committing.
+- Analyzer config lives in `src/.editorconfig` (Docker builds copy only `src/`); formatting/naming in the root `.editorconfig`.
+- Local SDK is 11, CI is 10: `AnalysisLevel` is pinned to `10.0-recommended` so both see the same rules; a CI-only diagnostic is still possible.
+- `[LoggerMessage]` must be `private static partial void` with a named `Message =`, or `check-telemetry-pii.mjs` flags it.
+- `PipelineTests` fails when run in isolation (static ctor never sets `Wa__Jwt__Secret`); pre-existing, passes in the full suite.
