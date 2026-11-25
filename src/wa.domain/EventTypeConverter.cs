@@ -20,8 +20,8 @@ public sealed class EventTypeConverter : JsonConverter<EventType>
     }
 
     /// <summary>The TA-5.3 wire name for a value (e.g. "transfer.created") — direct lookup, no serialization round-trip.</summary>
-    /// <param name="value">The value.</param>
-    /// <returns>The resulting text.</returns>
+    /// <param name="value">The event type to name.</param>
+    /// <returns>The dotted TA-5.3 wire name, for example <c>transfer.created</c>.</returns>
     public static string WireName(EventType value) => WireNames[(int)value];
 
     /// <inheritdoc />

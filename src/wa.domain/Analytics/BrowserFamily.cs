@@ -6,25 +6,25 @@ namespace wa.domain.Analytics;
 /// </summary>
 public static class BrowserFamily
 {
-    /// <summary>The edge constant; value <c>Edge</c>.</summary>
+    /// <summary>Browser-family bucket for Microsoft Edge (desktop, Android and iOS tokens).</summary>
     public const string Edge = "Edge";
-    /// <summary>The opera constant; value <c>Opera</c>.</summary>
+    /// <summary>Browser-family bucket for Opera.</summary>
     public const string Opera = "Opera";
-    /// <summary>The firefox constant; value <c>Firefox</c>.</summary>
+    /// <summary>Browser-family bucket for Firefox (desktop and iOS).</summary>
     public const string Firefox = "Firefox";
-    /// <summary>The chrome constant; value <c>Chrome</c>.</summary>
+    /// <summary>Browser-family bucket for Chrome and Chrome on iOS; Edge and Opera are matched first.</summary>
     public const string Chrome = "Chrome";
-    /// <summary>The safari constant; value <c>Safari</c>.</summary>
+    /// <summary>Browser-family bucket for Safari; only reached when no other family token matches.</summary>
     public const string Safari = "Safari";
-    /// <summary>The other constant; value <c>Other</c>.</summary>
+    /// <summary>Fallback bucket for a non-blank user agent that matches no known family.</summary>
     public const string Other = "Other";
 
     /// <summary>The closed set of values <see cref="FromUserAgent"/> can return (besides null).</summary>
     public static readonly IReadOnlyList<string> All = [Edge, Opera, Firefox, Chrome, Safari, Other];
 
-    /// <summary>Null/blank UA → null; otherwise one of <see cref="All"/>.</summary>
-    /// <param name="userAgent">The user agent.</param>
-    /// <returns>The resulting text.</returns>
+    /// <summary>Maps a raw User-Agent header to one of <see cref="All"/>; the match order matters because Edge and Opera also contain a Chrome token.</summary>
+    /// <param name="userAgent">Raw User-Agent header; may be null or blank.</param>
+    /// <returns>The browser family, or null when <paramref name="userAgent"/> is null or blank.</returns>
     public static string? FromUserAgent(string? userAgent)
     {
         if (string.IsNullOrWhiteSpace(userAgent)) return null;

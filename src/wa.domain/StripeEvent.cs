@@ -5,6 +5,6 @@ public class StripeEvent
 {
     /// <summary>Stripe event ID — primary key (VARCHAR(100)).</summary>
     public string StripeEventId { get; set; } = null!;
-    /// <summary>Gets or sets the processed at UTC of the stripe event.</summary>
+    /// <summary>UTC instant the webhook event was handled; its presence makes a Stripe redelivery a no-op.</summary>
     public DateTime ProcessedAtUtc { get; set; }
 }

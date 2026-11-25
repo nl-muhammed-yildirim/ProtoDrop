@@ -9,10 +9,10 @@ namespace wa.domain.Transfers;
 public static class SendTimeLimits
 {
     /// <summary>Stamps expiry and download cap onto a Draft. The -1 unlimited sentinel is copied as is. Does not change Status.</summary>
+    /// <param name="transfer">The Draft transfer to stamp.</param>
+    /// <param name="limits">Limits resolved for the sender at the moment of send.</param>
+    /// <param name="nowUtc">Current UTC time; the base of the new expiry.</param>
     /// <exception cref="InvalidOperationException">The transfer is not a Draft; nothing is written.</exception>
-    /// <param name="transfer">The transfer.</param>
-    /// <param name="limits">The limits.</param>
-    /// <param name="nowUtc">The now UTC.</param>
     public static void Stamp(Transfer transfer, LimitsRecord limits, DateTime nowUtc)
     {
         if (transfer.Status != 0)

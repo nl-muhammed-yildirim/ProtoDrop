@@ -7,18 +7,18 @@ namespace wa.domain.Transfers;
 /// The term is last (it may contain '|'). Any malformed input → CursorFormatException (endpoint → 400 VALIDATION).</summary>
 public static class SearchCursorCodec
 {
-    /// <summary>Encodes the text value.</summary>
-    /// <param name="term">The term.</param>
-    /// <param name="rank">The rank.</param>
-    /// <param name="createdAtUtc">The created at UTC.</param>
-    /// <param name="id">The identifier.</param>
-    /// <returns>The resulting text.</returns>
+    /// <summary>Encodes the position of the last row of a page, plus the search term it belongs to, as an opaque cursor.</summary>
+    /// <param name="term">Normalized search term the page was produced for.</param>
+    /// <param name="rank">Relevance rank of the last row (<see cref="SearchTerm.RankFileName"/> down to <see cref="SearchTerm.RankSender"/>).</param>
+    /// <param name="createdAtUtc">CreatedAtUtc of the last row.</param>
+    /// <param name="id">Id of the last row; breaks ties between equal rank and timestamp.</param>
+    /// <returns>The opaque base64 cursor to hand to the client.</returns>
     public static string Encode(string term, int rank, DateTime createdAtUtc, Guid id) =>
         Convert.ToBase64String(Encoding.UTF8.GetBytes($"{rank.ToString(CultureInfo.InvariantCulture)}|{createdAtUtc:O}|{id:N}|{term}"));
 
-    /// <summary>Decodes the value tuple of text value.</summary>
-    /// <param name="cursor">The cursor.</param>
-    /// <returns>A tuple of the term, rank, created at UTC, ID values.</returns>
+    /// <summary>Decodes a cursor produced by <see cref="Encode"/> and validates every part.</summary>
+    /// <param name="cursor">Opaque cursor received from the client.</param>
+    /// <returns>The term, rank, CreatedAtUtc and Id of the last row of the previous page.</returns>
     /// <exception cref="CursorFormatException">Thrown when a cursor format failure is detected.</exception>
     public static (string Term, int Rank, DateTime CreatedAtUtc, Guid Id) Decode(string cursor)
     {

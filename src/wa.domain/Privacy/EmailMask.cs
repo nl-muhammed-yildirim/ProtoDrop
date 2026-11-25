@@ -6,9 +6,9 @@ namespace wa.domain.Privacy;
 /// </summary>
 public static class EmailMask
 {
-    /// <summary>Masks the text value.</summary>
-    /// <param name="email">The email.</param>
-    /// <returns>The resulting text.</returns>
+    /// <summary>Replaces everything between the first character and the at-sign with asterisks; an address without a local part becomes four asterisks.</summary>
+    /// <param name="email">Full email address; may be null or empty.</param>
+    /// <returns>The masked address, or null when <paramref name="email"/> is null or empty.</returns>
     public static string? Mask(string? email)
     {
         if (string.IsNullOrEmpty(email))

@@ -6,37 +6,37 @@ namespace wa.domain.Errors;
 /// </summary>
 public static class ProblemCodes
 {
-    /// <summary>The validation constant; value <c>VALIDATION</c>.</summary>
+    /// <summary>HTTP 400: the request body or parameters failed validation.</summary>
     public const string Validation = "VALIDATION";
-    /// <summary>The unauthenticated constant; value <c>UNAUTHENTICATED</c>.</summary>
+    /// <summary>HTTP 401: no valid session or credentials were supplied.</summary>
     public const string Unauthenticated = "UNAUTHENTICATED";
-    /// <summary>The forbidden constant; value <c>FORBIDDEN</c>.</summary>
+    /// <summary>HTTP 403: authenticated, but not allowed to perform the action (for example not the transfer owner or not an admin).</summary>
     public const string Forbidden = "FORBIDDEN";
-    /// <summary>The not found constant; value <c>NOT_FOUND</c>.</summary>
+    /// <summary>HTTP 404: the resource or route does not exist (also used to hide resources the caller may not see).</summary>
     public const string NotFound = "NOT_FOUND";
-    /// <summary>The transfer not finalized constant; value <c>TRANSFER_NOT_FINALIZED</c>.</summary>
+    /// <summary>HTTP 409: the transfer is still a draft and cannot be shared or downloaded yet.</summary>
     public const string TransferNotFinalized = "TRANSFER_NOT_FINALIZED";
-    /// <summary>The transfer size exceeded constant; value <c>TRANSFER_SIZE_EXCEEDED</c>.</summary>
+    /// <summary>HTTP 422: the total transfer size is above the sender's plan limit.</summary>
     public const string TransferSizeExceeded = "TRANSFER_SIZE_EXCEEDED";
-    /// <summary>The storage quota exceeded constant; value <c>STORAGE_QUOTA_EXCEEDED</c>.</summary>
+    /// <summary>HTTP 507: the sender's storage quota would be exceeded by the upload.</summary>
     public const string StorageQuotaExceeded = "STORAGE_QUOTA_EXCEEDED";
-    /// <summary>The max downloads reached constant; value <c>MAX_DOWNLOADS_REACHED</c>.</summary>
+    /// <summary>HTTP 409: the transfer already served its maximum number of downloads.</summary>
     public const string MaxDownloadsReached = "MAX_DOWNLOADS_REACHED";
-    /// <summary>The wrong password constant; value <c>WRONG_PASSWORD</c>.</summary>
+    /// <summary>HTTP 401: the password supplied for a protected transfer is wrong.</summary>
     public const string WrongPassword = "WRONG_PASSWORD";
-    /// <summary>The transfer expired constant; value <c>TRANSFER_EXPIRED</c>.</summary>
+    /// <summary>HTTP 410: the transfer passed its expiry time and is no longer downloadable.</summary>
     public const string TransferExpired = "TRANSFER_EXPIRED";
-    /// <summary>The transfer deleted constant; value <c>TRANSFER_DELETED</c>.</summary>
+    /// <summary>HTTP 410: the transfer was deleted by its owner or by cleanup.</summary>
     public const string TransferDeleted = "TRANSFER_DELETED";
-    /// <summary>The files gone constant; value <c>FILES_GONE</c>.</summary>
+    /// <summary>HTTP 410: the transfer row still exists but its blobs have been physically removed.</summary>
     public const string FilesGone = "FILES_GONE";
-    /// <summary>The idempotency conflict constant; value <c>IDEMPOTENCY_CONFLICT</c>.</summary>
+    /// <summary>HTTP 409: an <c>Idempotency-Key</c> was reused with a different request body.</summary>
     public const string IdempotencyConflict = "IDEMPOTENCY_CONFLICT";
-    /// <summary>The rate limited constant; value <c>RATE_LIMITED</c>.</summary>
+    /// <summary>HTTP 429: the caller exceeded a rate limit; a <c>Retry-After</c> header is sent.</summary>
     public const string RateLimited = "RATE_LIMITED";
-    /// <summary>The stripe webhook mismatch constant; value <c>STRIPE_WEBHOOK_MISMATCH</c>.</summary>
+    /// <summary>HTTP 400: a Stripe webhook failed signature verification or carried an unexpected payload.</summary>
     public const string StripeWebhookMismatch = "STRIPE_WEBHOOK_MISMATCH";
-    /// <summary>The email unsubscribed constant; value <c>EMAIL_UNSUBSCRIBED</c>.</summary>
+    /// <summary>HTTP 409: the recipient has unsubscribed, so no email can be sent to them.</summary>
     public const string EmailUnsubscribed = "EMAIL_UNSUBSCRIBED";
     /// <summary>
     /// T-008-04 (EC-008-3): magic-link token expired, redeemed, or unknown — same 410 Gone for all three (don't leak
@@ -83,7 +83,7 @@ public static class ProblemCodes
     /// US-045-01 (EC-045-3): q longer than SearchTerm.MaxLength (100 chars) on endpoints 14 and 21 — nothing queried.
     /// </summary>
     public const string QTooLong = "Q_TOO_LONG";
-    /// <summary>The internal constant; value <c>INTERNAL</c>.</summary>
+    /// <summary>HTTP 500: an unexpected server error; the body carries only the correlation id, never internals.</summary>
     public const string Internal = "INTERNAL";
 
     private static readonly Dictionary<string, (int Status, string Title)> Table = new(StringComparer.Ordinal)
@@ -119,13 +119,15 @@ public static class ProblemCodes
     };
 
     /// <summary>Canonical HTTP status for a closed-list code. Unknown codes throw at call site — invalid codes fail fast, never at serialize time.</summary>
-    /// <param name="code">The code.</param>
-    /// <returns>The resulting numeric value.</returns>
+    /// <param name="code">One of the <see cref="ProblemCodes"/> constants.</param>
+    /// <returns>The HTTP status code pinned for <paramref name="code"/>.</returns>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="code"/> is not in the closed list.</exception>
     public static int StatusOf(string code) => Lookup(code).Status;
 
     /// <summary>The RFC 7804 human-readable title pinned per code (TA-4.1.3 example style).</summary>
-    /// <param name="code">The code.</param>
-    /// <returns>The resulting text.</returns>
+    /// <param name="code">One of the <see cref="ProblemCodes"/> constants.</param>
+    /// <returns>The short human-readable title pinned for <paramref name="code"/>.</returns>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="code"/> is not in the closed list.</exception>
     public static string TitleOf(string code) => Lookup(code).Title;
 
     private static (int Status, string Title) Lookup(string code) => Table.TryGetValue(code, out var value)

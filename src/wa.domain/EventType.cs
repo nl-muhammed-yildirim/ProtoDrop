@@ -11,47 +11,47 @@ namespace wa.domain;
 [JsonConverter(typeof(EventTypeConverter))]
 public enum EventType
 {
-    /// <summary>Transfer created.</summary>
+    /// <summary>A sender finalized a transfer; the wire name is <c>transfer.created</c>.</summary>
     [JsonPropertyName("transfer.created")]
     TransferCreated,
 
-    /// <summary>Transfer expired.</summary>
+    /// <summary>A transfer passed its expiry time; the wire name is <c>transfer.expired</c>.</summary>
     [JsonPropertyName("transfer.expired")]
     TransferExpired,
 
-    /// <summary>Transfer deleted.</summary>
+    /// <summary>A transfer was deleted by its owner or by cleanup; the wire name is <c>transfer.deleted</c>.</summary>
     [JsonPropertyName("transfer.deleted")]
     TransferDeleted,
 
-    /// <summary>Email sent.</summary>
+    /// <summary>A notification email was handed to the mail provider; the wire name is <c>email.sent</c>.</summary>
     [JsonPropertyName("email.sent")]
     EmailSent,
 
-    /// <summary>Email failed.</summary>
+    /// <summary>Sending a notification email failed permanently; the wire name is <c>email.failed</c>.</summary>
     [JsonPropertyName("email.failed")]
     EmailFailed,
 
-    /// <summary>Download completed.</summary>
+    /// <summary>A recipient finished downloading a file or the zip; the wire name is <c>download.completed</c>.</summary>
     [JsonPropertyName("download.completed")]
     DownloadCompleted,
 
-    /// <summary>ZIP generated.</summary>
+    /// <summary>The zip of a multi-file transfer was built; the wire name is <c>zip.generated</c>.</summary>
     [JsonPropertyName("zip.generated")]
     ZipGenerated,
 
-    /// <summary>User created.</summary>
+    /// <summary>A new account was created; the wire name is <c>user.created</c>.</summary>
     [JsonPropertyName("user.created")]
     UserCreated,
 
-    /// <summary>Account deleted.</summary>
+    /// <summary>An account was deleted (GDPR erasure starts); the wire name is <c>account.deleted</c>.</summary>
     [JsonPropertyName("account.deleted")]
     AccountDeleted,
 
-    /// <summary>Plan changed.</summary>
+    /// <summary>A user's plan changed through billing or admin action; the wire name is <c>plan.changed</c>.</summary>
     [JsonPropertyName("plan.changed")]
     PlanChanged,
 
-    /// <summary>Admin action.</summary>
+    /// <summary>An administrator performed an audited action; the wire name is <c>admin.action</c>.</summary>
     [JsonPropertyName("admin.action")]
     AdminAction,
 

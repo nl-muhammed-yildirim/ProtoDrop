@@ -3,18 +3,18 @@ namespace wa.domain;
 /// <summary>A file belonging to a transfer. TA-3.2: dbo.FileItem.</summary>
 public class FileItem
 {
-    /// <summary>Gets or sets the ID of the file item.</summary>
+    /// <summary>Primary key of the file row.</summary>
     public Guid Id { get; set; }
-    /// <summary>Gets or sets the transfer ID of the file item.</summary>
+    /// <summary>The transfer the file belongs to.</summary>
     public Guid TransferId { get; set; }
-    /// <summary>Gets or sets the blob ref ID of the file item.</summary>
+    /// <summary>The ref-counted blob holding the bytes; several files can share one blob.</summary>
     public Guid BlobRefId { get; set; }
-    /// <summary>Gets or sets the original name of the file item.</summary>
+    /// <summary>File name as uploaded by the sender; PII, so telemetry only sees its hash (TA-9.4).</summary>
     public string OriginalName { get; set; } = null!;
-    /// <summary>Gets or sets the size bytes of the file item.</summary>
+    /// <summary>File size in bytes.</summary>
     public long SizeBytes { get; set; }
-    /// <summary>Gets or sets the content type of the file item.</summary>
+    /// <summary>MIME type reported at upload, or null when unknown.</summary>
     public string? ContentType { get; set; }
-    /// <summary>Gets or sets the sort order of the file item.</summary>
+    /// <summary>Zero-based position of the file within its transfer.</summary>
     public int SortOrder { get; set; }
 }

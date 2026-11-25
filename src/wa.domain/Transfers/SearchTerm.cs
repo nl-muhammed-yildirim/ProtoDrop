@@ -6,17 +6,17 @@ public static class SearchTerm
     /// <summary>FR-045-1: 1..100 chars after trim. Input-width constant (ORG_NAME_MAX_LENGTH precedent), not a plan limit.</summary>
     public const int MaxLength = 100;
 
-    /// <summary>FR-045-3 / EC-045-6: relevance = max of the matched fields.</summary>
+    /// <summary>Relevance rank of a transfer that matched on a file name; the highest rank (FR-045-3, EC-045-6: relevance is the maximum over the matched fields).</summary>
     public const int RankFileName = 3;
-    /// <summary>The rank recipient constant; value <c>2</c>.</summary>
+    /// <summary>Relevance rank of a transfer that matched on a recipient address.</summary>
     public const int RankRecipient = 2;
-    /// <summary>The rank sender constant; value <c>1</c>.</summary>
+    /// <summary>Relevance rank of a transfer that matched only on the sender name; the lowest rank.</summary>
     public const int RankSender = 1;
 
     /// <summary>Trim; null/whitespace → null (no search). Over MaxLength after trim → SearchTermTooLongException (→ 400 Q_TOO_LONG).
     /// Characters are never interpreted: '*', '~', '"' stay literal (FR-045-6).</summary>
-    /// <param name="raw">The raw.</param>
-    /// <returns>The resulting text.</returns>
+    /// <param name="raw">Raw <c>q</c> value from the query string; may be null.</param>
+    /// <returns>The trimmed term, or null when no search was requested.</returns>
     /// <exception cref="SearchTermTooLongException">Thrown when a search term too long failure is detected.</exception>
     public static string? Normalize(string? raw)
     {

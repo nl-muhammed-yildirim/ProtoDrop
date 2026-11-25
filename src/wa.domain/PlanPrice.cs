@@ -15,11 +15,11 @@ public class PlanPrice
     [JsonPropertyName("currency")]
     public string Currency { get; set; } = null!;
 
-    /// <summary>Gets or sets the monthly of the plan price.</summary>
+    /// <summary>Price of the monthly billing interval.</summary>
     [JsonPropertyName("monthly")]
     public PlanPriceTier Monthly { get; set; } = null!;
 
-    /// <summary>Gets or sets the annual of the plan price.</summary>
+    /// <summary>Price of the annual billing interval.</summary>
     [JsonPropertyName("annual")]
     public PlanPriceTier Annual { get; set; } = null!;
 
@@ -28,8 +28,8 @@ public class PlanPrice
     public long? PerSeatMonthly { get; set; }
 
     /// <summary>Parses the row's PriceJson; throws <see cref="InvalidOperationException"/> naming the plan code when it yields no value.</summary>
-    /// <param name="plan">The plan.</param>
-    /// <returns>The plan price.</returns>
+    /// <param name="plan">The plan whose <see cref="Plan.PriceJson"/> is parsed.</param>
+    /// <returns>The deserialized price data.</returns>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the operation is not valid in the current state.
     /// </exception>
@@ -39,9 +39,9 @@ public class PlanPrice
         return price ?? throw new InvalidOperationException($"Plan '{plan.Code}' has no price data.");
     }
 
-    /// <summary>Creates for the plan price tier.</summary>
-    /// <param name="interval">The interval.</param>
-    /// <returns>The plan price tier.</returns>
+    /// <summary>Selects the price tier for a billing interval.</summary>
+    /// <param name="interval">The billing interval chosen by the user.</param>
+    /// <returns>The monthly or annual <see cref="PlanPriceTier"/>.</returns>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when an argument is outside the allowed range.</exception>
     public PlanPriceTier For(BillingInterval interval) => interval switch
     {

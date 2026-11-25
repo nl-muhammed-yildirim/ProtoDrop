@@ -1,6 +1,6 @@
 namespace wa.domain.Analytics;
 
-/// <summary>A top-N bucket (country code or browser family) with its count.</summary>
-/// <param name="Key">The key of the bucket count.</param>
-/// <param name="Count">The count of the bucket count.</param>
+/// <summary>A top-N bucket (country code or browser family) with the number of downloads that fell into it.</summary>
+/// <param name="Key">Normalized bucket key: an upper-case ISO country code (or <c>??</c>) or a browser family name.</param>
+/// <param name="Count">Number of download events merged into the bucket.</param>
 public sealed record BucketCount(string Key, int Count);
