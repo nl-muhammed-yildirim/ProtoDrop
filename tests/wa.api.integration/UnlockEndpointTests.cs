@@ -442,9 +442,3 @@ public class UnlockEndpointTests : IAsyncLifetime
         }
     }
 }
-
-// Shared across the factory host + tests (static — WebApplicationFactory caches one host per process).
-public static class UnlockEndpointTelemetryCapture
-{
-    public static readonly List<string> Lines = new();
-}

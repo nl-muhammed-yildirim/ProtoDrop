@@ -3,13 +3,6 @@ using System.Text.Json.Serialization;
 
 namespace wa.domain;
 
-/// <summary>The user's billing-interval toggle (AC-018-4).</summary>
-public enum BillingInterval
-{
-    Monthly,
-    Annual
-}
-
 /// <summary>
 /// Shape contract and read model for <see cref="Plan.PriceJson"/> (F-BIL-001, FR-018-2/3). Amounts are minor units.
 /// <see cref="PlanDefinition"/> uses the JsonPropertyName set as the exact key contract. Checkout (T-033) and the plan
@@ -45,17 +38,4 @@ public class PlanPrice
         BillingInterval.Annual => Annual,
         _ => throw new ArgumentOutOfRangeException(nameof(interval), interval, null)
     };
-}
-
-/// <summary>One billing interval's price: amount in minor units and the Stripe Price ID (null until the operator wires it).</summary>
-public class PlanPriceTier
-{
-    [JsonPropertyName("amount")]
-    public long Amount { get; set; }
-
-    [JsonPropertyName("stripePriceId")]
-    public string? StripePriceId { get; set; }
-
-    /// <summary>False when no Stripe Price ID is set yet — checkout stays disabled (T-033).</summary>
-    public bool IsWiredToStripe() => !string.IsNullOrWhiteSpace(StripePriceId);
 }

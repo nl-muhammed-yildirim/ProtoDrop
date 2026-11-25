@@ -23,6 +23,3 @@ public sealed class BusinessException : Exception
 
     internal int Status => ProblemCodes.StatusOf(Code);
 }
-
-/// <summary>One entry of the optional TA-4.1.3 <c>errors[]</c> array (e.g. per-field validation details).</summary>
-public sealed record ProblemFieldError(string Field, string Message);

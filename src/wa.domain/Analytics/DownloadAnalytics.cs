@@ -1,34 +1,5 @@
 namespace wa.domain.Analytics;
 
-/// <summary>One day bucket (UTC date) of the daily line.</summary>
-public sealed record DailyCount(DateOnly Day, int Count);
-
-/// <summary>A top-N bucket (country code or browser family) with its count.</summary>
-public sealed record BucketCount(string Key, int Count);
-
-/// <summary>A transfer's file as the per-file breakdown input.</summary>
-public sealed record AnalyticsFile(Guid Id, string Name, int SortOrder);
-
-/// <summary>SQL-grouped per-file row: FileId null = download-all (zip); LastAtUtc = most recent event (tie-break).</summary>
-public sealed record FileCountRow(Guid? FileId, int Count, DateTime LastAtUtc);
-
-/// <summary>One file with its download count.</summary>
-public sealed record FileDownloadCount(Guid FileId, string Name, int Count);
-
-/// <summary>FR-023-2/3: every file with its count (SortOrder), the separate download-all count (null = absent), top files.</summary>
-public sealed record FileBreakdown(
-    IReadOnlyList<FileDownloadCount> Files,
-    int? DownloadAll,
-    IReadOnlyList<FileDownloadCount> Top);
-
-/// <summary>F-PRF-003 FR-023-1 result: aggregates only, never raw rows.</summary>
-public sealed record TransferAnalytics(
-    int Total,
-    IReadOnlyList<DailyCount> Daily,
-    IReadOnlyList<BucketCount> Countries,
-    IReadOnlyList<BucketCount> Browsers,
-    FileBreakdown Files);
-
 /// <summary>F-PRF-003: pure analytics functions (window, zero fill, top-N merge). All date logic takes <c>now</c> for testability.</summary>
 public static class DownloadAnalytics
 {

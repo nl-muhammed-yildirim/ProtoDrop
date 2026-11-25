@@ -2,12 +2,6 @@ using wa.application.Limits;
 
 namespace wa.application.UseCases.Transfers;
 
-/// <summary>US-021-04: what the gate lets through — the trimmed org name (or null) and whether the sender has a stored logo.</summary>
-public sealed record SenderBrandingView(string? OrgName, bool HasLogo)
-{
-    public static readonly SenderBrandingView Empty = new(null, false);
-}
-
 /// <summary>F-PRF-001: the single sender-branding gate rule, shared by the recipient page (US-021-01) and the notification email (US-021-02).</summary>
 public static class SenderBranding
 {

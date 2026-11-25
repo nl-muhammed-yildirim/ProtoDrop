@@ -5,9 +5,6 @@ using wa.application.UseCases.Transfers;
 
 namespace wa.infrastructure.Persistence;
 
-/// <summary>T-006-03 (FR-006-5): Unsubscribe result — Success or NotFound.</summary>
-public record UnsubscribeResult(bool Success);
-
 /// <summary>
 /// T-006-03 (FR-006-5, TA-6.7): Unsubscribe handler — verify token + insert EmailSuppression idempotently.
 /// Plain sealed class (no MediatR) following the T-006-01 pattern; called directly from Program.cs's MapGet.

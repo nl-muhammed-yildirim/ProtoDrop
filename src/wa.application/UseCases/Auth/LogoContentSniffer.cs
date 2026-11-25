@@ -2,15 +2,6 @@ using System.Text;
 
 namespace wa.application.UseCases.Auth;
 
-/// <summary>US-021-04 (FR-021-5): the image kinds an org logo may be, decided from content only.</summary>
-public enum LogoImageType
-{
-    Png,
-    Jpeg,
-    WebP,
-    Svg
-}
-
 /// <summary>
 /// US-021-04 (FR-021-5, type half): pure magic-byte sniffer for org logos. The client Content-Type is never trusted.
 /// Returns null for anything that is not PNG / JPEG / WebP / SVG.

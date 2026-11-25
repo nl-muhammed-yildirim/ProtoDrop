@@ -13,7 +13,6 @@ using Testcontainers.MsSql;
 using wa.application.Telemetry;
 using wa.application.UseCases.Transfers;
 using wa.domain;
-using wa.domain.Errors;
 using wa.domain.Telemetry;
 using wa.infrastructure.Persistence;
 
@@ -282,10 +281,4 @@ public class UnsubscribeEndpointTests : IAsyncLifetime
             public void Dispose() { }
         }
     }
-}
-
-// Shared across the factory host + tests (static — WebApplicationFactory caches one host per process).
-public static class UnsubscribeTelemetryCapture
-{
-    public static readonly List<string> Lines = new();
 }

@@ -1,0 +1,15 @@
+using Microsoft.Extensions.Logging;
+using wa.application.Telemetry;
+using wa.domain.Telemetry;
+using wa.domain.ValueObjects;
+
+namespace wa.application.UseCases.Transfers;
+
+/// <summary>
+/// T-003-04 (D1): the password field is missing from the unlock request body. The endpoint catches this and throws
+/// BusinessException(ProblemCodes.Validation) with errors[] — keeps the closed code list intact (same precedent as TransferValidationException).
+/// </summary>
+public sealed class UnlockPasswordMissingException : Exception
+{
+    public UnlockPasswordMissingException(string message) : base(message) { }
+}
