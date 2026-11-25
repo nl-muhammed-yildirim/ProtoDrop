@@ -14,7 +14,7 @@ public sealed class IdempotencyStore : IIdempotencyStore
     private readonly WaDbContext _db;
 
     /// <summary>Initializes a new instance of the <see cref="IdempotencyStore"/> class.</summary>
-    /// <param name="db">The database.</param>
+    /// <param name="db">Database context that backs the store.</param>
     public IdempotencyStore(WaDbContext db) => _db = db;
 
     /// <inheritdoc />

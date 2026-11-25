@@ -14,7 +14,7 @@ public sealed class EmailStore : IEmailStore
     private readonly WaDbContext _db;
 
     /// <summary>Initializes a new instance of the <see cref="EmailStore"/> class.</summary>
-    /// <param name="db">The database.</param>
+    /// <param name="db">Database context that backs the store.</param>
     public EmailStore(WaDbContext db) => _db = db;
 
     /// <inheritdoc />

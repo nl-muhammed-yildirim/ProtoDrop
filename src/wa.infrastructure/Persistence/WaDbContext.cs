@@ -10,7 +10,7 @@ namespace wa.infrastructure.Persistence;
 public sealed class WaDbContext : DbContext
 {
     /// <summary>Initializes a new instance of the <see cref="WaDbContext"/> class.</summary>
-    /// <param name="options">The options.</param>
+    /// <param name="options">EF Core options (provider and connection) for this context.</param>
     public WaDbContext(DbContextOptions<WaDbContext> options)
         : base(options)
     {

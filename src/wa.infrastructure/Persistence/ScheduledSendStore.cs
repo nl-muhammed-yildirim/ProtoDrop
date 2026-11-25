@@ -16,7 +16,7 @@ public sealed class ScheduledSendStore : IScheduledSendStore
     private readonly IDbContextFactory<WaDbContext> _factory;
 
     /// <summary>Initializes a new instance of the <see cref="ScheduledSendStore"/> class.</summary>
-    /// <param name="factory">The factory.</param>
+    /// <param name="factory">Factory that creates a short-lived database context per call.</param>
     /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public ScheduledSendStore(IDbContextFactory<WaDbContext> factory) =>
         _factory = factory ?? throw new ArgumentNullException(nameof(factory));
@@ -44,9 +44,9 @@ public sealed class ScheduledSendStore : IScheduledSendStore
     /// covered by IX_Transfer_Sched (Status, ScheduledSendAtUtc) — an index seek with no lookup; do not add other columns.
     /// Public static so the integration plan test runs the exact query.
     /// </summary>
-    /// <param name="transfers">The transfers.</param>
-    /// <param name="nowUtc">The now UTC.</param>
-    /// <returns>The i queryable of due scheduled row.</returns>
+    /// <param name="transfers">Transfer query to filter, normally the untracked transfer set.</param>
+    /// <param name="nowUtc">Current UTC time; transfers scheduled at or before it are due.</param>
+    /// <returns>A query of the Scheduled transfers whose send time has been reached, projected to id and due time only.</returns>
     public static IQueryable<DueScheduledRow> DueQuery(IQueryable<Transfer> transfers, DateTime nowUtc) =>
         transfers
             .Where(t => t.Status == TransferStatus.Scheduled && t.ScheduledSendAtUtc <= nowUtc)

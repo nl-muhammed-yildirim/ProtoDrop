@@ -11,7 +11,7 @@ public sealed class AppDbContextFactory : IDbContextFactory<WaDbContext>
     private readonly DbContextOptions<WaDbContext> _options;
 
     /// <summary>Initializes a new instance of the <see cref="AppDbContextFactory"/> class.</summary>
-    /// <param name="options">The options.</param>
+    /// <param name="options">EF Core options shared by every context this factory creates.</param>
     public AppDbContextFactory(DbContextOptions<WaDbContext> options) => _options = options;
 
     /// <inheritdoc />

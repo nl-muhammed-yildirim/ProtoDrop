@@ -13,7 +13,7 @@ public sealed class GdprSweepStore : IGdprSweepStore
     private readonly IDbContextFactory<WaDbContext> _factory;
 
     /// <summary>Initializes a new instance of the <see cref="GdprSweepStore"/> class.</summary>
-    /// <param name="factory">The factory.</param>
+    /// <param name="factory">Factory that creates a short-lived database context per call.</param>
     /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public GdprSweepStore(IDbContextFactory<WaDbContext> factory) =>
         _factory = factory ?? throw new ArgumentNullException(nameof(factory));

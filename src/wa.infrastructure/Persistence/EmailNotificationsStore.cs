@@ -10,7 +10,7 @@ public sealed class EmailNotificationsStore : IEmailNotificationsStore
     private readonly IDbContextFactory<WaDbContext> _factory;
 
     /// <summary>Initializes a new instance of the <see cref="EmailNotificationsStore"/> class.</summary>
-    /// <param name="factory">The factory.</param>
+    /// <param name="factory">Factory that creates a short-lived database context per call.</param>
     public EmailNotificationsStore(IDbContextFactory<WaDbContext> factory) => _factory = factory;
 
     /// <inheritdoc />

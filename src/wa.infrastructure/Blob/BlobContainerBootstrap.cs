@@ -35,8 +35,8 @@ public sealed class BlobContainerBootstrap : BackgroundService
     private readonly ILogger<BlobContainerBootstrap> _logger;
 
     /// <summary>Initializes a new instance of the <see cref="BlobContainerBootstrap"/> class.</summary>
-    /// <param name="serviceClient">The service client.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="serviceClient">Blob service client used to create the containers.</param>
+    /// <param name="logger">Logger for the bootstrap progress and the settings that cannot be applied.</param>
     public BlobContainerBootstrap(
         BlobServiceClient serviceClient, ILogger<BlobContainerBootstrap> logger)
     {

@@ -13,16 +13,13 @@ public sealed class OverviewStore : IOverviewStore
     private readonly WaDbContext _db;
 
     /// <summary>Initializes a new instance of the <see cref="OverviewStore"/> class.</summary>
-    /// <param name="db">The database.</param>
+    /// <param name="db">Database context that backs the store.</param>
     public OverviewStore(WaDbContext db) => _db = db;
 
-    /// <summary>
+    /// <inheritdoc />
+    /// <remarks>
     /// AC-011-1: four numbers + recent-transfers list. Windows are passed IN (UTC day boundary is unit-testable).
-    /// </summary>
-    /// <param name="todayStartUtc">The today start UTC.</param>
-    /// <param name="emailsWindowStartUtc">The emails window start UTC.</param>
-    /// <param name="ct">Token that cancels the operation.</param>
-    /// <returns>The overview data.</returns>
+    /// </remarks>
     public async Task<OverviewData> GetAsync(DateTime todayStartUtc, DateTime emailsWindowStartUtc, CancellationToken ct)
     {
         // (a) Active transfers — Status=1 per FR-011-2's literal, plus Scheduled (5): a live transfer awaiting its send time (F-PRF-002 review).

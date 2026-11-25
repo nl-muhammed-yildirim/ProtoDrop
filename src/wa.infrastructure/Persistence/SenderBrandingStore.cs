@@ -10,7 +10,7 @@ public sealed class SenderBrandingStore : ISenderBrandingStore
     private readonly WaDbContext _db;
 
     /// <summary>Initializes a new instance of the <see cref="SenderBrandingStore"/> class.</summary>
-    /// <param name="db">The database.</param>
+    /// <param name="db">Database context that backs the store.</param>
     public SenderBrandingStore(WaDbContext db) => _db = db;
 
     /// <inheritdoc />

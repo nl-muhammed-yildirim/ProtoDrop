@@ -13,12 +13,11 @@ public sealed class AdminSuppressionStore : IAdminSuppressionStore
     private readonly WaDbContext _db;
 
     /// <summary>Initializes a new instance of the <see cref="AdminSuppressionStore"/> class.</summary>
-    /// <param name="db">The database.</param>
+    /// <param name="db">Database context that backs the store.</param>
     public AdminSuppressionStore(WaDbContext db) => _db = db;
 
-    /// <summary>T-011-09 (TA-4.2#24): list all rows — no order contract (the handler orders).</summary>
-    /// <param name="ct">Token that cancels the operation.</param>
-    /// <returns>The matching email suppression items.</returns>
+    /// <inheritdoc />
+    /// <remarks>T-011-09 (TA-4.2#24): list all rows — no order contract (the handler orders).</remarks>
     public async Task<IReadOnlyList<EmailSuppression>> ListAsync(CancellationToken ct)
     {
         return await _db.Set<EmailSuppression>()
@@ -26,13 +25,11 @@ public sealed class AdminSuppressionStore : IAdminSuppressionStore
             .ToListAsync(ct);
     }
 
-    /// <summary>
+    /// <inheritdoc />
+    /// <remarks>
     /// T-011-09 (TA-4.2#24): single-row delete — returns the REMOVED row or null when no row for that Id.
     /// No transaction (single-row delete).
-    /// </summary>
-    /// <param name="id">The identifier.</param>
-    /// <param name="ct">Token that cancels the operation.</param>
-    /// <returns>The email suppression, or <see langword="null"/> when there is none.</returns>
+    /// </remarks>
     public async Task<EmailSuppression?> RemoveByIdAsync(Guid id, CancellationToken ct)
     {
         var row = await _db.Set<EmailSuppression>().FirstOrDefaultAsync(s => s.Id == id, ct);

@@ -35,16 +35,16 @@ namespace wa.infrastructure.Blob;
 /// </remarks>
 public sealed class BlobSasMinter
 {
-    /// <summary>TA-3.6 "Version 2024" — the spec literal for the sv token.</summary>
+    /// <summary>Storage service version written into the <c>sv</c> token of every SAS (TA-3.6 "Version 2024").</summary>
     internal const string Version = "2024";
 
-    /// <summary>TA-3.6 draft upload TTL: 2 h (constant, not a local setting).</summary>
+    /// <summary>Validity of a draft-upload SAS: 2 hours (TA-3.6).</summary>
     internal static readonly TimeSpan DraftTtl = TimeSpan.FromHours(2);
 
-    /// <summary>TA-3.6 recipient single-file/zip TTL: 30 min (constant, not a local setting).</summary>
+    /// <summary>Validity of a recipient file, zip or logo SAS: 30 minutes (TA-3.6).</summary>
     internal static readonly TimeSpan RecipientTtl = TimeSpan.FromMinutes(30);
 
-    /// <summary>US-047-01 data-export download TTL: 24 h (D-22 default, constant not a local setting).</summary>
+    /// <summary>Validity of a data-export download SAS: 24 hours (D-22 default).</summary>
     internal static readonly TimeSpan ExportTtl = TimeSpan.FromHours(24);
 
     private readonly Uri _accountUrl;
@@ -53,9 +53,9 @@ public sealed class BlobSasMinter
     private readonly Func<DateTimeOffset> _now;
 
     /// <summary>Initializes a new instance of the <see cref="BlobSasMinter"/> class.</summary>
-    /// <param name="accountUrl">The account URL.</param>
-    /// <param name="keyBase64">The key base64.</param>
-    /// <param name="now">The reference time (UTC) used for the check.</param>
+    /// <param name="accountUrl">Storage account URL; only its authority is used in the minted URLs.</param>
+    /// <param name="keyBase64">Storage account key, base64; used to sign the SAS tokens.</param>
+    /// <param name="now">Optional time source (UTC) used for the SAS start and expiry; defaults to the system clock.</param>
     public BlobSasMinter(Uri accountUrl, string keyBase64,
         Func<DateTimeOffset>? now = null)
     {
@@ -73,9 +73,9 @@ public sealed class BlobSasMinter
     /// permissions <c>cwr</c>, 2 h window, blob resource scope —
     /// Start = now, Expiry = now + 2 h (EC-055-1: a fresh mint after expiry works).
     /// </summary>
-    /// <param name="draftId">Identifier of the draft.</param>
-    /// <param name="fileId">Identifier of the file.</param>
-    /// <returns>The URI.</returns>
+    /// <param name="draftId">Draft id, compact "N" form; part of the staging path.</param>
+    /// <param name="fileId">File id, compact "N" form; part of the staging path.</param>
+    /// <returns>An absolute SAS URL with <c>cwr</c> permissions that is valid for <see cref="DraftTtl"/>.</returns>
     public Uri MintDraftUpload(string draftId, string fileId)
         => Mint(
             BlobPaths.StagingFile(new Guid(draftId), new Guid(fileId)),
@@ -85,9 +85,9 @@ public sealed class BlobSasMinter
             respContentDisposition: null);
 
     /// <summary>TA-3.6 recipient single file (<c>transfers</c> container): permissions <c>r</c>, 30 min, no start bound.</summary>
-    /// <param name="transferId">Identifier of the transfer.</param>
-    /// <param name="fileId">Identifier of the file.</param>
-    /// <returns>The URI.</returns>
+    /// <param name="transferId">Transfer id, compact "N" form.</param>
+    /// <param name="fileId">File id, compact "N" form.</param>
+    /// <returns>An absolute read-only SAS URL valid for <see cref="RecipientTtl"/>, without a Content-Disposition override.</returns>
     public Uri MintRecipientFile(string transferId, string fileId)
         => MintRecipientFile(transferId, fileId, respContentDisposition: null);
 
@@ -95,10 +95,10 @@ public sealed class BlobSasMinter
     /// T-003-06 (TA-4.2#6): mint a 30-minute read SAS on one transfer file with an original-filename Content-Disposition
     /// override (EC-003-3, RFC 5987 <c>filename*</c>). The override is part of the string-to-sign, so it must be provided at mint time.
     /// </summary>
-    /// <param name="transferId">Identifier of the transfer.</param>
-    /// <param name="fileId">Identifier of the file.</param>
-    /// <param name="respContentDisposition">The resp content disposition.</param>
-    /// <returns>The URI.</returns>
+    /// <param name="transferId">Transfer id, compact "N" form.</param>
+    /// <param name="fileId">File id, compact "N" form.</param>
+    /// <param name="respContentDisposition">Content-Disposition header the storage service returns on download; null or empty for none.</param>
+    /// <returns>An absolute read-only SAS URL valid for <see cref="RecipientTtl"/>.</returns>
     public Uri MintRecipientFile(string transferId, string fileId, string? respContentDisposition)
         => Mint(
             BlobPaths.TransferFile(new Guid(transferId), new Guid(fileId)),
@@ -114,8 +114,8 @@ public sealed class BlobSasMinter
     /// TA-3.6 recipient zip (<c>transfers</c> container): permissions <c>r</c>, 30 min, no start bound.
     /// Signs an <c>attachment</c> Content-Disposition (all.zip) so mobile browsers treat it as a download (FR-003-10 / FR-017-3).
     /// </summary>
-    /// <param name="transferId">Identifier of the transfer.</param>
-    /// <returns>The URI.</returns>
+    /// <param name="transferId">Transfer id, compact "N" form.</param>
+    /// <returns>An absolute read-only SAS URL for the transfer zip, valid for <see cref="RecipientTtl"/>.</returns>
     public Uri MintRecipientZip(string transferId)
         => Mint(
             BlobPaths.TransferZip(new Guid(transferId)),
@@ -127,9 +127,9 @@ public sealed class BlobSasMinter
     private const string ExportContentDisposition = "attachment;filename*=UTF-8''my-data.zip";
 
     /// <summary>US-047-01 (TA-3.6 export row): <c>exports</c> container, permissions <c>r</c>, 24 h, no start bound, attachment my-data.zip.</summary>
-    /// <param name="userId">Identifier of the user.</param>
-    /// <param name="exportId">Identifier of the export.</param>
-    /// <returns>The URI.</returns>
+    /// <param name="userId">The user the export belongs to.</param>
+    /// <param name="exportId">The export request id.</param>
+    /// <returns>An absolute read-only SAS URL for the export zip, valid for <see cref="ExportTtl"/>.</returns>
     public Uri MintExportDownload(Guid userId, Guid exportId)
         => Mint(
             BlobPaths.DataExportZip(userId, exportId),
@@ -141,8 +141,8 @@ public sealed class BlobSasMinter
     private const string LogoContentDisposition = "inline";
 
     /// <summary>US-021-04 (TA-3.6 org-logo row): <c>avatars</c> container, permissions <c>r</c>, 30 min, no start bound, inline Content-Disposition.</summary>
-    /// <param name="userId">Identifier of the user.</param>
-    /// <returns>The URI.</returns>
+    /// <param name="userId">The user who owns the logo.</param>
+    /// <returns>An absolute read-only SAS URL for the logo, valid for <see cref="RecipientTtl"/>, served inline.</returns>
     public Uri MintOrgLogo(Guid userId)
         => Mint(
             BlobPaths.OrgLogo(userId),

@@ -13,7 +13,7 @@ public sealed class ExpiryDeletionStore : IExpiryDeletionStore
     private readonly WaDbContext _db;
 
     /// <summary>Initializes a new instance of the <see cref="ExpiryDeletionStore"/> class.</summary>
-    /// <param name="db">The database.</param>
+    /// <param name="db">Database context that backs the store.</param>
     public ExpiryDeletionStore(WaDbContext db) => _db = db;
 
     /// <inheritdoc />

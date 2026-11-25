@@ -3,9 +3,7 @@ using wa.application.Ports;
 
 namespace wa.infrastructure.Email;
 
-/// <summary>
-/// T-006-01: Azure Communication Services email sender (production).
-/// </summary>
+/// <summary>T-006-01: <see cref="IEmailSender"/> that sends through Azure Communication Services Email (production).</summary>
 public sealed class CommunicationHubEmailSender : IEmailSender
 {
     private readonly Azure.Communication.Email.EmailClient _emailClient;
@@ -15,7 +13,7 @@ public sealed class CommunicationHubEmailSender : IEmailSender
     /// <summary>Initializes a new instance of the <see cref="CommunicationHubEmailSender"/> class.</summary>
     /// <param name="connectionString">Wa:CommunicationHub:Connection (TA-9.3, Key Vault secret).</param>
     /// <param name="fromAddress">Sender address of each message (Wa:Email:FromAddress).</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="logger">Logger for send failures (never logs the message body or address).</param>
     public CommunicationHubEmailSender(string connectionString, string fromAddress, ILogger<CommunicationHubEmailSender> logger)
     {
         _emailClient = new Azure.Communication.Email.EmailClient(connectionString);

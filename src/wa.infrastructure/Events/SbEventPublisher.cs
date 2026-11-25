@@ -29,9 +29,9 @@ public sealed class SbEventPublisher : IEventPublisher
     private readonly IDbContextFactory<WaDbContext> _dbFactory;
 
     /// <summary>Initializes a new instance of the <see cref="SbEventPublisher"/> class.</summary>
-    /// <param name="configuration">The configuration.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
-    /// <param name="dbFactory">The database factory.</param>
+    /// <param name="configuration">Configuration source; supplies the Service Bus connection string.</param>
+    /// <param name="logger">Logger for publish failures (the row stays unpublished for re-publish).</param>
+    /// <param name="dbFactory">Factory for the database context that holds the outbox table.</param>
     public SbEventPublisher(IConfiguration configuration, ILogger<SbEventPublisher> logger, IDbContextFactory<WaDbContext> dbFactory)
     {
         // Cached for publish-time use. DI selects this adapter only when the key exists (Program.cs), so production never sees a null here; direct constructions with an empty config throw at publish time from the ServiceBusClient ctor — OutboxRetryTests relies on that path.

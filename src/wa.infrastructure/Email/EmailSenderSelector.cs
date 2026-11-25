@@ -12,22 +12,20 @@ namespace wa.infrastructure.Email;
 /// </summary>
 public static class EmailSenderSelector
 {
-    /// <summary>The sender key constant; value <c>Wa:Email:Sender</c>.</summary>
+    /// <summary>Configuration key that selects the sender; the value <c>log</c> chooses the log-only sender.</summary>
     public const string SenderKey = "Wa:Email:Sender";
-    /// <summary>The from address key constant; value <c>Wa:Email:FromAddress</c>.</summary>
+    /// <summary>Configuration key for the From address of outgoing mail.</summary>
     public const string FromAddressKey = "Wa:Email:FromAddress";
-    /// <summary>The connection key constant; value <c>Wa:CommunicationHub:Connection</c>.</summary>
+    /// <summary>Configuration key for the Communication Services connection string (a Key Vault secret in production).</summary>
     public const string ConnectionKey = "Wa:CommunicationHub:Connection";
-    /// <summary>The default from address constant; value <c>no-reply@protodrop.com</c>.</summary>
+    /// <summary>From address used when <see cref="FromAddressKey"/> is not configured.</summary>
     public const string DefaultFromAddress = "no-reply@protodrop.com";
 
-    /// <summary>Creates the i email sender.</summary>
-    /// <param name="configuration">The configuration.</param>
-    /// <param name="loggerFactory">The logger factory.</param>
-    /// <returns>The i email sender.</returns>
-    /// <exception cref="InvalidOperationException">
-    /// Thrown when the operation is not valid in the current state.
-    /// </exception>
+    /// <summary>Builds the email sender that the configuration selects.</summary>
+    /// <param name="configuration">Configuration source; reads the sender, from-address and connection keys.</param>
+    /// <param name="loggerFactory">Factory for the logger of the chosen sender.</param>
+    /// <returns>The log-only sender when the sender key is <c>log</c>; otherwise a Communication Services sender.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when a real sender is selected but the connection string is missing (the message names the key only).</exception>
     public static IEmailSender Create(IConfiguration configuration, ILoggerFactory loggerFactory)
     {
         if (configuration[SenderKey] == "log")

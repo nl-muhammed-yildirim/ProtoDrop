@@ -13,7 +13,7 @@ public sealed class OrgLogoStore : IOrgLogoStore
     private readonly WaDbContext _db;
 
     /// <summary>Initializes a new instance of the <see cref="OrgLogoStore"/> class.</summary>
-    /// <param name="db">The database.</param>
+    /// <param name="db">Database context that backs the store.</param>
     public OrgLogoStore(WaDbContext db) => _db = db;
 
     /// <inheritdoc />

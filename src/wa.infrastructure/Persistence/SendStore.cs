@@ -15,8 +15,8 @@ public sealed class SendStore : ISendStore
     private readonly IBlobStore _blobs;   // T-010-02: the gate primitive — physical-presence checks via ExistsAsync.
 
     /// <summary>Initializes a new instance of the <see cref="SendStore"/> class.</summary>
-    /// <param name="db">The database.</param>
-    /// <param name="blobs">The blobs.</param>
+    /// <param name="db">Database context that backs the store.</param>
+    /// <param name="blobs">Blob store used to check that re-sent files still physically exist.</param>
     public SendStore(WaDbContext db, IBlobStore blobs)
     {
         _db = db;
@@ -86,17 +86,13 @@ public sealed class SendStore : ISendStore
             .Select(f => new FileItemRow(f.Id, f.BlobRefId, f.OriginalName, f.SizeBytes, f.ContentType, f.SortOrder))
             .ToListAsync(ct);
 
-    /// <summary>
+    /// <inheritdoc />
+    /// <remarks>
     /// T-010-01 (AC-010-1): steps 5–8 in ONE transaction — insert the new draft Transfer + new FileItem rows, then a
     /// guarded atomic RefCount++ per shared blob (ExecuteUpdate with the guard in the WHERE, same style as
     /// PublicTransferStore.RecordSingleFileDownloadAsync; no data copy, ADR-009). rowsAffected &lt; 1 → InvalidOperationException.
     /// T-010-02 inserts its FILES_GONE gate at step 0 inside this same transaction (full rollback — AC-010-2).
-    /// </summary>
-    /// <param name="draft">The draft.</param>
-    /// <param name="fileItems">The file items.</param>
-    /// <param name="recipients">The recipients.</param>
-    /// <param name="sharedBlobRefs">The shared blob refs.</param>
-    /// <param name="ct">Token that cancels the operation.</param>
+    /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the operation is not valid in the current state.
     /// </exception>

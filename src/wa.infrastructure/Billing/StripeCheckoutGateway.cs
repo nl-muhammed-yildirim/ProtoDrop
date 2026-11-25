@@ -16,10 +16,10 @@ public sealed class StripeCheckoutGateway : IStripeCheckoutGateway, IStripeSubsc
     private readonly ILogger<StripeCheckoutGateway> _logger;
 
     /// <summary>Initializes a new instance of the <see cref="StripeCheckoutGateway"/> class.</summary>
-    /// <param name="http">The HTTP.</param>
-    /// <param name="secretKey">The secret key.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
-    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    /// <param name="http">HTTP client already configured with the Stripe API base address.</param>
+    /// <param name="secretKey">Stripe secret API key; when null or blank every call fails with a billing-unavailable error.</param>
+    /// <param name="logger">Logger that records only status codes and request ids, never keys or emails.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="http"/> or <paramref name="logger"/> is null.</exception>
     public StripeCheckoutGateway(HttpClient http, string? secretKey, ILogger<StripeCheckoutGateway> logger)
     {
         _http = http ?? throw new ArgumentNullException(nameof(http));
@@ -60,11 +60,11 @@ public sealed class StripeCheckoutGateway : IStripeCheckoutGateway, IStripeSubsc
         return new StripePortalSession(id, url);
     }
 
-    /// <summary>US-019-07 (EC-019-4): GET v1/subscriptions/{id}. Null = Stripe 404; any other failure → BillingUnavailableException.</summary>
-    /// <param name="subscriptionId">Identifier of the subscription.</param>
+    /// <summary>Fetches a subscription from Stripe (GET v1/subscriptions/{id}) so webhook handling can use Stripe's current state (EC-019-4).</summary>
+    /// <param name="subscriptionId">Stripe subscription id.</param>
     /// <param name="ct">Token that cancels the operation.</param>
-    /// <returns>The stripe subscription snapshot, or <see langword="null"/> when there is none.</returns>
-    /// <exception cref="BillingUnavailableException">Thrown when a billing unavailable failure is detected.</exception>
+    /// <returns>The current snapshot, or <see langword="null"/> when Stripe answers 404.</returns>
+    /// <exception cref="BillingUnavailableException">Thrown when Stripe is unreachable, not configured or answers with any other error.</exception>
     public async Task<StripeSubscriptionSnapshot?> GetSubscriptionAsync(string subscriptionId, CancellationToken ct)
     {
         using var doc = await GetJsonAsync($"v1/subscriptions/{Uri.EscapeDataString(subscriptionId)}", "subscription", ct);

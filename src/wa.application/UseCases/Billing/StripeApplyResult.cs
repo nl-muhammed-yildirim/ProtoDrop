@@ -15,7 +15,7 @@ public sealed record StripeApplyResult(
     string FromPlanCode,
     string ToPlanCode)
 {
-    /// <summary>Creates the stripe apply result of.</summary>
+    /// <summary>Creates a result that reports only an outcome, with empty user and plan details.</summary>
     /// <param name="outcome">The outcome to report.</param>
     /// <returns>A result with that outcome and empty ids and codes.</returns>
     public static StripeApplyResult Of(StripeApplyOutcome outcome) =>

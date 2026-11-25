@@ -13,7 +13,7 @@ public sealed class BlobDeletionStore : IBlobDeletionStore
     private readonly WaDbContext _db;
 
     /// <summary>Initializes a new instance of the <see cref="BlobDeletionStore"/> class.</summary>
-    /// <param name="db">The database.</param>
+    /// <param name="db">Database context that backs the store.</param>
     public BlobDeletionStore(WaDbContext db) => _db = db;
 
     /// <inheritdoc />
