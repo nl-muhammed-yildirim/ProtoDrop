@@ -17,8 +17,8 @@ public class UnsubscribeServiceTests : IDisposable
 {
     private static readonly byte[] Key = Encoding.UTF8.GetBytes("unit-test-key");
 
-    private WaDbContext _db;
-    private UnsubscribeService _service;
+    private readonly WaDbContext _db;
+    private readonly UnsubscribeService _service;
 
     public UnsubscribeServiceTests()
     {

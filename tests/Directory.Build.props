@@ -1,0 +1,6 @@
+<Project>
+  <!-- CHORE-code-style-2: tests compile warning-free with enforced style; analyzers stay src-only (CA1707 vs xUnit names). -->
+  <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.csproj'">
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+</Project>

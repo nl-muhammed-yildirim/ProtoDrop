@@ -1,3 +1,8 @@
 # CHORE-code-style §2.3: interfaces live in Interfaces/ folders but keep their area namespace (no .Interfaces suffix).
 [**/Interfaces/*.cs]
 dotnet_style_namespace_match_folder = false
+
+[wa.infrastructure/Persistence/Migrations/**.cs]
+# EF-generated (BOM, array literals) — not linted or reformatted.
+generated_code = true
+charset = unset

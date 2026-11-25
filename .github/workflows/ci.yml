@@ -4,7 +4,7 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 jobs:
   # AGENT.md §4: cd src/wa.web && npm run lint
@@ -28,7 +28,7 @@ jobs:
         working-directory: src/wa.web
         run: npx prettier --check .
 
-  # AGENT.md §4 (determinism via T-051-01 .gitattributes): structural no-op until an .editorconfig lands.
+  # AGENT.md §4 (determinism via T-051-01 .gitattributes): enforces the repo .editorconfig (root + src/) on every PR into main or develop.
   lint-dotnet:
     runs-on: ubuntu-latest
     steps:

@@ -2,6 +2,7 @@
   <!-- CHORE-code-style: XML docs on src/ C# projects only (tests/ do not inherit this file; wa.web.esproj is excluded by the condition). -->
   <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.csproj'">
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <WarningsAsErrors>$(WarningsAsErrors);CS1570;CS1572;CS1573;CS1574;CS1587;CS1591</WarningsAsErrors>
   </PropertyGroup>
 </Project>

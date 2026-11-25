@@ -8,7 +8,7 @@ namespace wa.application.Limits;
 public interface IFeaturesProvider
 {
     /// <summary>TA-13.2 global gate key prefix; the segment is the camelCase <see cref="PlanFeatures"/> property name.</summary>
-    public const string GlobalGatePrefix = "feature.";
+    const string GlobalGatePrefix = "feature.";
 
     /// <summary>Returns the effective features for <paramref name="planCode"/>. Null or blank resolves to <see cref="Plan.DefaultCode"/>. Unknown plans throw <see cref="PlanUnknownException"/>; DB failure on cache miss propagates. Each call returns a fresh instance.</summary>
     /// <param name="planCode">Plan to resolve; null or blank means the default plan.</param>

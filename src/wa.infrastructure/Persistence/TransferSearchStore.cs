@@ -40,7 +40,7 @@ public sealed class TransferSearchStore : ITransferSearchStore
                     : 0
             })
             .Where(x => x.Rank > 0)   // only matching transfers — the term is guaranteed non-empty by the handler.
-            // FR-045-3: search cursor predicate (rank DESC, then CreatedAtUtc/Id keyset). afterRank null = first page.
+                                      // FR-045-3: search cursor predicate (rank DESC, then CreatedAtUtc/Id keyset). afterRank null = first page.
             .Where(x => afterRank == null
                 || x.Rank < afterRank.Value
                 || (x.Rank == afterRank.Value && (x.T.CreatedAtUtc < afterUtc!.Value

@@ -24,7 +24,7 @@ public class BlobSasMinterTest : IDisposable
     private const string TrnId = "2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e";
 
     private readonly BlobSasMinter _minter;
-    private byte[] _accountKey;
+    private readonly byte[] _accountKey;
 
     public BlobSasMinterTest()
     {
