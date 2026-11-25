@@ -12,8 +12,11 @@ public sealed class OrgLogoStore : IOrgLogoStore
 {
     private readonly WaDbContext _db;
 
+    /// <summary>Initializes a new instance of the <see cref="OrgLogoStore"/> class.</summary>
+    /// <param name="db">The database.</param>
     public OrgLogoStore(WaDbContext db) => _db = db;
 
+    /// <inheritdoc />
     public async Task<bool> SetPathAsync(Guid userId, string? blobPath, CancellationToken ct)
     {
         var rows = await _db.Set<AppUser>()

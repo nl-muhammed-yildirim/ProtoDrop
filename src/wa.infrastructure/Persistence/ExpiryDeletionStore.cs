@@ -12,8 +12,11 @@ public sealed class ExpiryDeletionStore : IExpiryDeletionStore
 {
     private readonly WaDbContext _db;
 
+    /// <summary>Initializes a new instance of the <see cref="ExpiryDeletionStore"/> class.</summary>
+    /// <param name="db">The database.</param>
     public ExpiryDeletionStore(WaDbContext db) => _db = db;
 
+    /// <inheritdoc />
     public async Task<bool> TryClaimAsync(DateTime runWindowStartUtc, DateTime lockUntilUtc, CancellationToken ct)
     {
         try
@@ -31,6 +34,7 @@ public sealed class ExpiryDeletionStore : IExpiryDeletionStore
         }
     }
 
+    /// <inheritdoc />
     public async Task<IReadOnlyList<TransferDeletionBatchRow>> GetNextBatchAsync(DateTime cutoffUtc, int batchSize, CancellationToken ct)
     {
         return await _db.Set<Transfer>()
@@ -42,6 +46,7 @@ public sealed class ExpiryDeletionStore : IExpiryDeletionStore
             .ToListAsync(ct);
     }
 
+    /// <inheritdoc />
     public async Task<int> DeleteTransfersAsync(IReadOnlyList<Guid> transferIds, DateTime deletedAtUtc, CancellationToken ct)
     {
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
@@ -107,6 +112,7 @@ public sealed class ExpiryDeletionStore : IExpiryDeletionStore
         return updated;
     }
 
+    /// <inheritdoc />
     public async Task CompleteClaimAsync(DateTime runWindowStartUtc, CancellationToken ct)
     {
         var jobRun = _db.Set<JobRun>().Find("delete-transfers", runWindowStartUtc);

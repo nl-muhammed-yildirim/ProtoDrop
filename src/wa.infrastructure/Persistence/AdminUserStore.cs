@@ -13,6 +13,8 @@ public sealed class AdminUserStore : IAdminUserStore
 {
     private readonly WaDbContext _db;
 
+    /// <summary>Initializes a new instance of the <see cref="AdminUserStore"/> class.</summary>
+    /// <param name="db">The database.</param>
     public AdminUserStore(WaDbContext db) => _db = db;
 
     /// <summary>
@@ -20,10 +22,16 @@ public sealed class AdminUserStore : IAdminUserStore
     /// + cursor predicate (CreatedAtUtc &lt; @afterUtc OR (= AND Id &lt; @afterIdExcluded)) + Take(limit+1) for next-page detection.
     /// q semantics (DECISION): plain Contains on the normalized term — AppUser.Email is stored lowercased so a lowercase q matches case-insensitively.
     /// Per-row computed columns via scalar subqueries (EF translates to correlated subselects — bounded per row at Take(25)):
-    ///   PlanName            = scalar subquery over Plan (FirstOrDefault).
-    ///   StorageBytesUsed    = T-010-04's 3-step expression inlined as a nested subquery (Status IN (1,3), per-ref counting US-010-03).
-    ///   ActiveTransferCount = scalar subquery over Transfer (Status == 1 only — task file literal).
+    /// PlanName            = scalar subquery over Plan (FirstOrDefault).
+    /// StorageBytesUsed    = T-010-04's 3-step expression inlined as a nested subquery (Status IN (1,3), per-ref counting US-010-03).
+    /// ActiveTransferCount = scalar subquery over Transfer (Status == 1 only — task file literal).
     /// </summary>
+    /// <param name="q">The q.</param>
+    /// <param name="afterUtc">The after UTC.</param>
+    /// <param name="afterIdExcluded">The after ID excluded.</param>
+    /// <param name="limit">The limit.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>A tuple holding the items and next cursor values.</returns>
     public async Task<(List<AdminUserRow> Items, string? NextCursor)> GetUsersAsync(
         string? q,
         DateTime? afterUtc,
@@ -74,6 +82,10 @@ public sealed class AdminUserStore : IAdminUserStore
     /// T-011-07 (TA-4.2#22 / FR-011-2): set AppUser.PlanId via ExecuteUpdateAsync — mirrors AppUserStore.SoftDeleteWithReHomeAsync's
     /// idiom (L57-69). Single-row update, no transaction needed. Returns false when the row vanished in a race.
     /// </summary>
+    /// <param name="userId">Identifier of the user.</param>
+    /// <param name="newPlanId">Identifier of the new plan.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns><see langword="true"/> when the operation succeeded; otherwise <see langword="false"/>.</returns>
     public async Task<bool> SetPlanIdAsync(Guid userId, Guid newPlanId, CancellationToken ct)
     {
         var updatedUsers = await _db.Set<AppUser>()

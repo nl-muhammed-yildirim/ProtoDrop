@@ -7,6 +7,7 @@ namespace wa.infrastructure.Persistence.EntityConfigurations;
 /// <summary>US-047-01: dbo.DataExport (GDPR export requests). No FK to AppUser — soft-deleted users keep their rows (EC-047-3).</summary>
 public sealed class DataExportConfiguration : IEntityTypeConfiguration<DataExport>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<DataExport> b)
     {
         b.ToTable("DataExport");

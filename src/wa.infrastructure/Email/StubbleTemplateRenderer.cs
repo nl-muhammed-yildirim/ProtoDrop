@@ -34,6 +34,9 @@ public sealed class StubbleTemplateRenderer : ITemplateRenderer
 
     private static readonly string[] SupportedLocales = ["en", "nl", "fr", "es", "pt", "it", "de", "tr"];
 
+    /// <summary>Initializes a new instance of the <see cref="StubbleTemplateRenderer"/> class.</summary>
+    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="telemetry">The telemetry.</param>
     public StubbleTemplateRenderer(ILogger<StubbleTemplateRenderer> logger, WaTelemetryReporter? telemetry = null)
     {
         _logger = logger;
@@ -50,6 +53,7 @@ public sealed class StubbleTemplateRenderer : ITemplateRenderer
         }
     }
 
+    /// <inheritdoc />
     public (string Subject, string HtmlBody, string TextBody) Render(TemplateData data, string locale)
     {
         // Resolve culture for number formatting.

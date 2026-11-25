@@ -34,6 +34,9 @@ public sealed class BlobContainerBootstrap : BackgroundService
     private readonly BlobServiceClient _svc;
     private readonly ILogger<BlobContainerBootstrap> _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="BlobContainerBootstrap"/> class.</summary>
+    /// <param name="serviceClient">The service client.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
     public BlobContainerBootstrap(
         BlobServiceClient serviceClient, ILogger<BlobContainerBootstrap> logger)
     {
@@ -41,6 +44,7 @@ public sealed class BlobContainerBootstrap : BackgroundService
         _logger = logger;
     }
 
+    /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         // Ensure both TA-3.5 containers exist (idempotent).

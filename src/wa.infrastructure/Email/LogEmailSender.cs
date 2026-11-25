@@ -11,8 +11,11 @@ public sealed class LogEmailSender : IEmailSender
 {
     private readonly ILogger<LogEmailSender> _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="LogEmailSender"/> class.</summary>
+    /// <param name="logger">The logger used for diagnostics.</param>
     public LogEmailSender(ILogger<LogEmailSender> logger) => _logger = logger;
 
+    /// <inheritdoc />
     public Task SendAsync(EmailMessage message, CancellationToken ct)
     {
         _logger.LogInformation(

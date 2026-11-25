@@ -15,9 +15,13 @@ public sealed class BillingGraceStore : IBillingGraceStore
 
     private readonly IDbContextFactory<WaDbContext> _factory;
 
+    /// <summary>Initializes a new instance of the <see cref="BillingGraceStore"/> class.</summary>
+    /// <param name="factory">The factory.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public BillingGraceStore(IDbContextFactory<WaDbContext> factory) =>
         _factory = factory ?? throw new ArgumentNullException(nameof(factory));
 
+    /// <inheritdoc />
     public async Task<IReadOnlyList<GraceCandidate>> GetExpiredGracesAsync(DateTime nowUtc, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);
@@ -47,6 +51,7 @@ public sealed class BillingGraceStore : IBillingGraceStore
         return candidates;
     }
 
+    /// <inheritdoc />
     public async Task<GraceDowngradeResult> TryDowngradeAsync(
         Guid subscriptionId, DateTime graceEndsAtUtc, DateTime nowUtc, CancellationToken ct)
     {

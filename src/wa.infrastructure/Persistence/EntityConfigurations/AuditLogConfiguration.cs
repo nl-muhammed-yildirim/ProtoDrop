@@ -7,6 +7,7 @@ namespace wa.infrastructure.Persistence.EntityConfigurations;
 /// <summary>TA-3.2: dbo.AuditLog.</summary>
 public sealed class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<AuditLog> b)
     {
         b.ToTable("AuditLog");

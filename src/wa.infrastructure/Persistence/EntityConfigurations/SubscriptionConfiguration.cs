@@ -7,6 +7,7 @@ namespace wa.infrastructure.Persistence.EntityConfigurations;
 /// <summary>TA-3.2: dbo.Subscription (billing mirror, P1).</summary>
 public sealed class SubscriptionConfiguration : IEntityTypeConfiguration<Subscription>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<Subscription> b)
     {
         b.ToTable("Subscription");

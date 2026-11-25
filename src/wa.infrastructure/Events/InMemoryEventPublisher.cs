@@ -12,6 +12,8 @@ namespace wa.infrastructure.Events;
 /// Expired entries are purged via an injectable clock — no unbounded growth, no real waits in tests.
 /// This is a test double, not a second implementation: production code never branches on "is this the fake?" — DI picks the adapter (TA-0.2 rule 7).
 /// </summary>
+/// <param name="ttl">The TTL of the in memory event publisher.</param>
+/// <param name="clock">The clock of the in memory event publisher.</param>
 public sealed class InMemoryEventPublisher(TimeSpan ttl, Func<DateTimeOffset> clock) : IEventPublisher
 {
     private const string TopicName = "core";
@@ -36,6 +38,8 @@ public sealed class InMemoryEventPublisher(TimeSpan ttl, Func<DateTimeOffset> cl
     }
 
     /// <summary>Returns stored envelopes for a topic in publish order (test round-trip support — AC-054-4 second Gherkin block).</summary>
+    /// <param name="topic">The topic.</param>
+    /// <returns>The matching stored envelope items.</returns>
     public IReadOnlyList<StoredEnvelope> GetByTopic(string topic)
     {
         PurgeExpired(clock());
@@ -50,5 +54,8 @@ public sealed class InMemoryEventPublisher(TimeSpan ttl, Func<DateTimeOffset> cl
     }
 
     /// <summary>A single stored event: its exact serialized TA-5.2 envelope + metadata for read-back and TTL checks.</summary>
+    /// <param name="Json">The JSON of the stored envelope.</param>
+    /// <param name="Topic">The topic of the stored envelope.</param>
+    /// <param name="StoredAtUtc">The stored at UTC of the stored envelope.</param>
     public sealed record StoredEnvelope(string Json, string Topic, DateTimeOffset StoredAtUtc);
 }

@@ -13,6 +13,8 @@ public sealed class SearchTransfersStore : ISearchTransfersStore
 {
     private readonly WaDbContext _db;
 
+    /// <summary>Initializes a new instance of the <see cref="SearchTransfersStore"/> class.</summary>
+    /// <param name="db">The database.</param>
     public SearchTransfersStore(WaDbContext db) => _db = db;
 
     /// <summary>
@@ -22,6 +24,18 @@ public sealed class SearchTransfersStore : ISearchTransfersStore
     /// with one param and no shape sniffing. LinkId equality is case-insensitive via SQL Server CI collation (same idiom as TransferStore L22).
     /// Owner email via the OverviewStore subquery idiom (AppUser where Id == t.OwnerAppUserId, FirstOrDefault — null for guest transfers).
     /// </summary>
+    /// <param name="q">The q.</param>
+    /// <param name="matchFilesAndSender">Whether match files and sender.</param>
+    /// <param name="statuses">The statuses.</param>
+    /// <param name="minBytes">The min bytes.</param>
+    /// <param name="maxBytes">The max bytes.</param>
+    /// <param name="fromUtc">The from UTC.</param>
+    /// <param name="toUtc">The to UTC.</param>
+    /// <param name="afterUtc">The after UTC.</param>
+    /// <param name="afterIdExcluded">The after ID excluded.</param>
+    /// <param name="limit">The limit.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>A tuple holding the items and next cursor values.</returns>
     public async Task<(List<AdminTransferRow> Items, string? NextCursor)> SearchAsync(
         string? q,
         bool matchFilesAndSender,

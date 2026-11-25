@@ -13,8 +13,11 @@ public sealed class IdempotencyStore : IIdempotencyStore
 {
     private readonly WaDbContext _db;
 
+    /// <summary>Initializes a new instance of the <see cref="IdempotencyStore"/> class.</summary>
+    /// <param name="db">The database.</param>
     public IdempotencyStore(WaDbContext db) => _db = db;
 
+    /// <inheritdoc />
     public async Task<IdempotencyEntry?> FindAsync(string key, CancellationToken ct)
     {
         var entry = await _db.Set<IdempotencyKey>().AsNoTracking().FirstOrDefaultAsync(k => k.Key == key, ct);
@@ -23,6 +26,7 @@ public sealed class IdempotencyStore : IIdempotencyStore
         return new IdempotencyEntry(entry.Key, entry.ResultJson!, entry.StatusCode, entry.ExpiresAtUtc);
     }
 
+    /// <inheritdoc />
     public async Task SaveAsync(string key, string resultJson, int statusCode, CancellationToken ct)
     {
         // Singleton context (adapter-owned): the finalize handler may already have tracked an

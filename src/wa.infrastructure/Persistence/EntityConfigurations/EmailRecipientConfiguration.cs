@@ -7,6 +7,7 @@ namespace wa.infrastructure.Persistence.EntityConfigurations;
 /// <summary>TA-3.2: dbo.EmailRecipient (re-send idempotency per address).</summary>
 public sealed class EmailRecipientConfiguration : IEntityTypeConfiguration<EmailRecipient>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<EmailRecipient> b)
     {
         b.ToTable("EmailRecipient");

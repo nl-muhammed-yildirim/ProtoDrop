@@ -9,8 +9,11 @@ public sealed class EmailNotificationsStore : IEmailNotificationsStore
 {
     private readonly IDbContextFactory<WaDbContext> _factory;
 
+    /// <summary>Initializes a new instance of the <see cref="EmailNotificationsStore"/> class.</summary>
+    /// <param name="factory">The factory.</param>
     public EmailNotificationsStore(IDbContextFactory<WaDbContext> factory) => _factory = factory;
 
+    /// <inheritdoc />
     public async Task SetAsync(Guid userId, bool enabled, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);
@@ -19,6 +22,7 @@ public sealed class EmailNotificationsStore : IEmailNotificationsStore
             .ExecuteUpdateAsync(s => s.SetProperty(u => u.EmailNotificationsEnabled, (bool?)enabled), ct);
     }
 
+    /// <inheritdoc />
     public async Task<bool?> GetAsync(Guid userId, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);

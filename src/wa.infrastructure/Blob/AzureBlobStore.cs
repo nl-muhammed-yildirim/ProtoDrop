@@ -23,6 +23,9 @@ public sealed class AzureBlobStore : IBlobStore, IBlobContentWriter
     /// <c>{acct}.blob.core.windows.net</c> host prefix, an Azurite local-dev
     /// URL as the final path segment (e.g. <c>…/devstoreaccount1</c>).
     /// </summary>
+    /// <param name="accountUrl">The account URL.</param>
+    /// <param name="accountKey">The account key.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
     public AzureBlobStore(
         Uri accountUrl, string accountKey, ILogger<AzureBlobStore> logger)
     {
@@ -34,9 +37,12 @@ public sealed class AzureBlobStore : IBlobStore, IBlobContentWriter
     }
 
     /// <summary>Take an already-constructed client (integration tests build one against Testcontainers Azurite).</summary>
+    /// <param name="serviceClient">The service client.</param>
     public AzureBlobStore(BlobServiceClient serviceClient) => _svc = serviceClient;
 
     /// <summary>TA-0.2 rule 7 — the account name for shared-key credentials (DI in Program.cs needs it).</summary>
+    /// <param name="url">The URL.</param>
+    /// <returns>The resulting text.</returns>
     public static string AccountNameFrom(Uri url)
     {
         var host = url.Host;
@@ -47,6 +53,7 @@ public sealed class AzureBlobStore : IBlobStore, IBlobContentWriter
         var name = last.TrimEnd('/');
         return name.Length == 0 ? host : name;
     }
+    /// <inheritdoc />
     public Task UploadAsync(
         string path, Stream content, CancellationToken cancellationToken = default)
     {
@@ -57,6 +64,10 @@ public sealed class AzureBlobStore : IBlobStore, IBlobContentWriter
     }
 
     /// <summary>US-021-04: overwrite upload that stores the given Content-Type (no Conditions = overwrite).</summary>
+    /// <param name="path">The path.</param>
+    /// <param name="content">The content.</param>
+    /// <param name="contentType">The content type.</param>
+    /// <param name="cancellationToken">Token that cancels the operation.</param>
     public Task UploadAsync(
         string path, Stream content, string contentType, CancellationToken cancellationToken = default)
     {
@@ -69,6 +80,7 @@ public sealed class AzureBlobStore : IBlobStore, IBlobContentWriter
                 cancellationToken);
     }
 
+    /// <inheritdoc />
     public async Task<Stream> DownloadAsync(
         string path, CancellationToken cancellationToken = default)
     {
@@ -80,6 +92,7 @@ public sealed class AzureBlobStore : IBlobStore, IBlobContentWriter
         return download.Value.Content;
     }
 
+    /// <inheritdoc />
     public async Task CopyAsync(
         string sourcePath, string destinationPath, CancellationToken cancellationToken = default)
     {
@@ -97,6 +110,7 @@ public sealed class AzureBlobStore : IBlobStore, IBlobContentWriter
             .SyncCopyFromUriAsync(srcUrl, cancellationToken: cancellationToken);
     }
 
+    /// <inheritdoc />
     public async Task<long> GetSizeAsync(
         string path, CancellationToken cancellationToken = default)
     {
@@ -108,6 +122,7 @@ public sealed class AzureBlobStore : IBlobStore, IBlobContentWriter
         return info.Value.ContentLength;
     }
 
+    /// <inheritdoc />
     public async Task<bool> ExistsAsync(
         string path, CancellationToken cancellationToken = default)
     {
@@ -118,6 +133,7 @@ public sealed class AzureBlobStore : IBlobStore, IBlobContentWriter
         return exists.Value;
     }
 
+    /// <inheritdoc />
     public Task DeleteAsync(
         string path, CancellationToken cancellationToken = default)
     {

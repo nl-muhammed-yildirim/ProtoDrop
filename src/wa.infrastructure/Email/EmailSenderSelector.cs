@@ -12,11 +12,22 @@ namespace wa.infrastructure.Email;
 /// </summary>
 public static class EmailSenderSelector
 {
+    /// <summary>The sender key constant; value <c>Wa:Email:Sender</c>.</summary>
     public const string SenderKey = "Wa:Email:Sender";
+    /// <summary>The from address key constant; value <c>Wa:Email:FromAddress</c>.</summary>
     public const string FromAddressKey = "Wa:Email:FromAddress";
+    /// <summary>The connection key constant; value <c>Wa:CommunicationHub:Connection</c>.</summary>
     public const string ConnectionKey = "Wa:CommunicationHub:Connection";
+    /// <summary>The default from address constant; value <c>no-reply@protodrop.com</c>.</summary>
     public const string DefaultFromAddress = "no-reply@protodrop.com";
 
+    /// <summary>Creates the i email sender.</summary>
+    /// <param name="configuration">The configuration.</param>
+    /// <param name="loggerFactory">The logger factory.</param>
+    /// <returns>The i email sender.</returns>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the operation is not valid in the current state.
+    /// </exception>
     public static IEmailSender Create(IConfiguration configuration, ILoggerFactory loggerFactory)
     {
         if (configuration[SenderKey] == "log")

@@ -12,6 +12,8 @@ public sealed class AppUserStore : IAppUserStore
 {
     private readonly WaDbContext _db;
 
+    /// <summary>Initializes a new instance of the <see cref="AppUserStore"/> class.</summary>
+    /// <param name="db">The database.</param>
     public AppUserStore(WaDbContext db) => _db = db;
 
     /// <summary>
@@ -22,9 +24,13 @@ public sealed class AppUserStore : IAppUserStore
     /// Untracked: the context is a singleton, so a tracked read would be served from the identity map and hide
     /// out-of-band changes (e.g. AppUser.PlanId written by a plan change) until restart. Same idiom as UserPlanStore.
     /// </remarks>
+    /// <param name="lowercasedEmail">The lowercased email.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>The app user, or <see langword="null"/> when there is none.</returns>
     public Task<AppUser?> FindByEmailAsync(string lowercasedEmail, CancellationToken ct) =>
         _db.Set<AppUser>().AsNoTracking().FirstOrDefaultAsync(u => u.Email == lowercasedEmail, ct);
 
+    /// <inheritdoc />
     public async Task CreateAsync(AppUser user, CancellationToken ct)
     {
         _db.Set<AppUser>().Add(user);
@@ -33,10 +39,17 @@ public sealed class AppUserStore : IAppUserStore
     }
 
     /// <summary>T-008-06: session-user read — soft-deleted rows are treated as unknown (endpoint 13 → 404 NOT_FOUND). Untracked, see FindByEmailAsync.</summary>
+    /// <param name="userId">Identifier of the user.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>The app user, or <see langword="null"/> when there is none.</returns>
     public Task<AppUser?> GetByIdAsync(Guid userId, CancellationToken ct) =>
         _db.Set<AppUser>().AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId && u.DeletedAtUtc == null, ct);
 
     /// <summary>T-008-06 (FR-008-4): partial profile update — null arguments are left alone; empty displayName falls back to the email local part.</summary>
+    /// <param name="userId">Identifier of the user.</param>
+    /// <param name="displayName">The display name.</param>
+    /// <param name="theme">The theme.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
     public async Task UpdateProfileAsync(Guid userId, string? displayName, string? theme, CancellationToken ct)
     {
         var user = await _db.Set<AppUser>().FirstAsync(u => u.Id == userId, ct); // caller pre-checked via GetByIdAsync (no-row → 404 before this runs)
@@ -54,6 +67,10 @@ public sealed class AppUserStore : IAppUserStore
     }
 
     /// <summary>T-008-06 / FR-008-8: soft-delete + transfer re-home in ONE transaction (mirrors ExpiryDeletionStore's idiom); US-047-02 adds the pending Erasure marker to the same transaction.</summary>
+    /// <param name="userId">Identifier of the user.</param>
+    /// <param name="deletedAtUtc">The deleted at UTC.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns><see langword="true"/> when the operation succeeded; otherwise <see langword="false"/>.</returns>
     public async Task<bool> SoftDeleteWithReHomeAsync(Guid userId, DateTime deletedAtUtc, CancellationToken ct)
     {
         // Mirror ExpiryDeletionStore.DeleteTransfersAsync's idiom EXACTLY: await using tx, CommitAsync at the end — no try/catch.

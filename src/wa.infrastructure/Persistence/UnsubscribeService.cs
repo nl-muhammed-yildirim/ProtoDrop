@@ -15,6 +15,10 @@ public sealed class UnsubscribeService
     private readonly byte[] _hmacKey;
     private readonly ILogger<UnsubscribeService> _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="UnsubscribeService"/> class.</summary>
+    /// <param name="db">The database.</param>
+    /// <param name="hmacKey">The HMAC key.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
     public UnsubscribeService(WaDbContext db, byte[] hmacKey, ILogger<UnsubscribeService> logger)
     {
         _db = db;
@@ -26,6 +30,9 @@ public sealed class UnsubscribeService
     /// Verify the token and insert an EmailSuppression row (idempotent via UQ_ES unique constraint).
     /// EC-006-3: suppression created mid-batch can at most save or miss one email — documented, no lock needed.
     /// </summary>
+    /// <param name="token">The token.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>The unsubscribe result.</returns>
     public async Task<UnsubscribeResult> HandleAsync(string token, CancellationToken ct)
     {
         if (UnsubscribeToken.Verify(token, _hmacKey) is not (string Address, string SenderEmail))

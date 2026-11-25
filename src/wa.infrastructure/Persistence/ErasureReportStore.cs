@@ -14,9 +14,13 @@ public sealed class ErasureReportStore : IErasureReportStore
 {
     private readonly IDbContextFactory<WaDbContext> _factory;
 
+    /// <summary>Initializes a new instance of the <see cref="ErasureReportStore"/> class.</summary>
+    /// <param name="factory">The factory.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public ErasureReportStore(IDbContextFactory<WaDbContext> factory) =>
         _factory = factory ?? throw new ArgumentNullException(nameof(factory));
 
+    /// <inheritdoc />
     public async Task<(IReadOnlyList<ErasureReportRow> Items, string? NextCursor)> GetPageAsync(
         DateTime? afterUtc, Guid? afterIdExcluded, int limit, CancellationToken ct)
     {

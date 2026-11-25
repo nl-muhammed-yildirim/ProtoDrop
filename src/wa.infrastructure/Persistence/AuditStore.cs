@@ -12,9 +12,13 @@ public sealed class AuditStore : IAuditStore
 {
     private readonly WaDbContext _db;
 
+    /// <summary>Initializes a new instance of the <see cref="AuditStore"/> class.</summary>
+    /// <param name="db">The database.</param>
     public AuditStore(WaDbContext db) => _db = db;
 
     /// <summary>One Add + one SaveChanges — no extra round-trips (AC-009-1 idiom).</summary>
+    /// <param name="row">The row.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
     public async Task AddAsync(AuditLog row, CancellationToken ct)
     {
         _db.Set<AuditLog>().Add(row);

@@ -8,6 +8,7 @@ namespace wa.infrastructure.Persistence.EntityConfigurations;
 /// <summary>TA-3.2: dbo.Plan.</summary>
 public sealed class PlanConfiguration : IEntityTypeConfiguration<Plan>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<Plan> b)
     {
         b.ToTable("Plan");

@@ -15,9 +15,13 @@ public sealed class ScheduledSendStore : IScheduledSendStore
 
     private readonly IDbContextFactory<WaDbContext> _factory;
 
+    /// <summary>Initializes a new instance of the <see cref="ScheduledSendStore"/> class.</summary>
+    /// <param name="factory">The factory.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public ScheduledSendStore(IDbContextFactory<WaDbContext> factory) =>
         _factory = factory ?? throw new ArgumentNullException(nameof(factory));
 
+    /// <inheritdoc />
     public async Task<bool> TryClaimAsync(DateTime runWindowStartUtc, DateTime lockUntilUtc, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);
@@ -40,18 +44,23 @@ public sealed class ScheduledSendStore : IScheduledSendStore
     /// covered by IX_Transfer_Sched (Status, ScheduledSendAtUtc) — an index seek with no lookup; do not add other columns.
     /// Public static so the integration plan test runs the exact query.
     /// </summary>
+    /// <param name="transfers">The transfers.</param>
+    /// <param name="nowUtc">The now UTC.</param>
+    /// <returns>The i queryable of due scheduled row.</returns>
     public static IQueryable<DueScheduledRow> DueQuery(IQueryable<Transfer> transfers, DateTime nowUtc) =>
         transfers
             .Where(t => t.Status == TransferStatus.Scheduled && t.ScheduledSendAtUtc <= nowUtc)
             .OrderBy(t => t.ScheduledSendAtUtc)
             .Select(t => new DueScheduledRow(t.Id, t.ScheduledSendAtUtc!.Value));
 
+    /// <inheritdoc />
     public async Task<IReadOnlyList<DueScheduledRow>> GetDueBatchAsync(DateTime nowUtc, int batchSize, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);
         return await DueQuery(db.Set<Transfer>().AsNoTracking(), nowUtc).Take(batchSize).ToListAsync(ct);
     }
 
+    /// <inheritdoc />
     public async Task<ActivatedTransfer?> TryActivateAsync(Guid transferId, DateTime nowUtc, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);
@@ -81,6 +90,7 @@ public sealed class ScheduledSendStore : IScheduledSendStore
             row.ScheduledSendAtUtc ?? nowUtc, emails);
     }
 
+    /// <inheritdoc />
     public async Task CompleteClaimAsync(DateTime runWindowStartUtc, DateTime finishedAtUtc, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);

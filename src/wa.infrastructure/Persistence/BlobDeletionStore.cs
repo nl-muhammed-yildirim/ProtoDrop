@@ -12,8 +12,11 @@ public sealed class BlobDeletionStore : IBlobDeletionStore
 {
     private readonly WaDbContext _db;
 
+    /// <summary>Initializes a new instance of the <see cref="BlobDeletionStore"/> class.</summary>
+    /// <param name="db">The database.</param>
     public BlobDeletionStore(WaDbContext db) => _db = db;
 
+    /// <inheritdoc />
     public async Task<bool> TryClaimAsync(DateTime runWindowStartUtc, DateTime lockUntilUtc, CancellationToken ct)
     {
         try
@@ -31,6 +34,7 @@ public sealed class BlobDeletionStore : IBlobDeletionStore
         }
     }
 
+    /// <inheritdoc />
     public async Task<IReadOnlyList<BlobDeletionBatchRow>> GetNextBatchAsync(DateTime cutoffUtc, int batchSize, CancellationToken ct)
     {
         return await _db.Set<BlobRef>()
@@ -42,6 +46,7 @@ public sealed class BlobDeletionStore : IBlobDeletionStore
             .ToListAsync(ct);
     }
 
+    /// <inheritdoc />
     public async Task DeleteRowAsync(Guid blobRefId, CancellationToken ct)
     {
         var blob = await _db.Set<BlobRef>().FirstAsync(b => b.Id == blobRefId, ct);
@@ -49,6 +54,7 @@ public sealed class BlobDeletionStore : IBlobDeletionStore
         await _db.SaveChangesAsync(ct);
     }
 
+    /// <inheritdoc />
     public async Task CompleteClaimAsync(DateTime runWindowStartUtc, CancellationToken ct)
     {
         var jobRun = _db.Set<JobRun>().Find("delete-blobs", runWindowStartUtc);

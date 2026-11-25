@@ -9,8 +9,11 @@ public sealed class SenderBrandingStore : ISenderBrandingStore
 {
     private readonly WaDbContext _db;
 
+    /// <summary>Initializes a new instance of the <see cref="SenderBrandingStore"/> class.</summary>
+    /// <param name="db">The database.</param>
     public SenderBrandingStore(WaDbContext db) => _db = db;
 
+    /// <inheritdoc />
     public async Task<SenderBrandingRow?> GetAsync(Guid ownerAppUserId, CancellationToken ct) =>
         await _db.Set<AppUser>().AsNoTracking()
             .Where(u => u.Id == ownerAppUserId && u.DeletedAtUtc == null)

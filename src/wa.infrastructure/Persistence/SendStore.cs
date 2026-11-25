@@ -14,15 +14,20 @@ public sealed class SendStore : ISendStore
     private readonly WaDbContext _db;
     private readonly IBlobStore _blobs;   // T-010-02: the gate primitive — physical-presence checks via ExistsAsync.
 
+    /// <summary>Initializes a new instance of the <see cref="SendStore"/> class.</summary>
+    /// <param name="db">The database.</param>
+    /// <param name="blobs">The blobs.</param>
     public SendStore(WaDbContext db, IBlobStore blobs)
     {
         _db = db;
         _blobs = blobs;
     }
 
+    /// <inheritdoc />
     public Task<Transfer?> FindByIdAsync(Guid id, CancellationToken ct) =>
         _db.Set<Transfer>().FirstOrDefaultAsync(t => t.Id == id, ct);
 
+    /// <inheritdoc />
     public async Task SaveSendAsync(Transfer transfer, IReadOnlyList<EmailRecipient> recipients, CancellationToken ct)
     {
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
@@ -65,12 +70,14 @@ public sealed class SendStore : ISendStore
         await tx.CommitAsync(ct);
     }
 
+    /// <inheritdoc />
     public async Task<IReadOnlyList<string>> GetRecipientAddressesAsync(Guid transferId, CancellationToken ct) =>
         await _db.Set<EmailRecipient>()
             .Where(r => r.TransferId == transferId)
             .Select(r => r.Address)
             .ToListAsync(ct);
 
+    /// <inheritdoc />
     public async Task<IReadOnlyList<FileItemRow>> ListFileItemsByTransferAsync(Guid transferId, CancellationToken ct) =>
         await _db.Set<FileItem>()
             .AsNoTracking()
@@ -85,6 +92,14 @@ public sealed class SendStore : ISendStore
     /// PublicTransferStore.RecordSingleFileDownloadAsync; no data copy, ADR-009). rowsAffected &lt; 1 → InvalidOperationException.
     /// T-010-02 inserts its FILES_GONE gate at step 0 inside this same transaction (full rollback — AC-010-2).
     /// </summary>
+    /// <param name="draft">The draft.</param>
+    /// <param name="fileItems">The file items.</param>
+    /// <param name="recipients">The recipients.</param>
+    /// <param name="sharedBlobRefs">The shared blob refs.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the operation is not valid in the current state.
+    /// </exception>
     public async Task SaveResendAsync(Transfer draft, IReadOnlyList<FileItem> fileItems, IReadOnlyList<EmailRecipient> recipients, IReadOnlyList<BlobRef> sharedBlobRefs, CancellationToken ct)
     {
         await using var tx = await _db.Database.BeginTransactionAsync(ct);

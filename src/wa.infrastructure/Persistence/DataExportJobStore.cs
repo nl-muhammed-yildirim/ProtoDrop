@@ -12,9 +12,13 @@ public sealed class DataExportJobStore : IDataExportJobStore
 
     private readonly IDbContextFactory<WaDbContext> _factory;
 
+    /// <summary>Initializes a new instance of the <see cref="DataExportJobStore"/> class.</summary>
+    /// <param name="factory">The factory.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public DataExportJobStore(IDbContextFactory<WaDbContext> factory) =>
         _factory = factory ?? throw new ArgumentNullException(nameof(factory));
 
+    /// <inheritdoc />
     public async Task<bool> TryClaimAsync(DateTime windowStartUtc, DateTime lockUntilUtc, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);
@@ -31,6 +35,7 @@ public sealed class DataExportJobStore : IDataExportJobStore
         }
     }
 
+    /// <inheritdoc />
     public async Task CompleteClaimAsync(DateTime windowStartUtc, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);
@@ -42,6 +47,7 @@ public sealed class DataExportJobStore : IDataExportJobStore
         }
     }
 
+    /// <inheritdoc />
     public async Task<IReadOnlyList<DataExport>> GetProcessingAsync(int batchSize, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);
@@ -52,6 +58,7 @@ public sealed class DataExportJobStore : IDataExportJobStore
             .ToListAsync(ct);
     }
 
+    /// <inheritdoc />
     public async Task<ExportSnapshot?> ReadSnapshotAsync(Guid userId, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);
@@ -103,6 +110,7 @@ public sealed class DataExportJobStore : IDataExportJobStore
         return new ExportSnapshot(profile with { CreatedAtUtc = DateTime.SpecifyKind(profile.CreatedAtUtc, DateTimeKind.Utc) }, rows);
     }
 
+    /// <inheritdoc />
     public async Task MarkReadyAsync(Guid id, string blobPath, DateTime readyAtUtc, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);
@@ -129,6 +137,7 @@ public sealed class DataExportJobStore : IDataExportJobStore
             .ExecuteDeleteAsync(ct);
     }
 
+    /// <inheritdoc />
     public async Task MarkFailedAsync(Guid id, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);
@@ -137,6 +146,7 @@ public sealed class DataExportJobStore : IDataExportJobStore
             .ExecuteUpdateAsync(s => s.SetProperty(e => e.State, DataExportState.Failed), ct);
     }
 
+    /// <inheritdoc />
     public async Task<IReadOnlyList<PurgeableExport>> GetPurgeableAsync(DateTime readyBeforeUtc, int batchSize, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);
@@ -151,6 +161,7 @@ public sealed class DataExportJobStore : IDataExportJobStore
         return rows.Select(r => new PurgeableExport(r.Id, r.BlobPath!)).ToList();
     }
 
+    /// <inheritdoc />
     public async Task DeleteAsync(Guid id, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);

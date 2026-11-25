@@ -14,9 +14,12 @@ public sealed class SbHealthProbe : ISbHealthProbe
 
     private readonly string? _connectionString;
 
+    /// <summary>Initializes a new instance of the <see cref="SbHealthProbe"/> class.</summary>
+    /// <param name="configuration">The configuration.</param>
     public SbHealthProbe(IConfiguration configuration) =>
         _connectionString = configuration["Wa:ServiceBus:ConnectionString"];
 
+    /// <inheritdoc />
     public async Task<ComponentStatus> CheckAsync(CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(_connectionString))

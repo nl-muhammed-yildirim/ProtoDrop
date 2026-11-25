@@ -9,6 +9,7 @@ namespace wa.infrastructure.Persistence.DesignTime;
 /// </summary>
 public sealed class WaDbContextFactory : IDesignTimeDbContextFactory<WaDbContext>
 {
+    /// <inheritdoc />
     public WaDbContext CreateDbContext(string[] args)
     {
         var options = new DbContextOptionsBuilder<WaDbContext>()

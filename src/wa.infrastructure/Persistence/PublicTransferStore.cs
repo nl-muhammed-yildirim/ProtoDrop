@@ -12,6 +12,8 @@ public sealed class PublicTransferStore : IPublicTransferStore
 {
     private readonly WaDbContext _db;
 
+    /// <summary>Initializes a new instance of the <see cref="PublicTransferStore"/> class.</summary>
+    /// <param name="db">The database.</param>
     public PublicTransferStore(WaDbContext db) => _db = db;
 
     /// <summary>
@@ -21,6 +23,9 @@ public sealed class PublicTransferStore : IPublicTransferStore
     /// FR-003-9's byte identity (CapReached_410_BodyByteIdenticalToEndpoint4). No handler mutates or saves this entity, so an
     /// untracked read is safe for all three callers (GetPublicTransfer/GetFileDownloadUrl/UnlockTransfer — status checks + email only).
     /// </summary>
+    /// <param name="linkId">Identifier of the link.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>A tuple holding the item1 and item2 values.</returns>
     public async Task<(Transfer?, IReadOnlyList<PublicFileItem>)> GetByLinkIdAsync(string linkId, CancellationToken ct)
     {
         var transfer = await _db.Set<Transfer>().AsNoTracking().FirstOrDefaultAsync(t => t.LinkId == linkId, ct);
@@ -41,6 +46,13 @@ public sealed class PublicTransferStore : IPublicTransferStore
     /// when the guard rejects, the status flips to 3 via US-005-03's literal idempotent UPDATE (the flip happens here, not in a worker).
     /// DownloadEvent insertion follows a successful increment only — a rejected mint leaves no trace.
     /// </summary>
+    /// <param name="transferId">Identifier of the transfer.</param>
+    /// <param name="fileId">Identifier of the file.</param>
+    /// <param name="ipHash">The IP hash.</param>
+    /// <param name="uaHash">The ua hash.</param>
+    /// <param name="userAgentFamily">The user agent family.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>The single file download result.</returns>
     public async Task<SingleFileDownloadResult> RecordSingleFileDownloadAsync(
         Guid transferId,
         Guid fileId,
@@ -90,6 +102,12 @@ public sealed class PublicTransferStore : IPublicTransferStore
     /// when the guard rejects, the status flips to 3 via US-005-03's literal idempotent UPDATE (the flip happens here, not in a worker).
     /// DownloadEvent insertion follows a successful increment only — a rejected mint leaves no trace.
     /// </summary>
+    /// <param name="transferId">Identifier of the transfer.</param>
+    /// <param name="ipHash">The IP hash.</param>
+    /// <param name="uaHash">The ua hash.</param>
+    /// <param name="userAgentFamily">The user agent family.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>The single file download result.</returns>
     public async Task<SingleFileDownloadResult> RecordZipDownloadAsync(
         Guid transferId,
         string? ipHash,

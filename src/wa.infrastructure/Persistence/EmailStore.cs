@@ -13,8 +13,11 @@ public sealed class EmailStore : IEmailStore
 {
     private readonly WaDbContext _db;
 
+    /// <summary>Initializes a new instance of the <see cref="EmailStore"/> class.</summary>
+    /// <param name="db">The database.</param>
     public EmailStore(WaDbContext db) => _db = db;
 
+    /// <inheritdoc />
     public async Task<EmailTransferContext?> GetTransferWithFilesAsync(Guid transferId, CancellationToken ct)
     {
         var transfer = await _db.Set<Transfer>().FirstOrDefaultAsync(t => t.Id == transferId, ct);
@@ -40,6 +43,7 @@ public sealed class EmailStore : IEmailStore
             transfer.ScheduledSendAtUtc);
     }
 
+    /// <inheritdoc />
     public async Task<IReadOnlyList<EmailRecipient>> GetRecipientsAsync(Guid transferId, CancellationToken ct)
     {
         var recipients = await _db.Set<EmailRecipient>()
@@ -48,6 +52,7 @@ public sealed class EmailStore : IEmailStore
         return recipients;
     }
 
+    /// <inheritdoc />
     public async Task<IReadOnlySet<string>> GetSuppressedAddressesAsync(
         IReadOnlyCollection<string> addresses,
         string? senderEmail,
@@ -65,6 +70,7 @@ public sealed class EmailStore : IEmailStore
         return new HashSet<string>(suppressed, StringComparer.OrdinalIgnoreCase);
     }
 
+    /// <inheritdoc />
     public async Task MarkNotifiedAsync(
         IReadOnlyCollection<Guid> recipientIds,
         DateTime notifiedAtUtc,

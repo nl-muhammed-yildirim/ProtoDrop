@@ -9,6 +9,9 @@ namespace wa.infrastructure.Persistence;
 /// </summary>
 internal static class TransferTrackerExtensions
 {
+    /// <summary>Detaches the transfer.</summary>
+    /// <param name="db">The database.</param>
+    /// <param name="transferId">Identifier of the transfer.</param>
     public static void DetachTransfer(this WaDbContext db, Guid transferId)
     {
         // ChangeTracker.Entries (not Local): Local hides Deleted entries, so this also cleans one that is already Deleted.

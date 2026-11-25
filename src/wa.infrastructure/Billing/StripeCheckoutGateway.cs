@@ -15,6 +15,11 @@ public sealed class StripeCheckoutGateway : IStripeCheckoutGateway, IStripeSubsc
     private readonly string? _secretKey;
     private readonly ILogger<StripeCheckoutGateway> _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="StripeCheckoutGateway"/> class.</summary>
+    /// <param name="http">The HTTP.</param>
+    /// <param name="secretKey">The secret key.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public StripeCheckoutGateway(HttpClient http, string? secretKey, ILogger<StripeCheckoutGateway> logger)
     {
         _http = http ?? throw new ArgumentNullException(nameof(http));
@@ -22,6 +27,7 @@ public sealed class StripeCheckoutGateway : IStripeCheckoutGateway, IStripeSubsc
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
+    /// <inheritdoc />
     public async Task<StripeCheckoutSession> CreateSubscriptionCheckoutAsync(StripeCheckoutRequest request, CancellationToken ct)
     {
         var userId = request.UserId.ToString("N");
@@ -41,6 +47,7 @@ public sealed class StripeCheckoutGateway : IStripeCheckoutGateway, IStripeSubsc
         return new StripeCheckoutSession(id, url);
     }
 
+    /// <inheritdoc />
     public async Task<StripePortalSession> CreatePortalSessionAsync(string customerId, string returnUrl, CancellationToken ct)
     {
         var form = new Dictionary<string, string>
@@ -54,6 +61,10 @@ public sealed class StripeCheckoutGateway : IStripeCheckoutGateway, IStripeSubsc
     }
 
     /// <summary>US-019-07 (EC-019-4): GET v1/subscriptions/{id}. Null = Stripe 404; any other failure → BillingUnavailableException.</summary>
+    /// <param name="subscriptionId">Identifier of the subscription.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>The stripe subscription snapshot, or <see langword="null"/> when there is none.</returns>
+    /// <exception cref="BillingUnavailableException">Thrown when a billing unavailable failure is detected.</exception>
     public async Task<StripeSubscriptionSnapshot?> GetSubscriptionAsync(string subscriptionId, CancellationToken ct)
     {
         using var doc = await GetJsonAsync($"v1/subscriptions/{Uri.EscapeDataString(subscriptionId)}", "subscription", ct);

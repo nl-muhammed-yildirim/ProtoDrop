@@ -12,6 +12,8 @@ public sealed class AdminFlagStore : IAdminFlagStore
 {
     private readonly WaDbContext _db;
 
+    /// <summary>Initializes a new instance of the <see cref="AdminFlagStore"/> class.</summary>
+    /// <param name="db">The database.</param>
     public AdminFlagStore(WaDbContext db) => _db = db;
 
     /// <summary>
@@ -19,6 +21,11 @@ public sealed class AdminFlagStore : IAdminFlagStore
     /// Value + UpdatedAtUtc WHERE Key==key (last-write-wins, EC-011-1). No transaction (single-row update).
     /// Returns the OLD row (pre-update) so the handler can audit {old,new} — or null when no row for that key.
     /// </summary>
+    /// <param name="key">The key.</param>
+    /// <param name="value">The value.</param>
+    /// <param name="updatedAtUtc">The updated at UTC.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>The feature flag, or <see langword="null"/> when there is none.</returns>
     public async Task<FeatureFlag?> UpsertAsync(string key, string value, DateTime updatedAtUtc, CancellationToken ct)
     {
         // 1. Read the old row (AsNoTracking — no change tracking on this write path).

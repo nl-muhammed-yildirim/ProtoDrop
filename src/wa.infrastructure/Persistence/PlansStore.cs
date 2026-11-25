@@ -9,8 +9,11 @@ public sealed class PlansStore : IPlansStore
 {
     private readonly WaDbContext _db;
 
+    /// <summary>Initializes a new instance of the <see cref="PlansStore"/> class.</summary>
+    /// <param name="db">The database.</param>
     public PlansStore(WaDbContext db) => _db = db;
 
+    /// <inheritdoc />
     public async Task<Plan> GetAsync(string planCode, CancellationToken cancellationToken)
     {
         // AsNoTracking: singleton WaDbContext identity map must not cache Plan rows (FR-007-5).
@@ -18,6 +21,7 @@ public sealed class PlansStore : IPlansStore
         return row ?? throw new PlanUnknownException(planCode); // AC-053-4: loud, never null/empty.
     }
 
+    /// <inheritdoc />
     public async Task<Plan?> GetByIdAsync(Guid planId, CancellationToken cancellationToken) =>
         await _db.Set<Plan>().AsNoTracking().FirstOrDefaultAsync(p => p.Id == planId, cancellationToken); // T-008-02: thin, singleton, AsNoTracking like existing methods.
 }

@@ -10,5 +10,6 @@ namespace wa.infrastructure.Telemetry;
 /// </summary>
 public sealed class ClosedSetTelemetryEraser : ITelemetryEraser
 {
+    /// <inheritdoc />
     public Task EraseUserAsync(Guid userId, DateTime sinceUtc, CancellationToken ct) => Task.CompletedTask;
 }

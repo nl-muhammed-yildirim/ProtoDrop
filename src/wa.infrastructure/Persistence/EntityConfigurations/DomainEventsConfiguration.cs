@@ -7,6 +7,7 @@ namespace wa.infrastructure.Persistence.EntityConfigurations;
 /// <summary>T-054-02: dbo.DomainEvents — outbox row for published domain events (new migration, golden rule 4).</summary>
 public sealed class DomainEventsConfiguration : IEntityTypeConfiguration<DomainEvent>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<DomainEvent> b)
     {
         b.ToTable("DomainEvents");

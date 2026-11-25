@@ -13,9 +13,13 @@ public sealed class DataExportStore : IDataExportStore
 {
     private readonly IDbContextFactory<WaDbContext> _factory;
 
+    /// <summary>Initializes a new instance of the <see cref="DataExportStore"/> class.</summary>
+    /// <param name="factory">The factory.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public DataExportStore(IDbContextFactory<WaDbContext> factory) =>
         _factory = factory ?? throw new ArgumentNullException(nameof(factory));
 
+    /// <inheritdoc />
     public async Task<DataExport?> GetLatestAsync(Guid userId, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);
@@ -25,6 +29,7 @@ public sealed class DataExportStore : IDataExportStore
             .FirstOrDefaultAsync(ct);
     }
 
+    /// <inheritdoc />
     public async Task<bool> TryCreateAsync(DataExport row, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);

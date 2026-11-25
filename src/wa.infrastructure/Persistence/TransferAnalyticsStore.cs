@@ -13,8 +13,11 @@ public sealed class TransferAnalyticsStore : ITransferAnalyticsStore
 {
     private readonly WaDbContext _db;
 
+    /// <summary>Initializes a new instance of the <see cref="TransferAnalyticsStore"/> class.</summary>
+    /// <param name="db">The database.</param>
     public TransferAnalyticsStore(WaDbContext db) => _db = db;
 
+    /// <inheritdoc />
     public Task<AnalyticsTransfer?> GetOwnedTransferAsync(Guid ownerId, Guid transferId, CancellationToken ct) =>
         _db.Set<Transfer>()
             .AsNoTracking()
@@ -22,6 +25,7 @@ public sealed class TransferAnalyticsStore : ITransferAnalyticsStore
             .Select(t => new AnalyticsTransfer(t.Id, t.CreatedAtUtc, t.Status))
             .FirstOrDefaultAsync(ct);
 
+    /// <inheritdoc />
     public async Task<AnalyticsAggregate> AggregateAsync(Guid transferId, DateTime sinceUtc, CancellationToken ct)
     {
         var events = _db.Set<DownloadEvent>().AsNoTracking();
@@ -53,12 +57,20 @@ public sealed class TransferAnalyticsStore : ITransferAnalyticsStore
     }
 
     /// <summary>GROUP BY CONVERT(date, CreatedAtUtc). Public so the integration test can inspect the real plan (IX_DownEvent_T seek).</summary>
+    /// <param name="events">The events.</param>
+    /// <param name="transferId">Identifier of the transfer.</param>
+    /// <param name="sinceUtc">The since UTC.</param>
+    /// <returns>The i queryable of day count.</returns>
     public static IQueryable<DayCount> DailyQuery(IQueryable<DownloadEvent> events, Guid transferId, DateTime sinceUtc) =>
         Scope(events, transferId, sinceUtc)
             .GroupBy(e => e.CreatedAtUtc.Date)
             .Select(g => new DayCount(g.Key, g.Count()));
 
     /// <summary>GROUP BY FileId (NULL = download-all) with count and latest event time. Public for the plan-inspection test.</summary>
+    /// <param name="events">The events.</param>
+    /// <param name="transferId">Identifier of the transfer.</param>
+    /// <param name="sinceUtc">The since UTC.</param>
+    /// <returns>The i queryable of file key count.</returns>
     public static IQueryable<FileKeyCount> FileQuery(IQueryable<DownloadEvent> events, Guid transferId, DateTime sinceUtc) =>
         Scope(events, transferId, sinceUtc)
             .GroupBy(e => e.FileId)
@@ -68,9 +80,14 @@ public sealed class TransferAnalyticsStore : ITransferAnalyticsStore
         events.Where(e => e.TransferId == transferId && e.CreatedAtUtc >= sinceUtc);
 
     /// <summary>SQL-side projection: a UTC calendar day and its count.</summary>
+    /// <param name="Day">The day of the day count.</param>
+    /// <param name="Count">The count of the day count.</param>
     public sealed record DayCount(DateTime Day, int Count);
 
     /// <summary>SQL-side projection: a FileId (null = download-all), its count and last event time.</summary>
+    /// <param name="FileId">Identifier of the file of the file key count.</param>
+    /// <param name="Count">The count of the file key count.</param>
+    /// <param name="LastAtUtc">The last at UTC of the file key count.</param>
     public sealed record FileKeyCount(Guid? FileId, int Count, DateTime LastAtUtc);
 
     private sealed record KeyCount(string? Key, int Count);

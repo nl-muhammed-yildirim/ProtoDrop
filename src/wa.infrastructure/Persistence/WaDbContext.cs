@@ -9,11 +9,14 @@ namespace wa.infrastructure.Persistence;
 /// </summary>
 public sealed class WaDbContext : DbContext
 {
+    /// <summary>Initializes a new instance of the <see cref="WaDbContext"/> class.</summary>
+    /// <param name="options">The options.</param>
     public WaDbContext(DbContextOptions<WaDbContext> options)
         : base(options)
     {
     }
 
+    /// <inheritdoc />
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         base.ConfigureConventions(configurationBuilder);
@@ -23,6 +26,7 @@ public sealed class WaDbContext : DbContext
         configurationBuilder.Conventions.Remove(typeof(ForeignKeyIndexConvention));
     }
 
+    /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // 16 configurations in EntityConfigurations/ (one per entity); the model build below proves discovery.
