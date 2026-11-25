@@ -5,6 +5,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using wa.application.Limits;
 using wa.application.Ports;
@@ -32,7 +33,7 @@ builder.Host.UseSerilog((context, cfg) => cfg
     .MinimumLevel.Information()
     .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
     .MinimumLevel.Override("AspNetCoreRateLimit", LogEventLevel.Warning)
-    .WriteTo.Console());
+    .WriteTo.Console(formatProvider: CultureInfo.CurrentCulture));
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(PingCommand).Assembly));
 builder.Services.AddSingleton(TimeProvider.System); // CHORE-code-style-2: the one clock — handlers/stores take TimeProvider instead of reading DateTime.UtcNow
 builder.Services.AddSingleton<wa.application.Ports.IDbHealthProbe, WaDbHealthProbe>();
@@ -274,7 +275,7 @@ app.MapPost("/api/v1/transfers/draft/{draftId}/finalize", async (Guid draftId, H
 {
     var idempotencyKey = request.Headers["Idempotency-Key"].FirstOrDefault() ?? string.Empty;
     using var ms = new MemoryStream();
-    await request.Body.CopyToAsync(ms);
+    await request.Body.CopyToAsync(ms, CancellationToken.None);
     ms.Position = 0;
     using var bodyDoc = System.Text.Json.JsonDocument.Parse(ms);
     var files = bodyDoc.RootElement.GetProperty("files").EnumerateArray().Select(e => new FinalizeFile
@@ -319,7 +320,7 @@ app.MapPost("/api/v1/transfers/{id}/send", async (Guid id, HttpContext httpConte
     var ownerAppUserId = httpContext.Items[SessionMiddleware.SessionUserIdKey] as Guid?;
 
     using var ms = new MemoryStream();
-    await request.Body.CopyToAsync(ms);
+    await request.Body.CopyToAsync(ms, CancellationToken.None);
     ms.Position = 0;
     using var bodyDoc = System.Text.Json.JsonDocument.Parse(ms);
     var root = bodyDoc.RootElement;
@@ -469,7 +470,7 @@ app.MapPost("/api/v1/public/transfers/{linkId}/unlock", async (string linkId, Ht
     // Same JsonDocument style as the send endpoint: empty body → password stays null → the handler throws the VALIDATION application-level exception (D1).
     string? password = null;
     using var ms = new MemoryStream();
-    await request.Body.CopyToAsync(ms);
+    await request.Body.CopyToAsync(ms, CancellationToken.None);
     if (ms.Length > 0)
     {
         ms.Position = 0;
@@ -627,7 +628,7 @@ app.MapGet("/api/v1/admin/overview", async (HttpContext ctx, IAppUserStore users
         try
         {
             var adminClient = new Azure.Messaging.ServiceBus.Administration.ServiceBusAdministrationClient(sbConnString);
-            var response = await adminClient.GetSubscriptionRuntimePropertiesAsync("core", "email");
+            var response = await adminClient.GetSubscriptionRuntimePropertiesAsync("core", "email", CancellationToken.None);
             dlqCount = response.Value.DeadLetterMessageCount;
         }
         catch (Exception)

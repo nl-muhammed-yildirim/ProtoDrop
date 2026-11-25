@@ -92,13 +92,13 @@ public sealed partial class IdempotencyMiddleware
             await _store.SaveAsync(key, body, context.Response.StatusCode, context.RequestAborted);
 
             // Write the buffered response to the client.
-            await originalBody.WriteAsync(buffer.GetBuffer(), 0, (int)buffer.Length, context.RequestAborted);
+            await originalBody.WriteAsync(buffer.GetBuffer().AsMemory(0, (int)buffer.Length), context.RequestAborted);
         }
         else
         {
             // Non-2xx: write through without caching.
             buffer.Position = 0;
-            await originalBody.WriteAsync(buffer.GetBuffer(), 0, (int)buffer.Length, context.RequestAborted);
+            await originalBody.WriteAsync(buffer.GetBuffer().AsMemory(0, (int)buffer.Length), context.RequestAborted);
         }
     }
 

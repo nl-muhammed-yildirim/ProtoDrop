@@ -136,7 +136,7 @@ public sealed class SendStore : ISendStore
     /// a FilesGoneException throw rolls it back → zero new rows, no RefCount change (AC-010-2). An empty id collection
     /// returns early (a SourcedFrom draft with no file rows must not fire the gate).
     /// </summary>
-    private async Task AssertBlobsPhysicallyPresentAsync(IReadOnlyCollection<Guid> blobRefIds, CancellationToken ct)
+    private async Task AssertBlobsPhysicallyPresentAsync(List<Guid> blobRefIds, CancellationToken ct)
     {
         if (blobRefIds.Count == 0)
             return;

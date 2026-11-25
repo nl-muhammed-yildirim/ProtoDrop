@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -167,7 +168,7 @@ public sealed partial class SendBillingEmailHandler : IEmailEventHandler
     }
 
     private static string Render(string template, int step, string ctaUrl) =>
-        template.Replace("{{Step}}", step.ToString()).Replace("{{CtaUrl}}", ctaUrl);
+        template.Replace("{{Step}}", step.ToString(CultureInfo.InvariantCulture)).Replace("{{CtaUrl}}", ctaUrl);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "f-email: missing or invalid email in billing payload")]
     private static partial void LogMissingEmail(ILogger logger);

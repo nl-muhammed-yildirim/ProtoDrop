@@ -107,7 +107,7 @@ public sealed partial class GetDownloadAllUrlHandler : IRequestHandler<GetDownlo
         }
 
         // Zip doesn't exist yet — trigger f-zip generation (fire-and-forget) and return Generating (202).
-        _ = Task.Run(() => TriggerZipGeneration(transfer.Id, cancellationToken));
+        _ = Task.Run(() => TriggerZipGeneration(transfer.Id, cancellationToken), CancellationToken.None); // intentionally not tied to the request token: the zip trigger must outlive the request
 
         return new DownloadAllResult(DownloadAllState.Generating, PollAfterSec: 2);
     }

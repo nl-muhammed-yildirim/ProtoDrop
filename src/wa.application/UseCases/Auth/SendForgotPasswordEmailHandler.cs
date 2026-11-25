@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -177,7 +178,7 @@ public sealed partial class SendForgotPasswordEmailHandler : IEmailEventHandler
         template
             .Replace("{{Email}}", email)
             .Replace("{{CtaUrl}}", ctaUrl)
-            .Replace("{{MinutesRemaining}}", minutesRemaining.ToString());
+            .Replace("{{MinutesRemaining}}", minutesRemaining.ToString(CultureInfo.InvariantCulture));
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "f-email: missing or invalid email in forgot-password payload")]
     private static partial void LogMissingEmail(ILogger logger);

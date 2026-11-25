@@ -94,8 +94,7 @@ public sealed class RequestMagicLinkHandler : IRequestHandler<RequestMagicLinkCo
     /// <summary>Compute SHA-256 hex (64 chars) of a raw token string.</summary>
     private static string ComputeSha256Hex(string token)
     {
-        using var sha = SHA256.Create();
-        var bytes = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(token));
+        var bytes = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token));
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 

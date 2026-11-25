@@ -37,8 +37,8 @@ public sealed class EventTypeConverter : JsonConverter<EventType>
     private static Dictionary<string, EventType> BuildIndex()
     {
         var index = new Dictionary<string, EventType>();
-        foreach (var value in Enum.GetValues(typeof(EventType)))
-            index[WireNames[(int)value]] = (EventType)value;
+        foreach (var value in Enum.GetValues<EventType>())
+            index[WireNames[(int)value]] = value;
         return index;
     }
 }

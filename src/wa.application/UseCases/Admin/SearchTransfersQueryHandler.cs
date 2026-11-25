@@ -70,7 +70,7 @@ public sealed class SearchTransfersQueryHandler(ISearchTransfersStore store, IFl
     /// T-011-04: status vocabulary — per-status values (draft/active/expired/download_limit/deleted), NOT T-009-02's grouping.
     /// absent→null (all); all→null; unknown→BusinessException(ProblemCodes.Validation).
     /// </summary>
-    private static IReadOnlyCollection<byte>? ResolveStatus(string? status)
+    private static byte[]? ResolveStatus(string? status)
     {
         if (status is null) return null; // absent → all
         return status.Trim().ToLowerInvariant() switch

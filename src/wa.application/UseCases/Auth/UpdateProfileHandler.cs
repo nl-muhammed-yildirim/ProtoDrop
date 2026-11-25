@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json.Serialization;
 using MediatR;
 using wa.application.Limits;
@@ -63,7 +64,7 @@ public sealed class UpdateProfileHandler : IRequestHandler<UpdateProfileCommand,
         {
             var trimmed = request.DisplayName.Trim();
             if (trimmed.Length > DisplayNameMaxLength)
-                throw MeProfileException.ForDisplayNameTooLong(DisplayNameMaxLength.ToString());
+                throw MeProfileException.ForDisplayNameTooLong(DisplayNameMaxLength.ToString(CultureInfo.InvariantCulture));
         }
 
         // 4b. orgName validation (only when present in the body): no CR/LF, <= ORG_NAME_MAX_LENGTH after trim; blank = clear.

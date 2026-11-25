@@ -194,7 +194,7 @@ public partial class ZipFunction
         }
     }
 
-    private bool VerifySignature(bool hasHeader, string? providedSign, string expectedSign)
+    private static bool VerifySignature(bool hasHeader, string? providedSign, string expectedSign)
     {
         if (!hasHeader || providedSign is null || providedSign.Length == 0)
             return false;
