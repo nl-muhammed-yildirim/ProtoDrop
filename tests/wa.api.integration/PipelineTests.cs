@@ -21,11 +21,12 @@ namespace wa.api.integration;
 // AC-056-1/2/4 (T-056-05 — T-008 exit checks): Problem+JSON with correlationId for 404/500, no stack in the body, and an upload_started-style event through WaTelemetryReporter with the exact TA-10.2 template name + properties.
 public class PipelineTests
 {
-    // Program.cs builds the blob client eagerly from §5.2 config (T-055-02) — env vars are always visible to CreateBuilder's configuration, same pattern as HealthFailureTests.
+    // Program.cs builds the blob client eagerly from §5.2 config (T-055-02) and ApiServices requires Wa:Jwt:Secret at startup (same pattern as the other test classes) — env vars are always visible to CreateBuilder's configuration, same pattern as HealthFailureTests.
     static PipelineTests()
     {
         Environment.SetEnvironmentVariable("Wa__Blob__AccountUrl", "http://127.0.0.1:10000/devstoreaccount1");
         Environment.SetEnvironmentVariable("Wa__Blob__AccountKey", "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==");
+        Environment.SetEnvironmentVariable("Wa__Jwt__Secret", "test-jwt-secret");
     }
 
     private sealed class ThrowingRouteFactory : WebApplicationFactory<Program>
