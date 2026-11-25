@@ -8,19 +8,12 @@ namespace wa.infrastructure.Persistence;
 /// <summary>
 /// T-005-01: thin adapter over WaDbContext implementing IExpiryStore — the f-expire job's DB surface (TA-6.3).
 /// </summary>
-public sealed class ExpiryStore : IExpiryStore
+/// <param name="db">Database context that backs the store.</param>
+/// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+public sealed class ExpiryStore(WaDbContext db, TimeProvider timeProvider) : IExpiryStore
 {
-    private readonly WaDbContext _db;
-    private readonly TimeProvider _timeProvider;
-
-    /// <summary>Initializes a new instance of the <see cref="ExpiryStore"/> class.</summary>
-    /// <param name="db">Database context that backs the store.</param>
-    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
-    public ExpiryStore(WaDbContext db, TimeProvider timeProvider)
-    {
-        _db = db;
-        _timeProvider = timeProvider;
-    }
+    private readonly WaDbContext _db = db;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <inheritdoc />
     public async Task<bool> TryClaimAsync(DateTime runWindowStartUtc, DateTime lockUntilUtc, CancellationToken ct)

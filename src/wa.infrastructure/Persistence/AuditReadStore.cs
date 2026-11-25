@@ -8,13 +8,10 @@ namespace wa.infrastructure.Persistence;
 /// T-011-09 (TA-4.2#25 / US-011-04 happy path 5): read adapter over WaDbContext for AuditLog rows.
 /// Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext).
 /// </summary>
-public sealed class AuditReadStore : IAuditReadStore
+/// <param name="db">Database context that backs the store.</param>
+public sealed class AuditReadStore(WaDbContext db) : IAuditReadStore
 {
-    private readonly WaDbContext _db;
-
-    /// <summary>Initializes a new instance of the <see cref="AuditReadStore"/> class.</summary>
-    /// <param name="db">Database context that backs the store.</param>
-    public AuditReadStore(WaDbContext db) => _db = db;
+    private readonly WaDbContext _db = db;
 
     /// <inheritdoc />
     /// <remarks>

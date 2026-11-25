@@ -9,13 +9,10 @@ namespace wa.infrastructure.Persistence;
 /// T-011-04 (TA-4.2#21 / FR-011-3): platform-wide admin transfer search — single bounded query over WaDbContext.
 /// Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext).
 /// </summary>
-public sealed class SearchTransfersStore : ISearchTransfersStore
+/// <param name="db">Database context that backs the store.</param>
+public sealed class SearchTransfersStore(WaDbContext db) : ISearchTransfersStore
 {
-    private readonly WaDbContext _db;
-
-    /// <summary>Initializes a new instance of the <see cref="SearchTransfersStore"/> class.</summary>
-    /// <param name="db">Database context that backs the store.</param>
-    public SearchTransfersStore(WaDbContext db) => _db = db;
+    private readonly WaDbContext _db = db;
 
     /// <inheritdoc />
     /// <remarks>

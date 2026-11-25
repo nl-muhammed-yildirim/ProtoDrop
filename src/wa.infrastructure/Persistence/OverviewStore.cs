@@ -8,13 +8,10 @@ namespace wa.infrastructure.Persistence;
 /// T-011-03 (TA-4.2#20 / FR-011-6): platform-wide overview aggregates — six bounded queries over WaDbContext.
 /// Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext).
 /// </summary>
-public sealed class OverviewStore : IOverviewStore
+/// <param name="db">Database context that backs the store.</param>
+public sealed class OverviewStore(WaDbContext db) : IOverviewStore
 {
-    private readonly WaDbContext _db;
-
-    /// <summary>Initializes a new instance of the <see cref="OverviewStore"/> class.</summary>
-    /// <param name="db">Database context that backs the store.</param>
-    public OverviewStore(WaDbContext db) => _db = db;
+    private readonly WaDbContext _db = db;
 
     /// <inheritdoc />
     /// <remarks>

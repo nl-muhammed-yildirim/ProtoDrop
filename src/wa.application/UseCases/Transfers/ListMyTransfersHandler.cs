@@ -8,16 +8,10 @@ namespace wa.application.UseCases.Transfers;
 /// and returns rows + NextCursor exactly as the store produced them (the store encodes it from the last row).
 /// Malformed cursor → CursorFormatException propagates to the endpoint → 400 VALIDATION (existing closed-list member).
 /// </summary>
-public sealed class ListMyTransfersHandler : IRequestHandler<ListMyTransfersQuery, ListMyTransfersResult>
+/// <param name="transfers">Store that reads the owner's transfer list.</param>
+public sealed class ListMyTransfersHandler(ITransferStore transfers) : IRequestHandler<ListMyTransfersQuery, ListMyTransfersResult>
 {
-    private readonly ITransferStore _transfers;
-
-    /// <summary>Initializes a new instance of the <see cref="ListMyTransfersHandler"/> class.</summary>
-    /// <param name="transfers">Store that reads the owner's transfer list.</param>
-    public ListMyTransfersHandler(ITransferStore transfers)
-    {
-        _transfers = transfers;
-    }
+    private readonly ITransferStore _transfers = transfers;
 
     /// <inheritdoc />
     public async Task<ListMyTransfersResult> Handle(ListMyTransfersQuery request, CancellationToken cancellationToken)

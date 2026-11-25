@@ -9,19 +9,12 @@ namespace wa.api.Middleware;
 /// 500 INTERNAL with the full stack in Serilog but none in the body (TA-10.5); logs carry the route template (never the raw path) and business codes (never their message) per TA-9.4. Minimal APIs answer unknown routes with an empty-body 404 —
 /// rewritten here to a proper NOT_FOUND Problem so every 404/500 has the exact field set + correlationId.
 /// </summary>
-public sealed partial class GlobalErrorMiddleware
+/// <param name="next">Next middleware in the pipeline.</param>
+/// <param name="logger">Logger for failures; logs route templates and business codes, never raw paths or messages.</param>
+public sealed partial class GlobalErrorMiddleware(RequestDelegate next, ILogger<GlobalErrorMiddleware> logger)
 {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<GlobalErrorMiddleware> _logger;
-
-    /// <summary>Initializes a new instance of the <see cref="GlobalErrorMiddleware"/> class.</summary>
-    /// <param name="next">Next middleware in the pipeline.</param>
-    /// <param name="logger">Logger for failures; logs route templates and business codes, never raw paths or messages.</param>
-    public GlobalErrorMiddleware(RequestDelegate next, ILogger<GlobalErrorMiddleware> logger)
-    {
-        _next = next;
-        _logger = logger;
-    }
+    private readonly RequestDelegate _next = next;
+    private readonly ILogger<GlobalErrorMiddleware> _logger = logger;
 
     /// <summary>Runs the rest of the pipeline and converts any exception, and any unknown-route 404 without a body, into a TA-4.1.3 Problem+JSON response.</summary>
     /// <param name="context">The current HTTP context.</param>

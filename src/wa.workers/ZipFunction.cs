@@ -19,41 +19,29 @@ namespace wa.workers;
 /// <summary>
 /// T-004-01: f-zip Azure Function — generates a ZIP of all files in a transfer, streamed to blob storage.
 /// </summary>
-public partial class ZipFunction
+/// <param name="blobStore">Blob store that holds the files and receives the zip.</param>
+/// <param name="sasMinter">Mints the read URLs used to stream each file into the zip.</param>
+/// <param name="fileSource">Source of the transfer's file list.</param>
+/// <param name="limits">Provider of the guest plan's limits, including the zip size cap.</param>
+/// <param name="telemetry">Reporter for the <c>zip_generated</c> and <c>zip_failed</c> events.</param>
+/// <param name="config">Configuration source for the <c>x-zip-sign</c> key.</param>
+/// <param name="logger">Logger for the run (carries the correlation ids).</param>
+public partial class ZipFunction(
+    IBlobStore blobStore,
+    IBlobSasMinter sasMinter,
+    IZipFileSource fileSource,
+    ILimitsProvider limits,
+    WaTelemetryReporter telemetry,
+    IConfiguration config,
+    ILogger<ZipFunction> logger)
 {
-    private readonly IBlobStore _blobStore;
-    private readonly IBlobSasMinter _sasMinter;
-    private readonly IZipFileSource _fileSource;
-    private readonly ILimitsProvider _limits;
-    private readonly WaTelemetryReporter _telemetry;
-    private readonly IConfiguration _config;
-    private readonly ILogger<ZipFunction> _logger;
-
-    /// <summary>Initializes a new instance of the <see cref="ZipFunction"/> class.</summary>
-    /// <param name="blobStore">Blob store that holds the files and receives the zip.</param>
-    /// <param name="sasMinter">Mints the read URLs used to stream each file into the zip.</param>
-    /// <param name="fileSource">Source of the transfer's file list.</param>
-    /// <param name="limits">Provider of the guest plan's limits, including the zip size cap.</param>
-    /// <param name="telemetry">Reporter for the <c>zip_generated</c> and <c>zip_failed</c> events.</param>
-    /// <param name="config">Configuration source for the <c>x-zip-sign</c> key.</param>
-    /// <param name="logger">Logger for the run (carries the correlation ids).</param>
-    public ZipFunction(
-        IBlobStore blobStore,
-        IBlobSasMinter sasMinter,
-        IZipFileSource fileSource,
-        ILimitsProvider limits,
-        WaTelemetryReporter telemetry,
-        IConfiguration config,
-        ILogger<ZipFunction> logger)
-    {
-        _blobStore = blobStore;
-        _sasMinter = sasMinter;
-        _fileSource = fileSource;
-        _limits = limits;
-        _telemetry = telemetry;
-        _config = config;
-        _logger = logger;
-    }
+    private readonly IBlobStore _blobStore = blobStore;
+    private readonly IBlobSasMinter _sasMinter = sasMinter;
+    private readonly IZipFileSource _fileSource = fileSource;
+    private readonly ILimitsProvider _limits = limits;
+    private readonly WaTelemetryReporter _telemetry = telemetry;
+    private readonly IConfiguration _config = config;
+    private readonly ILogger<ZipFunction> _logger = logger;
 
     /// <summary>HTTP entry point <c>POST zip/{transferId}</c>: builds the zip of a transfer, streaming it to blob storage, and answers with the outcome. Requires a valid <c>x-zip-sign</c> header; an existing zip is reused.</summary>
     /// <param name="context">Function invocation context.</param>

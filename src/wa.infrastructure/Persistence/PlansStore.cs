@@ -5,13 +5,10 @@ using wa.domain;
 namespace wa.infrastructure.Persistence;
 
 /// <summary>EF adapter over seeded Plan rows (TA-0.2 rule 7: the only place IPlansStore reads the DB).</summary>
-public sealed class PlansStore : IPlansStore
+/// <param name="db">Database context that backs the store.</param>
+public sealed class PlansStore(WaDbContext db) : IPlansStore
 {
-    private readonly WaDbContext _db;
-
-    /// <summary>Initializes a new instance of the <see cref="PlansStore"/> class.</summary>
-    /// <param name="db">Database context that backs the store.</param>
-    public PlansStore(WaDbContext db) => _db = db;
+    private readonly WaDbContext _db = db;
 
     /// <inheritdoc />
     public async Task<Plan> GetAsync(string planCode, CancellationToken cancellationToken)

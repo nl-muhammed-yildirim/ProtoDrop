@@ -9,13 +9,10 @@ namespace wa.infrastructure.Persistence;
 /// T-001-10: thin adapter over WaDbContext implementing ITransferStore — the only DB surface the finalize handler needs.
 /// Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext).
 /// </summary>
-public sealed class TransferStore : ITransferStore
+/// <param name="db">Database context that backs the store.</param>
+public sealed class TransferStore(WaDbContext db) : ITransferStore
 {
-    private readonly WaDbContext _db;
-
-    /// <summary>Initializes a new instance of the <see cref="TransferStore"/> class.</summary>
-    /// <param name="db">Database context that backs the store.</param>
-    public TransferStore(WaDbContext db) => _db = db;
+    private readonly WaDbContext _db = db;
 
     /// <inheritdoc />
     public Task<IdempotencyKey?> FindByIdempotencyKeyAsync(string key, CancellationToken ct) =>

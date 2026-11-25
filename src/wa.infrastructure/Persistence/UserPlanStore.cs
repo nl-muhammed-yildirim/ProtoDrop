@@ -5,13 +5,10 @@ using wa.domain;
 namespace wa.infrastructure.Persistence;
 
 /// <summary>EF adapter for IUserPlanStore (US-020-01): AppUser → Plan code over the adapter-owned WaDbContext.</summary>
-public sealed class UserPlanStore : IUserPlanStore
+/// <param name="db">Database context that backs the store.</param>
+public sealed class UserPlanStore(WaDbContext db) : IUserPlanStore
 {
-    private readonly WaDbContext _db;
-
-    /// <summary>Initializes a new instance of the <see cref="UserPlanStore"/> class.</summary>
-    /// <param name="db">Database context that backs the store.</param>
-    public UserPlanStore(WaDbContext db) => _db = db;
+    private readonly WaDbContext _db = db;
 
     /// <inheritdoc />
     /// <remarks>

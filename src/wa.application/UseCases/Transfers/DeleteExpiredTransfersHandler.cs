@@ -11,36 +11,26 @@ namespace wa.application.UseCases.Transfers;
 /// marks them Deleted, decrements BlobRef.RefCount per FileItem, deletes FileItem + EmailRecipient rows, and emits transfer.deleted per row.
 /// Claim via JobRun prevents double-processing in scale-out (FR-005-9).
 /// </summary>
-public sealed partial class DeleteExpiredTransfersHandler
+/// <param name="store">Store that claims the window and marks transfers deleted.</param>
+/// <param name="eventPublisher">Publishes the <c>transfer.deleted</c> event for each deleted transfer.</param>
+/// <param name="blobStore">Blob store used to remove the transfer's zip blob.</param>
+/// <param name="telemetry">Reporter for telemetry events.</param>
+/// <param name="logger">Logger used to warn when deleting a transfer's zip blob fails.</param>
+public sealed partial class DeleteExpiredTransfersHandler(
+    IExpiryDeletionStore store,
+    IEventPublisher eventPublisher,
+    IBlobStore blobStore,
+    WaTelemetryReporter telemetry,
+    ILogger<DeleteExpiredTransfersHandler> logger)
 {
     private const int BatchSize = 100; // TA-6.4 architecture constant, not a plan limit
     private const int GraceDays = 3;   // TA-6.4, all plans (FR-005-3)
 
-    private readonly IExpiryDeletionStore _store;
-    private readonly IEventPublisher _eventPublisher;
-    private readonly IBlobStore _blobStore;
-    private readonly WaTelemetryReporter _telemetry;
-    private readonly ILogger<DeleteExpiredTransfersHandler> _logger;
-
-    /// <summary>Initializes a new instance of the <see cref="DeleteExpiredTransfersHandler"/> class.</summary>
-    /// <param name="store">Store that claims the window and marks transfers deleted.</param>
-    /// <param name="eventPublisher">Publishes the <c>transfer.deleted</c> event for each deleted transfer.</param>
-    /// <param name="blobStore">Blob store used to remove the transfer's zip blob.</param>
-    /// <param name="telemetry">Reporter for telemetry events.</param>
-    /// <param name="logger">Logger used to warn when deleting a transfer's zip blob fails.</param>
-    public DeleteExpiredTransfersHandler(
-        IExpiryDeletionStore store,
-        IEventPublisher eventPublisher,
-        IBlobStore blobStore,
-        WaTelemetryReporter telemetry,
-        ILogger<DeleteExpiredTransfersHandler> logger)
-    {
-        _store = store;
-        _eventPublisher = eventPublisher;
-        _blobStore = blobStore;
-        _telemetry = telemetry;
-        _logger = logger;
-    }
+    private readonly IExpiryDeletionStore _store = store;
+    private readonly IEventPublisher _eventPublisher = eventPublisher;
+    private readonly IBlobStore _blobStore = blobStore;
+    private readonly WaTelemetryReporter _telemetry = telemetry;
+    private readonly ILogger<DeleteExpiredTransfersHandler> _logger = logger;
 
     /// <summary>Run the deletion job. Returns the number of transfers deleted (0 if claim was lost or no rows).</summary>
     /// <param name="nowUtc">Current UTC time; defines the 15-minute claim window and the grace cutoff.</param>

@@ -5,22 +5,17 @@ using wa.domain;
 namespace wa.application.UseCases.DataExport;
 
 /// <summary>US-047-01: creates a Processing row unless one is already in flight (EC-047-6); failed/ready rows never block (EC-047-2).</summary>
-public sealed class ExportMyDataHandler : IRequestHandler<ExportMyDataCommand, DataExportView>
+/// <param name="users">Store used to check that the account exists.</param>
+/// <param name="store">Store that holds the export rows.</param>
+/// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+public sealed class ExportMyDataHandler(
+    IAppUserStore users,
+    IDataExportStore store,
+    TimeProvider timeProvider) : IRequestHandler<ExportMyDataCommand, DataExportView>
 {
-    private readonly IAppUserStore _users;
-    private readonly IDataExportStore _store;
-    private readonly TimeProvider _timeProvider;
-
-    /// <summary>Initializes a new instance of the <see cref="ExportMyDataHandler"/> class.</summary>
-    /// <param name="users">Store used to check that the account exists.</param>
-    /// <param name="store">Store that holds the export rows.</param>
-    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
-    public ExportMyDataHandler(IAppUserStore users, IDataExportStore store, TimeProvider timeProvider)
-    {
-        _users = users;
-        _store = store;
-        _timeProvider = timeProvider;
-    }
+    private readonly IAppUserStore _users = users;
+    private readonly IDataExportStore _store = store;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <inheritdoc />
     public async Task<DataExportView> Handle(ExportMyDataCommand request, CancellationToken cancellationToken)

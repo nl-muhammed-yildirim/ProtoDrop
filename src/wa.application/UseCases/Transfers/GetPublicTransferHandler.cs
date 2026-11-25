@@ -13,57 +13,41 @@ namespace wa.application.UseCases.Transfers;
 /// T-014 (TA-4.2#4): recipient metadata for GET /api/v1/public/transfers/{linkId}. No auth, no cookie;
 /// a page view never mints a SAS and never consumes a download (F-TRF-003 technical notes).
 /// </summary>
-public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransferQuery, GetPublicTransferResult>
+/// <param name="store">Store that reads the transfer by link id.</param>
+/// <param name="limits">Provider of the guest plan's limits.</param>
+/// <param name="telemetry">Reporter for the <c>transfer_page_viewed</c> and <c>transfer_not_found</c> events.</param>
+/// <param name="tokens">Verifies the unlock token of password-protected transfers.</param>
+/// <param name="branding">Store that reads the sender's organization branding.</param>
+/// <param name="features">Provider of the sender plan's feature toggles.</param>
+/// <param name="blobs">Blob store used to check that the logo blob exists.</param>
+/// <param name="logoMinter">Mints the inline read URL of the sender's logo.</param>
+/// <param name="users">Store used to resolve the sender's plan.</param>
+/// <param name="flags">Resolver for the ads feature gate.</param>
+/// <param name="logger">Logger injected for the handler (currently unused).</param>
+public sealed class GetPublicTransferHandler(
+    IPublicTransferStore store,
+    ILimitsProvider limits,
+    WaTelemetryReporter telemetry,
+    IUnlockTokenMinter tokens,
+    ISenderBrandingStore branding,
+    IFeaturesProvider features,
+    IBlobStore blobs,
+    IOrgLogoSasMinter logoMinter,
+    IUserPlanStore users,
+    IFlagResolver flags,
+    ILogger<GetPublicTransferHandler> logger) : IRequestHandler<GetPublicTransferQuery, GetPublicTransferResult>
 {
-    private readonly IPublicTransferStore _store;
-    private readonly ILimitsProvider _limits;
-    private readonly WaTelemetryReporter _telemetry;
-    private readonly IUnlockTokenMinter _tokens;
-    private readonly ISenderBrandingStore _branding;
-    private readonly IFeaturesProvider _features;
-    private readonly IBlobStore _blobs;
-    private readonly IOrgLogoSasMinter _logoMinter;
-    private readonly IUserPlanStore _users;
-    private readonly IFlagResolver _flags;
-    private readonly ILogger<GetPublicTransferHandler> _logger;
-
-    /// <summary>Initializes a new instance of the <see cref="GetPublicTransferHandler"/> class.</summary>
-    /// <param name="store">Store that reads the transfer by link id.</param>
-    /// <param name="limits">Provider of the guest plan's limits.</param>
-    /// <param name="telemetry">Reporter for the <c>transfer_page_viewed</c> and <c>transfer_not_found</c> events.</param>
-    /// <param name="tokens">Verifies the unlock token of password-protected transfers.</param>
-    /// <param name="branding">Store that reads the sender's organization branding.</param>
-    /// <param name="features">Provider of the sender plan's feature toggles.</param>
-    /// <param name="blobs">Blob store used to check that the logo blob exists.</param>
-    /// <param name="logoMinter">Mints the inline read URL of the sender's logo.</param>
-    /// <param name="users">Store used to resolve the sender's plan.</param>
-    /// <param name="flags">Resolver for the ads feature gate.</param>
-    /// <param name="logger">Logger injected for the handler (currently unused).</param>
-    public GetPublicTransferHandler(
-        IPublicTransferStore store,
-        ILimitsProvider limits,
-        WaTelemetryReporter telemetry,
-        IUnlockTokenMinter tokens,
-        ISenderBrandingStore branding,
-        IFeaturesProvider features,
-        IBlobStore blobs,
-        IOrgLogoSasMinter logoMinter,
-        IUserPlanStore users,
-        IFlagResolver flags,
-        ILogger<GetPublicTransferHandler> logger)
-    {
-        _store = store;
-        _limits = limits;
-        _telemetry = telemetry;
-        _tokens = tokens;
-        _branding = branding;
-        _features = features;
-        _blobs = blobs;
-        _logoMinter = logoMinter;
-        _users = users;
-        _flags = flags;
-        _logger = logger;
-    }
+    private readonly IPublicTransferStore _store = store;
+    private readonly ILimitsProvider _limits = limits;
+    private readonly WaTelemetryReporter _telemetry = telemetry;
+    private readonly IUnlockTokenMinter _tokens = tokens;
+    private readonly ISenderBrandingStore _branding = branding;
+    private readonly IFeaturesProvider _features = features;
+    private readonly IBlobStore _blobs = blobs;
+    private readonly IOrgLogoSasMinter _logoMinter = logoMinter;
+    private readonly IUserPlanStore _users = users;
+    private readonly IFlagResolver _flags = flags;
+    private readonly ILogger<GetPublicTransferHandler> _logger = logger;
 
     /// <inheritdoc />
     public async Task<GetPublicTransferResult> Handle(GetPublicTransferQuery request, CancellationToken cancellationToken)

@@ -17,41 +17,29 @@ namespace wa.application.UseCases.Transfers;
 /// If the zip doesn't exist yet, trigger f-zip generation via fire-and-forget HTTP POST and return Generating (202).
 /// Reuses T-003-04's unlock-token verification; D6 rule: status wins over credentials.
 /// </summary>
-public sealed partial class GetDownloadAllUrlHandler : IRequestHandler<GetDownloadAllUrlQuery, DownloadAllResult>
+/// <param name="store">Store that reads the transfer and records the download.</param>
+/// <param name="minter">Mints the 30-minute read URL of the zip.</param>
+/// <param name="blobStore">Blob store used to check whether the zip exists.</param>
+/// <param name="tokens">Verifies the unlock token of password-protected transfers.</param>
+/// <param name="telemetry">Reporter whose PII slots hash the client IP and User-Agent.</param>
+/// <param name="config">Configuration source for the zip function URL and signing key.</param>
+/// <param name="logger">Logger for zip-trigger warnings and failures.</param>
+public sealed partial class GetDownloadAllUrlHandler(
+    IPublicTransferStore store,
+    IBlobSasMinter minter,
+    IBlobStore blobStore,
+    IUnlockTokenMinter tokens,
+    WaTelemetryReporter telemetry,
+    IConfiguration config,
+    ILogger<GetDownloadAllUrlHandler> logger) : IRequestHandler<GetDownloadAllUrlQuery, DownloadAllResult>
 {
-    private readonly IPublicTransferStore _store;
-    private readonly IBlobSasMinter _minter;
-    private readonly IBlobStore _blobStore;
-    private readonly IUnlockTokenMinter _tokens;
-    private readonly WaTelemetryReporter _telemetry;
-    private readonly IConfiguration _config;
-    private readonly ILogger<GetDownloadAllUrlHandler> _logger;
-
-    /// <summary>Initializes a new instance of the <see cref="GetDownloadAllUrlHandler"/> class.</summary>
-    /// <param name="store">Store that reads the transfer and records the download.</param>
-    /// <param name="minter">Mints the 30-minute read URL of the zip.</param>
-    /// <param name="blobStore">Blob store used to check whether the zip exists.</param>
-    /// <param name="tokens">Verifies the unlock token of password-protected transfers.</param>
-    /// <param name="telemetry">Reporter whose PII slots hash the client IP and User-Agent.</param>
-    /// <param name="config">Configuration source for the zip function URL and signing key.</param>
-    /// <param name="logger">Logger for zip-trigger warnings and failures.</param>
-    public GetDownloadAllUrlHandler(
-        IPublicTransferStore store,
-        IBlobSasMinter minter,
-        IBlobStore blobStore,
-        IUnlockTokenMinter tokens,
-        WaTelemetryReporter telemetry,
-        IConfiguration config,
-        ILogger<GetDownloadAllUrlHandler> logger)
-    {
-        _store = store;
-        _minter = minter;
-        _blobStore = blobStore;
-        _tokens = tokens;
-        _telemetry = telemetry;
-        _config = config;
-        _logger = logger;
-    }
+    private readonly IPublicTransferStore _store = store;
+    private readonly IBlobSasMinter _minter = minter;
+    private readonly IBlobStore _blobStore = blobStore;
+    private readonly IUnlockTokenMinter _tokens = tokens;
+    private readonly WaTelemetryReporter _telemetry = telemetry;
+    private readonly IConfiguration _config = config;
+    private readonly ILogger<GetDownloadAllUrlHandler> _logger = logger;
 
     /// <inheritdoc />
     public async Task<DownloadAllResult> Handle(GetDownloadAllUrlQuery request, CancellationToken cancellationToken)

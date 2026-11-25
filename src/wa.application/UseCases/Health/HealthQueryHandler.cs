@@ -5,22 +5,17 @@ using wa.application.Ports;
 namespace wa.application.UseCases.Health;
 
 /// <summary>Handles <see cref="HealthQuery"/>: pings the database and checks Service Bus, and reports <c>ok</c> or <c>skipped</c> per component. A failing probe throws, which the host turns into an unhealthy response.</summary>
-public sealed partial class HealthQueryHandler : IRequestHandler<HealthQuery, HealthResult>
+/// <param name="db">Probe that pings the database.</param>
+/// <param name="sb">Probe that checks Service Bus reachability.</param>
+/// <param name="logger">Logger for probe failures.</param>
+public sealed partial class HealthQueryHandler(
+    IDbHealthProbe db,
+    ISbHealthProbe sb,
+    ILogger<HealthQueryHandler> logger) : IRequestHandler<HealthQuery, HealthResult>
 {
-    private readonly IDbHealthProbe _db;
-    private readonly ISbHealthProbe _sb;
-    private readonly ILogger<HealthQueryHandler> _logger;
-
-    /// <summary>Initializes a new instance of the <see cref="HealthQueryHandler"/> class.</summary>
-    /// <param name="db">Probe that pings the database.</param>
-    /// <param name="sb">Probe that checks Service Bus reachability.</param>
-    /// <param name="logger">Logger for probe failures.</param>
-    public HealthQueryHandler(IDbHealthProbe db, ISbHealthProbe sb, ILogger<HealthQueryHandler> logger)
-    {
-        _db = db;
-        _sb = sb;
-        _logger = logger;
-    }
+    private readonly IDbHealthProbe _db = db;
+    private readonly ISbHealthProbe _sb = sb;
+    private readonly ILogger<HealthQueryHandler> _logger = logger;
 
     /// <inheritdoc />
     public async Task<HealthResult> Handle(HealthQuery request, CancellationToken cancellationToken)

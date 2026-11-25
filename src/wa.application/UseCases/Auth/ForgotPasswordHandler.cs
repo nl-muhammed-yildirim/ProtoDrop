@@ -16,32 +16,23 @@ namespace wa.application.UseCases.Auth;
 /// with an extra purpose=2 payload field — the D-3 discriminator EmailFunction routes on (D-2: event reuse).
 /// Redeem (endpoint 10) filters on TokenHash only — no Purpose check — so Purpose=2 signs in exactly like Purpose=1.
 /// </summary>
-public sealed class ForgotPasswordHandler : IRequestHandler<ForgotPasswordCommand, ForgotPasswordResult>
+/// <param name="users">Store used to look up the account by email.</param>
+/// <param name="tokens">Store that persists the single-use reset token.</param>
+/// <param name="eventPublisher">Publishes the <c>auth.magic_link_requested</c> event that triggers the email.</param>
+/// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+public sealed class ForgotPasswordHandler(
+    IAppUserStore users,
+    IAuthTokenStore tokens,
+    IEventPublisher eventPublisher,
+    TimeProvider timeProvider) : IRequestHandler<ForgotPasswordCommand, ForgotPasswordResult>
 {
     /// <summary>Purpose code for forgot-password tokens (TA-3.2: AuthToken.Purpose; 2=forgot-password).</summary>
     private const byte PurposeForgotPassword = 2;
 
-    private readonly IAppUserStore _users;
-    private readonly IAuthTokenStore _tokens;
-    private readonly IEventPublisher _eventPublisher;
-    private readonly TimeProvider _timeProvider;
-
-    /// <summary>Initializes a new instance of the <see cref="ForgotPasswordHandler"/> class.</summary>
-    /// <param name="users">Store used to look up the account by email.</param>
-    /// <param name="tokens">Store that persists the single-use reset token.</param>
-    /// <param name="eventPublisher">Publishes the <c>auth.magic_link_requested</c> event that triggers the email.</param>
-    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
-    public ForgotPasswordHandler(
-        IAppUserStore users,
-        IAuthTokenStore tokens,
-        IEventPublisher eventPublisher,
-        TimeProvider timeProvider)
-    {
-        _users = users;
-        _tokens = tokens;
-        _eventPublisher = eventPublisher;
-        _timeProvider = timeProvider;
-    }
+    private readonly IAppUserStore _users = users;
+    private readonly IAuthTokenStore _tokens = tokens;
+    private readonly IEventPublisher _eventPublisher = eventPublisher;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <inheritdoc />
     public async Task<ForgotPasswordResult> Handle(ForgotPasswordCommand request, CancellationToken cancellationToken)

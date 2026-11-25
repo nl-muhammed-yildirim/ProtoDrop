@@ -14,41 +14,29 @@ namespace wa.workers;
 /// T-005-04: HTTP trigger for E2E manual invocation.
 /// US-022-04: also runs the schedule sub-step (Scheduled → Active + transfer.created re-emit) after expiry.
 /// </summary>
-public partial class ExpireFunction
+/// <param name="handler">Handler that marks overdue transfers expired.</param>
+/// <param name="scheduled">Handler that activates scheduled transfers that are due.</param>
+/// <param name="billingEmails">Handler that queues the payment-failed reminder emails.</param>
+/// <param name="billingGrace">Handler that downgrades users whose billing grace ended.</param>
+/// <param name="logger">Logger for the job run (carries the generated correlation ids).</param>
+/// <param name="config">Configuration source for the <c>Wa:Jobs:SignKey</c> that guards the HTTP trigger.</param>
+/// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+public partial class ExpireFunction(
+    ExpireTransfersHandler handler,
+    ActivateScheduledTransfersHandler scheduled,
+    SendBillingEmailsHandler billingEmails,
+    EndBillingGraceHandler billingGrace,
+    ILogger<ExpireFunction> logger,
+    IConfiguration config,
+    TimeProvider timeProvider)
 {
-    private readonly ExpireTransfersHandler _handler;
-    private readonly ActivateScheduledTransfersHandler _scheduled;
-    private readonly SendBillingEmailsHandler _billingEmails;
-    private readonly EndBillingGraceHandler _billingGrace;
-    private readonly ILogger<ExpireFunction> _logger;
-    private readonly IConfiguration _config;
-    private readonly TimeProvider _timeProvider;
-
-    /// <summary>Initializes a new instance of the <see cref="ExpireFunction"/> class.</summary>
-    /// <param name="handler">Handler that marks overdue transfers expired.</param>
-    /// <param name="scheduled">Handler that activates scheduled transfers that are due.</param>
-    /// <param name="billingEmails">Handler that queues the payment-failed reminder emails.</param>
-    /// <param name="billingGrace">Handler that downgrades users whose billing grace ended.</param>
-    /// <param name="logger">Logger for the job run (carries the generated correlation ids).</param>
-    /// <param name="config">Configuration source for the <c>Wa:Jobs:SignKey</c> that guards the HTTP trigger.</param>
-    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
-    public ExpireFunction(
-        ExpireTransfersHandler handler,
-        ActivateScheduledTransfersHandler scheduled,
-        SendBillingEmailsHandler billingEmails,
-        EndBillingGraceHandler billingGrace,
-        ILogger<ExpireFunction> logger,
-        IConfiguration config,
-        TimeProvider timeProvider)
-    {
-        _handler = handler;
-        _scheduled = scheduled;
-        _billingEmails = billingEmails;
-        _billingGrace = billingGrace;
-        _logger = logger;
-        _config = config;
-        _timeProvider = timeProvider;
-    }
+    private readonly ExpireTransfersHandler _handler = handler;
+    private readonly ActivateScheduledTransfersHandler _scheduled = scheduled;
+    private readonly SendBillingEmailsHandler _billingEmails = billingEmails;
+    private readonly EndBillingGraceHandler _billingGrace = billingGrace;
+    private readonly ILogger<ExpireFunction> _logger = logger;
+    private readonly IConfiguration _config = config;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <summary>Timer entry point (every 15 minutes): expires overdue transfers, then runs the scheduled-send, billing-email and billing-grace sub-steps in that order inside one try block; an exception in any step is logged and rethrown, so the remaining steps are skipped until the next run.</summary>
     /// <param name="context">Function invocation context.</param>

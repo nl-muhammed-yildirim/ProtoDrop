@@ -7,13 +7,10 @@ namespace wa.infrastructure.Email;
 /// T-006-01: Log-only email sender (dev switch: Wa:Email:Sender=log).
 /// Visible in dev run for T-019 exit check.
 /// </summary>
-public sealed partial class LogEmailSender : IEmailSender
+/// <param name="logger">Logger that receives the mail details instead of a real mail provider.</param>
+public sealed partial class LogEmailSender(ILogger<LogEmailSender> logger) : IEmailSender
 {
-    private readonly ILogger<LogEmailSender> _logger;
-
-    /// <summary>Initializes a new instance of the <see cref="LogEmailSender"/> class.</summary>
-    /// <param name="logger">Logger that receives the mail details instead of a real mail provider.</param>
-    public LogEmailSender(ILogger<LogEmailSender> logger) => _logger = logger;
+    private readonly ILogger<LogEmailSender> _logger = logger;
 
     /// <inheritdoc />
     public Task SendAsync(EmailMessage message, CancellationToken ct)

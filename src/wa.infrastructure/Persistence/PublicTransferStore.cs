@@ -8,19 +8,12 @@ namespace wa.infrastructure.Persistence;
 /// T-014: thin adapter over WaDbContext implementing IPublicTransferStore — the only DB surface the recipient-page handler needs.
 /// Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext).
 /// </summary>
-public sealed class PublicTransferStore : IPublicTransferStore
+/// <param name="db">Database context that backs the store.</param>
+/// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+public sealed class PublicTransferStore(WaDbContext db, TimeProvider timeProvider) : IPublicTransferStore
 {
-    private readonly WaDbContext _db;
-    private readonly TimeProvider _timeProvider;
-
-    /// <summary>Initializes a new instance of the <see cref="PublicTransferStore"/> class.</summary>
-    /// <param name="db">Database context that backs the store.</param>
-    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
-    public PublicTransferStore(WaDbContext db, TimeProvider timeProvider)
-    {
-        _db = db;
-        _timeProvider = timeProvider;
-    }
+    private readonly WaDbContext _db = db;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <inheritdoc />
     /// <remarks>

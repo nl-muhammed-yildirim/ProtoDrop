@@ -8,13 +8,10 @@ namespace wa.infrastructure.Persistence;
 /// T-008-04 (TA-9.1): thin adapter over WaDbContext implementing IAuthTokenStore — the only DB surface magic-link needs.
 /// Singleton over the adapter-owned WaDbContext (same lifetime as AppUserStore, T-008-01).
 /// </summary>
-public sealed class AuthTokenStore : IAuthTokenStore
+/// <param name="db">Database context that backs the store.</param>
+public sealed class AuthTokenStore(WaDbContext db) : IAuthTokenStore
 {
-    private readonly WaDbContext _db;
-
-    /// <summary>Initializes a new instance of the <see cref="AuthTokenStore"/> class.</summary>
-    /// <param name="db">Database context that backs the store.</param>
-    public AuthTokenStore(WaDbContext db) => _db = db;
+    private readonly WaDbContext _db = db;
 
     /// <inheritdoc />
     /// <remarks>TA-9.1: lookup by the SHA-256 hex token hash — single-use identity (UQ_AuthToken_Hash unique index).</remarks>

@@ -13,25 +13,20 @@ namespace wa.workers;
 /// Host.json settings: concurrency 1, timeout 30 min.
 /// T-005-04: HTTP trigger for E2E manual invocation.
 /// </summary>
-public partial class DeleteBlobsFunction
+/// <param name="handler">Handler that deletes blobs that nothing references any more.</param>
+/// <param name="logger">Logger for the job run (carries the generated correlation ids).</param>
+/// <param name="config">Configuration source for the <c>Wa:Jobs:SignKey</c> that guards the HTTP trigger.</param>
+/// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+public partial class DeleteBlobsFunction(
+    DeleteOrphanBlobsHandler handler,
+    ILogger<DeleteBlobsFunction> logger,
+    IConfiguration config,
+    TimeProvider timeProvider)
 {
-    private readonly DeleteOrphanBlobsHandler _handler;
-    private readonly ILogger<DeleteBlobsFunction> _logger;
-    private readonly IConfiguration _config;
-    private readonly TimeProvider _timeProvider;
-
-    /// <summary>Initializes a new instance of the <see cref="DeleteBlobsFunction"/> class.</summary>
-    /// <param name="handler">Handler that deletes blobs that nothing references any more.</param>
-    /// <param name="logger">Logger for the job run (carries the generated correlation ids).</param>
-    /// <param name="config">Configuration source for the <c>Wa:Jobs:SignKey</c> that guards the HTTP trigger.</param>
-    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
-    public DeleteBlobsFunction(DeleteOrphanBlobsHandler handler, ILogger<DeleteBlobsFunction> logger, IConfiguration config, TimeProvider timeProvider)
-    {
-        _handler = handler;
-        _logger = logger;
-        _config = config;
-        _timeProvider = timeProvider;
-    }
+    private readonly DeleteOrphanBlobsHandler _handler = handler;
+    private readonly ILogger<DeleteBlobsFunction> _logger = logger;
+    private readonly IConfiguration _config = config;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <summary>Timer entry point (hourly): runs one orphan-blob deletion pass under a freshly generated traceparent.</summary>
     /// <param name="context">Function invocation context.</param>

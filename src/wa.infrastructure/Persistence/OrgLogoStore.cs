@@ -8,13 +8,10 @@ namespace wa.infrastructure.Persistence;
 /// US-021-04: org logo path write surface. ExecuteUpdateAsync keeps the singleton, shared WaDbContext free of tracked
 /// entities (same idiom as AdminFlagStore). Registered as a singleton in Program.cs.
 /// </summary>
-public sealed class OrgLogoStore : IOrgLogoStore
+/// <param name="db">Database context that backs the store.</param>
+public sealed class OrgLogoStore(WaDbContext db) : IOrgLogoStore
 {
-    private readonly WaDbContext _db;
-
-    /// <summary>Initializes a new instance of the <see cref="OrgLogoStore"/> class.</summary>
-    /// <param name="db">Database context that backs the store.</param>
-    public OrgLogoStore(WaDbContext db) => _db = db;
+    private readonly WaDbContext _db = db;
 
     /// <inheritdoc />
     public async Task<bool> SetPathAsync(Guid userId, string? blobPath, CancellationToken ct)

@@ -7,22 +7,14 @@ namespace wa.application.UseCases.Gdpr;
 /// their Erasure marker swept. Idempotent per userId (a swept marker is never due again); emits no event (FR-047-8).
 /// No log template carries a userId — logging it would itself create a userId-keyed trace after the sweep.
 /// </summary>
-public sealed partial class SweepErasedTelemetryHandler
+/// <param name="store">Store that claims the window and tracks pending markers.</param>
+/// <param name="eraser">Port that erases the telemetry of one user.</param>
+/// <param name="logger">Logger for diagnostics (never logs user ids).</param>
+public sealed partial class SweepErasedTelemetryHandler(IGdprSweepStore store, ITelemetryEraser eraser, ILogger<SweepErasedTelemetryHandler> logger)
 {
-    private readonly IGdprSweepStore _store;
-    private readonly ITelemetryEraser _eraser;
-    private readonly ILogger<SweepErasedTelemetryHandler> _logger;
-
-    /// <summary>Initializes a new instance of the <see cref="SweepErasedTelemetryHandler"/> class.</summary>
-    /// <param name="store">Store that claims the window and tracks pending markers.</param>
-    /// <param name="eraser">Port that erases the telemetry of one user.</param>
-    /// <param name="logger">Logger for diagnostics (never logs user ids).</param>
-    public SweepErasedTelemetryHandler(IGdprSweepStore store, ITelemetryEraser eraser, ILogger<SweepErasedTelemetryHandler> logger)
-    {
-        _store = store;
-        _eraser = eraser;
-        _logger = logger;
-    }
+    private readonly IGdprSweepStore _store = store;
+    private readonly ITelemetryEraser _eraser = eraser;
+    private readonly ILogger<SweepErasedTelemetryHandler> _logger = logger;
 
     /// <summary>Returns the number of markers swept (0 when the claim was lost or nothing is due).</summary>
     /// <param name="nowUtc">Current UTC time; defines the claim window and the 24-hour cutoff.</param>

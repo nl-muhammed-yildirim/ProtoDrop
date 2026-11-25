@@ -3,13 +3,10 @@ using Microsoft.EntityFrameworkCore;
 namespace wa.infrastructure.Persistence;
 
 /// <summary>Minimal DbContext factory for the workers' SbEventPublisher (TA-0.2 rule 7: DI picks the adapter).</summary>
-public sealed class WaDbContextFactory : IDbContextFactory<WaDbContext>
+/// <param name="options">EF Core options shared by every context this factory creates.</param>
+public sealed class WaDbContextFactory(DbContextOptions<WaDbContext> options) : IDbContextFactory<WaDbContext>
 {
-    private readonly DbContextOptions<WaDbContext> _options;
-
-    /// <summary>Initializes a new instance of the <see cref="WaDbContextFactory"/> class.</summary>
-    /// <param name="options">EF Core options shared by every context this factory creates.</param>
-    public WaDbContextFactory(DbContextOptions<WaDbContext> options) => _options = options;
+    private readonly DbContextOptions<WaDbContext> _options = options;
 
     /// <inheritdoc />
     public Task<WaDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>

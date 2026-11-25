@@ -10,31 +10,22 @@ namespace wa.application.UseCases.Transfers;
 /// TA-6.1); the per-row conditional UPDATE is the second guard. The scan is stateless, so a missed run is caught by the next.
 /// Ignores the feature.scheduling gate on purpose: already-scheduled rows must still go out if the gate is later switched off.
 /// </summary>
-public sealed partial class ActivateScheduledTransfersHandler
+/// <param name="store">Store that claims the window and flips due transfers to Active.</param>
+/// <param name="eventPublisher">Publishes the <c>transfer.created</c> event for each activated transfer.</param>
+/// <param name="logger">Logger for diagnostics (never logs addresses).</param>
+/// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+public sealed partial class ActivateScheduledTransfersHandler(
+    IScheduledSendStore store,
+    IEventPublisher eventPublisher,
+    ILogger<ActivateScheduledTransfersHandler> logger,
+    TimeProvider timeProvider)
 {
     private const int BatchSize = 500; // TA-6.3 architecture constant, not a plan limit
 
-    private readonly IScheduledSendStore _store;
-    private readonly IEventPublisher _eventPublisher;
-    private readonly ILogger<ActivateScheduledTransfersHandler> _logger;
-    private readonly TimeProvider _timeProvider;
-
-    /// <summary>Initializes a new instance of the <see cref="ActivateScheduledTransfersHandler"/> class.</summary>
-    /// <param name="store">Store that claims the window and flips due transfers to Active.</param>
-    /// <param name="eventPublisher">Publishes the <c>transfer.created</c> event for each activated transfer.</param>
-    /// <param name="logger">Logger for diagnostics (never logs addresses).</param>
-    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
-    public ActivateScheduledTransfersHandler(
-        IScheduledSendStore store,
-        IEventPublisher eventPublisher,
-        ILogger<ActivateScheduledTransfersHandler> logger,
-        TimeProvider timeProvider)
-    {
-        _store = store;
-        _eventPublisher = eventPublisher;
-        _logger = logger;
-        _timeProvider = timeProvider;
-    }
+    private readonly IScheduledSendStore _store = store;
+    private readonly IEventPublisher _eventPublisher = eventPublisher;
+    private readonly ILogger<ActivateScheduledTransfersHandler> _logger = logger;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <summary>Run the sub-step. Returns the number of transfers activated (0 if the claim was lost or nothing was due).</summary>
     /// <param name="nowUtc">Current UTC time; defines the 15-minute claim window and which transfers are due.</param>

@@ -9,25 +9,16 @@ namespace wa.infrastructure.Persistence;
 /// T-006-03 (FR-006-5, TA-6.7): Unsubscribe handler — verify token + insert EmailSuppression idempotently.
 /// Plain sealed class (no MediatR) following the T-006-01 pattern; called directly from Program.cs's MapGet.
 /// </summary>
-public sealed partial class UnsubscribeService
+/// <param name="db">Database context that stores the suppression rows.</param>
+/// <param name="hmacKey">Secret key bytes the unsubscribe tokens are signed with.</param>
+/// <param name="logger">Logger for diagnostics (never logs the address).</param>
+/// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+public sealed partial class UnsubscribeService(WaDbContext db, byte[] hmacKey, ILogger<UnsubscribeService> logger, TimeProvider timeProvider)
 {
-    private readonly WaDbContext _db;
-    private readonly byte[] _hmacKey;
-    private readonly ILogger<UnsubscribeService> _logger;
-    private readonly TimeProvider _timeProvider;
-
-    /// <summary>Initializes a new instance of the <see cref="UnsubscribeService"/> class.</summary>
-    /// <param name="db">Database context that stores the suppression rows.</param>
-    /// <param name="hmacKey">Secret key bytes the unsubscribe tokens are signed with.</param>
-    /// <param name="logger">Logger for diagnostics (never logs the address).</param>
-    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
-    public UnsubscribeService(WaDbContext db, byte[] hmacKey, ILogger<UnsubscribeService> logger, TimeProvider timeProvider)
-    {
-        _db = db;
-        _hmacKey = hmacKey;
-        _logger = logger;
-        _timeProvider = timeProvider;
-    }
+    private readonly WaDbContext _db = db;
+    private readonly byte[] _hmacKey = hmacKey;
+    private readonly ILogger<UnsubscribeService> _logger = logger;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <summary>
     /// Verify the token and insert an EmailSuppression row (idempotent via UQ_ES unique constraint).

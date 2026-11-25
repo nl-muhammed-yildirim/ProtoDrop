@@ -14,37 +14,26 @@ namespace wa.application.UseCases.Transfers;
 /// the cap is reached (the flip lives in the store, not a worker). Reuses T-003-04's unlock-token verification; TA-9.6
 /// enumeration safety: unknown/malformed fileId under an active transfer answers NotFound — same shape as unknown linkId.
 /// </summary>
-public sealed class GetFileDownloadUrlHandler : IRequestHandler<GetFileDownloadUrlQuery, FileDownloadResult>
+/// <param name="store">Store that reads the transfer and records the download.</param>
+/// <param name="minter">Mints the 30-minute read URL of the file.</param>
+/// <param name="tokens">Verifies the unlock token of password-protected transfers.</param>
+/// <param name="telemetry">Reporter whose PII slots hash the client IP and User-Agent.</param>
+/// <param name="logger">Logger injected for the handler (currently unused).</param>
+/// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+public sealed class GetFileDownloadUrlHandler(
+    IPublicTransferStore store,
+    IBlobSasMinter minter,
+    IUnlockTokenMinter tokens,
+    WaTelemetryReporter telemetry,
+    ILogger<GetFileDownloadUrlHandler> logger,
+    TimeProvider timeProvider) : IRequestHandler<GetFileDownloadUrlQuery, FileDownloadResult>
 {
-    private readonly IPublicTransferStore _store;
-    private readonly IBlobSasMinter _minter;
-    private readonly IUnlockTokenMinter _tokens;
-    private readonly WaTelemetryReporter _telemetry;
-    private readonly ILogger<GetFileDownloadUrlHandler> _logger;
-    private readonly TimeProvider _timeProvider;
-
-    /// <summary>Initializes a new instance of the <see cref="GetFileDownloadUrlHandler"/> class.</summary>
-    /// <param name="store">Store that reads the transfer and records the download.</param>
-    /// <param name="minter">Mints the 30-minute read URL of the file.</param>
-    /// <param name="tokens">Verifies the unlock token of password-protected transfers.</param>
-    /// <param name="telemetry">Reporter whose PII slots hash the client IP and User-Agent.</param>
-    /// <param name="logger">Logger injected for the handler (currently unused).</param>
-    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
-    public GetFileDownloadUrlHandler(
-        IPublicTransferStore store,
-        IBlobSasMinter minter,
-        IUnlockTokenMinter tokens,
-        WaTelemetryReporter telemetry,
-        ILogger<GetFileDownloadUrlHandler> logger,
-        TimeProvider timeProvider)
-    {
-        _store = store;
-        _minter = minter;
-        _tokens = tokens;
-        _telemetry = telemetry;
-        _logger = logger;
-        _timeProvider = timeProvider;
-    }
+    private readonly IPublicTransferStore _store = store;
+    private readonly IBlobSasMinter _minter = minter;
+    private readonly IUnlockTokenMinter _tokens = tokens;
+    private readonly WaTelemetryReporter _telemetry = telemetry;
+    private readonly ILogger<GetFileDownloadUrlHandler> _logger = logger;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <inheritdoc />
     public async Task<FileDownloadResult> Handle(GetFileDownloadUrlQuery request, CancellationToken cancellationToken)

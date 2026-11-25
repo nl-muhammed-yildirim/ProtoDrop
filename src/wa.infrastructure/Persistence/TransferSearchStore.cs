@@ -10,13 +10,10 @@ namespace wa.infrastructure.Persistence;
 /// (file=3 &gt; recipient=2 &gt; sender=1); order rank DESC, CreatedAtUtc DESC, Id DESC; Take(limit+1) for next-page detection. No schema change, no migration — the owner predicate bounds the scan to one user's rows.
 /// Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext), mirroring ITransferStore.
 /// </summary>
-public sealed class TransferSearchStore : ITransferSearchStore
+/// <param name="db">Database context that backs the store.</param>
+public sealed class TransferSearchStore(WaDbContext db) : ITransferSearchStore
 {
-    private readonly WaDbContext _db;
-
-    /// <summary>Initializes a new instance of the <see cref="TransferSearchStore"/> class.</summary>
-    /// <param name="db">Database context that backs the store.</param>
-    public TransferSearchStore(WaDbContext db) => _db = db;
+    private readonly WaDbContext _db = db;
 
     /// <inheritdoc />
     /// <remarks>FR-045-1/3/7: one row per transfer (de-dup by construction — the rank is a CASE over EXISTS subqueries); search cursor bound to the term.</remarks>

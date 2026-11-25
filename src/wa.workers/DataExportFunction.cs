@@ -12,25 +12,20 @@ namespace wa.workers;
 /// Claims its window via JobRun (TA-6.1); builds processing exports and purges ready ones past 7 days.
 /// The signed HTTP trigger lets E2E/QA run a pass on demand.
 /// </summary>
-public partial class DataExportFunction
+/// <param name="handler">Handler that builds pending exports and purges old ones.</param>
+/// <param name="logger">Logger for the job run (carries the generated correlation ids).</param>
+/// <param name="config">Configuration source for the <c>Wa:Jobs:SignKey</c> that guards the HTTP trigger.</param>
+/// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+public partial class DataExportFunction(
+    BuildDataExportsHandler handler,
+    ILogger<DataExportFunction> logger,
+    IConfiguration config,
+    TimeProvider timeProvider)
 {
-    private readonly BuildDataExportsHandler _handler;
-    private readonly ILogger<DataExportFunction> _logger;
-    private readonly IConfiguration _config;
-    private readonly TimeProvider _timeProvider;
-
-    /// <summary>Initializes a new instance of the <see cref="DataExportFunction"/> class.</summary>
-    /// <param name="handler">Handler that builds pending exports and purges old ones.</param>
-    /// <param name="logger">Logger for the job run (carries the generated correlation ids).</param>
-    /// <param name="config">Configuration source for the <c>Wa:Jobs:SignKey</c> that guards the HTTP trigger.</param>
-    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
-    public DataExportFunction(BuildDataExportsHandler handler, ILogger<DataExportFunction> logger, IConfiguration config, TimeProvider timeProvider)
-    {
-        _handler = handler;
-        _logger = logger;
-        _config = config;
-        _timeProvider = timeProvider;
-    }
+    private readonly BuildDataExportsHandler _handler = handler;
+    private readonly ILogger<DataExportFunction> _logger = logger;
+    private readonly IConfiguration _config = config;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <summary>Timer entry point (every 5 minutes): runs one build and purge pass under a freshly generated traceparent.</summary>
     /// <param name="context">Function invocation context.</param>

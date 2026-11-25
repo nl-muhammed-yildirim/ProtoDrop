@@ -9,22 +9,14 @@ namespace wa.application.UseCases.Auth;
 /// owner can retry and no orphan is left unreachable. Idempotent (no stored path = no-op). Not plan-gated: an owner may always
 /// remove their own data.
 /// </summary>
-public sealed class RemoveOrgLogoHandler : IRequestHandler<RemoveOrgLogoCommand, Unit>
+/// <param name="users">Store used to read the user's current logo path.</param>
+/// <param name="logos">Store that clears the logo path on the user row.</param>
+/// <param name="blobs">Blob store the logo file is deleted from.</param>
+public sealed class RemoveOrgLogoHandler(IAppUserStore users, IOrgLogoStore logos, IBlobStore blobs) : IRequestHandler<RemoveOrgLogoCommand, Unit>
 {
-    private readonly IAppUserStore _users;
-    private readonly IOrgLogoStore _logos;
-    private readonly IBlobStore _blobs;
-
-    /// <summary>Initializes a new instance of the <see cref="RemoveOrgLogoHandler"/> class.</summary>
-    /// <param name="users">Store used to read the user's current logo path.</param>
-    /// <param name="logos">Store that clears the logo path on the user row.</param>
-    /// <param name="blobs">Blob store the logo file is deleted from.</param>
-    public RemoveOrgLogoHandler(IAppUserStore users, IOrgLogoStore logos, IBlobStore blobs)
-    {
-        _users = users;
-        _logos = logos;
-        _blobs = blobs;
-    }
+    private readonly IAppUserStore _users = users;
+    private readonly IOrgLogoStore _logos = logos;
+    private readonly IBlobStore _blobs = blobs;
 
     /// <inheritdoc />
     public async Task<Unit> Handle(RemoveOrgLogoCommand request, CancellationToken cancellationToken)

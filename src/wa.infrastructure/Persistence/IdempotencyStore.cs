@@ -9,19 +9,12 @@ namespace wa.infrastructure.Persistence;
 /// the generic HTTP-level idempotency storage used by IdempotencyMiddleware.
 /// Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext).
 /// </summary>
-public sealed class IdempotencyStore : IIdempotencyStore
+/// <param name="db">Database context that backs the store.</param>
+/// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+public sealed class IdempotencyStore(WaDbContext db, TimeProvider timeProvider) : IIdempotencyStore
 {
-    private readonly WaDbContext _db;
-    private readonly TimeProvider _timeProvider;
-
-    /// <summary>Initializes a new instance of the <see cref="IdempotencyStore"/> class.</summary>
-    /// <param name="db">Database context that backs the store.</param>
-    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
-    public IdempotencyStore(WaDbContext db, TimeProvider timeProvider)
-    {
-        _db = db;
-        _timeProvider = timeProvider;
-    }
+    private readonly WaDbContext _db = db;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <inheritdoc />
     public async Task<IdempotencyEntry?> FindAsync(string key, CancellationToken ct)

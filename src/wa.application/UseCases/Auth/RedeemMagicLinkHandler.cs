@@ -12,40 +12,29 @@ namespace wa.application.UseCases.Auth;
 /// Unknown email → create AppUser on redeem (sign-up is sign-in); user_created emitted BEFORE login_success.
 /// Expired/redeemed/unknown → LinkExpiredException (410 Gone at endpoint).
 /// </summary>
-public sealed class RedeemMagicLinkHandler : IRequestHandler<RedeemMagicLinkCommand, RedeemMagicLinkResult>
+/// <param name="tokens">Store that looks up and redeems the token row.</param>
+/// <param name="users">Store used to find or create the account.</param>
+/// <param name="plans">Store used to resolve the default plan and the plan code.</param>
+/// <param name="telemetry">Reporter for the <c>user_created</c> and <c>login_success</c> events.</param>
+/// <param name="minter">Mints the session token returned to the caller.</param>
+/// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+public sealed class RedeemMagicLinkHandler(
+    IAuthTokenStore tokens,
+    IAppUserStore users,
+    IPlansStore plans,
+    WaTelemetryReporter telemetry,
+    ISessionTokenMinter minter,
+    TimeProvider timeProvider) : IRequestHandler<RedeemMagicLinkCommand, RedeemMagicLinkResult>
 {
     /// <summary>Lifetime of a magic link in seconds (10 minutes, frozen in Open-Decisions-and-Constants Part 2 and TA-9.1).</summary>
     public const int TtlSeconds = 600;
 
-    private readonly IAuthTokenStore _tokens;
-    private readonly IAppUserStore _users;
-    private readonly IPlansStore _plans;
-    private readonly WaTelemetryReporter _telemetry;
-    private readonly ISessionTokenMinter _minter;
-    private readonly TimeProvider _timeProvider;
-
-    /// <summary>Initializes a new instance of the <see cref="RedeemMagicLinkHandler"/> class.</summary>
-    /// <param name="tokens">Store that looks up and redeems the token row.</param>
-    /// <param name="users">Store used to find or create the account.</param>
-    /// <param name="plans">Store used to resolve the default plan and the plan code.</param>
-    /// <param name="telemetry">Reporter for the <c>user_created</c> and <c>login_success</c> events.</param>
-    /// <param name="minter">Mints the session token returned to the caller.</param>
-    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
-    public RedeemMagicLinkHandler(
-        IAuthTokenStore tokens,
-        IAppUserStore users,
-        IPlansStore plans,
-        WaTelemetryReporter telemetry,
-        ISessionTokenMinter minter,
-        TimeProvider timeProvider)
-    {
-        _tokens = tokens;
-        _users = users;
-        _plans = plans;
-        _telemetry = telemetry;
-        _minter = minter;
-        _timeProvider = timeProvider;
-    }
+    private readonly IAuthTokenStore _tokens = tokens;
+    private readonly IAppUserStore _users = users;
+    private readonly IPlansStore _plans = plans;
+    private readonly WaTelemetryReporter _telemetry = telemetry;
+    private readonly ISessionTokenMinter _minter = minter;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <inheritdoc />
     public async Task<RedeemMagicLinkResult> Handle(RedeemMagicLinkCommand request, CancellationToken cancellationToken)

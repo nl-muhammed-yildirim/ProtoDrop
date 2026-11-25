@@ -13,7 +13,13 @@ namespace wa.application.UseCases.Auth;
 /// publishes auth.magic_link_requested via IEventPublisher so f-email worker sends the sign-in link.
 /// Only the hash is persisted — the raw token goes in the event payload (TA-9.1: DB leak reveals no working link).
 /// </summary>
-public sealed class RequestMagicLinkHandler : IRequestHandler<RequestMagicLinkCommand, RequestMagicLinkResult>
+/// <param name="tokens">Store that persists the single-use token row.</param>
+/// <param name="eventPublisher">Publishes the <c>auth.magic_link_requested</c> event that triggers the email.</param>
+/// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+public sealed class RequestMagicLinkHandler(
+    IAuthTokenStore tokens,
+    IEventPublisher eventPublisher,
+    TimeProvider timeProvider) : IRequestHandler<RequestMagicLinkCommand, RequestMagicLinkResult>
 {
     /// <summary>Lifetime of a magic link in seconds (10 minutes, frozen in Open-Decisions-and-Constants Part 2 and TA-9.1).</summary>
     public const int TtlSeconds = 600;
@@ -21,23 +27,9 @@ public sealed class RequestMagicLinkHandler : IRequestHandler<RequestMagicLinkCo
     /// <summary>Purpose code for magic-link tokens (TA-3.2: AuthToken.Purpose; 1=magic-link-login).</summary>
     private const byte PurposeMagicLinkLogin = 1;
 
-    private readonly IAuthTokenStore _tokens;
-    private readonly IEventPublisher _eventPublisher;
-    private readonly TimeProvider _timeProvider;
-
-    /// <summary>Initializes a new instance of the <see cref="RequestMagicLinkHandler"/> class.</summary>
-    /// <param name="tokens">Store that persists the single-use token row.</param>
-    /// <param name="eventPublisher">Publishes the <c>auth.magic_link_requested</c> event that triggers the email.</param>
-    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
-    public RequestMagicLinkHandler(
-        IAuthTokenStore tokens,
-        IEventPublisher eventPublisher,
-        TimeProvider timeProvider)
-    {
-        _tokens = tokens;
-        _eventPublisher = eventPublisher;
-        _timeProvider = timeProvider;
-    }
+    private readonly IAuthTokenStore _tokens = tokens;
+    private readonly IEventPublisher _eventPublisher = eventPublisher;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <inheritdoc />
     public async Task<RequestMagicLinkResult> Handle(RequestMagicLinkCommand request, CancellationToken cancellationToken)

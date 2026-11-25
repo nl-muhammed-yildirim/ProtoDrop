@@ -9,13 +9,10 @@ namespace wa.infrastructure.Persistence;
 /// T-006-01: thin adapter over WaDbContext implementing IEmailStore.
 /// Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext).
 /// </summary>
-public sealed class EmailStore : IEmailStore
+/// <param name="db">Database context that backs the store.</param>
+public sealed class EmailStore(WaDbContext db) : IEmailStore
 {
-    private readonly WaDbContext _db;
-
-    /// <summary>Initializes a new instance of the <see cref="EmailStore"/> class.</summary>
-    /// <param name="db">Database context that backs the store.</param>
-    public EmailStore(WaDbContext db) => _db = db;
+    private readonly WaDbContext _db = db;
 
     /// <inheritdoc />
     public async Task<EmailTransferContext?> GetTransferWithFilesAsync(Guid transferId, CancellationToken ct)

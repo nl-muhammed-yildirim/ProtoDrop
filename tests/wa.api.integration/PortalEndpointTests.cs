@@ -189,10 +189,9 @@ public class PortalEndpointTests : IAsyncLifetime
             throw new NotSupportedException();
     }
 
-    private sealed class TestFactory : WebApplicationFactory<Program>
+    private sealed class TestFactory(IStripeCheckoutGateway gateway) : WebApplicationFactory<Program>
     {
-        private readonly IStripeCheckoutGateway _gateway;
-        public TestFactory(IStripeCheckoutGateway gateway) => _gateway = gateway;
+        private readonly IStripeCheckoutGateway _gateway = gateway;
 
         protected override void ConfigureWebHost(IWebHostBuilder builder) =>
             builder.ConfigureServices(services =>

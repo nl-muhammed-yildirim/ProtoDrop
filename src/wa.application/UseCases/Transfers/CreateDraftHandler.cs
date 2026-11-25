@@ -10,25 +10,20 @@ namespace wa.application.UseCases.Transfers;
 /// <summary>
 /// TA-4.2a — the only business logic behind POST /api/v1/transfers/draft: resolve the request's plan limits via PlanContext (never literals), check the whole selection against MAX_TRANSFER_SIZE and per-file MAX_SINGLE_FILE, mint one staging SAS per file, emit upload_started once. Returns null when oversized — the endpoint throws BusinessException(ProblemCodes.TransferSizeExceeded) from there; no new tables/migrations (T-001-05).
 /// </summary>
-public sealed partial class CreateDraftHandler : IRequestHandler<CreateDraftCommand, CreateDraftResult>
+/// <param name="planContext">Accessor for the request's plan limits.</param>
+/// <param name="minter">Mints the staging upload URL of each file.</param>
+/// <param name="telemetry">Reporter for the <c>upload_started</c> event.</param>
+/// <param name="logger">Logger used to warn when a draft selection is rejected.</param>
+public sealed partial class CreateDraftHandler(
+    IPlanContextAccessor planContext,
+    IBlobSasMinter minter,
+    WaTelemetryReporter telemetry,
+    ILogger<CreateDraftHandler> logger) : IRequestHandler<CreateDraftCommand, CreateDraftResult>
 {
-    private readonly IPlanContextAccessor _planContext;
-    private readonly IBlobSasMinter _minter;
-    private readonly WaTelemetryReporter _telemetry;
-    private readonly ILogger<CreateDraftHandler> _logger;
-
-    /// <summary>Initializes a new instance of the <see cref="CreateDraftHandler"/> class.</summary>
-    /// <param name="planContext">Accessor for the request's plan limits.</param>
-    /// <param name="minter">Mints the staging upload URL of each file.</param>
-    /// <param name="telemetry">Reporter for the <c>upload_started</c> event.</param>
-    /// <param name="logger">Logger used to warn when a draft selection is rejected.</param>
-    public CreateDraftHandler(IPlanContextAccessor planContext, IBlobSasMinter minter, WaTelemetryReporter telemetry, ILogger<CreateDraftHandler> logger)
-    {
-        _planContext = planContext;
-        _minter = minter;
-        _telemetry = telemetry;
-        _logger = logger;
-    }
+    private readonly IPlanContextAccessor _planContext = planContext;
+    private readonly IBlobSasMinter _minter = minter;
+    private readonly WaTelemetryReporter _telemetry = telemetry;
+    private readonly ILogger<CreateDraftHandler> _logger = logger;
 
     /// <inheritdoc />
     public async Task<CreateDraftResult> Handle(CreateDraftCommand request, CancellationToken cancellationToken)

@@ -9,22 +9,14 @@ namespace wa.application.UseCases.DataExport;
 /// past retention (ready zips of deleted accounts are purged on the next pass), then builds every processing export into exports/{userId}/{exportId}.zip. No events, no telemetry (FR-047-8).
 /// The feature flag is deliberately not checked: the gate stops creation, not completion (FR-047-4).
 /// </summary>
-public sealed partial class BuildDataExportsHandler
+/// <param name="store">Job store that claims the window and reads and updates export rows.</param>
+/// <param name="blobs">Blob store that receives the built zips and deletes purged ones.</param>
+/// <param name="logger">Logger for diagnostics (never logs user data).</param>
+public sealed partial class BuildDataExportsHandler(IDataExportJobStore store, IBlobStore blobs, ILogger<BuildDataExportsHandler> logger)
 {
-    private readonly IDataExportJobStore _store;
-    private readonly IBlobStore _blobs;
-    private readonly ILogger<BuildDataExportsHandler> _logger;
-
-    /// <summary>Initializes a new instance of the <see cref="BuildDataExportsHandler"/> class.</summary>
-    /// <param name="store">Job store that claims the window and reads and updates export rows.</param>
-    /// <param name="blobs">Blob store that receives the built zips and deletes purged ones.</param>
-    /// <param name="logger">Logger for diagnostics (never logs user data).</param>
-    public BuildDataExportsHandler(IDataExportJobStore store, IBlobStore blobs, ILogger<BuildDataExportsHandler> logger)
-    {
-        _store = store;
-        _blobs = blobs;
-        _logger = logger;
-    }
+    private readonly IDataExportJobStore _store = store;
+    private readonly IBlobStore _blobs = blobs;
+    private readonly ILogger<BuildDataExportsHandler> _logger = logger;
 
     /// <summary>Runs one pass. Returns the number of exports built to ready (0 when the claim was lost).</summary>
     /// <param name="nowUtc">Current UTC time; defines the claim window and the retention cutoff.</param>

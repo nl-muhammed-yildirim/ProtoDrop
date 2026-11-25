@@ -29,20 +29,12 @@ namespace wa.infrastructure.Blob;
 /// </list>
 /// Each unsupported bit is a logged note so a later task can add a REST round-trip without changing the contract.
 /// </remarks>
-public sealed partial class BlobContainerBootstrap : BackgroundService
+/// <param name="serviceClient">Blob service client used to create the containers.</param>
+/// <param name="logger">Logger for the bootstrap progress and the settings that cannot be applied.</param>
+public sealed partial class BlobContainerBootstrap(BlobServiceClient serviceClient, ILogger<BlobContainerBootstrap> logger) : BackgroundService
 {
-    private readonly BlobServiceClient _svc;
-    private readonly ILogger<BlobContainerBootstrap> _logger;
-
-    /// <summary>Initializes a new instance of the <see cref="BlobContainerBootstrap"/> class.</summary>
-    /// <param name="serviceClient">Blob service client used to create the containers.</param>
-    /// <param name="logger">Logger for the bootstrap progress and the settings that cannot be applied.</param>
-    public BlobContainerBootstrap(
-        BlobServiceClient serviceClient, ILogger<BlobContainerBootstrap> logger)
-    {
-        _svc = serviceClient;
-        _logger = logger;
-    }
+    private readonly BlobServiceClient _svc = serviceClient;
+    private readonly ILogger<BlobContainerBootstrap> _logger = logger;
 
     /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

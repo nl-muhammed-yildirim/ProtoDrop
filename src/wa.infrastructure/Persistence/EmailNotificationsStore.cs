@@ -5,13 +5,10 @@ using wa.domain;
 namespace wa.infrastructure.Persistence;
 
 /// <summary>F-XCT-003: AppUser.EmailNotificationsEnabled read/write — fresh context per call (safe under f-email concurrency). Singleton in both hosts.</summary>
-public sealed class EmailNotificationsStore : IEmailNotificationsStore
+/// <param name="factory">Factory that creates a short-lived database context per call.</param>
+public sealed class EmailNotificationsStore(IDbContextFactory<WaDbContext> factory) : IEmailNotificationsStore
 {
-    private readonly IDbContextFactory<WaDbContext> _factory;
-
-    /// <summary>Initializes a new instance of the <see cref="EmailNotificationsStore"/> class.</summary>
-    /// <param name="factory">Factory that creates a short-lived database context per call.</param>
-    public EmailNotificationsStore(IDbContextFactory<WaDbContext> factory) => _factory = factory;
+    private readonly IDbContextFactory<WaDbContext> _factory = factory;
 
     /// <inheritdoc />
     public async Task SetAsync(Guid userId, bool enabled, CancellationToken ct)

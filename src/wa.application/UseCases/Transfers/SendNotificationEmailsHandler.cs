@@ -16,57 +16,41 @@ namespace wa.application.UseCases.Transfers;
 /// T-006-01: f-email consumer handler — sends notification emails for transfer.created events.
 /// Two-layer dedup: EventDeduplicator (eventId, 15-min window) + NotifiedAtUtc null check per recipient row.
 /// </summary>
-public sealed partial class SendNotificationEmailsHandler : wa.application.UseCases.Auth.IEmailEventHandler
+/// <param name="store">Store that reads the transfer, recipients and suppressions and records notifications.</param>
+/// <param name="emailSender">Port that delivers the rendered emails.</param>
+/// <param name="templateRenderer">Renders the email in the recipient's language.</param>
+/// <param name="eventPublisher">Publishes the <c>email.sent</c> and <c>email.failed</c> events.</param>
+/// <param name="deduplicator">Skips events that were already handled in the dedup window.</param>
+/// <param name="telemetry">Reporter for the email telemetry events.</param>
+/// <param name="config">Configuration source for the public site URL, sender address and unsubscribe signing key.</param>
+/// <param name="logger">Logger for diagnostics (never logs addresses).</param>
+/// <param name="branding">Store that reads the sender's organization name.</param>
+/// <param name="features">Provider of the sender plan's feature toggles.</param>
+/// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+public sealed partial class SendNotificationEmailsHandler(
+    IEmailStore store,
+    IEmailSender emailSender,
+    ITemplateRenderer templateRenderer,
+    IEventPublisher eventPublisher,
+    EventDeduplicator deduplicator,
+    WaTelemetryReporter telemetry,
+    IConfiguration config,
+    ILogger<SendNotificationEmailsHandler> logger,
+    ISenderBrandingStore branding,
+    IFeaturesProvider features,
+    TimeProvider timeProvider) : wa.application.UseCases.Auth.IEmailEventHandler
 {
-    private readonly IEmailStore _store;
-    private readonly IEmailSender _emailSender;
-    private readonly ITemplateRenderer _templateRenderer;
-    private readonly IEventPublisher _eventPublisher;
-    private readonly EventDeduplicator _deduplicator;
-    private readonly WaTelemetryReporter _telemetry;
-    private readonly IConfiguration _config;
-    private readonly ILogger<SendNotificationEmailsHandler> _logger;
-    private readonly ISenderBrandingStore _branding;
-    private readonly IFeaturesProvider _features;
-    private readonly TimeProvider _timeProvider;
-
-    /// <summary>Initializes a new instance of the <see cref="SendNotificationEmailsHandler"/> class.</summary>
-    /// <param name="store">Store that reads the transfer, recipients and suppressions and records notifications.</param>
-    /// <param name="emailSender">Port that delivers the rendered emails.</param>
-    /// <param name="templateRenderer">Renders the email in the recipient's language.</param>
-    /// <param name="eventPublisher">Publishes the <c>email.sent</c> and <c>email.failed</c> events.</param>
-    /// <param name="deduplicator">Skips events that were already handled in the dedup window.</param>
-    /// <param name="telemetry">Reporter for the email telemetry events.</param>
-    /// <param name="config">Configuration source for the public site URL, sender address and unsubscribe signing key.</param>
-    /// <param name="logger">Logger for diagnostics (never logs addresses).</param>
-    /// <param name="branding">Store that reads the sender's organization name.</param>
-    /// <param name="features">Provider of the sender plan's feature toggles.</param>
-    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
-    public SendNotificationEmailsHandler(
-        IEmailStore store,
-        IEmailSender emailSender,
-        ITemplateRenderer templateRenderer,
-        IEventPublisher eventPublisher,
-        EventDeduplicator deduplicator,
-        WaTelemetryReporter telemetry,
-        IConfiguration config,
-        ILogger<SendNotificationEmailsHandler> logger,
-        ISenderBrandingStore branding,
-        IFeaturesProvider features,
-        TimeProvider timeProvider)
-    {
-        _branding = branding;
-        _features = features;
-        _store = store;
-        _emailSender = emailSender;
-        _templateRenderer = templateRenderer;
-        _eventPublisher = eventPublisher;
-        _deduplicator = deduplicator;
-        _telemetry = telemetry;
-        _config = config;
-        _logger = logger;
-        _timeProvider = timeProvider;
-    }
+    private readonly IEmailStore _store = store;
+    private readonly IEmailSender _emailSender = emailSender;
+    private readonly ITemplateRenderer _templateRenderer = templateRenderer;
+    private readonly IEventPublisher _eventPublisher = eventPublisher;
+    private readonly EventDeduplicator _deduplicator = deduplicator;
+    private readonly WaTelemetryReporter _telemetry = telemetry;
+    private readonly IConfiguration _config = config;
+    private readonly ILogger<SendNotificationEmailsHandler> _logger = logger;
+    private readonly ISenderBrandingStore _branding = branding;
+    private readonly IFeaturesProvider _features = features;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <inheritdoc />
     public async Task HandleAsync(EventEnvelope envelope, int attempt, int maxDeliveryCount, CancellationToken ct)

@@ -7,27 +7,16 @@ namespace wa.application.UseCases.Transfers;
 /// T-005-03: f-delete-blobs timer job handler (TA-6.5). Selects BlobRef rows with RefCount=0 AND PhysicallyDeletedAtUtc &lt; now,
 /// deletes the blob from storage (swallowing BlobNotFound), then removes the row. Hourly JobRun claim (TA-6.1).
 /// </summary>
-public sealed partial class DeleteOrphanBlobsHandler
+/// <param name="store">Store that claims the window and lists blobs without references.</param>
+/// <param name="blobStore">Blob store the blobs are physically deleted from.</param>
+/// <param name="logger">Logger used to warn about blobs with an unexpected path and blobs that fail to delete.</param>
+public sealed partial class DeleteOrphanBlobsHandler(IBlobDeletionStore store, IBlobStore blobStore, ILogger<DeleteOrphanBlobsHandler> logger)
 {
     private const int BatchSize = 200; // TA-6.5 — no explicit batch size in spec; 200 is a reasonable default for hourly sweep
 
-    private readonly IBlobDeletionStore _store;
-    private readonly IBlobStore _blobStore;
-    private readonly ILogger<DeleteOrphanBlobsHandler> _logger;
-
-    /// <summary>Initializes a new instance of the <see cref="DeleteOrphanBlobsHandler"/> class.</summary>
-    /// <param name="store">Store that claims the window and lists blobs without references.</param>
-    /// <param name="blobStore">Blob store the blobs are physically deleted from.</param>
-    /// <param name="logger">Logger used to warn about blobs with an unexpected path and blobs that fail to delete.</param>
-    public DeleteOrphanBlobsHandler(
-        IBlobDeletionStore store,
-        IBlobStore blobStore,
-        ILogger<DeleteOrphanBlobsHandler> logger)
-    {
-        _store = store;
-        _blobStore = blobStore;
-        _logger = logger;
-    }
+    private readonly IBlobDeletionStore _store = store;
+    private readonly IBlobStore _blobStore = blobStore;
+    private readonly ILogger<DeleteOrphanBlobsHandler> _logger = logger;
 
     /// <summary>Run the blob deletion job. Returns the number of blobs deleted (0 if claim was lost or no rows).</summary>
     /// <param name="nowUtc">Current UTC time; defines the hourly claim window and the deletion cutoff.</param>

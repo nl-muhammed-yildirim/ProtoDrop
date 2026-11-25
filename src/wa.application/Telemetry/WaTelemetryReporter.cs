@@ -13,19 +13,12 @@ namespace wa.application.Telemetry;
 /// PII slots (TA-9.4): raw file names and IPs never enter a property untransformed — pass them through <see cref="FileNameSlot"/>/<see cref="IpSlot"/> first.
 /// No separate metrics SDK: metrics use the same closed list, emitted by this same pipeline when T-025 needs them (T-056-04 note).
 /// </summary>
-public sealed class WaTelemetryReporter
+/// <param name="logger">Logger whose pipeline carries the telemetry events.</param>
+/// <param name="hmacKey">Secret key bytes for the IP and User-Agent hashes (UTF-8 of <c>Wa:Jwt:Secret</c>).</param>
+public sealed class WaTelemetryReporter(ILogger<WaTelemetryReporter> logger, byte[] hmacKey)
 {
-    private readonly ILogger<WaTelemetryReporter> _logger;
-    private readonly byte[] _hmacKey; // TA-9.4: UTF-8 of Wa:Jwt:Secret, wired in at Program.cs (the reporter stays config-free — the domain transforms take key bytes as parameters)
-
-    /// <summary>Initializes a new instance of the <see cref="WaTelemetryReporter"/> class.</summary>
-    /// <param name="logger">Logger whose pipeline carries the telemetry events.</param>
-    /// <param name="hmacKey">Secret key bytes for the IP and User-Agent hashes (UTF-8 of <c>Wa:Jwt:Secret</c>).</param>
-    public WaTelemetryReporter(ILogger<WaTelemetryReporter> logger, byte[] hmacKey)
-    {
-        _logger = logger;
-        _hmacKey = hmacKey;
-    }
+    private readonly ILogger<WaTelemetryReporter> _logger = logger;
+    private readonly byte[] _hmacKey = hmacKey; // TA-9.4: UTF-8 of Wa:Jwt:Secret, wired in at Program.cs (the reporter stays config-free — the domain transforms take key bytes as parameters)
 
     /// <summary>Emit a closed-set event with no contract-named properties (the 20 property-free TA-10.2 events — e.g. upload_started, transfer_page_viewed).
     /// Throws <see cref="ArgumentException"/> for anything not in <see cref="TelemetryEvents.IsEvent"/>: ad-hoc names fail fast here, not silently later in App Insights (EC-056-4).</summary>
