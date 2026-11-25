@@ -7,9 +7,9 @@ namespace wa.application.UseCases.Auth;
 public interface IOrgLogoStore
 {
     /// <summary>Set (or clear, with null) the logo blob path of a non-deleted user. Returns false when no row matched (missing or soft-deleted).</summary>
-    /// <param name="userId">Identifier of the user.</param>
-    /// <param name="blobPath">The blob path.</param>
+    /// <param name="userId">Primary key of the user.</param>
+    /// <param name="blobPath">New logo blob path, or null to clear the logo.</param>
     /// <param name="ct">Token that cancels the operation.</param>
-    /// <returns><see langword="true"/> when the operation succeeded; otherwise <see langword="false"/>.</returns>
+    /// <returns><see langword="true"/> when a user row was updated; <see langword="false"/> when the user is missing or soft-deleted.</returns>
     Task<bool> SetPathAsync(Guid userId, string? blobPath, CancellationToken ct);
 }

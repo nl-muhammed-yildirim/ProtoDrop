@@ -9,8 +9,8 @@ public sealed class GetSuppressionsQueryHandler : IRequestHandler<GetSuppression
     private readonly IAdminSuppressionStore _store;
 
     /// <summary>Initializes a new instance of the <see cref="GetSuppressionsQueryHandler"/> class.</summary>
-    /// <param name="store">The store.</param>
-    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    /// <param name="store">Admin store that lists email suppressions.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="store"/> is null.</exception>
     public GetSuppressionsQueryHandler(IAdminSuppressionStore store)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));

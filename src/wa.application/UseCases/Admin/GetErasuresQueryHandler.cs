@@ -4,8 +4,8 @@ using wa.domain.Transfers;
 
 namespace wa.application.UseCases.Admin;
 
-/// <summary>Handles <see cref="GetErasuresQuery"/> and produces <see cref="GetErasuresResult"/>.</summary>
-/// <param name="store">The store of the get erasures query handler.</param>
+/// <summary>Handles <see cref="GetErasuresQuery"/>: decodes the cursor, reads one page of erasure rows, masks emails unless revealed and derives the pending or swept status.</summary>
+/// <param name="store">Read store for the erasure report.</param>
 public sealed class GetErasuresQueryHandler(IErasureReportStore store) : IRequestHandler<GetErasuresQuery, GetErasuresResult>
 {
     /// <inheritdoc />

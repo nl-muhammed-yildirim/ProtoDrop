@@ -8,10 +8,10 @@ namespace wa.application.UseCases.Auth;
 /// </summary>
 public interface IEmailEventHandler
 {
-    /// <summary>Handles the operation.</summary>
-    /// <param name="envelope">The envelope.</param>
-    /// <param name="attempt">The attempt.</param>
-    /// <param name="maxDeliveryCount">The max delivery count.</param>
+    /// <summary>Processes one email-related event delivered by Service Bus and sends or records the resulting email.</summary>
+    /// <param name="envelope">The deserialized TA-5.2 envelope of the event.</param>
+    /// <param name="attempt">Current delivery attempt, starting at 1.</param>
+    /// <param name="maxDeliveryCount">Delivery attempts after which the broker dead-letters the message.</param>
     /// <param name="ct">Token that cancels the operation.</param>
     Task HandleAsync(EventEnvelope envelope, int attempt, int maxDeliveryCount, CancellationToken ct);
 }

@@ -6,9 +6,9 @@ namespace wa.application.UseCases.Gdpr;
 /// </summary>
 public interface ITelemetryEraser
 {
-    /// <summary>Erases the user.</summary>
-    /// <param name="userId">Identifier of the user.</param>
-    /// <param name="sinceUtc">The since UTC.</param>
+    /// <summary>Deletes the telemetry that is keyed by the user id from the telemetry store.</summary>
+    /// <param name="userId">The deleted account whose telemetry is erased.</param>
+    /// <param name="sinceUtc">Lower bound of the erase window (the account's deletion time).</param>
     /// <param name="ct">Token that cancels the operation.</param>
     Task EraseUserAsync(Guid userId, DateTime sinceUtc, CancellationToken ct);
 }

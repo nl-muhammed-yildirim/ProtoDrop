@@ -9,8 +9,8 @@ public sealed class RemoveSuppressionCommandHandler : IRequestHandler<RemoveSupp
     private readonly IAdminSuppressionStore _store;
 
     /// <summary>Initializes a new instance of the <see cref="RemoveSuppressionCommandHandler"/> class.</summary>
-    /// <param name="store">The store.</param>
-    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    /// <param name="store">Admin store that removes suppressions.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="store"/> is null.</exception>
     public RemoveSuppressionCommandHandler(IAdminSuppressionStore store)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));

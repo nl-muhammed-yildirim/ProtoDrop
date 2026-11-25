@@ -15,9 +15,9 @@ public sealed class OwnerNotificationGate
     private readonly ILogger<OwnerNotificationGate> _logger;
 
     /// <summary>Initializes a new instance of the <see cref="OwnerNotificationGate"/> class.</summary>
-    /// <param name="store">The store.</param>
-    /// <param name="flags">The flags.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="store">Store that holds the owner's notification choice.</param>
+    /// <param name="flags">Resolver for the email-settings feature gate.</param>
+    /// <param name="logger">Logger for the skipped-send message.</param>
     public OwnerNotificationGate(IEmailNotificationsStore store, IFlagResolver flags, ILogger<OwnerNotificationGate> logger)
     {
         _store = store;
@@ -26,9 +26,9 @@ public sealed class OwnerNotificationGate
     }
 
     /// <summary>True when the owner notification may be sent. Reads the column on every call (send time, no cache).</summary>
-    /// <param name="ownerAppUserId">Identifier of the owner app user.</param>
+    /// <param name="ownerAppUserId">The transfer owner; null for anonymous transfers.</param>
     /// <param name="ct">Token that cancels the operation.</param>
-    /// <returns><see langword="true"/> when the operation succeeded; otherwise <see langword="false"/>.</returns>
+    /// <returns><see langword="true"/> when the owner should be notified (anonymous owner, gate off, or setting on); <see langword="false"/> when the owner opted out.</returns>
     public async Task<bool> MaySendAsync(Guid? ownerAppUserId, CancellationToken ct)
     {
         if (ownerAppUserId is not { } ownerId)

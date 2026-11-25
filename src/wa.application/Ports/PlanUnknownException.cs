@@ -4,7 +4,7 @@ namespace wa.application.Ports;
 public sealed class PlanUnknownException : Exception
 {
     /// <summary>Initializes a new instance of the <see cref="PlanUnknownException"/> class.</summary>
-    /// <param name="planCode">The plan code.</param>
+    /// <param name="planCode">The plan code that has no seeded row.</param>
     public PlanUnknownException(string planCode)
         : base($"No seeded plan with code '{planCode}'.") => PlanCode = planCode;
 

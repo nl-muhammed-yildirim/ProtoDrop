@@ -16,9 +16,9 @@ public sealed class GetFlagsQueryHandler : IRequestHandler<GetFlagsQuery, IReadO
     private readonly PlansCache _plans;
 
     /// <summary>Initializes a new instance of the <see cref="GetFlagsQueryHandler"/> class.</summary>
-    /// <param name="flags">The flags.</param>
-    /// <param name="plans">The plans.</param>
-    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    /// <param name="flags">Store that lists all flag rows.</param>
+    /// <param name="plans">Cache used to read each limit's seeded plan default.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="flags"/> or <paramref name="plans"/> is null.</exception>
     public GetFlagsQueryHandler(IFlagsStore flags, PlansCache plans)
     {
         _flags = flags ?? throw new ArgumentNullException(nameof(flags));

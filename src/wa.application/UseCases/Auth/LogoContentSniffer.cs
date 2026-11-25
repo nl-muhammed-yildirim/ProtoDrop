@@ -16,9 +16,9 @@ public static class LogoContentSniffer
     private static ReadOnlySpan<byte> WebPTag => "WEBP"u8;
 
     /// <summary>The Content-Type stored with a sniffed logo (never the client's header).</summary>
-    /// <param name="type">The type.</param>
-    /// <returns>The resulting text.</returns>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown when an argument is outside the allowed range.</exception>
+    /// <param name="type">Image type detected by <see cref="Sniff"/>.</param>
+    /// <returns>The MIME type to store with the logo blob, for example <c>image/png</c>.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="type"/> is not a defined value.</exception>
     public static string ContentTypeOf(LogoImageType type) => type switch
     {
         LogoImageType.Png => "image/png",
@@ -28,9 +28,9 @@ public static class LogoContentSniffer
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
     };
 
-    /// <summary>Sniffs the logo image type.</summary>
-    /// <param name="head">The head.</param>
-    /// <returns>The logo image type, or <see langword="null"/> when there is none.</returns>
+    /// <summary>Detects the image type of an uploaded logo from its first bytes (PNG, JPEG and WebP signatures, or an SVG root element after an optional XML prolog and comments).</summary>
+    /// <param name="head">The first bytes of the upload; at least 12 are needed for WebP detection.</param>
+    /// <returns>The detected type, or <see langword="null"/> when the content is none of the supported formats.</returns>
     public static LogoImageType? Sniff(ReadOnlySpan<byte> head)
     {
         if (head.StartsWith(PngMagic))

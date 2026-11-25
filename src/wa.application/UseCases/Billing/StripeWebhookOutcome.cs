@@ -8,13 +8,13 @@ using wa.domain.Telemetry;
 
 namespace wa.application.UseCases.Billing;
 
-/// <summary>Enumerates the stripe webhook outcome values.</summary>
+/// <summary>What happened to a verified Stripe webhook event; every outcome answers 2xx.</summary>
 public enum StripeWebhookOutcome
 {
-    /// <summary>Applied.</summary>
+    /// <summary>The event changed state or queued emails.</summary>
     Applied,
-    /// <summary>Duplicate.</summary>
+    /// <summary>The event or invoice was already processed.</summary>
     Duplicate,
-    /// <summary>Ignored.</summary>
+    /// <summary>The event type or subscription state is not relevant and was acknowledged without change.</summary>
     Ignored
 }

@@ -18,6 +18,6 @@ namespace wa.application.UseCases.Transfers;
 public sealed class TransferValidationException : Exception
 {
     /// <summary>Initializes a new instance of the <see cref="TransferValidationException"/> class.</summary>
-    /// <param name="message">The message.</param>
+    /// <param name="message">Human-readable reason that is returned to the client as the validation detail.</param>
     public TransferValidationException(string message) : base(message) { }
 }

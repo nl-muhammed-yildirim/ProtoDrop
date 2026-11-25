@@ -4,16 +4,16 @@ using wa.domain.Analytics;
 
 namespace wa.application.UseCases.Transfers;
 
-/// <summary>Handles <see cref="GetTransferAnalyticsQuery"/> and produces <see cref="TransferAnalytics"/>.</summary>
+/// <summary>Handles <see cref="GetTransferAnalyticsQuery"/>: checks that the plan includes analytics, reads the owner's transfer and builds the windowed download analytics.</summary>
 public sealed class GetTransferAnalyticsHandler : IRequestHandler<GetTransferAnalyticsQuery, TransferAnalytics?>
 {
     private readonly IPlanContextAccessor _planContext;
     private readonly ITransferAnalyticsStore _store;
 
     /// <summary>Initializes a new instance of the <see cref="GetTransferAnalyticsHandler"/> class.</summary>
-    /// <param name="planContext">The plan context.</param>
-    /// <param name="store">The store.</param>
-    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    /// <param name="planContext">Accessor for the request's plan, limits and features.</param>
+    /// <param name="store">Store that reads the owner's transfer and its download aggregates.</param>
+    /// <exception cref="ArgumentNullException">Thrown when any argument is null.</exception>
     public GetTransferAnalyticsHandler(IPlanContextAccessor planContext, ITransferAnalyticsStore store)
     {
         _planContext = planContext ?? throw new ArgumentNullException(nameof(planContext));

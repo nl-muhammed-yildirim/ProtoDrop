@@ -4,14 +4,14 @@ namespace wa.application.UseCases.EmailSettings;
 public interface IEmailNotificationsStore
 {
     /// <summary>Store the explicit choice for a non-deleted user. A missing row is a no-op.</summary>
-    /// <param name="userId">Identifier of the user.</param>
-    /// <param name="enabled">Whether enabled.</param>
+    /// <param name="userId">The account to update.</param>
+    /// <param name="enabled">True to receive owner notification emails; false to opt out.</param>
     /// <param name="ct">Token that cancels the operation.</param>
     Task SetAsync(Guid userId, bool enabled, CancellationToken ct);
 
     /// <summary>Stored value of a non-deleted user; null when the column is null OR the row is unknown/deleted (both mean on).</summary>
-    /// <param name="userId">Identifier of the user.</param>
+    /// <param name="userId">The account to read.</param>
     /// <param name="ct">Token that cancels the operation.</param>
-    /// <returns>The flag, or <see langword="null"/> when there is none.</returns>
+    /// <returns>The stored choice, or <see langword="null"/> when the user never chose or does not exist (both count as on).</returns>
     Task<bool?> GetAsync(Guid userId, CancellationToken ct);
 }

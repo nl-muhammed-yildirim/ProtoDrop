@@ -23,11 +23,11 @@ public sealed class GetFileDownloadUrlHandler : IRequestHandler<GetFileDownloadU
     private readonly ILogger<GetFileDownloadUrlHandler> _logger;
 
     /// <summary>Initializes a new instance of the <see cref="GetFileDownloadUrlHandler"/> class.</summary>
-    /// <param name="store">The store.</param>
-    /// <param name="minter">The minter.</param>
-    /// <param name="tokens">The tokens.</param>
-    /// <param name="telemetry">The telemetry.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="store">Store that reads the transfer and records the download.</param>
+    /// <param name="minter">Mints the 30-minute read URL of the file.</param>
+    /// <param name="tokens">Verifies the unlock token of password-protected transfers.</param>
+    /// <param name="telemetry">Reporter whose PII slots hash the client IP and User-Agent.</param>
+    /// <param name="logger">Logger for diagnostics.</param>
     public GetFileDownloadUrlHandler(
         IPublicTransferStore store,
         IBlobSasMinter minter,

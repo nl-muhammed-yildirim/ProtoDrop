@@ -15,8 +15,8 @@ public sealed class LinkExpiredException : Exception
 {
     private LinkExpiredException(string message) : base(message) { }
 
-    /// <summary>Creates the link expired exception for link expired.</summary>
-    /// <returns>The link expired exception.</returns>
+    /// <summary>The magic-link token is expired, already redeemed or unknown; all three cases look the same to the caller.</summary>
+    /// <returns>An exception that the endpoint maps to 410 LINK_EXPIRED.</returns>
     public static LinkExpiredException ForLinkExpired() =>
         new(ProblemCodes.TitleOf(ProblemCodes.LinkExpired)); // title from the closed table — never leaks which emails exist
 }

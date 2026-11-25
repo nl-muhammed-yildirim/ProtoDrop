@@ -28,13 +28,13 @@ public sealed class GetDownloadAllUrlHandler : IRequestHandler<GetDownloadAllUrl
     private readonly ILogger<GetDownloadAllUrlHandler> _logger;
 
     /// <summary>Initializes a new instance of the <see cref="GetDownloadAllUrlHandler"/> class.</summary>
-    /// <param name="store">The store.</param>
-    /// <param name="minter">The minter.</param>
-    /// <param name="blobStore">The blob store.</param>
-    /// <param name="tokens">The tokens.</param>
-    /// <param name="telemetry">The telemetry.</param>
-    /// <param name="config">The config.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="store">Store that reads the transfer and records the download.</param>
+    /// <param name="minter">Mints the 30-minute read URL of the zip.</param>
+    /// <param name="blobStore">Blob store used to check whether the zip exists.</param>
+    /// <param name="tokens">Verifies the unlock token of password-protected transfers.</param>
+    /// <param name="telemetry">Reporter whose PII slots hash the client IP and User-Agent.</param>
+    /// <param name="config">Configuration source for the zip function URL and signing key.</param>
+    /// <param name="logger">Logger for diagnostics.</param>
     public GetDownloadAllUrlHandler(
         IPublicTransferStore store,
         IBlobSasMinter minter,

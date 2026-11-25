@@ -11,22 +11,19 @@ namespace wa.application.UseCases.Auth;
 /// <summary>Default implementation of <see cref="ISessionTokenMinter"/>.</summary>
 public sealed class SessionTokenService : ISessionTokenMinter
 {
-    /// <summary>Frozen Session TTL — 30 days rolling (Open-Decisions-and-Constants.md Part 2, TA-9.1). Not a plan limit (TA-3.4).</summary>
+    /// <summary>Lifetime of a session token in days (30, frozen in Open-Decisions-and-Constants Part 2 and TA-9.1); not a plan limit.</summary>
     public const int LifetimeDays = 30;
 
-    /// <summary>
-    /// FR-008-2 / TA-9.1 rolling threshold: re-mint when remaining lifetime is under 15 days. Task instructions §2 cites TA-9.1's
-    /// 30-day rolling rule; not a Part 2 FROZEN row → pinned as a named constant (no magic number).
-    /// </summary>
+    /// <summary>A token with this many days or fewer left is re-issued on use, which keeps the 30-day session rolling (FR-008-2, TA-9.1).</summary>
     public const int RenewRemainingDays = 15;
 
     private readonly byte[] _key;
     private readonly Func<DateTimeOffset> _clock;
 
     /// <summary>Initializes a new instance of the <see cref="SessionTokenService"/> class.</summary>
-    /// <param name="key">The key.</param>
-    /// <param name="clock">The clock.</param>
-    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    /// <param name="key">HMAC signing key bytes; shared by every instance so tokens verify across nodes.</param>
+    /// <param name="clock">Time source (injected for tests).</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="key"/> or <paramref name="clock"/> is null.</exception>
     public SessionTokenService(byte[] key, Func<DateTimeOffset> clock)
     {
         _key = key ?? throw new ArgumentNullException(nameof(key));
@@ -41,9 +38,9 @@ public sealed class SessionTokenService : ISessionTokenMinter
         return Sign(userId, expSeconds);
     }
 
-    /// <summary>TA-9.1 PARSE: Base64 decode → 3-segment split → HMAC-SHA256 over userId|exp with FixedTimeEquals; expired/null on tampered.</summary>
-    /// <param name="token">The token.</param>
-    /// <returns>The value tuple of identifier, or <see langword="null"/> when there is none.</returns>
+    /// <summary>Decodes a session token, verifies its HMAC-SHA256 signature in constant time and checks its expiry.</summary>
+    /// <param name="token">Raw cookie value; may be null or empty.</param>
+    /// <returns>The user id and UTC expiry, or <see langword="null"/> when the token is missing, malformed, tampered with or expired.</returns>
     public (Guid UserId, DateTime ExpUtc)? Parse(string? token)
     {
         if (string.IsNullOrEmpty(token))
@@ -80,10 +77,10 @@ public sealed class SessionTokenService : ISessionTokenMinter
         }
     }
 
-    /// <summary>FR-008-2 rolling refresh: re-mint when remaining lifetime is under RenewRemainingDays (the frozen threshold).</summary>
-    /// <param name="expUtc">The exp UTC.</param>
-    /// <param name="nowUtc">The now UTC.</param>
-    /// <returns><see langword="true"/> when the operation succeeded; otherwise <see langword="false"/>.</returns>
+    /// <summary>Tells whether a token is within <see cref="RenewRemainingDays"/> of its expiry and should be re-issued.</summary>
+    /// <param name="expUtc">Expiry of the current token.</param>
+    /// <param name="nowUtc">Current UTC time.</param>
+    /// <returns><see langword="true"/> when the remaining lifetime is at or below the renewal threshold; otherwise <see langword="false"/>.</returns>
     public bool NeedsRenewal(DateTime expUtc, DateTime nowUtc) =>
         expUtc - nowUtc <= TimeSpan.FromDays(RenewRemainingDays);
 

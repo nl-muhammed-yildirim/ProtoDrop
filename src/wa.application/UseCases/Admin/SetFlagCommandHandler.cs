@@ -16,9 +16,9 @@ public sealed class SetFlagCommandHandler : IRequestHandler<SetFlagCommand, SetF
     private readonly IFlagsStore _store;
 
     /// <summary>Initializes a new instance of the <see cref="SetFlagCommandHandler"/> class.</summary>
-    /// <param name="flags">The flags.</param>
-    /// <param name="store">The store.</param>
-    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    /// <param name="flags">Admin store that upserts the flag value.</param>
+    /// <param name="store">Store used to check, uncached, that the key is a seeded flag.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="flags"/> or <paramref name="store"/> is null.</exception>
     public SetFlagCommandHandler(IAdminFlagStore flags, IFlagsStore store)
     {
         _flags = flags ?? throw new ArgumentNullException(nameof(flags));

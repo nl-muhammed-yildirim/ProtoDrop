@@ -16,8 +16,8 @@ public sealed class GetProfileHandler : IRequestHandler<GetProfileCommand, GetPr
     private readonly IPlansStore _plans;
 
     /// <summary>Initializes a new instance of the <see cref="GetProfileHandler"/> class.</summary>
-    /// <param name="users">The users.</param>
-    /// <param name="plans">The plans.</param>
+    /// <param name="users">Store used to read the user row.</param>
+    /// <param name="plans">Store used to resolve the plan code of the user.</param>
     public GetProfileHandler(IAppUserStore users, IPlansStore plans)
     {
         _users = users;

@@ -23,12 +23,12 @@ public sealed class UploadOrgLogoHandler : IRequestHandler<UploadOrgLogoCommand,
     private readonly IOrgLogoSasMinter _minter;
 
     /// <summary>Initializes a new instance of the <see cref="UploadOrgLogoHandler"/> class.</summary>
-    /// <param name="users">The users.</param>
-    /// <param name="plan">The plan.</param>
-    /// <param name="writer">The writer.</param>
-    /// <param name="blobs">The blobs.</param>
-    /// <param name="logos">The logos.</param>
-    /// <param name="minter">The minter.</param>
+    /// <param name="users">Store used to read the user's current logo path.</param>
+    /// <param name="plan">Accessor used to read the plan's branding feature and logo size limit.</param>
+    /// <param name="writer">Blob writer that stores the logo with its detected Content-Type.</param>
+    /// <param name="blobs">Blob store used to delete a superseded or orphaned logo.</param>
+    /// <param name="logos">Store that records the new logo path on the user row.</param>
+    /// <param name="minter">Mints the preview URL returned to the caller.</param>
     public UploadOrgLogoHandler(
         IAppUserStore users, IPlanContextAccessor plan, IBlobContentWriter writer,
         IBlobStore blobs, IOrgLogoStore logos, IOrgLogoSasMinter minter)

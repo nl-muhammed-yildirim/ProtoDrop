@@ -16,9 +16,9 @@ public sealed class RemoveOrgLogoHandler : IRequestHandler<RemoveOrgLogoCommand,
     private readonly IBlobStore _blobs;
 
     /// <summary>Initializes a new instance of the <see cref="RemoveOrgLogoHandler"/> class.</summary>
-    /// <param name="users">The users.</param>
-    /// <param name="logos">The logos.</param>
-    /// <param name="blobs">The blobs.</param>
+    /// <param name="users">Store used to read the user's current logo path.</param>
+    /// <param name="logos">Store that clears the logo path on the user row.</param>
+    /// <param name="blobs">Blob store the logo file is deleted from.</param>
     public RemoveOrgLogoHandler(IAppUserStore users, IOrgLogoStore logos, IBlobStore blobs)
     {
         _users = users;

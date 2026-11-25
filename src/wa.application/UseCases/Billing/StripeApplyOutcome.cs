@@ -1,12 +1,12 @@
 namespace wa.application.UseCases.Billing;
 
-/// <summary>Enumerates the stripe apply outcome values.</summary>
+/// <summary>What happened when a subscription change was applied to the billing mirror.</summary>
 public enum StripeApplyOutcome
 {
-    /// <summary>Applied.</summary>
+    /// <summary>The change was stored and, if requested, the user's plan was updated.</summary>
     Applied,
-    /// <summary>Duplicate.</summary>
+    /// <summary>The Stripe event was already processed; nothing changed.</summary>
     Duplicate,
-    /// <summary>User unresolved.</summary>
+    /// <summary>No user could be matched to the subscription; everything was rolled back so Stripe redelivers.</summary>
     UserUnresolved
 }

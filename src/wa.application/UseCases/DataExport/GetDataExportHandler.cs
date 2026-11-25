@@ -11,8 +11,8 @@ public sealed class GetDataExportHandler : IRequestHandler<GetDataExportQuery, D
     private readonly IExportSasMinter _minter;
 
     /// <summary>Initializes a new instance of the <see cref="GetDataExportHandler"/> class.</summary>
-    /// <param name="store">The store.</param>
-    /// <param name="minter">The minter.</param>
+    /// <param name="store">Store that holds the export rows.</param>
+    /// <param name="minter">Mints the 24-hour download URL of a ready export.</param>
     public GetDataExportHandler(IDataExportStore store, IExportSasMinter minter)
     {
         _store = store;

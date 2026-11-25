@@ -20,11 +20,11 @@ public sealed class AdminForceDeleteUserHandler : IRequestHandler<AdminForceDele
     private readonly ILogger<AdminForceDeleteUserHandler>? _logger;
 
     /// <summary>Initializes a new instance of the <see cref="AdminForceDeleteUserHandler"/> class.</summary>
-    /// <param name="users">The users.</param>
-    /// <param name="eventPublisher">The event publisher.</param>
-    /// <param name="blobs">The blobs.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
-    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    /// <param name="users">Store that soft-deletes the account and re-homes its transfers.</param>
+    /// <param name="eventPublisher">Publishes the <c>account.deleted</c> event.</param>
+    /// <param name="blobs">Blob store used to remove the user's organization logo.</param>
+    /// <param name="logger">Optional logger for the best-effort logo cleanup warning.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="users"/>, <paramref name="eventPublisher"/> or <paramref name="blobs"/> is null.</exception>
     public AdminForceDeleteUserHandler(IAppUserStore users, IEventPublisher eventPublisher, IBlobStore blobs,
         ILogger<AdminForceDeleteUserHandler>? logger = null)
     {

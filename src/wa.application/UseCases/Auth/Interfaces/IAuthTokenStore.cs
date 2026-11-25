@@ -9,19 +9,19 @@ namespace wa.application.UseCases.Auth;
 public interface IAuthTokenStore
 {
     /// <summary>Look up a magic-link token row by its SHA-256 hex (64 chars) hash — single-use lookup on redeem.</summary>
-    /// <param name="sha256Hex">The sha256 hex.</param>
+    /// <param name="sha256Hex">Lowercase SHA-256 hex hash of the raw token.</param>
     /// <param name="ct">Token that cancels the operation.</param>
-    /// <returns>The auth token, or <see langword="null"/> when there is none.</returns>
+    /// <returns>The token row, or <see langword="null"/> when no token has that hash.</returns>
     Task<AuthToken?> FindByHashAsync(string sha256Hex, CancellationToken ct);
 
     /// <summary>Persist a new AuthToken row (hashed token + purpose + TTL).</summary>
-    /// <param name="token">The token.</param>
+    /// <param name="token">The new token row (hash, email, purpose and expiry already set).</param>
     /// <param name="ct">Token that cancels the operation.</param>
     Task CreateAsync(AuthToken token, CancellationToken ct);
 
     /// <summary>Mark the row redeemed (first redeem wins — sets RedeemedAtUtc; single-use).</summary>
-    /// <param name="id">The identifier.</param>
-    /// <param name="redeemedAtUtc">The redeemed at UTC.</param>
+    /// <param name="id">Primary key of the token row.</param>
+    /// <param name="redeemedAtUtc">UTC instant stored as the redemption time.</param>
     /// <param name="ct">Token that cancels the operation.</param>
     Task MarkRedeemedAsync(Guid id, DateTime redeemedAtUtc, CancellationToken ct);
 }

@@ -30,16 +30,16 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
     private readonly IFeaturesProvider _features;
 
     /// <summary>Initializes a new instance of the <see cref="SendNotificationEmailsHandler"/> class.</summary>
-    /// <param name="store">The store.</param>
-    /// <param name="emailSender">The email sender.</param>
-    /// <param name="templateRenderer">The template renderer.</param>
-    /// <param name="eventPublisher">The event publisher.</param>
-    /// <param name="deduplicator">The deduplicator.</param>
-    /// <param name="telemetry">The telemetry.</param>
-    /// <param name="config">The config.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
-    /// <param name="branding">The branding.</param>
-    /// <param name="features">The features.</param>
+    /// <param name="store">Store that reads the transfer, recipients and suppressions and records notifications.</param>
+    /// <param name="emailSender">Port that delivers the rendered emails.</param>
+    /// <param name="templateRenderer">Renders the email in the recipient's language.</param>
+    /// <param name="eventPublisher">Publishes the <c>email.sent</c> and <c>email.failed</c> events.</param>
+    /// <param name="deduplicator">Skips events that were already handled in the dedup window.</param>
+    /// <param name="telemetry">Reporter for the email telemetry events.</param>
+    /// <param name="config">Configuration source for the public site URL, sender address and unsubscribe signing key.</param>
+    /// <param name="logger">Logger for diagnostics (never logs addresses).</param>
+    /// <param name="branding">Store that reads the sender's organization name.</param>
+    /// <param name="features">Provider of the sender plan's feature toggles.</param>
     public SendNotificationEmailsHandler(
         IEmailStore store,
         IEmailSender emailSender,

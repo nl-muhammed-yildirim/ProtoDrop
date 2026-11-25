@@ -14,10 +14,10 @@ public sealed class SendBillingEmailsHandler
     private readonly ILogger<SendBillingEmailsHandler> _logger;
 
     /// <summary>Initializes a new instance of the <see cref="SendBillingEmailsHandler"/> class.</summary>
-    /// <param name="store">The store.</param>
-    /// <param name="events">The events.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
-    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    /// <param name="store">Ledger store that lists open sequences and claims steps.</param>
+    /// <param name="events">Publishes the <c>billing.email_requested</c> events.</param>
+    /// <param name="logger">Logger for diagnostics (never logs the address).</param>
+    /// <exception cref="ArgumentNullException">Thrown when any argument is null.</exception>
     public SendBillingEmailsHandler(IBillingSequenceStore store, IEventPublisher events, ILogger<SendBillingEmailsHandler> logger)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
@@ -25,10 +25,10 @@ public sealed class SendBillingEmailsHandler
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    /// <summary>Returns the number of emails queued.</summary>
-    /// <param name="nowUtc">The now UTC.</param>
+    /// <summary>Queues every payment-failed email whose offset has passed and whose step this instance manages to claim.</summary>
+    /// <param name="nowUtc">Current UTC time.</param>
     /// <param name="ct">Token that cancels the operation.</param>
-    /// <returns>The resulting numeric value.</returns>
+    /// <returns>The number of emails queued.</returns>
     public async Task<int> RunAsync(DateTime nowUtc, CancellationToken ct)
     {
         var queued = 0;

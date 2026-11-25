@@ -25,14 +25,12 @@ public sealed class SendMagicLinkEmailHandler : IEmailEventHandler
     private readonly (string Html, string Txt) _templates;
 
     /// <summary>Initializes a new instance of the <see cref="SendMagicLinkEmailHandler"/> class.</summary>
-    /// <param name="emailSender">The email sender.</param>
-    /// <param name="eventPublisher">The event publisher.</param>
-    /// <param name="config">The config.</param>
-    /// <param name="telemetry">The telemetry.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
-    /// <exception cref="InvalidOperationException">
-    /// Thrown when the operation is not valid in the current state.
-    /// </exception>
+    /// <param name="emailSender">Port that delivers the rendered email.</param>
+    /// <param name="eventPublisher">Publishes the <c>email.sent</c> and <c>email.failed</c> events.</param>
+    /// <param name="config">Configuration source for the public site URL and sender address.</param>
+    /// <param name="telemetry">Reporter for the email and dead-letter telemetry events.</param>
+    /// <param name="logger">Logger for payload problems and send failures.</param>
+    /// <exception cref="InvalidOperationException">Thrown when the magic-link templates are not found next to the worker binaries.</exception>
     public SendMagicLinkEmailHandler(
         IEmailSender emailSender,
         IEventPublisher eventPublisher,

@@ -11,8 +11,8 @@ public interface IFeaturesProvider
     public const string GlobalGatePrefix = "feature.";
 
     /// <summary>Returns the effective features for <paramref name="planCode"/>. Null or blank resolves to <see cref="Plan.DefaultCode"/>. Unknown plans throw <see cref="PlanUnknownException"/>; DB failure on cache miss propagates. Each call returns a fresh instance.</summary>
-    /// <param name="planCode">The plan code.</param>
+    /// <param name="planCode">Plan to resolve; null or blank means the default plan.</param>
     /// <param name="cancellationToken">Token that cancels the operation.</param>
-    /// <returns>The plan features.</returns>
+    /// <returns>A fresh <see cref="PlanFeatures"/> instance with the global gates applied.</returns>
     Task<PlanFeatures> Resolve(string? planCode, CancellationToken cancellationToken = default);
 }

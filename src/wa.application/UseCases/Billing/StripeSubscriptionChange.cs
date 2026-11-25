@@ -1,14 +1,14 @@
 namespace wa.application.UseCases.Billing;
 
 /// <summary>US-019-03: a Stripe subscription.created/updated event reduced to what the mirror needs.</summary>
-/// <param name="StripeEventId">Identifier of the stripe event of the stripe subscription change.</param>
-/// <param name="EventType">The event type of the stripe subscription change.</param>
-/// <param name="StripeSubId">Identifier of the stripe sub of the stripe subscription change.</param>
-/// <param name="StripeCustomerId">Identifier of the stripe customer of the stripe subscription change.</param>
-/// <param name="Status">The status of the stripe subscription change.</param>
-/// <param name="PriceId">Identifier of the price of the stripe subscription change.</param>
-/// <param name="CurrentPeriodEndUtc">The current period end UTC of the stripe subscription change.</param>
-/// <param name="MetadataUserId">Identifier of the metadata user of the stripe subscription change.</param>
+/// <param name="StripeEventId">Stripe event id, used for webhook deduplication.</param>
+/// <param name="EventType">Stripe event type, for example <c>customer.subscription.updated</c>.</param>
+/// <param name="StripeSubId">Stripe subscription id.</param>
+/// <param name="StripeCustomerId">Stripe customer id; null when absent.</param>
+/// <param name="Status">Stripe subscription status, for example <c>active</c> or <c>paused</c>.</param>
+/// <param name="PriceId">Stripe Price id of the first subscription item; null when absent.</param>
+/// <param name="CurrentPeriodEndUtc">End of the current paid period; null when Stripe does not report one.</param>
+/// <param name="MetadataUserId">User id stored in the subscription metadata at checkout; null when absent.</param>
 public sealed record StripeSubscriptionChange(
     string StripeEventId,
     string EventType,

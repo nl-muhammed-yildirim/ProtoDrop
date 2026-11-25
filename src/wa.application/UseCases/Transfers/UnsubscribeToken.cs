@@ -11,10 +11,10 @@ namespace wa.application.UseCases.Transfers;
 public static class UnsubscribeToken
 {
     /// <summary>Create a token for the given address + senderEmail pair.</summary>
-    /// <param name="address">The address.</param>
-    /// <param name="senderEmail">The sender email.</param>
-    /// <param name="hmacKey">The HMAC key.</param>
-    /// <returns>The resulting text.</returns>
+    /// <param name="address">Recipient address that may unsubscribe; PII (TA-9.4).</param>
+    /// <param name="senderEmail">Sender the unsubscribe applies to.</param>
+    /// <param name="hmacKey">Secret key bytes used to sign the token.</param>
+    /// <returns>The URL-safe token <c>payload.signature</c> to embed in the unsubscribe link.</returns>
     public static string Create(string address, string senderEmail, byte[] hmacKey)
     {
         var payload = $"{address}|{senderEmail}";
@@ -25,9 +25,9 @@ public static class UnsubscribeToken
     }
 
     /// <summary>Verify a token and return the (address, senderEmail) pair. Returns null on tamper/parse failure.</summary>
-    /// <param name="token">The token.</param>
-    /// <param name="hmacKey">The HMAC key.</param>
-    /// <returns>The value tuple of text value, or <see langword="null"/> when there is none.</returns>
+    /// <param name="token">Token taken from the unsubscribe link; may be null.</param>
+    /// <param name="hmacKey">Secret key bytes the token must have been signed with.</param>
+    /// <returns>The recipient address and sender email, or <see langword="null"/> when the token is missing, malformed or its signature does not match.</returns>
     public static (string Address, string SenderEmail)? Verify(string? token, byte[] hmacKey)
     {
         if (string.IsNullOrEmpty(token))

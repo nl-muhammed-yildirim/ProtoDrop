@@ -6,9 +6,7 @@ using wa.domain;
 
 namespace wa.application.UseCases.Billing;
 
-/// <summary>
-/// Handles <see cref="CreateCheckoutSessionCommand"/> and produces <see cref="StripeCheckoutSession"/>.
-/// </summary>
+/// <summary>Handles <see cref="CreateCheckoutSessionCommand"/>: rejects free or unknown target plans and users who already pay, then asks Stripe for a hosted checkout session and returns its URL.</summary>
 public sealed class CreateCheckoutSessionHandler : IRequestHandler<CreateCheckoutSessionCommand, StripeCheckoutSession>
 {
     private readonly IAppUserStore _users;
@@ -17,11 +15,11 @@ public sealed class CreateCheckoutSessionHandler : IRequestHandler<CreateCheckou
     private readonly string _publicUrl;
 
     /// <summary>Initializes a new instance of the <see cref="CreateCheckoutSessionHandler"/> class.</summary>
-    /// <param name="users">The users.</param>
-    /// <param name="plans">The plans.</param>
-    /// <param name="gateway">The gateway.</param>
-    /// <param name="configuration">The configuration.</param>
-    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    /// <param name="users">Store used to read the user and the current plan.</param>
+    /// <param name="plans">Store used to look up the target plan.</param>
+    /// <param name="gateway">Stripe gateway that creates the checkout session.</param>
+    /// <param name="configuration">Configuration source for the public site URL used in the return links.</param>
+    /// <exception cref="ArgumentNullException">Thrown when any argument is null.</exception>
     public CreateCheckoutSessionHandler(IAppUserStore users, IPlansStore plans, IStripeCheckoutGateway gateway, IConfiguration configuration)
     {
         _users = users ?? throw new ArgumentNullException(nameof(users));

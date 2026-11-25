@@ -19,10 +19,10 @@ public sealed class UnlockTransferHandler : IRequestHandler<UnlockTransferComman
     private readonly ILogger<UnlockTransferHandler> _logger;
 
     /// <summary>Initializes a new instance of the <see cref="UnlockTransferHandler"/> class.</summary>
-    /// <param name="store">The store.</param>
-    /// <param name="minter">The minter.</param>
-    /// <param name="telemetry">The telemetry.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="store">Store that reads the transfer by link id.</param>
+    /// <param name="minter">Mints the unlock token returned on a correct password.</param>
+    /// <param name="telemetry">Reporter for the <c>password_correct</c> and <c>password_wrong</c> events.</param>
+    /// <param name="logger">Logger for diagnostics.</param>
     public UnlockTransferHandler(
         IPublicTransferStore store,
         IUnlockTokenMinter minter,

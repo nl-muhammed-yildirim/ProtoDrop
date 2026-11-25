@@ -18,6 +18,6 @@ namespace wa.application.UseCases.Transfers;
 /// </summary>
 public sealed class FilesGoneException : Exception
 {
-    /// <summary>Initializes a new instance of the <see cref="FilesGoneException"/> class.</summary>
+    /// <summary>Initializes a new instance of the <see cref="FilesGoneException"/> class with the standard "upload again" message.</summary>
     public FilesGoneException() : base("The files for this transfer were deleted — upload again.") { }
 }

@@ -10,6 +10,6 @@ namespace wa.application.UseCases.Admin;
 /// T-011-07: the write result — email captured PRE-delete so the endpoint can audit {email} after the row is soft-deleted
 /// (IAppUserStore.GetByIdAsync filters DeletedAtUtc == null, so the email is unreadable post-delete).
 /// </summary>
-/// <param name="UserId">Identifier of the user of the admin force delete result.</param>
-/// <param name="Email">The email of the admin force delete result.</param>
+/// <param name="UserId">Id of the deleted user.</param>
+/// <param name="Email">The user's email as it was before deletion, for the audit entry; PII (TA-9.4).</param>
 public sealed record AdminForceDeleteResult(Guid UserId, string Email);

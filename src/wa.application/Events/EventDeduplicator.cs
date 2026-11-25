@@ -9,7 +9,7 @@ namespace wa.application.Events;
 /// consumer must also be idempotent by design (e.g. email send checks state, not just memory) — AC-054-3's post-expiry
 /// path relies on that property.
 /// </summary>
-/// <param name="clock">The clock of the event deduplicator.</param>
+/// <param name="clock">Time source (injected so tests can advance past <see cref="Window"/>).</param>
 public sealed class EventDeduplicator(Func<DateTimeOffset> clock)
 {
     /// <summary>Dedup window (FR-054-4/AC-054-3): replays of the same eventId inside this 15-min range are skipped.</summary>
@@ -20,8 +20,8 @@ public sealed class EventDeduplicator(Func<DateTimeOffset> clock)
     /// <summary>Returns true if <paramref name="eventId"/> was already consumed within <see cref="Window"/> — the consumer skips it (AC-054-3).
     /// First sight (or re-sight after expiry) records the event and returns false. Different eventIds with the same partitionKey keep
     /// per-partition order via broker PartitionKey semantics (EC-054-2); consumers remain idempotent anyway.</summary>
-    /// <param name="eventId">Identifier of the event.</param>
-    /// <returns><see langword="true"/> when the operation succeeded; otherwise <see langword="false"/>.</returns>
+    /// <param name="eventId">EventId of the envelope being consumed.</param>
+    /// <returns><see langword="true"/> when the same eventId was already recorded inside <see cref="Window"/> and the consumer should skip it; otherwise <see langword="false"/>.</returns>
     public bool AlreadySeen(Guid eventId)
     {
         var now = clock();

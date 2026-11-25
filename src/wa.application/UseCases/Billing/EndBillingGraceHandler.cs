@@ -17,11 +17,11 @@ public sealed class EndBillingGraceHandler
     private readonly ILogger<EndBillingGraceHandler> _logger;
 
     /// <summary>Initializes a new instance of the <see cref="EndBillingGraceHandler"/> class.</summary>
-    /// <param name="store">The store.</param>
-    /// <param name="events">The events.</param>
-    /// <param name="telemetry">The telemetry.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
-    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    /// <param name="store">Store that finds and downgrades expired graces.</param>
+    /// <param name="events">Publishes the <c>plan.changed</c> and billing email events.</param>
+    /// <param name="telemetry">Reporter for the <c>plan_changed</c> telemetry event.</param>
+    /// <param name="logger">Logger for diagnostics (never logs emails).</param>
+    /// <exception cref="ArgumentNullException">Thrown when any argument is null.</exception>
     public EndBillingGraceHandler(
         IBillingGraceStore store, IEventPublisher events, WaTelemetryReporter telemetry, ILogger<EndBillingGraceHandler> logger)
     {
@@ -31,10 +31,10 @@ public sealed class EndBillingGraceHandler
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    /// <summary>Returns the number of users downgraded.</summary>
-    /// <param name="nowUtc">The now UTC.</param>
+    /// <summary>Downgrades every user whose paused subscription has passed its grace end and publishes the resulting events.</summary>
+    /// <param name="nowUtc">Current UTC time used to find expired graces.</param>
     /// <param name="ct">Token that cancels the operation.</param>
-    /// <returns>The resulting numeric value.</returns>
+    /// <returns>The number of users that were downgraded to the free plan.</returns>
     public async Task<int> RunAsync(DateTime nowUtc, CancellationToken ct)
     {
         var downgraded = 0;

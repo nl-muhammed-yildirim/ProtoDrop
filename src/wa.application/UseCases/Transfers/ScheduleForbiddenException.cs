@@ -15,6 +15,6 @@ namespace wa.application.UseCases.Transfers;
 /// The endpoint maps it to 403 FORBIDDEN, keeping the closed code list intact.</summary>
 public sealed class ScheduleForbiddenException : Exception
 {
-    /// <summary>Initializes a new instance of the <see cref="ScheduleForbiddenException"/> class.</summary>
+    /// <summary>Initializes a new instance of the <see cref="ScheduleForbiddenException"/> class with the standard message.</summary>
     public ScheduleForbiddenException() : base("Pro plan required.") { }
 }

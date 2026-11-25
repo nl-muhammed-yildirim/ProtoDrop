@@ -1,16 +1,16 @@
 namespace wa.application.UseCases.Billing;
 
-/// <summary>Enumerates the payment failed outcome values.</summary>
+/// <summary>What happened when a payment-failed invoice event was applied.</summary>
 public enum PaymentFailedOutcome
 {
-    /// <summary>Started.</summary>
+    /// <summary>The sequence was started and email #1 is due.</summary>
     Started,
-    /// <summary>Duplicate event.</summary>
+    /// <summary>The Stripe event was already processed.</summary>
     DuplicateEvent,
-    /// <summary>Duplicate invoice.</summary>
+    /// <summary>Another event of the same invoice already started the sequence.</summary>
     DuplicateInvoice,
-    /// <summary>Ineligible.</summary>
+    /// <summary>The subscription status (canceled, incomplete, unpaid or paused) gets no sequence.</summary>
     Ineligible,
-    /// <summary>Subscription unresolved.</summary>
+    /// <summary>No subscription mirror row exists yet; the event is retried on redelivery.</summary>
     SubscriptionUnresolved
 }

@@ -11,14 +11,14 @@ using wa.domain.Transfers;
 namespace wa.application.UseCases.Transfers;
 
 /// <summary>POST /api/v1/transfers/{id}/send request (TA-4.2#3).</summary>
-/// <param name="TransferId">Identifier of the transfer of the send transfer command.</param>
-/// <param name="SenderName">The sender name of the send transfer command.</param>
-/// <param name="SenderEmail">The sender email of the send transfer command.</param>
-/// <param name="Note">The note of the send transfer command.</param>
-/// <param name="Emails">The emails of the send transfer command.</param>
-/// <param name="Password">The password of the send transfer command.</param>
+/// <param name="TransferId">Id of the draft transfer to send, from the route.</param>
+/// <param name="SenderName">Sender name shown to recipients; null keeps the stored one; PII (TA-9.4).</param>
+/// <param name="SenderEmail">Sender address for replies; null for none; PII (TA-9.4).</param>
+/// <param name="Note">Optional message shown on the download page.</param>
+/// <param name="Emails">Recipient addresses to notify; may be empty; PII (TA-9.4).</param>
+/// <param name="Password">Optional plain-text password to protect the transfer; hashed before it is stored.</param>
 /// <param name="OwnerAppUserId">T-008-08 (FR-008-7): session owner at send time — guest → null.</param>
-/// <param name="ScheduledSendAtUtc">The scheduled send at UTC of the send transfer command.</param>
+/// <param name="ScheduledSendAtUtc">Requested send time in UTC; null sends immediately.</param>
 public sealed record SendTransferCommand(
     Guid TransferId,
     string? SenderName,

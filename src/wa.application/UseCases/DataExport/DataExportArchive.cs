@@ -9,16 +9,16 @@ namespace wa.application.UseCases.DataExport;
 /// </summary>
 public static class DataExportArchive
 {
-    /// <summary>The profile entry constant; value <c>profile.json</c>.</summary>
+    /// <summary>Name of the zip entry that holds the user's profile data.</summary>
     public const string ProfileEntry = "profile.json";
-    /// <summary>The transfers entry constant; value <c>transfers.json</c>.</summary>
+    /// <summary>Name of the zip entry that holds the list of the user's transfers.</summary>
     public const string TransfersEntry = "transfers.json";
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
 
     /// <summary>Status byte → wire name (Transfer.Status: 0 draft … 4 deleted).</summary>
-    /// <param name="status">The status.</param>
-    /// <returns>The resulting text.</returns>
+    /// <param name="status">Stored transfer status byte.</param>
+    /// <returns>The export name of the status (for example <c>downloadLimit</c>), or <c>unknown</c> for an unexpected value.</returns>
     public static string StatusName(byte status) => status switch
     {
         0 => "draft",
@@ -30,8 +30,8 @@ public static class DataExportArchive
     };
 
     /// <summary>Builds the zip bytes for a snapshot. Zero transfers → transfers.json is <c>[]</c> (EC-047-1).</summary>
-    /// <param name="snapshot">The snapshot.</param>
-    /// <returns>The matching byte items.</returns>
+    /// <param name="snapshot">The owner's profile and transfers.</param>
+    /// <returns>The bytes of the finished zip archive.</returns>
     public static byte[] Build(ExportSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);

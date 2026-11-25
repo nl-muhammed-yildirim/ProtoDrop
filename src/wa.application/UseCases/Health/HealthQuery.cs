@@ -3,5 +3,5 @@ using wa.application.Ports;
 
 namespace wa.application.UseCases.Health;
 
-/// <summary>MediatR query for the health use case.</summary>
+/// <summary>Query for <c>GET /health</c>; carries no data.</summary>
 public sealed record HealthQuery : IRequest<HealthResult>;

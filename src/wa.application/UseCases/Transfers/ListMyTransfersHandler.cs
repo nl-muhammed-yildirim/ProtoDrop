@@ -13,7 +13,7 @@ public sealed class ListMyTransfersHandler : IRequestHandler<ListMyTransfersQuer
     private readonly ITransferStore _transfers;
 
     /// <summary>Initializes a new instance of the <see cref="ListMyTransfersHandler"/> class.</summary>
-    /// <param name="transfers">The transfers.</param>
+    /// <param name="transfers">Store that reads the owner's transfer list.</param>
     public ListMyTransfersHandler(ITransferStore transfers)
     {
         _transfers = transfers;

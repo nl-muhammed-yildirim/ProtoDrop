@@ -9,6 +9,6 @@ namespace wa.application.UseCases.Admin;
 /// T-011-07 (TA-4.2#22 / FR-011-2): PATCH /api/v1/admin/users/{id}?planId= — SuperAdmin-only plan write.
 /// Limits take effect at the NEXT finalize (FR-BIL-001-4 "applies to new transfers") — no limit recompute here.
 /// </summary>
-/// <param name="UserId">Identifier of the user of the set user plan command.</param>
-/// <param name="PlanId">Identifier of the plan of the set user plan command.</param>
+/// <param name="UserId">Id of the user whose plan changes, from the route.</param>
+/// <param name="PlanId">Id of the plan to assign, from the query string.</param>
 public sealed record SetUserPlanCommand(Guid UserId, Guid PlanId) : IRequest<SetUserPlanResult>;

@@ -4,7 +4,7 @@ using wa.application.Ports;
 
 namespace wa.application.UseCases.Health;
 
-/// <summary>Handles <see cref="HealthQuery"/> and produces <see cref="HealthResult"/>.</summary>
+/// <summary>Handles <see cref="HealthQuery"/>: pings the database and checks Service Bus, and reports <c>ok</c> or <c>skipped</c> per component. A failing probe throws, which the host turns into an unhealthy response.</summary>
 public sealed class HealthQueryHandler : IRequestHandler<HealthQuery, HealthResult>
 {
     private readonly IDbHealthProbe _db;
@@ -12,9 +12,9 @@ public sealed class HealthQueryHandler : IRequestHandler<HealthQuery, HealthResu
     private readonly ILogger<HealthQueryHandler> _logger;
 
     /// <summary>Initializes a new instance of the <see cref="HealthQueryHandler"/> class.</summary>
-    /// <param name="db">The database.</param>
-    /// <param name="sb">The Service Bus.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="db">Probe that pings the database.</param>
+    /// <param name="sb">Probe that checks Service Bus reachability.</param>
+    /// <param name="logger">Logger for probe failures.</param>
     public HealthQueryHandler(IDbHealthProbe db, ISbHealthProbe sb, ILogger<HealthQueryHandler> logger)
     {
         _db = db;

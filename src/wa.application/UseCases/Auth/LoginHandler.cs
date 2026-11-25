@@ -21,10 +21,10 @@ public sealed class LoginHandler : IRequestHandler<LoginCommand, LoginResult>
     private readonly ISessionTokenMinter _tokens;
 
     /// <summary>Initializes a new instance of the <see cref="LoginHandler"/> class.</summary>
-    /// <param name="users">The users.</param>
-    /// <param name="plans">The plans.</param>
-    /// <param name="telemetry">The telemetry.</param>
-    /// <param name="tokens">The tokens.</param>
+    /// <param name="users">Store used to look up the account by email.</param>
+    /// <param name="plans">Store used to resolve the plan code of the account.</param>
+    /// <param name="telemetry">Reporter for the <c>login_success</c> and <c>login_failed</c> events.</param>
+    /// <param name="tokens">Mints the session token returned to the caller.</param>
     public LoginHandler(
         IAppUserStore users,
         IPlansStore plans,

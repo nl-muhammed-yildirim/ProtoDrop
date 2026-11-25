@@ -12,9 +12,9 @@ public sealed class GetOrgLogoHandler : IRequestHandler<GetOrgLogoQuery, OrgLogo
     private readonly IOrgLogoSasMinter _minter;
 
     /// <summary>Initializes a new instance of the <see cref="GetOrgLogoHandler"/> class.</summary>
-    /// <param name="users">The users.</param>
-    /// <param name="plan">The plan.</param>
-    /// <param name="minter">The minter.</param>
+    /// <param name="users">Store used to read the user's logo path.</param>
+    /// <param name="plan">Accessor for the request's plan limits and feature toggles.</param>
+    /// <param name="minter">Mints the read URL for the logo blob.</param>
     public GetOrgLogoHandler(IAppUserStore users, IPlanContextAccessor plan, IOrgLogoSasMinter minter)
     {
         _users = users;

@@ -6,9 +6,9 @@ namespace wa.application.UseCases.Transfers;
 
 /// <summary>FR-045-5: feature.search off (or absent) → q is ignored entirely (plain list, plain cursor, no length check).
 /// On → SearchTerm.Normalize (Q_TOO_LONG), search cursor bound to the term, ITransferSearchStore. One flag read per request.</summary>
-/// <param name="transfers">The transfers of the search my transfers handler.</param>
-/// <param name="search">The search of the search my transfers handler.</param>
-/// <param name="flags">The flags of the search my transfers handler.</param>
+/// <param name="transfers">Store used for the plain, unsearched list.</param>
+/// <param name="search">Store that runs the ranked search.</param>
+/// <param name="flags">Resolver for the <c>feature.search</c> gate.</param>
 public sealed class SearchMyTransfersHandler(ITransferStore transfers, ITransferSearchStore search, IFlagResolver flags)
     : IRequestHandler<SearchMyTransfersQuery, ListMyTransfersResult>
 {

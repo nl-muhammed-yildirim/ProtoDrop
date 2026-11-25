@@ -17,10 +17,10 @@ namespace wa.application.UseCases.Transfers;
 /// Token = the ?t= unlock JWT (T-003-04, TA-9.6#1); ClientIp/UserAgent are raw request values — transformed here via the
 /// reporter's PII slots (TA-9.4).
 /// </summary>
-/// <param name="LinkId">Identifier of the link of the get download all URL query.</param>
-/// <param name="Token">The token of the get download all URL query.</param>
-/// <param name="ClientIp">The client IP of the get download all URL query.</param>
-/// <param name="UserAgent">The user agent of the get download all URL query.</param>
+/// <param name="LinkId">Public 8-character link id from the route.</param>
+/// <param name="Token">Unlock token from the <c>t</c> query parameter; null when the transfer has no password.</param>
+/// <param name="ClientIp">Raw client IP, hashed before it is stored; PII (TA-9.4).</param>
+/// <param name="UserAgent">Raw User-Agent header, reduced to a family and a hash before it is stored.</param>
 public sealed record GetDownloadAllUrlQuery(
     string LinkId,
     string? Token = null,

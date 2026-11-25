@@ -1,11 +1,11 @@
 namespace wa.application.Ports;
 
 /// <summary>Data passed to the template renderer (TA-6.7).</summary>
-/// <param name="SenderName">The sender name of the template data.</param>
-/// <param name="Files">The files of the template data.</param>
-/// <param name="CtaUrl">The cta URL of the template data.</param>
-/// <param name="ExpiryDays">The expiry days of the template data.</param>
-/// <param name="UnsubscribeUrl">The unsubscribe URL of the template data.</param>
+/// <param name="SenderName">Name of the person who sent the transfer.</param>
+/// <param name="Files">Files listed in the email.</param>
+/// <param name="CtaUrl">Link behind the call-to-action button (the transfer download page).</param>
+/// <param name="ExpiryDays">Number of days until the transfer expires, shown in the body.</param>
+/// <param name="UnsubscribeUrl">Link that suppresses further emails to the recipient; null to omit it.</param>
 public sealed record TemplateData(
     string SenderName,
     IReadOnlyList<FileEntry> Files,

@@ -12,10 +12,10 @@ public interface IAdminFlagStore
     /// Upsert a flag's value by its Key (single-key PK, last-write-wins — EC-011-1).
     /// Returns the pre-update row or null when no row exists for that key.
     /// </summary>
-    /// <param name="key">The key.</param>
-    /// <param name="value">The value.</param>
-    /// <param name="updatedAtUtc">The updated at UTC.</param>
+    /// <param name="key">Flag key; must already exist as a seeded row.</param>
+    /// <param name="value">New raw value, already validated against the key's type.</param>
+    /// <param name="updatedAtUtc">UTC instant recorded as the change time.</param>
     /// <param name="ct">Token that cancels the operation.</param>
-    /// <returns>The feature flag, or <see langword="null"/> when there is none.</returns>
+    /// <returns>The row as it was before the update, or <see langword="null"/> when no row exists for <paramref name="key"/>.</returns>
     Task<FeatureFlag?> UpsertAsync(string key, string value, DateTime updatedAtUtc, CancellationToken ct);
 }

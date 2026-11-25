@@ -17,13 +17,13 @@ public sealed class SignupValidationException : Exception
 {
     private SignupValidationException(string message) : base(message) { }
 
-    /// <summary>Creates the signup validation exception for short password.</summary>
-    /// <returns>The signup validation exception.</returns>
+    /// <summary>The submitted password is shorter than 8 characters; the endpoint maps this to 400 VALIDATION.</summary>
+    /// <returns>An exception carrying the "password too short" message.</returns>
     public static SignupValidationException ForShortPassword() =>
         new("Password must be at least 8 characters.");
 
-    /// <summary>Creates the signup validation exception for invalid email.</summary>
-    /// <returns>The signup validation exception.</returns>
+    /// <summary>The submitted email is not a valid address; the endpoint maps this to 400 VALIDATION.</summary>
+    /// <returns>An exception carrying the "valid email required" message.</returns>
     public static SignupValidationException ForInvalidEmail() =>
         new("A valid email address is required.");
 }

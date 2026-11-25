@@ -7,7 +7,7 @@ namespace wa.application.UseCases.Transfers;
 /// <summary>Default implementation of <see cref="IUnlockTokenMinter"/>.</summary>
 public sealed class UnlockTokenService : IUnlockTokenMinter
 {
-    /// <summary>TA-9.1 literal "exp: now+7d" — a security constant (token lifetime), not a plan limit, so it is NOT a Limits Registry entry (TA-3.4).</summary>
+    /// <summary>Lifetime of an unlock token in days (7, TA-9.1); a security constant, not a plan limit.</summary>
     public const int LifetimeDays = 7;
 
     private static readonly byte[] HeaderBytes = Encoding.UTF8.GetBytes("{\"typ\":\"JWT\",\"alg\":\"HS256\"}"); // frozen — Base64Url("eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9")
@@ -16,9 +16,9 @@ public sealed class UnlockTokenService : IUnlockTokenMinter
     private readonly Func<DateTimeOffset> _clock;
 
     /// <summary>Initializes a new instance of the <see cref="UnlockTokenService"/> class.</summary>
-    /// <param name="key">The key.</param>
-    /// <param name="clock">The clock.</param>
-    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    /// <param name="key">HMAC signing key bytes, shared with the session tokens so all instances verify the same tokens.</param>
+    /// <param name="clock">Time source (injected for tests).</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="key"/> or <paramref name="clock"/> is null.</exception>
     public UnlockTokenService(byte[] key, Func<DateTimeOffset> clock)
     {
         _key = key ?? throw new ArgumentNullException(nameof(key));

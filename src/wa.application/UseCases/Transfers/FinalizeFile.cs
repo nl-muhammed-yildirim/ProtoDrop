@@ -13,14 +13,14 @@ namespace wa.application.UseCases.Transfers;
 /// <summary>One file in the finalize request (TA-4.2#2 request row). POCO with settable properties for minimal-API binding.</summary>
 public sealed class FinalizeFile
 {
-    /// <summary>Gets or sets the file ID of the finalize file.</summary>
+    /// <summary>File id issued by the create-draft call; names the staged blob.</summary>
     public Guid FileId { get; set; }
-    /// <summary>Gets or sets the name of the finalize file.</summary>
+    /// <summary>Original file name.</summary>
     public string Name { get; set; } = null!;
-    /// <summary>Gets or sets the size bytes of the finalize file.</summary>
+    /// <summary>Size in bytes the client declares; checked against the staged blob.</summary>
     public long SizeBytes { get; set; }
-    /// <summary>Gets or sets the content type of the finalize file.</summary>
+    /// <summary>MIME type reported by the browser, or null when unknown.</summary>
     public string? ContentType { get; set; }
-    /// <summary>Gets or sets the retries of the finalize file.</summary>
+    /// <summary>Number of upload retries the client needed for this file; summed into the <c>upload_completed</c> telemetry.</summary>
     public int Retries { get; set; }
 }

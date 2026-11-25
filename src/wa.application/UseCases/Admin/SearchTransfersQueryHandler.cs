@@ -12,8 +12,8 @@ namespace wa.application.UseCases.Admin;
 /// (4) cursor decoded via CursorCodec.Decode (malformed → rethrow CursorFormatException; endpoint maps to 400 VALIDATION);
 /// (5) call store once with the resolved args + limit.
 /// </summary>
-/// <param name="store">The store of the search transfers query handler.</param>
-/// <param name="flags">The flags of the search transfers query handler.</param>
+/// <param name="store">Admin store that runs the platform-wide transfer search.</param>
+/// <param name="flags">Resolver for the <c>feature.search</c> gate that widens the match to file and sender names.</param>
 public sealed class SearchTransfersQueryHandler(ISearchTransfersStore store, IFlagResolver flags) : IRequestHandler<SearchTransfersQuery, SearchTransfersResult>
 {
     /// <inheritdoc />

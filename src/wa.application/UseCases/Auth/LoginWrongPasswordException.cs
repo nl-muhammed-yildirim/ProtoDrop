@@ -16,8 +16,8 @@ public sealed class LoginWrongPasswordException : Exception
 {
     private LoginWrongPasswordException(string message) : base(message) { }
 
-    /// <summary>Creates the login wrong password exception for wrong password.</summary>
-    /// <returns>The login wrong password exception.</returns>
+    /// <summary>Raised for every failed sign-in (unknown email, wrong password or missing plan row) so callers cannot tell which accounts exist.</summary>
+    /// <returns>An exception that the endpoint maps to 401 WRONG_PASSWORD.</returns>
     public static LoginWrongPasswordException ForWrongPassword() =>
         new(ProblemCodes.TitleOf(ProblemCodes.WrongPassword)); // title from the closed table — never "user not found"
 }

@@ -4,16 +4,16 @@ using wa.application.UseCases.Transfers;
 
 namespace wa.application.UseCases.Billing;
 
-/// <summary>Handles <see cref="GetPlanUsageQuery"/> and produces <see cref="PlanUsageResult"/>.</summary>
+/// <summary>Handles <see cref="GetPlanUsageQuery"/>: combines the request's plan context with the user's live storage and active-transfer counts.</summary>
 public sealed class GetPlanUsageHandler : IRequestHandler<GetPlanUsageQuery, PlanUsageResult>
 {
     private readonly IPlanContextAccessor _planContext;
     private readonly ITransferStore _transfers;
 
     /// <summary>Initializes a new instance of the <see cref="GetPlanUsageHandler"/> class.</summary>
-    /// <param name="planContext">The plan context.</param>
-    /// <param name="transfers">The transfers.</param>
-    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    /// <param name="planContext">Accessor for the request's plan, limits and features.</param>
+    /// <param name="transfers">Store that counts the user's active transfers and bytes.</param>
+    /// <exception cref="ArgumentNullException">Thrown when any argument is null.</exception>
     public GetPlanUsageHandler(IPlanContextAccessor planContext, ITransferStore transfers)
     {
         _planContext = planContext ?? throw new ArgumentNullException(nameof(planContext));

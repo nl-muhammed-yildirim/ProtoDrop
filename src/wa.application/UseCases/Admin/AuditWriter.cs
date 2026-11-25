@@ -16,9 +16,9 @@ public sealed class AuditWriter : IAuditWriter
     private readonly IEventPublisher _eventPublisher;
 
     /// <summary>Initializes a new instance of the <see cref="AuditWriter"/> class.</summary>
-    /// <param name="store">The store.</param>
-    /// <param name="eventPublisher">The event publisher.</param>
-    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    /// <param name="store">Store that persists the audit log row.</param>
+    /// <param name="eventPublisher">Publishes the <c>admin.action</c> event.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="store"/> or <paramref name="eventPublisher"/> is null.</exception>
     public AuditWriter(IAuditStore store, IEventPublisher eventPublisher)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));

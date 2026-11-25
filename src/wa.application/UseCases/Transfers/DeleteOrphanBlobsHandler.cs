@@ -16,9 +16,9 @@ public sealed class DeleteOrphanBlobsHandler
     private readonly ILogger<DeleteOrphanBlobsHandler> _logger;
 
     /// <summary>Initializes a new instance of the <see cref="DeleteOrphanBlobsHandler"/> class.</summary>
-    /// <param name="store">The store.</param>
-    /// <param name="blobStore">The blob store.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="store">Store that claims the window and lists blobs without references.</param>
+    /// <param name="blobStore">Blob store the blobs are physically deleted from.</param>
+    /// <param name="logger">Logger for diagnostics.</param>
     public DeleteOrphanBlobsHandler(
         IBlobDeletionStore store,
         IBlobStore blobStore,
@@ -30,9 +30,9 @@ public sealed class DeleteOrphanBlobsHandler
     }
 
     /// <summary>Run the blob deletion job. Returns the number of blobs deleted (0 if claim was lost or no rows).</summary>
-    /// <param name="nowUtc">The now UTC.</param>
+    /// <param name="nowUtc">Current UTC time; defines the hourly claim window and the deletion cutoff.</param>
     /// <param name="ct">Token that cancels the operation.</param>
-    /// <returns>The resulting numeric value.</returns>
+    /// <returns>The number of blobs deleted; zero when the claim was lost or nothing was due.</returns>
     public async Task<int> RunAsync(DateTime nowUtc, CancellationToken ct)
     {
         // 1. Claim the hourly window via JobRun composite PK.
@@ -87,8 +87,8 @@ public sealed class DeleteOrphanBlobsHandler
     }
 
     /// <summary>Truncate a UTC DateTime to the nearest hour boundary (TA-6.1 JobRun window key for hourly jobs).</summary>
-    /// <param name="utc">The UTC.</param>
-    /// <returns>The timestamp.</returns>
+    /// <param name="utc">Any UTC time.</param>
+    /// <returns><paramref name="utc"/> rounded down to the full hour, with UTC kind.</returns>
     public static DateTime TruncateToHour(DateTime utc) =>
         new(utc.Year, utc.Month, utc.Day, utc.Hour, 0, 0, DateTimeKind.Utc);
 }

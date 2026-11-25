@@ -6,10 +6,10 @@ namespace wa.application.UseCases.Admin;
 /// </summary>
 public interface IOverviewStore
 {
-    /// <summary>Gets the overview data.</summary>
+    /// <summary>Computes the platform overview aggregates for the given windows.</summary>
     /// <param name="todayStartUtc">UTC midnight of the current calendar day — for "new users today" count.</param>
     /// <param name="emailsWindowStartUtc">now − 7 days — for email sent/failed counts.</param>
     /// <param name="ct">Token that cancels the operation.</param>
-    /// <returns>The overview data.</returns>
+    /// <returns>The aggregates and the recent-transfer list.</returns>
     Task<OverviewData> GetAsync(DateTime todayStartUtc, DateTime emailsWindowStartUtc, CancellationToken ct);
 }

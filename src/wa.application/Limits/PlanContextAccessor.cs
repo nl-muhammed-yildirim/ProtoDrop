@@ -6,9 +6,9 @@ namespace wa.application.Limits;
 /// Scoped accessor: the middleware binds the session user (or guest) once; the first GetAsync resolves and memoizes for the request.
 /// Guest / missing user row → Free (FR-020-4); soft-deleted user → last-known plan (EC-020-3). Unknown plan code propagates as PlanUnknownException.
 /// </summary>
-/// <param name="users">The users of the plan context accessor.</param>
-/// <param name="limits">The limits of the plan context accessor.</param>
-/// <param name="features">The features of the plan context accessor.</param>
+/// <param name="users">Store that maps a user id to the plan code.</param>
+/// <param name="limits">Provider of the effective limits.</param>
+/// <param name="features">Provider of the effective feature toggles.</param>
 public sealed class PlanContextAccessor(IUserPlanStore users, ILimitsProvider limits, IFeaturesProvider features) : IPlanContextAccessor
 {
     private bool _bound;
@@ -16,10 +16,8 @@ public sealed class PlanContextAccessor(IUserPlanStore users, ILimitsProvider li
     private Task<PlanContext>? _resolved;
 
     /// <summary>Binds the session user id (null = guest). Exactly once per scope.</summary>
-    /// <param name="userId">Identifier of the user.</param>
-    /// <exception cref="InvalidOperationException">
-    /// Thrown when the operation is not valid in the current state.
-    /// </exception>
+    /// <param name="userId">Id of the signed-in user, or null for a guest.</param>
+    /// <exception cref="InvalidOperationException">Thrown when the accessor was already bound for this request.</exception>
     public void Bind(Guid? userId)
     {
         if (_bound) throw new InvalidOperationException("PlanContext is already bound for this request.");

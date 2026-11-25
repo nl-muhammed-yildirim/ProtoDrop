@@ -1,8 +1,8 @@
 namespace wa.application.UseCases.Billing;
 
-/// <summary>Email is null when the user is deleted — the ledger is kept, nothing is sent.</summary>
-/// <param name="Outcome">The outcome of the payment failed result.</param>
-/// <param name="SubscriptionId">Identifier of the subscription of the payment failed result.</param>
-/// <param name="UserId">Identifier of the user of the payment failed result.</param>
-/// <param name="Email">The email of the payment failed result.</param>
+/// <summary>Result of starting a payment-failed sequence. The email is null when the user is deleted: the ledger is kept but nothing is sent.</summary>
+/// <param name="Outcome">What happened.</param>
+/// <param name="SubscriptionId">The subscription in payment failure; default unless started.</param>
+/// <param name="UserId">The subscriber; default unless started.</param>
+/// <param name="Email">Address for email #1; PII (TA-9.4).</param>
 public sealed record PaymentFailedResult(PaymentFailedOutcome Outcome, Guid SubscriptionId = default, Guid UserId = default, string? Email = null);

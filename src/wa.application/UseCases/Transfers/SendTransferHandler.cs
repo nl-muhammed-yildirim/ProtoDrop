@@ -29,14 +29,14 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
     private readonly IAppUserStore _users;   // T-008-08 (FR-008-7): resolve the display-name "From" default
 
     /// <summary>Initializes a new instance of the <see cref="SendTransferHandler"/> class.</summary>
-    /// <param name="store">The store.</param>
-    /// <param name="transferStore">The transfer store.</param>
-    /// <param name="planContext">The plan context.</param>
-    /// <param name="eventPublisher">The event publisher.</param>
-    /// <param name="telemetry">The telemetry.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
-    /// <param name="users">The users.</param>
-    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    /// <param name="store">Send-side store that loads the draft and persists the sent transfer.</param>
+    /// <param name="transferStore">Store used to count the owner's active transfers and storage.</param>
+    /// <param name="planContext">Accessor for the request's plan limits and features.</param>
+    /// <param name="eventPublisher">Publishes the <c>transfer.created</c> event.</param>
+    /// <param name="telemetry">Reporter for the storage telemetry metric.</param>
+    /// <param name="logger">Logger for diagnostics (never logs addresses).</param>
+    /// <param name="users">Store used to resolve the signed-in sender's display name.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="users"/> is null.</exception>
     public SendTransferHandler(
         ISendStore store,
         ITransferStore transferStore,

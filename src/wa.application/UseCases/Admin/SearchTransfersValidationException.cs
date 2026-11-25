@@ -10,6 +10,6 @@ namespace wa.application.UseCases.Admin;
 public sealed class SearchTransfersValidationException : Exception
 {
     /// <summary>Initializes a new instance of the <see cref="SearchTransfersValidationException"/> class.</summary>
-    /// <param name="message">The message.</param>
+    /// <param name="message">Description of the invalid filter combination, returned to the client as the validation detail.</param>
     public SearchTransfersValidationException(string message) : base(message) { }
 }

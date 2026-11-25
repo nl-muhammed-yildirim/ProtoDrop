@@ -16,10 +16,10 @@ public sealed class SetUserPlanCommandHandler : IRequestHandler<SetUserPlanComma
     private readonly IAdminUserStore _adminUsers;
 
     /// <summary>Initializes a new instance of the <see cref="SetUserPlanCommandHandler"/> class.</summary>
-    /// <param name="users">The users.</param>
-    /// <param name="plans">The plans.</param>
-    /// <param name="adminUsers">The admin users.</param>
-    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    /// <param name="users">Store used to read the user and its current plan.</param>
+    /// <param name="plans">Store used to check that the target plan exists.</param>
+    /// <param name="adminUsers">Admin store that writes the new plan id.</param>
+    /// <exception cref="ArgumentNullException">Thrown when any argument is null.</exception>
     public SetUserPlanCommandHandler(IAppUserStore users, IPlansStore plans, IAdminUserStore adminUsers)
     {
         _users = users ?? throw new ArgumentNullException(nameof(users));

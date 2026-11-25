@@ -12,5 +12,5 @@ using wa.domain.Telemetry;
 
 namespace wa.application.UseCases.Auth;
 
-/// <summary>Result of the delete account use case.</summary>
+/// <summary>Result of deleting an account; carries no data because the endpoint answers 204 No Content.</summary>
 public sealed record DeleteAccountResult();

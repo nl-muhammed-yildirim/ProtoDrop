@@ -13,17 +13,17 @@ namespace wa.application.UseCases.Transfers;
 /// <summary>Thrown when a blob's actual size doesn't match the declared SizeBytes.</summary>
 public sealed class BlobSizeMismatchException : Exception
 {
-    /// <summary>Gets the file name of the blob size mismatch exception.</summary>
+    /// <summary>Name of the file whose blob size differs from the declared size.</summary>
     public string FileName { get; }
-    /// <summary>Gets the declared bytes of the blob size mismatch exception.</summary>
+    /// <summary>Size in bytes the client declared when it created the draft.</summary>
     public long DeclaredBytes { get; }
-    /// <summary>Gets the actual bytes of the blob size mismatch exception.</summary>
+    /// <summary>Size in bytes the staged blob actually has in storage.</summary>
     public long ActualBytes { get; }
 
     /// <summary>Initializes a new instance of the <see cref="BlobSizeMismatchException"/> class.</summary>
-    /// <param name="fileName">The file name.</param>
-    /// <param name="declaredBytes">The declared bytes.</param>
-    /// <param name="actualBytes">The actual bytes.</param>
+    /// <param name="fileName">Name of the file with the mismatch.</param>
+    /// <param name="declaredBytes">Size the client declared, in bytes.</param>
+    /// <param name="actualBytes">Size found in storage, in bytes.</param>
     internal BlobSizeMismatchException(string fileName, long declaredBytes, long actualBytes)
         : base($"File '{fileName}' is {actualBytes} bytes on the server but was declared as {declaredBytes} bytes.")
     {

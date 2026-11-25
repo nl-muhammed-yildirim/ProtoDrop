@@ -7,13 +7,13 @@ namespace wa.application.UseCases.Admin;
 /// </summary>
 public interface IAdminUserStore
 {
-    /// <summary>Gets the users.</summary>
+    /// <summary>Reads one page of users, newest first, with their computed storage and active-transfer figures.</summary>
     /// <param name="q">Trimmed + lowercased search term (null = no q predicate). Matches AppUser.Email substring.</param>
     /// <param name="afterUtc">Cursor: rows with CreatedAtUtc &lt; afterUtc (null = first page).</param>
     /// <param name="afterIdExcluded">Cursor: rows with CreatedAtUtc == afterUtc AND Id &lt; afterIdExcluded (null = no tiebreak).</param>
     /// <param name="limit">Page size (TA-4.1.4: 25 max).</param>
     /// <param name="ct">Token that cancels the operation.</param>
-    /// <returns>A tuple holding the items and next cursor values.</returns>
+    /// <returns>The page of rows and the cursor of the next page (null when there is none).</returns>
     Task<(List<AdminUserRow> Items, string? NextCursor)> GetUsersAsync(
         string? q,
         DateTime? afterUtc,
@@ -26,9 +26,9 @@ public interface IAdminUserStore
     /// vanished in a race (mirror SoftDeleteWithReHomeAsync's bool contract). Limits take effect at the NEXT finalize
     /// (FR-BIL-001-4 "applies to new transfers") — no limit recompute here.
     /// </summary>
-    /// <param name="userId">Identifier of the user.</param>
-    /// <param name="newPlanId">Identifier of the new plan.</param>
+    /// <param name="userId">Primary key of the user.</param>
+    /// <param name="newPlanId">Primary key of the plan to assign.</param>
     /// <param name="ct">Token that cancels the operation.</param>
-    /// <returns><see langword="true"/> when the operation succeeded; otherwise <see langword="false"/>.</returns>
+    /// <returns><see langword="true"/> when the user was updated; <see langword="false"/> when the user row no longer exists.</returns>
     Task<bool> SetPlanIdAsync(Guid userId, Guid newPlanId, CancellationToken ct);
 }

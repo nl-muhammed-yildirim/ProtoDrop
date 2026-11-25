@@ -3,7 +3,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace wa.application.UseCases.Billing;
 
-/// <summary>Handles <see cref="GetPortalSessionQuery"/> and produces <see cref="PortalSessionResult"/>.</summary>
+/// <summary>Handles <see cref="GetPortalSessionQuery"/>: looks up the user's Stripe customer and asks Stripe for a Billing Portal session URL.</summary>
 public sealed class GetPortalSessionHandler : IRequestHandler<GetPortalSessionQuery, PortalSessionResult>
 {
     private readonly IStripeBillingStore _store;
@@ -11,10 +11,10 @@ public sealed class GetPortalSessionHandler : IRequestHandler<GetPortalSessionQu
     private readonly string _publicUrl;
 
     /// <summary>Initializes a new instance of the <see cref="GetPortalSessionHandler"/> class.</summary>
-    /// <param name="store">The store.</param>
-    /// <param name="gateway">The gateway.</param>
-    /// <param name="configuration">The configuration.</param>
-    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    /// <param name="store">Store that holds the user's Stripe customer id.</param>
+    /// <param name="gateway">Stripe gateway that creates the portal session.</param>
+    /// <param name="configuration">Configuration source for the public site URL used as the return link.</param>
+    /// <exception cref="ArgumentNullException">Thrown when any argument is null.</exception>
     public GetPortalSessionHandler(IStripeBillingStore store, IStripeCheckoutGateway gateway, IConfiguration configuration)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));

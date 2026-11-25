@@ -11,8 +11,8 @@ public sealed class ExportMyDataHandler : IRequestHandler<ExportMyDataCommand, D
     private readonly IDataExportStore _store;
 
     /// <summary>Initializes a new instance of the <see cref="ExportMyDataHandler"/> class.</summary>
-    /// <param name="users">The users.</param>
-    /// <param name="store">The store.</param>
+    /// <param name="users">Store used to check that the account exists.</param>
+    /// <param name="store">Store that holds the export rows.</param>
     public ExportMyDataHandler(IAppUserStore users, IDataExportStore store)
     {
         _users = users;

@@ -26,12 +26,12 @@ public sealed class FinalizeTransferHandler : IRequestHandler<FinalizeTransferCo
     private readonly ILogger<FinalizeTransferHandler> _logger;
 
     /// <summary>Initializes a new instance of the <see cref="FinalizeTransferHandler"/> class.</summary>
-    /// <param name="store">The store.</param>
-    /// <param name="blobStore">The blob store.</param>
-    /// <param name="planContext">The plan context.</param>
-    /// <param name="configuration">The configuration.</param>
-    /// <param name="telemetry">The telemetry.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="store">Store that persists the draft transfer and its files.</param>
+    /// <param name="blobStore">Blob store used to copy staged blobs into the transfer.</param>
+    /// <param name="planContext">Accessor for the request's plan limits.</param>
+    /// <param name="configuration">Configuration source for the public site URL used in the result.</param>
+    /// <param name="telemetry">Reporter for the upload and storage telemetry.</param>
+    /// <param name="logger">Logger for diagnostics.</param>
     public FinalizeTransferHandler(
         ITransferStore store,
         IBlobStore blobStore,

@@ -3,10 +3,8 @@ using wa.application.Limits;
 
 namespace wa.application.UseCases.Features;
 
-/// <summary>
-/// Handles <see cref="GetFeatureGatesQuery"/> and produces <c>IReadOnlyDictionary&lt;string, bool&gt;</c>.
-/// </summary>
-/// <param name="flags">The flags of the get feature gates query handler.</param>
+/// <summary>Handles <see cref="GetFeatureGatesQuery"/>: resolves every phase-gate flag and returns its on/off state keyed by flag key.</summary>
+/// <param name="flags">Resolver that reads the flag values.</param>
 public sealed class GetFeatureGatesQueryHandler(IFlagResolver flags) : IRequestHandler<GetFeatureGatesQuery, IReadOnlyDictionary<string, bool>>
 {
     /// <inheritdoc />

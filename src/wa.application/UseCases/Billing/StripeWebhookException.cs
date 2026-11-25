@@ -13,16 +13,16 @@ public sealed class StripeWebhookException : Exception
 {
     private StripeWebhookException(string message, bool retryable) : base(message) => Retryable = retryable;
 
-    /// <summary>Gets a value indicating whether retryable applies to the stripe webhook exception.</summary>
+    /// <summary>True when the failure is transient and the endpoint should answer 500 so that Stripe redelivers the event.</summary>
     public bool Retryable { get; }
 
     /// <summary>Creates the stripe webhook exception for malformed.</summary>
-    /// <returns>The stripe webhook exception.</returns>
+    /// <returns>A non-retryable exception that the endpoint maps to 400 VALIDATION.</returns>
     public static StripeWebhookException ForMalformed() =>
         new("Stripe webhook payload is malformed.", retryable: false);
 
-    /// <summary>Message carries Stripe ids only (TA-9.4).</summary>
-    /// <param name="message">The message.</param>
-    /// <returns>The stripe webhook exception.</returns>
+    /// <summary>The event cannot be applied yet (for example it raced another step); Stripe should redeliver it.</summary>
+    /// <param name="message">Description that carries Stripe ids only, never PII.</param>
+    /// <returns>A retryable exception that the endpoint maps to 500.</returns>
     public static StripeWebhookException ForRetryable(string message) => new(message, retryable: true);
 }

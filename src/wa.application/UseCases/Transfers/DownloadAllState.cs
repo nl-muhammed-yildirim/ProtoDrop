@@ -14,18 +14,18 @@ namespace wa.application.UseCases.Transfers;
 /// <summary>The download-all endpoint's state mapping (TA-4.2#7): terminal states + the auth gate + zip ready/generating.</summary>
 public enum DownloadAllState
 {
-    /// <summary>Ok.</summary>
+    /// <summary>The zip exists and a download URL was minted.</summary>
     Ok,
-    /// <summary>Generating.</summary>
+    /// <summary>The zip is still being built; the caller should poll again.</summary>
     Generating,
-    /// <summary>Expired.</summary>
+    /// <summary>The transfer has expired (410).</summary>
     Expired,
-    /// <summary>Download limit.</summary>
+    /// <summary>The transfer reached its maximum number of downloads (409).</summary>
     DownloadLimit,
-    /// <summary>Not found.</summary>
+    /// <summary>No transfer exists for the link (404).</summary>
     NotFound,
-    /// <summary>Unauthenticated.</summary>
+    /// <summary>The transfer is password protected and no valid unlock token was supplied (401).</summary>
     Unauthenticated,
-    /// <summary>Storage unavailable.</summary>
+    /// <summary>Blob storage could not be reached, so the zip state is unknown.</summary>
     StorageUnavailable
 }

@@ -2,7 +2,7 @@ using MediatR;
 
 namespace wa.application.UseCases.Sample;
 
-/// <summary>Handles <see cref="PingCommand"/> and produces <see cref="String"/>.</summary>
+/// <summary>Handles <see cref="PingCommand"/> by returning the constant text <c>pong</c>.</summary>
 public sealed class PingCommandHandler : IRequestHandler<PingCommand, string>
 {
     /// <inheritdoc />

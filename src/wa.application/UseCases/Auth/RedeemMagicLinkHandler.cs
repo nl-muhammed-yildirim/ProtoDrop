@@ -14,7 +14,7 @@ namespace wa.application.UseCases.Auth;
 /// </summary>
 public sealed class RedeemMagicLinkHandler : IRequestHandler<RedeemMagicLinkCommand, RedeemMagicLinkResult>
 {
-    /// <summary>Frozen Magic link TTL — 10 minutes (Open-Decisions-and-Constants.md Part 2, TA-9.1).</summary>
+    /// <summary>Lifetime of a magic link in seconds (10 minutes, frozen in Open-Decisions-and-Constants Part 2 and TA-9.1).</summary>
     public const int TtlSeconds = 600;
 
     private readonly IAuthTokenStore _tokens;
@@ -24,11 +24,11 @@ public sealed class RedeemMagicLinkHandler : IRequestHandler<RedeemMagicLinkComm
     private readonly ISessionTokenMinter _minter;
 
     /// <summary>Initializes a new instance of the <see cref="RedeemMagicLinkHandler"/> class.</summary>
-    /// <param name="tokens">The tokens.</param>
-    /// <param name="users">The users.</param>
-    /// <param name="plans">The plans.</param>
-    /// <param name="telemetry">The telemetry.</param>
-    /// <param name="minter">The minter.</param>
+    /// <param name="tokens">Store that looks up and redeems the token row.</param>
+    /// <param name="users">Store used to find or create the account.</param>
+    /// <param name="plans">Store used to resolve the default plan and the plan code.</param>
+    /// <param name="telemetry">Reporter for the <c>user_created</c> and <c>login_success</c> events.</param>
+    /// <param name="minter">Mints the session token returned to the caller.</param>
     public RedeemMagicLinkHandler(
         IAuthTokenStore tokens,
         IAppUserStore users,

@@ -21,18 +21,18 @@ public sealed class UpdateProfileHandler : IRequestHandler<UpdateProfileCommand,
     private readonly IPlanContextAccessor _plan;
     private readonly IEmailNotificationsStore _emailNotifications;
 
-    /// <summary>NVARCHAR(100) column width — TA-3.2 (verified in WaDbContextModelSnapshot). Single re-check site.</summary>
+    /// <summary>Maximum display-name length after trimming; matches the NVARCHAR(100) column width (TA-3.2).</summary>
     public const int DisplayNameMaxLength = 100;
 
     /// <summary>The three closed theme values (spec + entity only — NOT in the frozen Open-Decisions-and-Constants registry).</summary>
     private static readonly string[] AllowedThemes = ["system", "light", "dark"];
 
     /// <summary>Initializes a new instance of the <see cref="UpdateProfileHandler"/> class.</summary>
-    /// <param name="users">The users.</param>
-    /// <param name="plans">The plans.</param>
-    /// <param name="orgNames">The org names.</param>
-    /// <param name="plan">The plan.</param>
-    /// <param name="emailNotifications">The email notifications.</param>
+    /// <param name="users">Store used to read and update the user row.</param>
+    /// <param name="plans">Store used to resolve the plan code for the returned profile.</param>
+    /// <param name="orgNames">Store that writes the organization name.</param>
+    /// <param name="plan">Accessor used to check that the plan includes branding.</param>
+    /// <param name="emailNotifications">Store that writes the owner-notification setting.</param>
     public UpdateProfileHandler(IAppUserStore users, IPlansStore plans, IOrgNameStore orgNames, IPlanContextAccessor plan, IEmailNotificationsStore emailNotifications)
     {
         _users = users;

@@ -15,7 +15,7 @@ namespace wa.application.UseCases.Auth;
 /// </summary>
 public sealed class RequestMagicLinkHandler : IRequestHandler<RequestMagicLinkCommand, RequestMagicLinkResult>
 {
-    /// <summary>Frozen Magic link TTL — 10 minutes (Open-Decisions-and-Constants.md Part 2, TA-9.1).</summary>
+    /// <summary>Lifetime of a magic link in seconds (10 minutes, frozen in Open-Decisions-and-Constants Part 2 and TA-9.1).</summary>
     public const int TtlSeconds = 600;
 
     /// <summary>Purpose code for magic-link tokens (TA-3.2: AuthToken.Purpose; 1=magic-link-login).</summary>
@@ -25,8 +25,8 @@ public sealed class RequestMagicLinkHandler : IRequestHandler<RequestMagicLinkCo
     private readonly IEventPublisher _eventPublisher;
 
     /// <summary>Initializes a new instance of the <see cref="RequestMagicLinkHandler"/> class.</summary>
-    /// <param name="tokens">The tokens.</param>
-    /// <param name="eventPublisher">The event publisher.</param>
+    /// <param name="tokens">Store that persists the single-use token row.</param>
+    /// <param name="eventPublisher">Publishes the <c>auth.magic_link_requested</c> event that triggers the email.</param>
     public RequestMagicLinkHandler(
         IAuthTokenStore tokens,
         IEventPublisher eventPublisher)

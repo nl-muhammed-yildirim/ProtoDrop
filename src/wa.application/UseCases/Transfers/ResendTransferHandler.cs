@@ -15,10 +15,10 @@ public sealed class ResendTransferHandler : IRequestHandler<ResendTransferComman
     private readonly IPlanContextAccessor _planContext;
 
     /// <summary>Initializes a new instance of the <see cref="ResendTransferHandler"/> class.</summary>
-    /// <param name="store">The store.</param>
-    /// <param name="transferStore">The transfer store.</param>
-    /// <param name="planContext">The plan context.</param>
-    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    /// <param name="store">Send-side store that reads the original and saves the new draft.</param>
+    /// <param name="transferStore">Store used to check that a new link id is unused.</param>
+    /// <param name="planContext">Accessor for the request's plan limits.</param>
+    /// <exception cref="ArgumentNullException">Thrown when any argument is null.</exception>
     public ResendTransferHandler(
         ISendStore store,
         ITransferStore transferStore,

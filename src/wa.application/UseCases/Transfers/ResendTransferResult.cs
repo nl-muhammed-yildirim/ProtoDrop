@@ -5,18 +5,18 @@ using wa.domain;
 namespace wa.application.UseCases.Transfers;
 
 /// <summary>POST /api/v1/transfers/{id}/resend result — the new draft with pre-filled fields for T-010-03's UI.</summary>
-/// <param name="TransferId">Identifier of the transfer of the resend transfer result.</param>
-/// <param name="LinkId">Identifier of the link of the resend transfer result.</param>
-/// <param name="Status">The status of the resend transfer result.</param>
-/// <param name="ExpiresAtUtc">The expires at UTC of the resend transfer result.</param>
-/// <param name="TotalBytes">The total bytes of the resend transfer result.</param>
-/// <param name="FileCount">The file count of the resend transfer result.</param>
-/// <param name="Recipients">The recipients of the resend transfer result.</param>
-/// <param name="Note">The note of the resend transfer result.</param>
-/// <param name="SenderName">The sender name of the resend transfer result.</param>
-/// <param name="SenderEmail">The sender email of the resend transfer result.</param>
-/// <param name="PasswordRequired">Whether password required of the resend transfer result.</param>
-/// <param name="Files">The files of the resend transfer result.</param>
+/// <param name="TransferId">Id of the new draft transfer.</param>
+/// <param name="LinkId">Public 8-character link id of the new draft.</param>
+/// <param name="Status">Stored status number of the draft.</param>
+/// <param name="ExpiresAtUtc">UTC instant the draft would expire; set again at send time.</param>
+/// <param name="TotalBytes">Total size of the files in bytes.</param>
+/// <param name="FileCount">Number of files in the transfer.</param>
+/// <param name="Recipients">Addresses copied from the original, for the sender to edit; PII (TA-9.4).</param>
+/// <param name="Note">Note copied from the original; null when none.</param>
+/// <param name="SenderName">Sender name copied from the original; PII (TA-9.4).</param>
+/// <param name="SenderEmail">Sender address copied from the original; null for anonymous senders; PII (TA-9.4).</param>
+/// <param name="PasswordRequired">True when the original is password protected and the copy keeps that password.</param>
+/// <param name="Files">The files of the new draft, which share the original's blobs.</param>
 public sealed record ResendTransferResult(
     Guid TransferId,
     string LinkId,

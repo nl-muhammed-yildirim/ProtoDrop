@@ -18,9 +18,9 @@ public sealed class AdminDeleteTransferHandler : IRequestHandler<AdminDeleteTran
     private readonly IEventPublisher _eventPublisher;
 
     /// <summary>Initializes a new instance of the <see cref="AdminDeleteTransferHandler"/> class.</summary>
-    /// <param name="store">The store.</param>
-    /// <param name="eventPublisher">The event publisher.</param>
-    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    /// <param name="store">Platform-scoped store that soft-deletes any transfer.</param>
+    /// <param name="eventPublisher">Publishes the <c>transfer.deleted</c> event.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="store"/> or <paramref name="eventPublisher"/> is null.</exception>
     public AdminDeleteTransferHandler(IAdminTransferStore store, IEventPublisher eventPublisher)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));

@@ -26,9 +26,9 @@ public sealed class ForgotPasswordHandler : IRequestHandler<ForgotPasswordComman
     private readonly IEventPublisher _eventPublisher;
 
     /// <summary>Initializes a new instance of the <see cref="ForgotPasswordHandler"/> class.</summary>
-    /// <param name="users">The users.</param>
-    /// <param name="tokens">The tokens.</param>
-    /// <param name="eventPublisher">The event publisher.</param>
+    /// <param name="users">Store used to look up the account by email.</param>
+    /// <param name="tokens">Store that persists the single-use reset token.</param>
+    /// <param name="eventPublisher">Publishes the <c>auth.magic_link_requested</c> event that triggers the email.</param>
     public ForgotPasswordHandler(
         IAppUserStore users,
         IAuthTokenStore tokens,

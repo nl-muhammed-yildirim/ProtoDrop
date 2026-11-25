@@ -10,7 +10,7 @@ namespace wa.application.UseCases.Admin;
 /// (2) cursor decoded via CursorCodec.Decode (malformed → rethrow CursorFormatException; endpoint maps to 400 VALIDATION);
 /// (3) call store once with the resolved args + limit.
 /// </summary>
-/// <param name="store">The store of the get users query handler.</param>
+/// <param name="store">Admin store that reads one page of users.</param>
 public sealed class GetUsersQueryHandler(IAdminUserStore store) : IRequestHandler<GetUsersQuery, GetUsersResult>
 {
     /// <inheritdoc />

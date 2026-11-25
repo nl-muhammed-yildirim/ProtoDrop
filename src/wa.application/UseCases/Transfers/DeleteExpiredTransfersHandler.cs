@@ -23,11 +23,11 @@ public sealed class DeleteExpiredTransfersHandler
     private readonly ILogger<DeleteExpiredTransfersHandler> _logger;
 
     /// <summary>Initializes a new instance of the <see cref="DeleteExpiredTransfersHandler"/> class.</summary>
-    /// <param name="store">The store.</param>
-    /// <param name="eventPublisher">The event publisher.</param>
-    /// <param name="blobStore">The blob store.</param>
-    /// <param name="telemetry">The telemetry.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="store">Store that claims the window and marks transfers deleted.</param>
+    /// <param name="eventPublisher">Publishes the <c>transfer.deleted</c> event for each deleted transfer.</param>
+    /// <param name="blobStore">Blob store used to remove the transfer's zip blob.</param>
+    /// <param name="telemetry">Reporter for telemetry events.</param>
+    /// <param name="logger">Logger for diagnostics.</param>
     public DeleteExpiredTransfersHandler(
         IExpiryDeletionStore store,
         IEventPublisher eventPublisher,
@@ -43,9 +43,9 @@ public sealed class DeleteExpiredTransfersHandler
     }
 
     /// <summary>Run the deletion job. Returns the number of transfers deleted (0 if claim was lost or no rows).</summary>
-    /// <param name="nowUtc">The now UTC.</param>
+    /// <param name="nowUtc">Current UTC time; defines the 15-minute claim window and the grace cutoff.</param>
     /// <param name="ct">Token that cancels the operation.</param>
-    /// <returns>The resulting numeric value.</returns>
+    /// <returns>The number of transfers deleted; zero when the claim was lost or nothing was due.</returns>
     public async Task<int> RunAsync(DateTime nowUtc, CancellationToken ct)
     {
         // 1. Claim the window via JobRun composite PK.

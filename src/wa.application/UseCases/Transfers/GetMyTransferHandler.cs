@@ -11,7 +11,7 @@ public sealed class GetMyTransferHandler : IRequestHandler<GetMyTransferQuery, G
     private readonly ITransferStore _transfers;
 
     /// <summary>Initializes a new instance of the <see cref="GetMyTransferHandler"/> class.</summary>
-    /// <param name="transfers">The transfers.</param>
+    /// <param name="transfers">Store that reads the owner's transfer with files and recipients.</param>
     public GetMyTransferHandler(ITransferStore transfers)
     {
         _transfers = transfers;

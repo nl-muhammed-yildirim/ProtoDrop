@@ -9,8 +9,8 @@ public sealed class GetRecentAuditQueryHandler : IRequestHandler<GetRecentAuditQ
     private readonly IAuditReadStore _store;
 
     /// <summary>Initializes a new instance of the <see cref="GetRecentAuditQueryHandler"/> class.</summary>
-    /// <param name="store">The store.</param>
-    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    /// <param name="store">Read store for audit rows.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="store"/> is null.</exception>
     public GetRecentAuditQueryHandler(IAuditReadStore store)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));

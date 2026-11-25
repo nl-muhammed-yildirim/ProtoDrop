@@ -4,7 +4,7 @@ namespace wa.application.UseCases.Billing;
 public sealed class BillingUnavailableException : Exception
 {
     /// <summary>Initializes a new instance of the <see cref="BillingUnavailableException"/> class.</summary>
-    /// <param name="message">The message.</param>
-    /// <param name="inner">The inner.</param>
+    /// <param name="message">Description of why billing cannot proceed.</param>
+    /// <param name="inner">The underlying Stripe or configuration failure, if any.</param>
     public BillingUnavailableException(string message, Exception? inner = null) : base(message, inner) { }
 }

@@ -11,14 +11,14 @@ namespace wa.application.UseCases.Transfers;
 /// <summary>The download endpoint's state mapping (TA-4.2#6): terminal states + the auth gate + mint success.</summary>
 public enum FileDownloadState
 {
-    /// <summary>Ok.</summary>
+    /// <summary>A download URL was minted.</summary>
     Ok,
-    /// <summary>Expired.</summary>
+    /// <summary>The transfer has expired (410).</summary>
     Expired,
-    /// <summary>Download limit.</summary>
+    /// <summary>The transfer reached its maximum number of downloads (409).</summary>
     DownloadLimit,
-    /// <summary>Not found.</summary>
+    /// <summary>No transfer or file exists for the link (404).</summary>
     NotFound,
-    /// <summary>Unauthenticated.</summary>
+    /// <summary>The transfer is password protected and no valid unlock token was supplied (401).</summary>
     Unauthenticated
 }

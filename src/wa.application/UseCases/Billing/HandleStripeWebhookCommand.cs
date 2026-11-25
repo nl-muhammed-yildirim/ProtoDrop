@@ -11,5 +11,5 @@ namespace wa.application.UseCases.Billing;
 /// US-019-03 (TA-4.2a / FR-019-4): apply one signature-verified Stripe webhook body exactly once.
 /// The endpoint verifies Stripe-Signature (it owns config + raw body); this command carries the verified raw payload.
 /// </summary>
-/// <param name="Payload">The payload of the handle stripe webhook command.</param>
+/// <param name="Payload">The raw Stripe event JSON, already signature-verified by the endpoint.</param>
 public sealed record HandleStripeWebhookCommand(string Payload) : IRequest<StripeWebhookOutcome>;

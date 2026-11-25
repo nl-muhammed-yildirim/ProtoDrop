@@ -15,6 +15,7 @@ namespace wa.application.UseCases.Auth;
 /// <summary>Reads the org name PATCH field; HandleNull makes an explicit JSON null reach Read so it can be told apart from absence.</summary>
 public sealed class OrgNamePatchJsonConverter : JsonConverter<OrgNamePatch>
 {
+    /// <summary>True so that an explicit JSON <c>null</c> reaches <see cref="Read"/> instead of being skipped.</summary>
     /// <inheritdoc />
     public override bool HandleNull => true;
 

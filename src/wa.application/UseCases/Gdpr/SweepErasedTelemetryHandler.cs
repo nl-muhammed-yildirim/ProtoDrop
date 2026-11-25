@@ -14,9 +14,9 @@ public sealed class SweepErasedTelemetryHandler
     private readonly ILogger<SweepErasedTelemetryHandler> _logger;
 
     /// <summary>Initializes a new instance of the <see cref="SweepErasedTelemetryHandler"/> class.</summary>
-    /// <param name="store">The store.</param>
-    /// <param name="eraser">The eraser.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="store">Store that claims the window and tracks pending markers.</param>
+    /// <param name="eraser">Port that erases the telemetry of one user.</param>
+    /// <param name="logger">Logger for diagnostics (never logs user ids).</param>
     public SweepErasedTelemetryHandler(IGdprSweepStore store, ITelemetryEraser eraser, ILogger<SweepErasedTelemetryHandler> logger)
     {
         _store = store;
@@ -25,7 +25,7 @@ public sealed class SweepErasedTelemetryHandler
     }
 
     /// <summary>Returns the number of markers swept (0 when the claim was lost or nothing is due).</summary>
-    /// <param name="nowUtc">The now UTC.</param>
+    /// <param name="nowUtc">Current UTC time; defines the claim window and the 24-hour cutoff.</param>
     /// <param name="ct">Token that cancels the operation.</param>
     /// <returns>The resulting numeric value.</returns>
     public async Task<int> RunAsync(DateTime nowUtc, CancellationToken ct)
@@ -68,8 +68,8 @@ public sealed class SweepErasedTelemetryHandler
     }
 
     /// <summary>Truncate a UTC DateTime to the hour boundary (TA-6.1 JobRun window key).</summary>
-    /// <param name="utc">The UTC.</param>
-    /// <returns>The timestamp.</returns>
+    /// <param name="utc">Any UTC time.</param>
+    /// <returns><paramref name="utc"/> rounded down to the full hour, with UTC kind.</returns>
     public static DateTime TruncateToHour(DateTime utc) =>
         new(utc.Year, utc.Month, utc.Day, utc.Hour, 0, 0, DateTimeKind.Utc);
 }

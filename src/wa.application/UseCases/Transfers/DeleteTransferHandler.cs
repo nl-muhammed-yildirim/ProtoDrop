@@ -17,9 +17,9 @@ public sealed class DeleteTransferHandler : IRequestHandler<DeleteTransferComman
     private readonly IEventPublisher _eventPublisher;
 
     /// <summary>Initializes a new instance of the <see cref="DeleteTransferHandler"/> class.</summary>
-    /// <param name="store">The store.</param>
-    /// <param name="eventPublisher">The event publisher.</param>
-    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    /// <param name="store">Store that soft-deletes the transfer and releases its blob references.</param>
+    /// <param name="eventPublisher">Publishes the <c>transfer.deleted</c> event.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="store"/> or <paramref name="eventPublisher"/> is null.</exception>
     public DeleteTransferHandler(ITransferStore store, IEventPublisher eventPublisher)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));

@@ -19,9 +19,9 @@ public sealed class ActivateScheduledTransfersHandler
     private readonly ILogger<ActivateScheduledTransfersHandler> _logger;
 
     /// <summary>Initializes a new instance of the <see cref="ActivateScheduledTransfersHandler"/> class.</summary>
-    /// <param name="store">The store.</param>
-    /// <param name="eventPublisher">The event publisher.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="store">Store that claims the window and flips due transfers to Active.</param>
+    /// <param name="eventPublisher">Publishes the <c>transfer.created</c> event for each activated transfer.</param>
+    /// <param name="logger">Logger for diagnostics (never logs addresses).</param>
     public ActivateScheduledTransfersHandler(
         IScheduledSendStore store,
         IEventPublisher eventPublisher,
@@ -33,9 +33,9 @@ public sealed class ActivateScheduledTransfersHandler
     }
 
     /// <summary>Run the sub-step. Returns the number of transfers activated (0 if the claim was lost or nothing was due).</summary>
-    /// <param name="nowUtc">The now UTC.</param>
+    /// <param name="nowUtc">Current UTC time; defines the 15-minute claim window and which transfers are due.</param>
     /// <param name="ct">Token that cancels the operation.</param>
-    /// <returns>The resulting numeric value.</returns>
+    /// <returns>The number of transfers activated; zero when the claim was lost or nothing was due.</returns>
     public async Task<int> RunAsync(DateTime nowUtc, CancellationToken ct)
     {
         var runWindowStart = ExpireTransfersHandler.TruncateTo15Min(nowUtc);

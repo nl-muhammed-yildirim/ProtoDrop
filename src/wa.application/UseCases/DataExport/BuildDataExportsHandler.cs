@@ -16,9 +16,9 @@ public sealed class BuildDataExportsHandler
     private readonly ILogger<BuildDataExportsHandler> _logger;
 
     /// <summary>Initializes a new instance of the <see cref="BuildDataExportsHandler"/> class.</summary>
-    /// <param name="store">The store.</param>
-    /// <param name="blobs">The blobs.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="store">Job store that claims the window and reads and updates export rows.</param>
+    /// <param name="blobs">Blob store that receives the built zips and deletes purged ones.</param>
+    /// <param name="logger">Logger for diagnostics (never logs user data).</param>
     public BuildDataExportsHandler(IDataExportJobStore store, IBlobStore blobs, ILogger<BuildDataExportsHandler> logger)
     {
         _store = store;
@@ -27,9 +27,9 @@ public sealed class BuildDataExportsHandler
     }
 
     /// <summary>Runs one pass. Returns the number of exports built to ready (0 when the claim was lost).</summary>
-    /// <param name="nowUtc">The now UTC.</param>
+    /// <param name="nowUtc">Current UTC time; defines the claim window and the retention cutoff.</param>
     /// <param name="ct">Token that cancels the operation.</param>
-    /// <returns>The resulting numeric value.</returns>
+    /// <returns>The number of exports that became ready; zero when the window claim was lost.</returns>
     public async Task<int> RunAsync(DateTime nowUtc, CancellationToken ct)
     {
         var windowStart = TruncateTo5Min(nowUtc);
@@ -94,8 +94,8 @@ public sealed class BuildDataExportsHandler
     }
 
     /// <summary>Truncate a UTC DateTime to its 5-minute boundary (TA-6.1 JobRun window key).</summary>
-    /// <param name="utc">The UTC.</param>
-    /// <returns>The timestamp.</returns>
+    /// <param name="utc">Any UTC time.</param>
+    /// <returns><paramref name="utc"/> rounded down to the previous five-minute mark, with UTC kind.</returns>
     public static DateTime TruncateTo5Min(DateTime utc) =>
         new(utc.Year, utc.Month, utc.Day, utc.Hour, (utc.Minute / 5) * 5, 0, DateTimeKind.Utc);
 }

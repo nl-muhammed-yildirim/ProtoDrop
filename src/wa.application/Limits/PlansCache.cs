@@ -8,9 +8,9 @@ namespace wa.application.Limits;
 /// 30 s TTL cache over <see cref="IPlansStore"/> (FR-053-4). Every plan read goes through here — no direct store calls outside the caches.
 /// The host wires both caches with the same value from <c>Wa:Flags:TtlSeconds</c> (TA-3.4) — no literal in this class.
 /// </summary>
-/// <param name="plans">The plans of the plans cache.</param>
-/// <param name="ttl">The TTL of the plans cache.</param>
-/// <param name="clock">The clock of the plans cache.</param>
+/// <param name="plans">Store that is read on a cache miss.</param>
+/// <param name="ttl">How long a fetched plan stays valid.</param>
+/// <param name="clock">Time source (injected for tests).</param>
 public sealed class PlansCache(IPlansStore plans, TimeSpan ttl, Func<DateTimeOffset> clock)
 {
     private readonly ConcurrentDictionary<string, Entry> _entries = new();

@@ -9,9 +9,7 @@ using wa.domain.Telemetry;
 
 namespace wa.application.UseCases.Billing;
 
-/// <summary>
-/// Handles <see cref="HandleStripeWebhookCommand"/> and produces <see cref="StripeWebhookOutcome"/>.
-/// </summary>
+/// <summary>Handles <see cref="HandleStripeWebhookCommand"/>: applies subscription and invoice events to the billing mirror and the user's plan exactly once (deduplicated by Stripe event id) and publishes the resulting events.</summary>
 public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWebhookCommand, StripeWebhookOutcome>
 {
     private const string SubscriptionCreated = "customer.subscription.created";
@@ -35,14 +33,14 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
     private readonly ILogger<HandleStripeWebhookHandler> _logger;
 
     /// <summary>Initializes a new instance of the <see cref="HandleStripeWebhookHandler"/> class.</summary>
-    /// <param name="store">The store.</param>
-    /// <param name="sequence">The sequence.</param>
-    /// <param name="plans">The plans.</param>
-    /// <param name="source">The source.</param>
-    /// <param name="events">The events.</param>
-    /// <param name="telemetry">The telemetry.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
-    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    /// <param name="store">Store that mirrors subscriptions and records processed events.</param>
+    /// <param name="sequence">Store for the payment-failed email sequence.</param>
+    /// <param name="plans">Store used to resolve plan ids and codes.</param>
+    /// <param name="source">Source used to fetch the current subscription state from Stripe.</param>
+    /// <param name="events">Publishes plan and billing email events.</param>
+    /// <param name="telemetry">Reporter for the <c>plan_changed</c> telemetry event.</param>
+    /// <param name="logger">Logger for diagnostics (never logs emails).</param>
+    /// <exception cref="ArgumentNullException">Thrown when any argument is null.</exception>
     public HandleStripeWebhookHandler(
         IStripeBillingStore store,
         IBillingSequenceStore sequence,

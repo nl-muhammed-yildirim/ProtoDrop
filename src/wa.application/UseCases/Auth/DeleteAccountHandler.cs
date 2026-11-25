@@ -22,11 +22,11 @@ public sealed class DeleteAccountHandler : IRequestHandler<DeleteAccountCommand,
     private readonly ILogger<DeleteAccountHandler>? _logger;
 
     /// <summary>Initializes a new instance of the <see cref="DeleteAccountHandler"/> class.</summary>
-    /// <param name="users">The users.</param>
-    /// <param name="eventPublisher">The event publisher.</param>
-    /// <param name="telemetry">The telemetry.</param>
-    /// <param name="blobs">The blobs.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="users">Store that soft-deletes the account and re-homes its transfers.</param>
+    /// <param name="eventPublisher">Publishes the <c>account.deleted</c> event.</param>
+    /// <param name="telemetry">Reporter for the <c>account_deleted</c> telemetry event.</param>
+    /// <param name="blobs">Blob store used to remove the user's organization logo.</param>
+    /// <param name="logger">Optional logger for the best-effort logo cleanup warning.</param>
     public DeleteAccountHandler(IAppUserStore users, IEventPublisher eventPublisher, WaTelemetryReporter telemetry, IBlobStore blobs,
         ILogger<DeleteAccountHandler>? logger = null)
     {

@@ -6,14 +6,15 @@ namespace wa.application.Ports;
 public interface IPlansStore
 {
     /// <summary>Returns the seeded row for <paramref name="planCode"/>, or throws <see cref="PlanUnknownException"/> when no such plan exists (AC-053-4).</summary>
-    /// <param name="planCode">The plan code.</param>
+    /// <param name="planCode">Plan code to load, for example the default plan code.</param>
     /// <param name="cancellationToken">Token that cancels the operation.</param>
-    /// <returns>The plan.</returns>
+    /// <returns>The seeded plan row.</returns>
+    /// <exception cref="PlanUnknownException">Thrown when no plan with that code exists.</exception>
     Task<Plan> GetAsync(string planCode, CancellationToken cancellationToken);
 
     /// <summary>T-008-02: resolve a plan by its Id for LoginResult.PlanCode. Returns the row or null — never throws.</summary>
-    /// <param name="planId">Identifier of the plan.</param>
+    /// <param name="planId">Primary key of the plan.</param>
     /// <param name="cancellationToken">Token that cancels the operation.</param>
-    /// <returns>The plan, or <see langword="null"/> when there is none.</returns>
+    /// <returns>The plan row, or <see langword="null"/> when no plan has that id.</returns>
     Task<Plan?> GetByIdAsync(Guid planId, CancellationToken cancellationToken);
 }

@@ -12,6 +12,6 @@ namespace wa.application.UseCases.Transfers;
 public sealed class UnlockPasswordMissingException : Exception
 {
     /// <summary>Initializes a new instance of the <see cref="UnlockPasswordMissingException"/> class.</summary>
-    /// <param name="message">The message.</param>
+    /// <param name="message">Description of the missing field, returned as the validation detail.</param>
     public UnlockPasswordMissingException(string message) : base(message) { }
 }

@@ -28,17 +28,17 @@ public sealed class GetPublicTransferHandler : IRequestHandler<GetPublicTransfer
     private readonly ILogger<GetPublicTransferHandler> _logger;
 
     /// <summary>Initializes a new instance of the <see cref="GetPublicTransferHandler"/> class.</summary>
-    /// <param name="store">The store.</param>
-    /// <param name="limits">The limits.</param>
-    /// <param name="telemetry">The telemetry.</param>
-    /// <param name="tokens">The tokens.</param>
-    /// <param name="branding">The branding.</param>
-    /// <param name="features">The features.</param>
-    /// <param name="blobs">The blobs.</param>
-    /// <param name="logoMinter">The logo minter.</param>
-    /// <param name="users">The users.</param>
-    /// <param name="flags">The flags.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="store">Store that reads the transfer by link id.</param>
+    /// <param name="limits">Provider of the guest plan's limits.</param>
+    /// <param name="telemetry">Reporter for the <c>transfer_page_viewed</c> and <c>transfer_not_found</c> events.</param>
+    /// <param name="tokens">Verifies the unlock token of password-protected transfers.</param>
+    /// <param name="branding">Store that reads the sender's organization branding.</param>
+    /// <param name="features">Provider of the sender plan's feature toggles.</param>
+    /// <param name="blobs">Blob store used to check that the logo blob exists.</param>
+    /// <param name="logoMinter">Mints the inline read URL of the sender's logo.</param>
+    /// <param name="users">Store used to resolve the sender's plan.</param>
+    /// <param name="flags">Resolver for the ads feature gate.</param>
+    /// <param name="logger">Logger for diagnostics.</param>
     public GetPublicTransferHandler(
         IPublicTransferStore store,
         ILimitsProvider limits,

@@ -3,7 +3,7 @@ using MediatR;
 namespace wa.application.UseCases.Admin;
 
 /// <summary>T-011-03: handler — returns the cached snapshot (no store call here; the cache owns the TTL).</summary>
-/// <param name="cache">The cache of the get overview query handler.</param>
+/// <param name="cache">Snapshot cache that owns the refresh interval.</param>
 public sealed class GetOverviewQueryHandler(OverviewSnapshotCache cache) : IRequestHandler<GetOverviewQuery, GetOverviewResult>
 {
     /// <inheritdoc />

@@ -1,14 +1,14 @@
 namespace wa.application.UseCases.Billing;
 
-/// <summary>Enumerates the invoice paid outcome values.</summary>
+/// <summary>What happened when a paid invoice was applied to the payment-failed email sequence.</summary>
 public enum InvoicePaidOutcome
 {
-    /// <summary>Cancelled.</summary>
+    /// <summary>An open sequence existed and its remaining emails were cancelled.</summary>
     Cancelled,
-    /// <summary>No sequence.</summary>
+    /// <summary>There was no open sequence for the subscription; nothing to cancel.</summary>
     NoSequence,
-    /// <summary>Duplicate event.</summary>
+    /// <summary>The Stripe event was already processed.</summary>
     DuplicateEvent,
-    /// <summary>Conflict.</summary>
+    /// <summary>The event raced the email pass; it is rejected as retryable so Stripe redelivers it.</summary>
     Conflict
 }

@@ -34,12 +34,12 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
     private const string GraceEndedSubject = "You're back on ProtoDrop Free";
 
     /// <summary>Initializes a new instance of the <see cref="SendBillingEmailHandler"/> class.</summary>
-    /// <param name="emailSender">The email sender.</param>
-    /// <param name="eventPublisher">The event publisher.</param>
-    /// <param name="config">The config.</param>
-    /// <param name="telemetry">The telemetry.</param>
-    /// <param name="logger">The logger used for diagnostics.</param>
-    /// <param name="templateRoot">The template root.</param>
+    /// <param name="emailSender">Port that delivers the rendered email.</param>
+    /// <param name="eventPublisher">Publishes the <c>email.sent</c> and <c>email.failed</c> events.</param>
+    /// <param name="config">Configuration source for the public site URL and sender address.</param>
+    /// <param name="telemetry">Reporter for the email and dead-letter telemetry events.</param>
+    /// <param name="logger">Logger for diagnostics (never logs the address).</param>
+    /// <param name="templateRoot">Directory that holds the per-kind template folders.</param>
     public SendBillingEmailHandler(
         IEmailSender emailSender,
         IEventPublisher eventPublisher,
