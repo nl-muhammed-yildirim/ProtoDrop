@@ -11,8 +11,13 @@ public sealed class PlanContextMiddleware
 {
     private readonly RequestDelegate _next;
 
+    /// <summary>Initializes a new instance of the <see cref="PlanContextMiddleware"/> class.</summary>
+    /// <param name="next">The next.</param>
     public PlanContextMiddleware(RequestDelegate next) => _next = next;
 
+    /// <summary>Invokes the operation.</summary>
+    /// <param name="context">The context.</param>
+    /// <param name="accessor">The accessor.</param>
     public async Task InvokeAsync(HttpContext context, PlanContextAccessor accessor)
     {
         accessor.Bind(context.Items[SessionMiddleware.SessionUserIdKey] as Guid?);

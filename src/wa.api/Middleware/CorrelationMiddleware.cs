@@ -12,8 +12,12 @@ public sealed class CorrelationMiddleware
 {
     private readonly RequestDelegate _next;
 
+    /// <summary>Initializes a new instance of the <see cref="CorrelationMiddleware"/> class.</summary>
+    /// <param name="next">The next.</param>
     public CorrelationMiddleware(RequestDelegate next) => _next = next;
 
+    /// <summary>Invokes the operation.</summary>
+    /// <param name="httpContext">The HTTP context.</param>
     public async Task InvokeAsync(HttpContext httpContext)
     {
         var traceparent = W3CTraceParser.Parse(httpContext.Request.Headers.TraceParent.ToString());

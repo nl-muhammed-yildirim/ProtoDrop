@@ -17,6 +17,10 @@ public class GdprSweepFunction
     private readonly ILogger<GdprSweepFunction> _logger;
     private readonly IConfiguration _config;
 
+    /// <summary>Initializes a new instance of the <see cref="GdprSweepFunction"/> class.</summary>
+    /// <param name="handler">The handler.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="config">The config.</param>
     public GdprSweepFunction(SweepErasedTelemetryHandler handler, ILogger<GdprSweepFunction> logger, IConfiguration config)
     {
         _handler = handler;
@@ -24,6 +28,9 @@ public class GdprSweepFunction
         _config = config;
     }
 
+    /// <summary>Runs the operation.</summary>
+    /// <param name="context">The context.</param>
+    /// <param name="trigger">The trigger.</param>
     [Function("GdprSweep")]
     public async Task Run(
         FunctionContext context,
@@ -46,6 +53,9 @@ public class GdprSweepFunction
     }
 
     /// <summary>HTTP trigger for E2E manual invocation (outside the 02:00 timer).</summary>
+    /// <param name="context">The context.</param>
+    /// <param name="req">The req.</param>
+    /// <returns>The HTTP response data.</returns>
     [Function("GdprSweepHttp")]
     public async Task<HttpResponseData> RunHttp(
         FunctionContext context,

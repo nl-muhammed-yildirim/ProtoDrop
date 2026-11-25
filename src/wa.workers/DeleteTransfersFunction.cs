@@ -19,6 +19,10 @@ public class DeleteTransfersFunction
     private readonly ILogger<DeleteTransfersFunction> _logger;
     private readonly IConfiguration _config;
 
+    /// <summary>Initializes a new instance of the <see cref="DeleteTransfersFunction"/> class.</summary>
+    /// <param name="handler">The handler.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="config">The config.</param>
     public DeleteTransfersFunction(DeleteExpiredTransfersHandler handler, ILogger<DeleteTransfersFunction> logger, IConfiguration config)
     {
         _handler = handler;
@@ -26,6 +30,9 @@ public class DeleteTransfersFunction
         _config = config;
     }
 
+    /// <summary>Runs the operation.</summary>
+    /// <param name="context">The context.</param>
+    /// <param name="trigger">The trigger.</param>
     [Function("DeleteTransfers")]
     public async Task Run(
         FunctionContext context,
@@ -49,6 +56,9 @@ public class DeleteTransfersFunction
     }
 
     /// <summary>T-005-04: HTTP trigger for E2E manual invocation (accelerates the 15-min timer).</summary>
+    /// <param name="context">The context.</param>
+    /// <param name="req">The req.</param>
+    /// <returns>The HTTP response data.</returns>
     [Function("DeleteTransfersHttp")]
     public async Task<HttpResponseData> RunHttp(
         FunctionContext context,

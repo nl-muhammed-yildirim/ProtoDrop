@@ -11,6 +11,12 @@ namespace wa.api.Middleware;
 /// </summary>
 public static class FeatureGateEndpointFilter
 {
+    /// <summary>Requires the feature.</summary>
+    /// <typeparam name="TBuilder">The builder type.</typeparam>
+    /// <param name="builder">The builder.</param>
+    /// <param name="gateKey">The gate key.</param>
+    /// <returns>The t builder.</returns>
+    /// <exception cref="ArgumentException">Thrown when an argument is invalid.</exception>
     public static TBuilder RequireFeature<TBuilder>(this TBuilder builder, string gateKey) where TBuilder : IEndpointConventionBuilder
     {
         if (!FeatureGates.All.Contains(gateKey, StringComparer.Ordinal))

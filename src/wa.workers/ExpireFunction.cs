@@ -23,6 +23,13 @@ public class ExpireFunction
     private readonly ILogger<ExpireFunction> _logger;
     private readonly IConfiguration _config;
 
+    /// <summary>Initializes a new instance of the <see cref="ExpireFunction"/> class.</summary>
+    /// <param name="handler">The handler.</param>
+    /// <param name="scheduled">The scheduled.</param>
+    /// <param name="billingEmails">The billing emails.</param>
+    /// <param name="billingGrace">The billing grace.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="config">The config.</param>
     public ExpireFunction(
         ExpireTransfersHandler handler,
         ActivateScheduledTransfersHandler scheduled,
@@ -39,6 +46,9 @@ public class ExpireFunction
         _config = config;
     }
 
+    /// <summary>Runs the operation.</summary>
+    /// <param name="context">The context.</param>
+    /// <param name="trigger">The trigger.</param>
     [Function("Expire")]
     public async Task Run(
         FunctionContext context,
@@ -75,6 +85,9 @@ public class ExpireFunction
     }
 
     /// <summary>T-005-04: HTTP trigger for E2E manual invocation (accelerates the 15-min timer).</summary>
+    /// <param name="context">The context.</param>
+    /// <param name="req">The req.</param>
+    /// <returns>The HTTP response data.</returns>
     [Function("ExpireHttp")]
     public async Task<HttpResponseData> RunHttp(
         FunctionContext context,

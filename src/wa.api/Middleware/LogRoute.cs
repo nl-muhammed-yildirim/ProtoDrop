@@ -14,6 +14,8 @@ public static class LogRoute
     public const string Unmatched = "(unmatched)";
 
     /// <summary>The matched route template, or <see cref="Unmatched"/>.</summary>
+    /// <param name="context">The context.</param>
+    /// <returns>The resulting text.</returns>
     public static string Of(HttpContext context) =>
         (context.GetEndpoint() as RouteEndpoint)?.RoutePattern.RawText ?? Unmatched;
 
@@ -21,6 +23,11 @@ public static class LogRoute
     /// Serilog request-logging properties (default template <c>HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed}</c>)
     /// with <c>RequestPath</c> = route template. The raw <paramref name="requestPath"/> is ignored on purpose (TA-9.4).
     /// </summary>
+    /// <param name="context">The context.</param>
+    /// <param name="requestPath">The request path.</param>
+    /// <param name="elapsedMs">The elapsed ms.</param>
+    /// <param name="statusCode">The status code.</param>
+    /// <returns>The matching log event property items.</returns>
     public static IEnumerable<LogEventProperty> RequestLogProperties(HttpContext context, string requestPath, double elapsedMs, int statusCode) =>
     [
         new LogEventProperty("RequestMethod", new ScalarValue(context.Request.Method)),

@@ -19,6 +19,10 @@ public class DeleteBlobsFunction
     private readonly ILogger<DeleteBlobsFunction> _logger;
     private readonly IConfiguration _config;
 
+    /// <summary>Initializes a new instance of the <see cref="DeleteBlobsFunction"/> class.</summary>
+    /// <param name="handler">The handler.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="config">The config.</param>
     public DeleteBlobsFunction(DeleteOrphanBlobsHandler handler, ILogger<DeleteBlobsFunction> logger, IConfiguration config)
     {
         _handler = handler;
@@ -26,6 +30,9 @@ public class DeleteBlobsFunction
         _config = config;
     }
 
+    /// <summary>Runs the operation.</summary>
+    /// <param name="context">The context.</param>
+    /// <param name="trigger">The trigger.</param>
     [Function("DeleteBlobs")]
     public async Task Run(
         FunctionContext context,
@@ -49,6 +56,9 @@ public class DeleteBlobsFunction
     }
 
     /// <summary>T-005-04: HTTP trigger for E2E manual invocation (accelerates the hourly timer).</summary>
+    /// <param name="context">The context.</param>
+    /// <param name="req">The req.</param>
+    /// <returns>The HTTP response data.</returns>
     [Function("DeleteBlobsHttp")]
     public async Task<HttpResponseData> RunHttp(
         FunctionContext context,

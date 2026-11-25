@@ -29,6 +29,14 @@ public class ZipFunction
     private readonly IConfiguration _config;
     private readonly ILogger<ZipFunction> _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="ZipFunction"/> class.</summary>
+    /// <param name="blobStore">The blob store.</param>
+    /// <param name="sasMinter">The SAS minter.</param>
+    /// <param name="fileSource">The file source.</param>
+    /// <param name="limits">The limits.</param>
+    /// <param name="telemetry">The telemetry.</param>
+    /// <param name="config">The config.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
     public ZipFunction(
         IBlobStore blobStore,
         IBlobSasMinter sasMinter,
@@ -47,6 +55,11 @@ public class ZipFunction
         _logger = logger;
     }
 
+    /// <summary>Runs the HTTP response data.</summary>
+    /// <param name="context">The context.</param>
+    /// <param name="req">The req.</param>
+    /// <param name="transferIdParam">The transfer ID param.</param>
+    /// <returns>The HTTP response data.</returns>
     [Function("Zip")]
     public async Task<HttpResponseData> Run(
         FunctionContext context,
@@ -165,6 +178,9 @@ public class ZipFunction
     /// <summary>
     /// FR-004-5: de-dup algorithm for zip entry names — deterministic, ordered by SortOrder.
     /// </summary>
+    /// <param name="originalName">The original name.</param>
+    /// <param name="usedNames">The used names.</param>
+    /// <returns>The resulting text.</returns>
     public static string DeduplicateName(string originalName, HashSet<string> usedNames)
     {
         if (usedNames.Add(originalName)) return originalName;

@@ -17,6 +17,11 @@ public static class ProblemWriter
     public const string TypeBase = "https://example.com/errors/";
 
     /// <summary>Builds the Problem payload as a node tree with exact key order (JsonObject preserves insertion order).</summary>
+    /// <param name="status">The status.</param>
+    /// <param name="code">The code.</param>
+    /// <param name="details">The details.</param>
+    /// <param name="errors">The errors.</param>
+    /// <returns>The JSON object.</returns>
     public static JsonObject Build(int status, string code, string details, IReadOnlyList<ProblemFieldError>? errors = null)
     {
         var payload = new JsonObject()
@@ -37,6 +42,11 @@ public static class ProblemWriter
     /// <summary>
     /// Writes the Problem response and commits it before writing a single body byte (Response.StartAsync). Kestrel flushes headers with the first bytes, so any header set after this method returns is lost — callers that must carry extra headers (e.g. Retry-After) set them on <c>context.Response.Headers</c> beforehand.
     /// </summary>
+    /// <param name="context">The context.</param>
+    /// <param name="status">The status.</param>
+    /// <param name="code">The code.</param>
+    /// <param name="details">The details.</param>
+    /// <param name="errors">The errors.</param>
     public static async Task WriteCompleteAsync(HttpContext context, int status, string code, string details, IReadOnlyList<ProblemFieldError>? errors = null)
     {
         var payload = Build(status, code, details, errors);
@@ -45,6 +55,12 @@ public static class ProblemWriter
         await context.Response.StartAsync(); // commits headers — everything set on Response.Headers up to now is locked in
         await JsonSerializer.SerializeAsync(context.Response.Body, payload);
     }
+    /// <summary>Writes the operation.</summary>
+    /// <param name="context">The context.</param>
+    /// <param name="status">The status.</param>
+    /// <param name="code">The code.</param>
+    /// <param name="details">The details.</param>
+    /// <param name="errors">The errors.</param>
     public static async Task WriteAsync(HttpContext context, int status, string code, string details, IReadOnlyList<ProblemFieldError>? errors = null)
     {
         var payload = Build(status, code, details, errors);

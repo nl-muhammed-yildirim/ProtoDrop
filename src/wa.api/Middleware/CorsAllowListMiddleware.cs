@@ -15,6 +15,9 @@ public sealed class CorsAllowListMiddleware
     private readonly RequestDelegate _next;
     private readonly string[] _allowedOrigins;
 
+    /// <summary>Initializes a new instance of the <see cref="CorsAllowListMiddleware"/> class.</summary>
+    /// <param name="next">The next.</param>
+    /// <param name="configuration">The configuration.</param>
     public CorsAllowListMiddleware(RequestDelegate next, IConfiguration configuration)
     {
         _next = next;
@@ -25,6 +28,8 @@ public sealed class CorsAllowListMiddleware
             : configured.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
+    /// <summary>Invokes the operation.</summary>
+    /// <param name="context">The context.</param>
     public async Task InvokeAsync(HttpContext context)
     {
         var origin = context.Request.Headers.Origin.ToString();

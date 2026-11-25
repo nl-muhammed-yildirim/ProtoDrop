@@ -5,23 +5,30 @@ namespace wa.api.Middleware;
 
 /// <summary>
 /// T-008-02 (FR-008-2 / TA-9.1): session middleware — reads wa.session cookie, parses via ISessionTokenMinter.Parse.
-/// Valid → sets user id in HttpContext.Items['wa.session.userId'] for endpoints 13–15; refreshes cookie when lifetime < 15 days (rolling).
+/// Valid → sets user id in HttpContext.Items['wa.session.userId'] for endpoints 13–15; refreshes cookie when lifetime &lt; 15 days (rolling).
 /// Missing/invalid/expired → guest (item null). No response writes except Set-Cookie refresh.
 /// </summary>
 public sealed class SessionMiddleware
 {
+    /// <summary>The session user ID key constant; value <c>wa.session.userId</c>.</summary>
     public const string SessionUserIdKey = "wa.session.userId";
     private const string CookieName = "wa.session";
 
     private readonly RequestDelegate _next;
     private readonly ISessionTokenMinter _tokens; // production = SessionTokenService (minter + reader in one class so format can't drift)
 
+    /// <summary>Initializes a new instance of the <see cref="SessionMiddleware"/> class.</summary>
+    /// <param name="next">The next.</param>
+    /// <param name="tokens">The tokens.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public SessionMiddleware(RequestDelegate next, ISessionTokenMinter tokens)
     {
         _next = next;
         _tokens = tokens ?? throw new ArgumentNullException(nameof(tokens));
     }
 
+    /// <summary>Invokes the operation.</summary>
+    /// <param name="context">The context.</param>
     public async Task InvokeAsync(HttpContext context)
     {
         var sessionCookie = context.Request.Cookies[CookieName];

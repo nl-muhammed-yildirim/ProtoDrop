@@ -14,12 +14,17 @@ public sealed class GlobalErrorMiddleware
     private readonly RequestDelegate _next;
     private readonly ILogger<GlobalErrorMiddleware> _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="GlobalErrorMiddleware"/> class.</summary>
+    /// <param name="next">The next.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
     public GlobalErrorMiddleware(RequestDelegate next, ILogger<GlobalErrorMiddleware> logger)
     {
         _next = next;
         _logger = logger;
     }
 
+    /// <summary>Invokes the operation.</summary>
+    /// <param name="context">The context.</param>
     public async Task InvokeAsync(HttpContext context)
     {
         try

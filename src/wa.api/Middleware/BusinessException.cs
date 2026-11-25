@@ -8,10 +8,16 @@ namespace wa.api.Middleware;
 /// </summary>
 public sealed class BusinessException : Exception
 {
+    /// <summary>Initializes a new instance of the <see cref="BusinessException"/> class.</summary>
+    /// <param name="code">The code.</param>
+    /// <param name="details">The details.</param>
     public BusinessException(string code, string details)
         : base(details) => Code = code;
 
     /// <summary>Preserves the inner exception so its stack trace survives — the wire shape still comes from <see cref="Code"/> + the pipeline.</summary>
+    /// <param name="code">The code.</param>
+    /// <param name="details">The details.</param>
+    /// <param name="innerException">The inner exception.</param>
     public BusinessException(string code, string details, Exception innerException)
         : base(details, innerException) => Code = code;
 
@@ -21,5 +27,6 @@ public sealed class BusinessException : Exception
     /// <summary>Optional per-field validation errors (TA-4.1.3 optional <c>errors[]</c>) — present only for VALIDATION-shaped responses.</summary>
     public IReadOnlyList<ProblemFieldError>? Errors { get; set; }
 
+    /// <summary>Gets the status of the business exception.</summary>
     internal int Status => ProblemCodes.StatusOf(Code);
 }

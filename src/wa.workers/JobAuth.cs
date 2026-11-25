@@ -8,6 +8,9 @@ namespace wa.workers;
 public static class JobAuth
 {
     /// <summary>Verify x-job-sign header against Wa:Jobs:SignKey using timing-safe comparison. Returns true if valid.</summary>
+    /// <param name="config">The config.</param>
+    /// <param name="req">The req.</param>
+    /// <returns><see langword="true"/> when the operation succeeded; otherwise <see langword="false"/>.</returns>
     public static bool Verify(IConfiguration config, HttpRequestData req)
     {
         var expected = config["Wa:Jobs:SignKey"];
@@ -23,6 +26,9 @@ public static class JobAuth
     }
 
     /// <summary>Create a 200 JSON success response.</summary>
+    /// <param name="req">The req.</param>
+    /// <param name="payload">The payload.</param>
+    /// <returns>The HTTP response data.</returns>
     public static HttpResponseData CreateSuccess(HttpRequestData req, object payload)
     {
         var json = System.Text.Json.JsonSerializer.Serialize(payload);
@@ -34,6 +40,11 @@ public static class JobAuth
     }
 
     /// <summary>Create a problem JSON response with the given status.</summary>
+    /// <param name="req">The req.</param>
+    /// <param name="status">The status.</param>
+    /// <param name="code">The code.</param>
+    /// <param name="details">The details.</param>
+    /// <returns>The HTTP response data.</returns>
     public static HttpResponseData CreateProblem(HttpRequestData req, int status, string code, string details)
     {
         var payload = new { type = $"https://example.com/errors/{code.ToLowerInvariant()}", title = code, status, code, details };

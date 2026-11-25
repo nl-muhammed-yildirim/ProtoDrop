@@ -30,6 +30,12 @@ public class EmailFunction
     private readonly SendBillingEmailHandler _billingHandler;
     private readonly ILogger<EmailFunction> _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="EmailFunction"/> class.</summary>
+    /// <param name="notificationHandler">The notification handler.</param>
+    /// <param name="magicLinkHandler">The magic link handler.</param>
+    /// <param name="forgotPasswordHandler">The forgot password handler.</param>
+    /// <param name="billingHandler">The billing handler.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
     public EmailFunction(
         SendNotificationEmailsHandler notificationHandler,
         SendMagicLinkEmailHandler magicLinkHandler,
@@ -44,6 +50,9 @@ public class EmailFunction
         _logger = logger;
     }
 
+    /// <summary>Runs the operation.</summary>
+    /// <param name="context">The context.</param>
+    /// <param name="message">The message.</param>
     [Function("f-email")]
     public async Task Run(
         FunctionContext context,

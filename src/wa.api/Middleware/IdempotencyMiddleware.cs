@@ -22,6 +22,10 @@ public sealed class IdempotencyMiddleware
     private readonly IIdempotencyStore _store;
     private readonly ILogger<IdempotencyMiddleware> _logger;
 
+    /// <summary>Initializes a new instance of the <see cref="IdempotencyMiddleware"/> class.</summary>
+    /// <param name="next">The next.</param>
+    /// <param name="store">The store.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
     public IdempotencyMiddleware(RequestDelegate next, IIdempotencyStore store, ILogger<IdempotencyMiddleware> logger)
     {
         _next = next;
@@ -29,6 +33,8 @@ public sealed class IdempotencyMiddleware
         _logger = logger;
     }
 
+    /// <summary>Invokes the operation.</summary>
+    /// <param name="context">The context.</param>
     public async Task InvokeAsync(HttpContext context)
     {
         // Only POST requests on idempotency-protected paths.

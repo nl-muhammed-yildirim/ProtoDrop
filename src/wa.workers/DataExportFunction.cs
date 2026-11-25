@@ -18,6 +18,10 @@ public class DataExportFunction
     private readonly ILogger<DataExportFunction> _logger;
     private readonly IConfiguration _config;
 
+    /// <summary>Initializes a new instance of the <see cref="DataExportFunction"/> class.</summary>
+    /// <param name="handler">The handler.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
+    /// <param name="config">The config.</param>
     public DataExportFunction(BuildDataExportsHandler handler, ILogger<DataExportFunction> logger, IConfiguration config)
     {
         _handler = handler;
@@ -25,6 +29,9 @@ public class DataExportFunction
         _config = config;
     }
 
+    /// <summary>Runs the operation.</summary>
+    /// <param name="context">The context.</param>
+    /// <param name="trigger">The trigger.</param>
     [Function("DataExport")]
     public async Task Run(
         FunctionContext context,
@@ -47,6 +54,9 @@ public class DataExportFunction
     }
 
     /// <summary>HTTP trigger for E2E manual invocation (accelerates the 5-min timer).</summary>
+    /// <param name="context">The context.</param>
+    /// <param name="req">The req.</param>
+    /// <returns>The HTTP response data.</returns>
     [Function("DataExportHttp")]
     public async Task<HttpResponseData> RunHttp(
         FunctionContext context,

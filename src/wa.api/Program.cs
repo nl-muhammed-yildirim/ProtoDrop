@@ -1528,5 +1528,5 @@ app.MapGet("/api/v1/features", async (ISender sender, CancellationToken ct) =>
 
 app.Run();
 
-// Empty partial class so WebApplicationFactory<Program> can resolve the entry point.
+/// <summary>Empty partial class so WebApplicationFactory&lt;Program&gt; can resolve the entry point.</summary>
 public partial class Program { }
