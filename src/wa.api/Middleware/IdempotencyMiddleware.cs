@@ -21,16 +21,19 @@ public sealed class IdempotencyMiddleware
     private readonly RequestDelegate _next;
     private readonly IIdempotencyStore _store;
     private readonly ILogger<IdempotencyMiddleware> _logger;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="IdempotencyMiddleware"/> class.</summary>
     /// <param name="next">Next middleware in the pipeline.</param>
     /// <param name="store">Store that holds replayable responses by idempotency key.</param>
     /// <param name="logger">Logger used only for the debug message written when a stored response is replayed (it logs the idempotency key and status code, never the body).</param>
-    public IdempotencyMiddleware(RequestDelegate next, IIdempotencyStore store, ILogger<IdempotencyMiddleware> logger)
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+    public IdempotencyMiddleware(RequestDelegate next, IIdempotencyStore store, ILogger<IdempotencyMiddleware> logger, TimeProvider timeProvider)
     {
         _next = next;
         _store = store;
         _logger = logger;
+        _timeProvider = timeProvider;
     }
 
     /// <summary>For finalize and send POSTs that carry an <c>Idempotency-Key</c>, replays the stored response of an earlier identical request, or stores the response of this one when it succeeds.</summary>
@@ -61,7 +64,7 @@ public sealed class IdempotencyMiddleware
 
         // Check store: on hit (not expired) replay the stored response.
         var entry = await _store.FindAsync(key, context.RequestAborted);
-        if (entry is not null && entry.ExpiresAtUtc > DateTime.UtcNow)
+        if (entry is not null && entry.ExpiresAtUtc > _timeProvider.GetUtcNow().UtcDateTime)
         {
             _logger.LogDebug("Idempotency hit for key {Key} — replaying {Status}", key, entry.StatusCode);
             context.Response.StatusCode = entry.StatusCode;

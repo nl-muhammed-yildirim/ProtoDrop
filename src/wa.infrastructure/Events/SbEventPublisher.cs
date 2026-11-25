@@ -27,17 +27,20 @@ public sealed class SbEventPublisher : IEventPublisher
     private readonly string _connectionString;
     private readonly ILogger<SbEventPublisher> _logger;
     private readonly IDbContextFactory<WaDbContext> _dbFactory;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="SbEventPublisher"/> class.</summary>
     /// <param name="configuration">Configuration source; supplies the Service Bus connection string.</param>
     /// <param name="logger">Logger for publish failures (the row stays unpublished for re-publish).</param>
     /// <param name="dbFactory">Factory for the database context that holds the outbox table.</param>
-    public SbEventPublisher(IConfiguration configuration, ILogger<SbEventPublisher> logger, IDbContextFactory<WaDbContext> dbFactory)
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+    public SbEventPublisher(IConfiguration configuration, ILogger<SbEventPublisher> logger, IDbContextFactory<WaDbContext> dbFactory, TimeProvider timeProvider)
     {
         // Cached for publish-time use. DI selects this adapter only when the key exists (Program.cs), so production never sees a null here; direct constructions with an empty config throw at publish time from the ServiceBusClient ctor — OutboxRetryTests relies on that path.
         _connectionString = configuration["Wa:ServiceBus:ConnectionString"]!;
         _logger = logger;
         _dbFactory = dbFactory;
+        _timeProvider = timeProvider;
     }
 
     /// <inheritdoc />
@@ -56,7 +59,7 @@ public sealed class SbEventPublisher : IEventPublisher
             PartitionKey = envelope.PartitionKey,
             OccurredAtUtc = envelope.OccurredAtUtc,
             IsPublished = false,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = _timeProvider.GetUtcNow().UtcDateTime
         };
         db.Set<DomainEvent>().Add(row);
         await db.SaveChangesAsync(cancellationToken); // outbox row committed (same change tracker as business data once use cases exist)

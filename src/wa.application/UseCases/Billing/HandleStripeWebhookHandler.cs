@@ -31,6 +31,7 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
     private readonly IEventPublisher _events;
     private readonly WaTelemetryReporter _telemetry;
     private readonly ILogger<HandleStripeWebhookHandler> _logger;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="HandleStripeWebhookHandler"/> class.</summary>
     /// <param name="store">Store that mirrors subscriptions and records processed events.</param>
@@ -40,6 +41,7 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
     /// <param name="events">Publishes plan and billing email events.</param>
     /// <param name="telemetry">Reporter for the <c>plan_changed</c> telemetry event.</param>
     /// <param name="logger">Logger for diagnostics (never logs emails).</param>
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
     /// <exception cref="ArgumentNullException">Thrown when any argument is null.</exception>
     public HandleStripeWebhookHandler(
         IStripeBillingStore store,
@@ -48,7 +50,8 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
         IStripeSubscriptionSource source,
         IEventPublisher events,
         WaTelemetryReporter telemetry,
-        ILogger<HandleStripeWebhookHandler> logger)
+        ILogger<HandleStripeWebhookHandler> logger,
+        TimeProvider timeProvider)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
         _store = store ?? throw new ArgumentNullException(nameof(store));
@@ -57,6 +60,7 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
         _events = events ?? throw new ArgumentNullException(nameof(events));
         _telemetry = telemetry ?? throw new ArgumentNullException(nameof(telemetry));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
     }
 
     /// <inheritdoc />
@@ -123,7 +127,7 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
             // D-4: status → target plan.
             var targetPlanId = await ResolveTargetPlanAsync(change, ct);
 
-            var result = await _store.ApplySubscriptionAsync(change, targetPlanId, DateTime.UtcNow, ct);
+            var result = await _store.ApplySubscriptionAsync(change, targetPlanId, _timeProvider.GetUtcNow().UtcDateTime, ct);
             switch (result.Outcome)
             {
                 case StripeApplyOutcome.Duplicate:
@@ -140,7 +144,7 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
                     EventId = Guid.NewGuid(),
                     Type = EventType.PlanChanged,
                     Version = 1,
-                    OccurredAtUtc = DateTime.UtcNow,
+                    OccurredAtUtc = _timeProvider.GetUtcNow().UtcDateTime,
                     CorrelationId = GetCorrelationGuid(),
                     PartitionKey = result.UserId.ToString("n"),
                     Payload = new
@@ -184,7 +188,7 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
 
         if (type == InvoicePaid)
         {
-            var paid = await _sequence.CancelSequenceAsync(eventId, subId, DateTime.UtcNow, ct);
+            var paid = await _sequence.CancelSequenceAsync(eventId, subId, _timeProvider.GetUtcNow().UtcDateTime, ct);
             switch (paid)
             {
                 case InvoicePaidOutcome.DuplicateEvent:
@@ -197,7 +201,7 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
             }
         }
 
-        var now = DateTime.UtcNow;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var result = await _sequence.StartPaymentFailedAsync(eventId, invoiceId, subId, now, ct);
         switch (result.Outcome)
         {

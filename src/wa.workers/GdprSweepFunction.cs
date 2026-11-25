@@ -16,16 +16,19 @@ public class GdprSweepFunction
     private readonly SweepErasedTelemetryHandler _handler;
     private readonly ILogger<GdprSweepFunction> _logger;
     private readonly IConfiguration _config;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="GdprSweepFunction"/> class.</summary>
     /// <param name="handler">Handler that erases telemetry of deleted accounts and marks their markers swept.</param>
     /// <param name="logger">Logger for the job run (carries the generated correlation ids).</param>
     /// <param name="config">Configuration source for the <c>Wa:Jobs:SignKey</c> that guards the HTTP trigger.</param>
-    public GdprSweepFunction(SweepErasedTelemetryHandler handler, ILogger<GdprSweepFunction> logger, IConfiguration config)
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+    public GdprSweepFunction(SweepErasedTelemetryHandler handler, ILogger<GdprSweepFunction> logger, IConfiguration config, TimeProvider timeProvider)
     {
         _handler = handler;
         _logger = logger;
         _config = config;
+        _timeProvider = timeProvider;
     }
 
     /// <summary>Timer entry point (nightly at 02:00 UTC): runs one GDPR sweep pass under a freshly generated traceparent.</summary>
@@ -42,7 +45,7 @@ public class GdprSweepFunction
 
         try
         {
-            var count = await _handler.RunAsync(DateTime.UtcNow, context.CancellationToken);
+            var count = await _handler.RunAsync(_timeProvider.GetUtcNow().UtcDateTime, context.CancellationToken);
             _logger.LogInformation("f-gdpr-sweep completed: {Count} markers swept", count);
         }
         catch (Exception ex)
@@ -64,7 +67,7 @@ public class GdprSweepFunction
         if (!JobAuth.Verify(_config, req))
             return JobAuth.CreateProblem(req, 401, "Unauthenticated", "Invalid or missing signature.");
 
-        var count = await _handler.RunAsync(DateTime.UtcNow, context.CancellationToken);
+        var count = await _handler.RunAsync(_timeProvider.GetUtcNow().UtcDateTime, context.CancellationToken);
         return JobAuth.CreateSuccess(req, new { swept = count });
     }
 }

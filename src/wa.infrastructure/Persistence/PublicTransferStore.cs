@@ -11,10 +11,16 @@ namespace wa.infrastructure.Persistence;
 public sealed class PublicTransferStore : IPublicTransferStore
 {
     private readonly WaDbContext _db;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="PublicTransferStore"/> class.</summary>
     /// <param name="db">Database context that backs the store.</param>
-    public PublicTransferStore(WaDbContext db) => _db = db;
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+    public PublicTransferStore(WaDbContext db, TimeProvider timeProvider)
+    {
+        _db = db;
+        _timeProvider = timeProvider;
+    }
 
     /// <inheritdoc />
     /// <remarks>
@@ -81,7 +87,7 @@ public sealed class PublicTransferStore : IPublicTransferStore
             IpHash = ipHash,
             UaHash = uaHash,
             UserAgentFamily = userAgentFamily,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = _timeProvider.GetUtcNow().UtcDateTime
         });
         await _db.SaveChangesAsync(ct);
         return new SingleFileDownloadResult(SingleFileDownloadOutcome.Recorded);
@@ -131,7 +137,7 @@ public sealed class PublicTransferStore : IPublicTransferStore
             IpHash = ipHash,
             UaHash = uaHash,
             UserAgentFamily = userAgentFamily,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = _timeProvider.GetUtcNow().UtcDateTime
         });
         await _db.SaveChangesAsync(ct);
         return new SingleFileDownloadResult(SingleFileDownloadOutcome.Recorded);

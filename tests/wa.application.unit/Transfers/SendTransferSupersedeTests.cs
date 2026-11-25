@@ -139,7 +139,7 @@ public class SendTransferSupersedeTests
             _eventPublisher,
             telemetry,
             NullLogger<SendTransferHandler>.Instance,
-            _users);
+            _users, TimeProvider.System);
     }
 
     // ---- Stubs (no Moq — mirrors SendTransferHandlerTests conventions) ----

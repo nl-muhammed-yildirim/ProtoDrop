@@ -22,6 +22,7 @@ public class ExpireFunction
     private readonly EndBillingGraceHandler _billingGrace;
     private readonly ILogger<ExpireFunction> _logger;
     private readonly IConfiguration _config;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="ExpireFunction"/> class.</summary>
     /// <param name="handler">Handler that marks overdue transfers expired.</param>
@@ -30,13 +31,15 @@ public class ExpireFunction
     /// <param name="billingGrace">Handler that downgrades users whose billing grace ended.</param>
     /// <param name="logger">Logger for the job run (carries the generated correlation ids).</param>
     /// <param name="config">Configuration source for the <c>Wa:Jobs:SignKey</c> that guards the HTTP trigger.</param>
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
     public ExpireFunction(
         ExpireTransfersHandler handler,
         ActivateScheduledTransfersHandler scheduled,
         SendBillingEmailsHandler billingEmails,
         EndBillingGraceHandler billingGrace,
         ILogger<ExpireFunction> logger,
-        IConfiguration config)
+        IConfiguration config,
+        TimeProvider timeProvider)
     {
         _handler = handler;
         _scheduled = scheduled;
@@ -44,6 +47,7 @@ public class ExpireFunction
         _billingGrace = billingGrace;
         _logger = logger;
         _config = config;
+        _timeProvider = timeProvider;
     }
 
     /// <summary>Timer entry point (every 15 minutes): expires overdue transfers, then runs the scheduled-send, billing-email and billing-grace sub-steps in that order inside one try block; an exception in any step is logged and rethrown, so the remaining steps are skipped until the next run.</summary>
@@ -58,7 +62,7 @@ public class ExpireFunction
         var tp = W3CTraceParser.New();
         using var scope = _logger.BeginScope(new Dictionary<string, object?> { ["CorrelationId"] = tp.CorrelationId, ["TraceParent"] = tp.ToHeader() });
 
-        var now = DateTime.UtcNow;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         try
         {
             var count = await _handler.RunAsync(now, context.CancellationToken);
@@ -96,7 +100,7 @@ public class ExpireFunction
         if (!JobAuth.Verify(_config, req))
             return JobAuth.CreateProblem(req, 401, "Unauthenticated", "Invalid or missing signature.");
 
-        var now = DateTime.UtcNow;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var count = await _handler.RunAsync(now, context.CancellationToken);
         // US-022-04: same order as the timer — expiry first, then the schedule step (its own "schedule" JobRun claim).
         var activated = await _scheduled.RunAsync(now, context.CancellationToken);

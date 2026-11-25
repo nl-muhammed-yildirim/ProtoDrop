@@ -21,7 +21,7 @@ public class ResendTransferHandlerTests
         _limits = new StubLimitsProvider();
     }
 
-    private ResendTransferHandler NewHandler() => new ResendTransferHandler(_store, _transferStore, _limits);
+    private ResendTransferHandler NewHandler() => new ResendTransferHandler(_store, _transferStore, _limits, TimeProvider.System);
 
     private Transfer NewOriginalTransfer(Guid id, Guid? ownerAppUserId = null, byte status = 1) => new()
     {

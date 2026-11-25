@@ -18,16 +18,19 @@ public class DeleteTransfersFunction
     private readonly DeleteExpiredTransfersHandler _handler;
     private readonly ILogger<DeleteTransfersFunction> _logger;
     private readonly IConfiguration _config;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="DeleteTransfersFunction"/> class.</summary>
     /// <param name="handler">Handler that deletes transfers that are past their grace period.</param>
     /// <param name="logger">Logger for the job run (carries the generated correlation ids).</param>
     /// <param name="config">Configuration source for the <c>Wa:Jobs:SignKey</c> that guards the HTTP trigger.</param>
-    public DeleteTransfersFunction(DeleteExpiredTransfersHandler handler, ILogger<DeleteTransfersFunction> logger, IConfiguration config)
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+    public DeleteTransfersFunction(DeleteExpiredTransfersHandler handler, ILogger<DeleteTransfersFunction> logger, IConfiguration config, TimeProvider timeProvider)
     {
         _handler = handler;
         _logger = logger;
         _config = config;
+        _timeProvider = timeProvider;
     }
 
     /// <summary>Timer entry point (every 15 minutes): runs one transfer deletion pass under a freshly generated traceparent.</summary>
@@ -42,7 +45,7 @@ public class DeleteTransfersFunction
         var tp = W3CTraceParser.New();
         using var scope = _logger.BeginScope(new Dictionary<string, object?> { ["CorrelationId"] = tp.CorrelationId, ["TraceParent"] = tp.ToHeader() });
 
-        var now = DateTime.UtcNow;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         try
         {
             var count = await _handler.RunAsync(now, context.CancellationToken);
@@ -67,7 +70,7 @@ public class DeleteTransfersFunction
         if (!JobAuth.Verify(_config, req))
             return JobAuth.CreateProblem(req, 401, "Unauthenticated", "Invalid or missing signature.");
 
-        var count = await _handler.RunAsync(DateTime.UtcNow, context.CancellationToken);
+        var count = await _handler.RunAsync(_timeProvider.GetUtcNow().UtcDateTime, context.CancellationToken);
         return JobAuth.CreateSuccess(req, new { deleted = count });
     }
 }

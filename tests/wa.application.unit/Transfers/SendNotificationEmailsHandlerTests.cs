@@ -52,7 +52,7 @@ public class SendNotificationEmailsHandlerTests
             config,
             _log,
             _branding,
-            new StubFeaturesProvider());
+            new StubFeaturesProvider(), TimeProvider.System);
     }
 
     [Fact]
@@ -535,7 +535,7 @@ public class SendNotificationEmailsHandlerTests
             new ConfigurationBuilder().AddInMemoryCollection(values).Build(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<SendNotificationEmailsHandler>.Instance,
             _branding,
-            new StubFeaturesProvider());
+            new StubFeaturesProvider(), TimeProvider.System);
     }
 
     private EventEnvelope ArrangeTwoRecipients(string? senderEmail)

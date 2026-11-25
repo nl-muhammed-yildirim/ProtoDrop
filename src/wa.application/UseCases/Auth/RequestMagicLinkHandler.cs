@@ -23,16 +23,20 @@ public sealed class RequestMagicLinkHandler : IRequestHandler<RequestMagicLinkCo
 
     private readonly IAuthTokenStore _tokens;
     private readonly IEventPublisher _eventPublisher;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="RequestMagicLinkHandler"/> class.</summary>
     /// <param name="tokens">Store that persists the single-use token row.</param>
     /// <param name="eventPublisher">Publishes the <c>auth.magic_link_requested</c> event that triggers the email.</param>
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
     public RequestMagicLinkHandler(
         IAuthTokenStore tokens,
-        IEventPublisher eventPublisher)
+        IEventPublisher eventPublisher,
+        TimeProvider timeProvider)
     {
         _tokens = tokens;
         _eventPublisher = eventPublisher;
+        _timeProvider = timeProvider;
     }
 
     /// <inheritdoc />
@@ -49,7 +53,7 @@ public sealed class RequestMagicLinkHandler : IRequestHandler<RequestMagicLinkCo
         var tokenHashHex = ComputeSha256Hex(rawToken); // only the hash is persisted (TA-9.1)
 
         // 3. Persist the AuthToken row with Purpose=1 and 10-minute TTL.
-        var nowUtc = DateTime.UtcNow;
+        var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
         var authToken = new AuthToken
         {
             Id = Guid.NewGuid(),

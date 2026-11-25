@@ -96,7 +96,7 @@ public class ErasureReportIntegrationTests : IAsyncLifetime
         await DeleteAsync(a);
         var sweptAt = DateTime.UtcNow;
 
-        await new GdprSweepStore(new WaDbContextFactory(_options)).MarkSweptAsync(a, sweptAt, CancellationToken.None);
+        await new GdprSweepStore(new WaDbContextFactory(_options), TimeProvider.System).MarkSweptAsync(a, sweptAt, CancellationToken.None);
 
         var (items, _) = await Store().GetPageAsync(null, null, 25, CancellationToken.None);
         var row = Assert.Single(items);

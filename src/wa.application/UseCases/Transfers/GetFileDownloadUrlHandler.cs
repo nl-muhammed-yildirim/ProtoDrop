@@ -21,6 +21,7 @@ public sealed class GetFileDownloadUrlHandler : IRequestHandler<GetFileDownloadU
     private readonly IUnlockTokenMinter _tokens;
     private readonly WaTelemetryReporter _telemetry;
     private readonly ILogger<GetFileDownloadUrlHandler> _logger;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="GetFileDownloadUrlHandler"/> class.</summary>
     /// <param name="store">Store that reads the transfer and records the download.</param>
@@ -28,18 +29,21 @@ public sealed class GetFileDownloadUrlHandler : IRequestHandler<GetFileDownloadU
     /// <param name="tokens">Verifies the unlock token of password-protected transfers.</param>
     /// <param name="telemetry">Reporter whose PII slots hash the client IP and User-Agent.</param>
     /// <param name="logger">Logger injected for the handler (currently unused).</param>
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
     public GetFileDownloadUrlHandler(
         IPublicTransferStore store,
         IBlobSasMinter minter,
         IUnlockTokenMinter tokens,
         WaTelemetryReporter telemetry,
-        ILogger<GetFileDownloadUrlHandler> logger)
+        ILogger<GetFileDownloadUrlHandler> logger,
+        TimeProvider timeProvider)
     {
         _store = store;
         _minter = minter;
         _tokens = tokens;
         _telemetry = telemetry;
         _logger = logger;
+        _timeProvider = timeProvider;
     }
 
     /// <inheritdoc />
@@ -87,7 +91,7 @@ public sealed class GetFileDownloadUrlHandler : IRequestHandler<GetFileDownloadU
         // observe download_completed (M0: no client telemetry pipeline — documented deviation from step 5).
         _telemetry.LogEvent(TelemetryEvents.DownloadStarted);
 
-        return new FileDownloadResult(FileDownloadState.Ok, Url: url, ExpiresAt: DateTimeOffset.UtcNow.AddMinutes(30));
+        return new FileDownloadResult(FileDownloadState.Ok, Url: url, ExpiresAt: _timeProvider.GetUtcNow().AddMinutes(30));
     }
 
     /// <summary>TA-9.4: IP → HMAC-SHA256 keyed by Wa:Jwt:Secret bytes (the reporter's designated slot; null stays null).</summary>

@@ -84,7 +84,7 @@ public class DataExportJobIntegrationTests : IAsyncLifetime
         return row;
     }
 
-    private DataExportJobStore Store() => new(new WaDbContextFactory(_options));
+    private DataExportJobStore Store() => new(new WaDbContextFactory(_options), TimeProvider.System);
 
     private BuildDataExportsHandler Handler(MemoryBlobStore blobs) =>
         new(Store(), blobs, Microsoft.Extensions.Logging.Abstractions.NullLogger<BuildDataExportsHandler>.Instance);

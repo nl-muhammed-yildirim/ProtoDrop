@@ -11,10 +11,16 @@ namespace wa.infrastructure.Persistence;
 public sealed class ExpiryStore : IExpiryStore
 {
     private readonly WaDbContext _db;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="ExpiryStore"/> class.</summary>
     /// <param name="db">Database context that backs the store.</param>
-    public ExpiryStore(WaDbContext db) => _db = db;
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+    public ExpiryStore(WaDbContext db, TimeProvider timeProvider)
+    {
+        _db = db;
+        _timeProvider = timeProvider;
+    }
 
     /// <inheritdoc />
     public async Task<bool> TryClaimAsync(DateTime runWindowStartUtc, DateTime lockUntilUtc, CancellationToken ct)
@@ -65,7 +71,7 @@ public sealed class ExpiryStore : IExpiryStore
         var jobRun = _db.Set<JobRun>().Find("expire", runWindowStartUtc);
         if (jobRun is not null)
         {
-            jobRun.FinishedAtUtc = DateTime.UtcNow;
+            jobRun.FinishedAtUtc = _timeProvider.GetUtcNow().UtcDateTime;
             await _db.SaveChangesAsync(ct);
         }
     }

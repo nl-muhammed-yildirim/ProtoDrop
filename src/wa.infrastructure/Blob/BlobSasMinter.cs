@@ -65,7 +65,7 @@ public sealed class BlobSasMinter
         _keyBase64 = keyBase64;
         _credential = new StorageSharedKeyCredential(
             AzureBlobStore.AccountNameFrom(accountUrl), keyBase64);
-        _now = now ?? (() => DateTimeOffset.UtcNow);
+        _now = now ?? TimeProvider.System.GetUtcNow;
     }
 
     /// <summary>

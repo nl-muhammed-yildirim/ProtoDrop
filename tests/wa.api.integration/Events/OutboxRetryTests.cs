@@ -68,7 +68,7 @@ public class OutboxRetryTests : IAsyncLifetime
         var publisher = new SbEventPublisher(
             new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<SbEventPublisher>.Instance,
-            new AppDbContextFactory(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(connString).Options));
+            new AppDbContextFactory(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(connString).Options), TimeProvider.System);
         var envelope = CreateEnvelope();
 
         // First publish: row committed via the change tracker, broker unreachable → stays unpublished.

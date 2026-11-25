@@ -34,6 +34,7 @@ builder.Host.UseSerilog((context, cfg) => cfg
     .MinimumLevel.Override("AspNetCoreRateLimit", LogEventLevel.Warning)
     .WriteTo.Console());
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(PingCommand).Assembly));
+builder.Services.AddSingleton(TimeProvider.System); // CHORE-code-style-2: the one clock — handlers/stores take TimeProvider instead of reading DateTime.UtcNow
 builder.Services.AddSingleton<wa.application.Ports.IDbHealthProbe, WaDbHealthProbe>();
 builder.Services.AddSingleton<wa.application.Ports.ISbHealthProbe, SbHealthProbe>();
 // Adapter-owned contexts (no request scope in the current API surface).
@@ -50,7 +51,7 @@ else
     builder.Services.AddSingleton<wa.application.Ports.IEventPublisher>(sp => new SbEventPublisher(
         sp.GetRequiredService<IConfiguration>(),
         sp.GetRequiredService<ILogger<SbEventPublisher>>(),
-        sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+        sp.GetRequiredService<IDbContextFactory<WaDbContext>>(), sp.GetRequiredService<TimeProvider>()));
 // T-055-02 (TA-3.5 topology, §5.2 config): blob store + one-time container bootstrap. GR#7 — no "is this the fake?" branch; the adapter is picked by its §5.2 config values only.
 var blobAccountUrl = builder.Configuration["Wa:Blob:AccountUrl"];
 var blobAccountKey = builder.Configuration["Wa:Blob:AccountKey"];
@@ -76,7 +77,7 @@ builder.Services.AddSingleton<wa.application.UseCases.Transfers.ITransferSearchS
 // T-010-02: IBlobStore (the gate primitive, registered as a singleton at L53) — SendStore's FILES_GONE gate checks physical presence via ExistsAsync.
 builder.Services.AddSingleton<wa.application.UseCases.Transfers.ISendStore>(sp => new wa.infrastructure.Persistence.SendStore(sp.GetRequiredService<WaDbContext>(), sp.GetRequiredService<wa.application.Ports.IBlobStore>()));
 // T-014 (TA-4.2#4): recipient-page handler's DB surface — thin adapter over the adapter-owned WaDbContext.
-builder.Services.AddSingleton<wa.application.UseCases.Transfers.IPublicTransferStore>(sp => new wa.infrastructure.Persistence.PublicTransferStore(sp.GetRequiredService<WaDbContext>()));
+builder.Services.AddSingleton<wa.application.UseCases.Transfers.IPublicTransferStore>(sp => new wa.infrastructure.Persistence.PublicTransferStore(sp.GetRequiredService<WaDbContext>(), sp.GetRequiredService<TimeProvider>()));
 // US-023-01 (F-PRF-003): download analytics read port (GET /transfers/{id}/analytics).
 builder.Services.AddSingleton<wa.application.UseCases.Transfers.ITransferAnalyticsStore>(sp => new wa.infrastructure.Persistence.TransferAnalyticsStore(sp.GetRequiredService<WaDbContext>()));
 // US-021-01: sender branding read port (org name beside the sender on the recipient page).
@@ -88,15 +89,15 @@ builder.Services.AddSingleton<wa.application.UseCases.Auth.IOrgNameStore>(sp => 
 // F-XCT-003: AppUser.EmailNotificationsEnabled port (PATCH /auth/me emailNotifications).
 builder.Services.AddSingleton<wa.application.UseCases.EmailSettings.IEmailNotificationsStore>(sp => new wa.infrastructure.Persistence.EmailNotificationsStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
 // T-002-02 (TA-4.1.5): generic HTTP idempotency store — used by IdempotencyMiddleware for finalize + send endpoints.
-builder.Services.AddSingleton<IIdempotencyStore>(sp => new wa.infrastructure.Persistence.IdempotencyStore(sp.GetRequiredService<WaDbContext>()));
+builder.Services.AddSingleton<IIdempotencyStore>(sp => new wa.infrastructure.Persistence.IdempotencyStore(sp.GetRequiredService<WaDbContext>(), sp.GetRequiredService<TimeProvider>()));
 // T-011-02 (FR-011-5 / TA-3.2): audit write helper — one AuditLog row + one admin.action domain event per mutation.
 builder.Services.AddSingleton<wa.application.UseCases.Admin.IAuditStore>(sp => new wa.infrastructure.Persistence.AuditStore(sp.GetRequiredService<WaDbContext>()));
-builder.Services.AddSingleton<wa.application.UseCases.Admin.IAuditWriter>(sp => new wa.application.UseCases.Admin.AuditWriter(sp.GetRequiredService<wa.application.UseCases.Admin.IAuditStore>(), sp.GetRequiredService<wa.application.Ports.IEventPublisher>()));
-builder.Services.AddSingleton(sp => new PlansCache(sp.GetRequiredService<IPlansStore>(), limitsTtl, () => DateTimeOffset.UtcNow));
-builder.Services.AddSingleton(sp => new FlagsCache(sp.GetRequiredService<IFlagsStore>(), limitsTtl, () => DateTimeOffset.UtcNow));
+builder.Services.AddSingleton<wa.application.UseCases.Admin.IAuditWriter>(sp => new wa.application.UseCases.Admin.AuditWriter(sp.GetRequiredService<wa.application.UseCases.Admin.IAuditStore>(), sp.GetRequiredService<wa.application.Ports.IEventPublisher>(), sp.GetRequiredService<TimeProvider>()));
+builder.Services.AddSingleton(sp => new PlansCache(sp.GetRequiredService<IPlansStore>(), limitsTtl, sp.GetRequiredService<TimeProvider>().GetUtcNow));
+builder.Services.AddSingleton(sp => new FlagsCache(sp.GetRequiredService<IFlagsStore>(), limitsTtl, sp.GetRequiredService<TimeProvider>().GetUtcNow));
 // T-011-03 (TA-4.2#20 / FR-011-6): overview aggregates — store + 5-min snapshot cache (pinned by spec; not config-driven).
 builder.Services.AddSingleton<wa.application.UseCases.Admin.IOverviewStore>(sp => new wa.infrastructure.Persistence.OverviewStore(sp.GetRequiredService<WaDbContext>()));
-builder.Services.AddSingleton(sp => new wa.application.UseCases.Admin.OverviewSnapshotCache(sp.GetRequiredService<wa.application.UseCases.Admin.IOverviewStore>(), TimeSpan.FromMinutes(5), () => DateTimeOffset.UtcNow));
+builder.Services.AddSingleton(sp => new wa.application.UseCases.Admin.OverviewSnapshotCache(sp.GetRequiredService<wa.application.UseCases.Admin.IOverviewStore>(), TimeSpan.FromMinutes(5), sp.GetRequiredService<TimeProvider>().GetUtcNow));
 // T-011-04 (TA-4.2#21 / FR-011-3): admin transfer search — store over the adapter-owned WaDbContext.
 builder.Services.AddSingleton<wa.application.UseCases.Admin.ISearchTransfersStore>(sp => new wa.infrastructure.Persistence.SearchTransfersStore(sp.GetRequiredService<WaDbContext>()));
 // T-011-05 (TA-4.2#21 / FR-011-4): admin force-delete — store over the adapter-owned WaDbContext (platform-scoped predicate).
@@ -151,20 +152,20 @@ builder.Services.AddSingleton<wa.application.Telemetry.WaTelemetryReporter>(sp =
     sp.GetRequiredService<ILogger<wa.application.Telemetry.WaTelemetryReporter>>(),
     System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Wa:Jwt:Secret"]!))); // TA-9.4: the IP HMAC key IS Wa:Jwt:Secret — UTF-8 of the raw string (same key T-008's session cookie signs with, TA-9.1)
 // T-003-04 (TA-4.2#5): unlock-JWT minter — BCL-only HS256, the SAME Wa:Jwt:Secret bytes (TA-9.1: "same key T-008's session cookie signs with").
-// Injectable clock arg is () => DateTimeOffset.UtcNow in production; unit tests pin exp via their own instance (D3).
+// Injectable clock arg is the registered TimeProvider's GetUtcNow in production; unit tests pin exp via their own instance (D3).
 builder.Services.AddSingleton<IUnlockTokenMinter>(sp => new UnlockTokenService(
-    System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Wa:Jwt:Secret"]!), () => DateTimeOffset.UtcNow));
+    System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Wa:Jwt:Secret"]!), sp.GetRequiredService<TimeProvider>().GetUtcNow));
 // T-008-01 (TA-4.2#8): signup's DB surface — thin adapter over the adapter-owned WaDbContext, and its TA-9.1 session-token minter (30-day rolling).
 builder.Services.AddSingleton<IAppUserStore>(sp => new wa.infrastructure.Persistence.AppUserStore(sp.GetRequiredService<WaDbContext>()));
 // T-008-04 (TA-9.1): magic-link token store — thin adapter over the adapter-owned WaDbContext (single-use, hashed token).
 builder.Services.AddSingleton<IAuthTokenStore>(sp => new wa.infrastructure.Persistence.AuthTokenStore(sp.GetRequiredService<WaDbContext>()));
 builder.Services.AddSingleton<ISessionTokenMinter>(sp => new SessionTokenService(
-    System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Wa:Jwt:Secret"]!), () => DateTimeOffset.UtcNow));
+    System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Wa:Jwt:Secret"]!), sp.GetRequiredService<TimeProvider>().GetUtcNow));
 // T-006-03 (TA-6.7): unsubscribe token verification + suppression insert — BCL-only HMAC, same Wa:Jwt:Secret key bytes.
 builder.Services.AddSingleton<wa.infrastructure.Persistence.UnsubscribeService>(sp => new wa.infrastructure.Persistence.UnsubscribeService(
     sp.GetRequiredService<WaDbContext>(),
     System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Wa:Jwt:Secret"]!),
-    sp.GetRequiredService<ILogger<wa.infrastructure.Persistence.UnsubscribeService>>()));
+    sp.GetRequiredService<ILogger<wa.infrastructure.Persistence.UnsubscribeService>>(), sp.GetRequiredService<TimeProvider>()));
 // US-019-03 (D-3): webhook dedup + mirror store — factory-based (fresh context per call; concurrent deliveries never share a context).
 builder.Services.AddSingleton<wa.application.UseCases.Billing.IStripeBillingStore>(sp => new wa.infrastructure.Persistence.StripeBillingStore(
     sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
@@ -1435,7 +1436,7 @@ static Dictionary<string, object?> ToExportBody(wa.application.UseCases.DataExpo
 }
 
 // US-019-03 (TA-4.2#19 / FR-019-5): POST /api/v1/billing/webhooks/stripe — Stripe-Signature is the auth (no session gate).
-app.MapPost("/api/v1/billing/webhooks/stripe", async (HttpRequest request, ISender sender, CancellationToken ct) =>
+app.MapPost("/api/v1/billing/webhooks/stripe", async (HttpRequest request, ISender sender, TimeProvider timeProvider, CancellationToken ct) =>
 {
     string payload;
     using (var reader = new StreamReader(request.Body, System.Text.Encoding.UTF8))
@@ -1443,7 +1444,7 @@ app.MapPost("/api/v1/billing/webhooks/stripe", async (HttpRequest request, ISend
 
     var secret = builder.Configuration["Wa:Stripe:WebhookSecret"];
     if (!wa.application.UseCases.Billing.StripeWebhookSignature.IsValid(
-            request.Headers["Stripe-Signature"].ToString(), payload, secret, DateTimeOffset.UtcNow))
+            request.Headers["Stripe-Signature"].ToString(), payload, secret, timeProvider.GetUtcNow()))
         throw new BusinessException(ProblemCodes.StripeWebhookMismatch, "Stripe signature verification failed.");
 
     try

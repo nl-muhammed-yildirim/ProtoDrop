@@ -11,10 +11,16 @@ namespace wa.infrastructure.Persistence;
 public sealed class BlobDeletionStore : IBlobDeletionStore
 {
     private readonly WaDbContext _db;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="BlobDeletionStore"/> class.</summary>
     /// <param name="db">Database context that backs the store.</param>
-    public BlobDeletionStore(WaDbContext db) => _db = db;
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+    public BlobDeletionStore(WaDbContext db, TimeProvider timeProvider)
+    {
+        _db = db;
+        _timeProvider = timeProvider;
+    }
 
     /// <inheritdoc />
     public async Task<bool> TryClaimAsync(DateTime runWindowStartUtc, DateTime lockUntilUtc, CancellationToken ct)
@@ -60,7 +66,7 @@ public sealed class BlobDeletionStore : IBlobDeletionStore
         var jobRun = _db.Set<JobRun>().Find("delete-blobs", runWindowStartUtc);
         if (jobRun is not null)
         {
-            jobRun.FinishedAtUtc = DateTime.UtcNow;
+            jobRun.FinishedAtUtc = _timeProvider.GetUtcNow().UtcDateTime;
             await _db.SaveChangesAsync(ct);
         }
     }

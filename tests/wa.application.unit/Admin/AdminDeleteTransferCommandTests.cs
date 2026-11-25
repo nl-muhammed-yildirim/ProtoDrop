@@ -19,7 +19,7 @@ public class AdminDeleteTransferCommandTests
     {
         _store = new StubAdminTransferStore();
         _eventPublisher = new StubEventPublisher();
-        _handler = new AdminDeleteTransferHandler(_store, _eventPublisher);
+        _handler = new AdminDeleteTransferHandler(_store, _eventPublisher, TimeProvider.System);
     }
 
     // ---- Exit check 1: happy path — Status=4 + DeletedAtUtc set, event emitted once with reason "admin" ----
@@ -47,6 +47,24 @@ public class AdminDeleteTransferCommandTests
         var row = Assert.Single(_store.Transfers, t => t.Id == transferId);
         Assert.Equal(4, row.Status);
         Assert.NotNull(row.DeletedAtUtc);
+    }
+
+    // ---- CHORE-code-style-2: the store receives the injected clock's instant as a UTC DateTime ----
+
+    [Fact]
+    public async Task Handle_PassesInjectedNowToStore_AsUtcDateTime()
+    {
+        var fixedNow = new DateTimeOffset(2026, 11, 25, 12, 0, 0, TimeSpan.Zero);
+        var handler = new AdminDeleteTransferHandler(_store, _eventPublisher, new ManualTimeProvider(fixedNow));
+        var transferId = Guid.NewGuid();
+        _store.Transfers.Add(NewTransfer(transferId, "ABCD1234", ownerId: null, status: 1));
+
+        var result = await handler.Handle(new AdminDeleteTransferCommand(transferId), CancellationToken.None);
+
+        Assert.NotNull(result);
+        var row = Assert.Single(_store.Transfers, t => t.Id == transferId);
+        Assert.Equal(fixedNow.UtcDateTime, row.DeletedAtUtc);
+        Assert.Equal(DateTimeKind.Utc, row.DeletedAtUtc!.Value.Kind);
     }
 
     // ---- Exit check 2: second delete of the same id → null (NOT_FOUND, EC-009-2) ----

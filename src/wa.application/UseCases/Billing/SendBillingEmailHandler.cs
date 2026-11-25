@@ -32,6 +32,7 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
     private readonly (string Html, string Txt) _graceTemplates;
 
     private const string GraceEndedSubject = "You're back on ProtoDrop Free";
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="SendBillingEmailHandler"/> class.</summary>
     /// <param name="emailSender">Port that delivers the rendered email.</param>
@@ -40,13 +41,15 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
     /// <param name="telemetry">Reporter for the email and dead-letter telemetry events.</param>
     /// <param name="logger">Logger for diagnostics (never logs the address).</param>
     /// <param name="templateRoot">Directory that holds the per-kind template folders.</param>
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
     public SendBillingEmailHandler(
         IEmailSender emailSender,
         IEventPublisher eventPublisher,
         IConfiguration config,
         WaTelemetryReporter telemetry,
         ILogger<SendBillingEmailHandler> logger,
-        string templateRoot)
+        string templateRoot,
+        TimeProvider timeProvider)
     {
         _emailSender = emailSender;
         _eventPublisher = eventPublisher;
@@ -56,6 +59,7 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
 
         _templates = LoadTemplates(templateRoot, "billing-payment-failed");
         _graceTemplates = LoadTemplates(templateRoot, "billing-grace-ended"); // US-019-05 (D-5)
+        _timeProvider = timeProvider;
     }
 
     private static (string Html, string Txt) LoadTemplates(string templateRoot, string folder)
@@ -129,7 +133,7 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
                 EventId = Guid.NewGuid(),
                 Type = EventType.EmailSent,
                 Version = 1,
-                OccurredAtUtc = DateTime.UtcNow,
+                OccurredAtUtc = _timeProvider.GetUtcNow().UtcDateTime,
                 CorrelationId = envelope.CorrelationId,
                 PartitionKey = email,
                 Payload = new { to = email, attempt, kind, step }
@@ -149,7 +153,7 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
                     EventId = Guid.NewGuid(),
                     Type = EventType.EmailFailed,
                     Version = 1,
-                    OccurredAtUtc = DateTime.UtcNow,
+                    OccurredAtUtc = _timeProvider.GetUtcNow().UtcDateTime,
                     CorrelationId = envelope.CorrelationId,
                     PartitionKey = email,
                     Payload = new { to = email, attempt = maxDeliveryCount, reason = ex.GetType().Name, kind, step }

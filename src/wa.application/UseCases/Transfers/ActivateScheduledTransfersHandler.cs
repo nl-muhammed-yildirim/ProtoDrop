@@ -17,19 +17,23 @@ public sealed class ActivateScheduledTransfersHandler
     private readonly IScheduledSendStore _store;
     private readonly IEventPublisher _eventPublisher;
     private readonly ILogger<ActivateScheduledTransfersHandler> _logger;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="ActivateScheduledTransfersHandler"/> class.</summary>
     /// <param name="store">Store that claims the window and flips due transfers to Active.</param>
     /// <param name="eventPublisher">Publishes the <c>transfer.created</c> event for each activated transfer.</param>
     /// <param name="logger">Logger for diagnostics (never logs addresses).</param>
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
     public ActivateScheduledTransfersHandler(
         IScheduledSendStore store,
         IEventPublisher eventPublisher,
-        ILogger<ActivateScheduledTransfersHandler> logger)
+        ILogger<ActivateScheduledTransfersHandler> logger,
+        TimeProvider timeProvider)
     {
         _store = store;
         _eventPublisher = eventPublisher;
         _logger = logger;
+        _timeProvider = timeProvider;
     }
 
     /// <summary>Run the sub-step. Returns the number of transfers activated (0 if the claim was lost or nothing was due).</summary>
@@ -92,7 +96,7 @@ public sealed class ActivateScheduledTransfersHandler
         }
         finally
         {
-            await _store.CompleteClaimAsync(runWindowStart, DateTime.UtcNow, ct);
+            await _store.CompleteClaimAsync(runWindowStart, _timeProvider.GetUtcNow().UtcDateTime, ct);
         }
     }
 }

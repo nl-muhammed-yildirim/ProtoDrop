@@ -14,16 +14,19 @@ public sealed class UnsubscribeService
     private readonly WaDbContext _db;
     private readonly byte[] _hmacKey;
     private readonly ILogger<UnsubscribeService> _logger;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="UnsubscribeService"/> class.</summary>
     /// <param name="db">Database context that stores the suppression rows.</param>
     /// <param name="hmacKey">Secret key bytes the unsubscribe tokens are signed with.</param>
     /// <param name="logger">Logger for diagnostics (never logs the address).</param>
-    public UnsubscribeService(WaDbContext db, byte[] hmacKey, ILogger<UnsubscribeService> logger)
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+    public UnsubscribeService(WaDbContext db, byte[] hmacKey, ILogger<UnsubscribeService> logger, TimeProvider timeProvider)
     {
         _db = db;
         _hmacKey = hmacKey;
         _logger = logger;
+        _timeProvider = timeProvider;
     }
 
     /// <summary>
@@ -51,7 +54,7 @@ public sealed class UnsubscribeService
             {
                 Address = address,
                 SenderEmail = senderEmail,
-                CreatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = _timeProvider.GetUtcNow().UtcDateTime
             });
             await _db.SaveChangesAsync(ct);
             return new UnsubscribeResult(true);

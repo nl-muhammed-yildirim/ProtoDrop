@@ -28,6 +28,7 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
     private readonly ILogger<SendNotificationEmailsHandler> _logger;
     private readonly ISenderBrandingStore _branding;
     private readonly IFeaturesProvider _features;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="SendNotificationEmailsHandler"/> class.</summary>
     /// <param name="store">Store that reads the transfer, recipients and suppressions and records notifications.</param>
@@ -40,6 +41,7 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
     /// <param name="logger">Logger for diagnostics (never logs addresses).</param>
     /// <param name="branding">Store that reads the sender's organization name.</param>
     /// <param name="features">Provider of the sender plan's feature toggles.</param>
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
     public SendNotificationEmailsHandler(
         IEmailStore store,
         IEmailSender emailSender,
@@ -50,7 +52,8 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
         IConfiguration config,
         ILogger<SendNotificationEmailsHandler> logger,
         ISenderBrandingStore branding,
-        IFeaturesProvider features)
+        IFeaturesProvider features,
+        TimeProvider timeProvider)
     {
         _branding = branding;
         _features = features;
@@ -62,6 +65,7 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
         _telemetry = telemetry;
         _config = config;
         _logger = logger;
+        _timeProvider = timeProvider;
     }
 
     /// <inheritdoc />
@@ -121,7 +125,7 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
         var suppressed = await _store.GetSuppressedAddressesAsync(addressesToCheck, context.SenderEmail, ct);
 
         // 7. Prepare template data (same for all recipients; rendered per-recipient with their locale — T-006-04).
-        var expiryDays = (int)Math.Ceiling((context.ExpiresAtUtc - DateTime.UtcNow).TotalDays);
+        var expiryDays = (int)Math.Ceiling((context.ExpiresAtUtc - _timeProvider.GetUtcNow().UtcDateTime).TotalDays);
         var publicOrigin = _config["Wa:Url:Public"] ?? "http://localhost:5173";
         var ctaUrl = $"{publicOrigin}/t/{context.LinkId}";
         // F-PRF-001 US-021-02 (D-1): org resolved once at dispatch; the rendered email is the send-time snapshot. Never logged (D-6).
@@ -179,7 +183,7 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
                     EventId = Guid.NewGuid(),
                     Type = EventType.EmailSent,
                     Version = 1,
-                    OccurredAtUtc = DateTime.UtcNow,
+                    OccurredAtUtc = _timeProvider.GetUtcNow().UtcDateTime,
                     CorrelationId = envelope.CorrelationId,
                     PartitionKey = context.LinkId,
                     Payload = new
@@ -208,7 +212,7 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
                         EventId = Guid.NewGuid(),
                         Type = EventType.EmailFailed,
                         Version = 1,
-                        OccurredAtUtc = DateTime.UtcNow,
+                        OccurredAtUtc = _timeProvider.GetUtcNow().UtcDateTime,
                         CorrelationId = envelope.CorrelationId,
                         PartitionKey = context.LinkId,
                         Payload = new
@@ -231,7 +235,7 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
         // 9. MarkNotifiedAsync for all successfully sent.
         if (notifiedIds.Count > 0)
         {
-            await _store.MarkNotifiedAsync(notifiedIds, DateTime.UtcNow, ct);
+            await _store.MarkNotifiedAsync(notifiedIds, _timeProvider.GetUtcNow().UtcDateTime, ct);
         }
     }
 

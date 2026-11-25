@@ -128,7 +128,7 @@ public class EmailBrandingIntegrationTests : IAsyncLifetime
             new SenderBrandingStore(workerDb),
             new FeaturesProvider(
                 new PlansCache(new PlansStore(workerDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow),
-                new FlagsCache(new FlagsStore(workerDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow)));
+                new FlagsCache(new FlagsStore(workerDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow)), TimeProvider.System);
 
         var envelope = new EventEnvelope
         {

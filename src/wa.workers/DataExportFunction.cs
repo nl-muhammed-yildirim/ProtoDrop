@@ -17,16 +17,19 @@ public class DataExportFunction
     private readonly BuildDataExportsHandler _handler;
     private readonly ILogger<DataExportFunction> _logger;
     private readonly IConfiguration _config;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="DataExportFunction"/> class.</summary>
     /// <param name="handler">Handler that builds pending exports and purges old ones.</param>
     /// <param name="logger">Logger for the job run (carries the generated correlation ids).</param>
     /// <param name="config">Configuration source for the <c>Wa:Jobs:SignKey</c> that guards the HTTP trigger.</param>
-    public DataExportFunction(BuildDataExportsHandler handler, ILogger<DataExportFunction> logger, IConfiguration config)
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+    public DataExportFunction(BuildDataExportsHandler handler, ILogger<DataExportFunction> logger, IConfiguration config, TimeProvider timeProvider)
     {
         _handler = handler;
         _logger = logger;
         _config = config;
+        _timeProvider = timeProvider;
     }
 
     /// <summary>Timer entry point (every 5 minutes): runs one build and purge pass under a freshly generated traceparent.</summary>
@@ -43,7 +46,7 @@ public class DataExportFunction
 
         try
         {
-            var count = await _handler.RunAsync(DateTime.UtcNow, context.CancellationToken);
+            var count = await _handler.RunAsync(_timeProvider.GetUtcNow().UtcDateTime, context.CancellationToken);
             _logger.LogInformation("f-data-export completed: {Count} exports built", count);
         }
         catch (Exception ex)
@@ -65,7 +68,7 @@ public class DataExportFunction
         if (!JobAuth.Verify(_config, req))
             return JobAuth.CreateProblem(req, 401, "Unauthenticated", "Invalid or missing signature.");
 
-        var count = await _handler.RunAsync(DateTime.UtcNow, context.CancellationToken);
+        var count = await _handler.RunAsync(_timeProvider.GetUtcNow().UtcDateTime, context.CancellationToken);
         return JobAuth.CreateSuccess(req, new { built = count });
     }
 }

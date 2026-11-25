@@ -20,6 +20,7 @@ public sealed class DeleteAccountHandler : IRequestHandler<DeleteAccountCommand,
     private readonly WaTelemetryReporter _telemetry;
     private readonly IBlobStore _blobs;
     private readonly ILogger<DeleteAccountHandler>? _logger;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="DeleteAccountHandler"/> class.</summary>
     /// <param name="users">Store that soft-deletes the account and re-homes its transfers.</param>
@@ -27,7 +28,12 @@ public sealed class DeleteAccountHandler : IRequestHandler<DeleteAccountCommand,
     /// <param name="telemetry">Reporter for the <c>account_deleted</c> telemetry event.</param>
     /// <param name="blobs">Blob store used to remove the user's organization logo.</param>
     /// <param name="logger">Optional logger for the best-effort logo cleanup warning.</param>
-    public DeleteAccountHandler(IAppUserStore users, IEventPublisher eventPublisher, WaTelemetryReporter telemetry, IBlobStore blobs,
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+    public DeleteAccountHandler(IAppUserStore users,
+        IEventPublisher eventPublisher,
+        WaTelemetryReporter telemetry,
+        IBlobStore blobs,
+        TimeProvider timeProvider,
         ILogger<DeleteAccountHandler>? logger = null)
     {
         _logger = logger;
@@ -35,6 +41,7 @@ public sealed class DeleteAccountHandler : IRequestHandler<DeleteAccountCommand,
         _eventPublisher = eventPublisher;
         _telemetry = telemetry;
         _blobs = blobs;
+        _timeProvider = timeProvider;
     }
 
     /// <inheritdoc />
@@ -47,7 +54,7 @@ public sealed class DeleteAccountHandler : IRequestHandler<DeleteAccountCommand,
 
         // 2. Soft-delete + transfer re-home in ONE transaction (D-1). The event publish happens AFTER this commits —
         //    the row is already soft-deleted at that point; EC-054-1's outbox re-publish covers broker failure.
-        var deletedAtUtc = DateTime.UtcNow;
+        var deletedAtUtc = _timeProvider.GetUtcNow().UtcDateTime;
         var ok = await _users.SoftDeleteWithReHomeAsync(user.Id, deletedAtUtc, cancellationToken);
         if (!ok)
             throw MeProfileException.ForNotFound(); // race where a concurrent DELETE already committed — same not-found shape

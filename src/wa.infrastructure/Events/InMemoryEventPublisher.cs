@@ -21,7 +21,7 @@ public sealed class InMemoryEventPublisher(TimeSpan ttl, Func<DateTimeOffset> cl
     private readonly ConcurrentDictionary<Guid, StoredEnvelope> _store = new();
 
     /// <summary>DI constructor (TA-0.2 rule 7): uses the real clock and keeps envelopes for 30 minutes, a process-lifetime stand-in for the broker's topic retention.</summary>
-    public InMemoryEventPublisher() : this(TimeSpan.FromMinutes(30), () => DateTimeOffset.UtcNow) { }
+    public InMemoryEventPublisher() : this(TimeSpan.FromMinutes(30), TimeProvider.System.GetUtcNow) { }
     /// <inheritdoc cref="IEventPublisher.PublishAsync"/> Dedup: a second publish of the same EventId is a no-op (one stored record, no double side effect).
     /// Note: synchronous body — <paramref name="cancellationToken"/> is accepted for interface parity but not observed; concurrent first-publish race on the same EventId is benign for this test double.
     public Task<DomainEventRecord> PublishAsync(EventEnvelope envelope, CancellationToken cancellationToken)

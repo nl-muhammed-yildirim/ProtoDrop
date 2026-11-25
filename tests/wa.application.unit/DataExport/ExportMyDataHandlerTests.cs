@@ -40,9 +40,9 @@ public class ExportMyDataHandlerTests
     }
 
     private static ExportMyDataHandler Requester(StubStore store, bool userExists = true)
-        => new(new StubUsers(userExists ? new AppUser { Id = UserId } : null), store);
+        => new(new StubUsers(userExists ? new AppUser { Id = UserId } : null), store, TimeProvider.System);
 
-    private static GetDataExportHandler Reader(StubStore store) => new(store, new StubMinter());
+    private static GetDataExportHandler Reader(StubStore store) => new(store, new StubMinter(), TimeProvider.System);
 
     [Fact]
     public async Task Request_NoRow_CreatesProcessingRow()

@@ -9,14 +9,17 @@ public sealed class ExportMyDataHandler : IRequestHandler<ExportMyDataCommand, D
 {
     private readonly IAppUserStore _users;
     private readonly IDataExportStore _store;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="ExportMyDataHandler"/> class.</summary>
     /// <param name="users">Store used to check that the account exists.</param>
     /// <param name="store">Store that holds the export rows.</param>
-    public ExportMyDataHandler(IAppUserStore users, IDataExportStore store)
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+    public ExportMyDataHandler(IAppUserStore users, IDataExportStore store, TimeProvider timeProvider)
     {
         _users = users;
         _store = store;
+        _timeProvider = timeProvider;
     }
 
     /// <inheritdoc />
@@ -35,7 +38,7 @@ public sealed class ExportMyDataHandler : IRequestHandler<ExportMyDataCommand, D
             Id = Guid.NewGuid(),
             AppUserId = request.UserId,
             State = DataExportState.Processing,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = _timeProvider.GetUtcNow().UtcDateTime,
         };
         // The filtered unique index makes the race loser fail the insert (EC-047-6).
         if (!await _store.TryCreateAsync(row, cancellationToken))

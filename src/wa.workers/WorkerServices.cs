@@ -39,6 +39,7 @@ public static class WorkerServices
     /// <returns>The same <paramref name="services"/>, so calls can be chained.</returns>
     public static IServiceCollection AddWorkerServices(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddSingleton(TimeProvider.System); // CHORE-code-style-2: the one clock — handlers/stores take TimeProvider instead of reading DateTime.UtcNow
         var dbConnection = configuration[DbKey] ?? "";
 
         // DbContext for the zip function
@@ -59,8 +60,8 @@ public static class WorkerServices
         var limitsTtl = TimeSpan.FromSeconds(30);
         services.AddSingleton<IPlansStore>(sp => new PlansStore(sp.GetRequiredService<WaDbContext>()));
         services.AddSingleton<IFlagsStore>(sp => new FlagsStore(sp.GetRequiredService<WaDbContext>()));
-        services.AddSingleton(sp => new PlansCache(sp.GetRequiredService<IPlansStore>(), limitsTtl, () => DateTimeOffset.UtcNow));
-        services.AddSingleton(sp => new FlagsCache(sp.GetRequiredService<IFlagsStore>(), limitsTtl, () => DateTimeOffset.UtcNow));
+        services.AddSingleton(sp => new PlansCache(sp.GetRequiredService<IPlansStore>(), limitsTtl, sp.GetRequiredService<TimeProvider>().GetUtcNow));
+        services.AddSingleton(sp => new FlagsCache(sp.GetRequiredService<IFlagsStore>(), limitsTtl, sp.GetRequiredService<TimeProvider>().GetUtcNow));
         services.AddSingleton<ILimitsProvider>(sp => new LimitsProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
         services.AddSingleton<IFlagResolver>(sp => (IFlagResolver)sp.GetRequiredService<ILimitsProvider>()); // LimitsProvider implements both (API precedent Program.cs L113)
         services.AddSingleton<IFeaturesProvider>(sp => new FeaturesProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
@@ -85,12 +86,12 @@ public static class WorkerServices
             services.AddSingleton<IEventPublisher>(sp => new SbEventPublisher(
                 sp.GetRequiredService<IConfiguration>(),
                 sp.GetRequiredService<ILogger<SbEventPublisher>>(),
-                sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+                sp.GetRequiredService<IDbContextFactory<WaDbContext>>(), sp.GetRequiredService<TimeProvider>()));
         else
             services.AddSingleton<IEventPublisher>(new InMemoryEventPublisher());
 
         // T-005-01: f-expire job
-        services.AddSingleton<IExpiryStore>(sp => new ExpiryStore(sp.GetRequiredService<WaDbContext>()));
+        services.AddSingleton<IExpiryStore>(sp => new ExpiryStore(sp.GetRequiredService<WaDbContext>(), sp.GetRequiredService<TimeProvider>()));
         services.AddSingleton<ExpireTransfersHandler>(sp => new ExpireTransfersHandler(
             sp.GetRequiredService<IExpiryStore>(),
             sp.GetRequiredService<IEventPublisher>(),
@@ -103,7 +104,7 @@ public static class WorkerServices
         services.AddSingleton<ActivateScheduledTransfersHandler>(sp => new ActivateScheduledTransfersHandler(
             sp.GetRequiredService<IScheduledSendStore>(),
             sp.GetRequiredService<IEventPublisher>(),
-            sp.GetRequiredService<ILogger<ActivateScheduledTransfersHandler>>()));
+            sp.GetRequiredService<ILogger<ActivateScheduledTransfersHandler>>(), sp.GetRequiredService<TimeProvider>()));
 
         // US-019-04 (D-6): billing email sub-step of the f-expire pass — per-step JobRun claims, no window claim.
         services.AddSingleton<IBillingSequenceStore>(sp => new BillingSequenceStore(
@@ -123,7 +124,7 @@ public static class WorkerServices
             sp.GetRequiredService<ILogger<EndBillingGraceHandler>>()));
 
         // T-005-02: f-delete-transfers job
-        services.AddSingleton<IExpiryDeletionStore>(sp => new ExpiryDeletionStore(sp.GetRequiredService<WaDbContext>()));
+        services.AddSingleton<IExpiryDeletionStore>(sp => new ExpiryDeletionStore(sp.GetRequiredService<WaDbContext>(), sp.GetRequiredService<TimeProvider>()));
         services.AddSingleton<DeleteExpiredTransfersHandler>(sp => new DeleteExpiredTransfersHandler(
             sp.GetRequiredService<IExpiryDeletionStore>(),
             sp.GetRequiredService<IEventPublisher>(),
@@ -132,21 +133,21 @@ public static class WorkerServices
             sp.GetRequiredService<ILogger<DeleteExpiredTransfersHandler>>()));
 
         // T-005-03: f-delete-blobs job
-        services.AddSingleton<IBlobDeletionStore>(sp => new BlobDeletionStore(sp.GetRequiredService<WaDbContext>()));
+        services.AddSingleton<IBlobDeletionStore>(sp => new BlobDeletionStore(sp.GetRequiredService<WaDbContext>(), sp.GetRequiredService<TimeProvider>()));
         services.AddSingleton<DeleteOrphanBlobsHandler>(sp => new DeleteOrphanBlobsHandler(
             sp.GetRequiredService<IBlobDeletionStore>(),
             sp.GetRequiredService<IBlobStore>(),
             sp.GetRequiredService<ILogger<DeleteOrphanBlobsHandler>>()));
 
         // US-047-01 (FR-047-1/2): f-data-export builder — JobRun window claim, purge then build; no events (FR-047-8).
-        services.AddSingleton<IDataExportJobStore>(sp => new DataExportJobStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+        services.AddSingleton<IDataExportJobStore>(sp => new DataExportJobStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>(), sp.GetRequiredService<TimeProvider>()));
         services.AddSingleton<BuildDataExportsHandler>(sp => new BuildDataExportsHandler(
             sp.GetRequiredService<IDataExportJobStore>(),
             sp.GetRequiredService<IBlobStore>(),
             sp.GetRequiredService<ILogger<BuildDataExportsHandler>>()));
 
         // US-047-02 (FR-047-5): f-gdpr-sweep — nightly, idempotent per userId; option-A eraser (contract by construction, DECISION 2026-11-18).
-        services.AddSingleton<IGdprSweepStore>(sp => new GdprSweepStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+        services.AddSingleton<IGdprSweepStore>(sp => new GdprSweepStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>(), sp.GetRequiredService<TimeProvider>()));
         services.AddSingleton<ITelemetryEraser, ClosedSetTelemetryEraser>();
         services.AddSingleton<SweepErasedTelemetryHandler>(sp => new SweepErasedTelemetryHandler(
             sp.GetRequiredService<IGdprSweepStore>(),
@@ -154,7 +155,7 @@ public static class WorkerServices
             sp.GetRequiredService<ILogger<SweepErasedTelemetryHandler>>()));
 
         // T-006-01: f-email consumer
-        services.AddSingleton<EventDeduplicator>(sp => new EventDeduplicator(() => DateTimeOffset.UtcNow));
+        services.AddSingleton<EventDeduplicator>(sp => new EventDeduplicator(sp.GetRequiredService<TimeProvider>().GetUtcNow));
         services.AddSingleton<IEmailStore>(sp => new EmailStore(sp.GetRequiredService<WaDbContext>()));
         // F-XCT-003 (FR-046-3): send-time owner-notification gate — every owner email handler calls MaySendAsync before sending.
         services.AddSingleton<IEmailNotificationsStore>(sp => new EmailNotificationsStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
@@ -183,7 +184,7 @@ public static class WorkerServices
             sp.GetRequiredService<IConfiguration>(),
             sp.GetRequiredService<ILogger<SendNotificationEmailsHandler>>(),
             sp.GetRequiredService<ISenderBrandingStore>(),
-            sp.GetRequiredService<IFeaturesProvider>()));
+            sp.GetRequiredService<IFeaturesProvider>(), sp.GetRequiredService<TimeProvider>()));
 
         // T-008-04 (D-6): magic-link f-email handler — self-contained, loads template from Emails/templates/magic-link/.
         services.AddSingleton<SendMagicLinkEmailHandler>(sp => new SendMagicLinkEmailHandler(
@@ -191,7 +192,7 @@ public static class WorkerServices
             sp.GetRequiredService<IEventPublisher>(),
             sp.GetRequiredService<IConfiguration>(),
             sp.GetRequiredService<wa.application.Telemetry.WaTelemetryReporter>(),
-            sp.GetRequiredService<ILogger<SendMagicLinkEmailHandler>>()));
+            sp.GetRequiredService<ILogger<SendMagicLinkEmailHandler>>(), sp.GetRequiredService<TimeProvider>()));
 
         // T-008-05 (D-3): forgot-password f-email handler — same shape as magic-link, template from Emails/templates/forgot-password/.
         services.AddSingleton<SendForgotPasswordEmailHandler>(sp => new SendForgotPasswordEmailHandler(
@@ -199,7 +200,7 @@ public static class WorkerServices
             sp.GetRequiredService<IEventPublisher>(),
             sp.GetRequiredService<IConfiguration>(),
             sp.GetRequiredService<wa.application.Telemetry.WaTelemetryReporter>(),
-            sp.GetRequiredService<ILogger<SendForgotPasswordEmailHandler>>()));
+            sp.GetRequiredService<ILogger<SendForgotPasswordEmailHandler>>(), sp.GetRequiredService<TimeProvider>()));
 
         // US-019-04 (D-7): billing email f-email handler — templates from Emails/templates/billing-payment-failed/.
         services.AddSingleton<SendBillingEmailHandler>(sp => new SendBillingEmailHandler(
@@ -208,7 +209,7 @@ public static class WorkerServices
             sp.GetRequiredService<IConfiguration>(),
             sp.GetRequiredService<wa.application.Telemetry.WaTelemetryReporter>(),
             sp.GetRequiredService<ILogger<SendBillingEmailHandler>>(),
-            Path.Combine(AppContext.BaseDirectory, "Emails", "templates")));
+            Path.Combine(AppContext.BaseDirectory, "Emails", "templates"), sp.GetRequiredService<TimeProvider>()));
 
         return services;
     }

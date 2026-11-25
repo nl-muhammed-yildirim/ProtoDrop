@@ -96,7 +96,7 @@ public class GdprSweepIntegrationTests : IAsyncLifetime
     private static SweepErasedTelemetryHandler Handler(IGdprSweepStore store, ITelemetryEraser eraser) =>
         new(store, eraser, Microsoft.Extensions.Logging.Abstractions.NullLogger<SweepErasedTelemetryHandler>.Instance);
 
-    private GdprSweepStore Store() => new(new WaDbContextFactory(_options));
+    private GdprSweepStore Store() => new(new WaDbContextFactory(_options), TimeProvider.System);
 
     [Fact]
     public async Task SoftDelete_WritesPendingErasureRow_WithReHomedCount()

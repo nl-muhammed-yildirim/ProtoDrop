@@ -27,6 +27,7 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
     private readonly WaTelemetryReporter _telemetry;
     private readonly ILogger<SendTransferHandler> _logger;
     private readonly IAppUserStore _users;   // T-008-08 (FR-008-7): resolve the display-name "From" default
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="SendTransferHandler"/> class.</summary>
     /// <param name="store">Send-side store that loads the draft and persists the sent transfer.</param>
@@ -36,7 +37,8 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
     /// <param name="telemetry">Reporter for the storage telemetry metric.</param>
     /// <param name="logger">Logger injected for the handler (currently unused).</param>
     /// <param name="users">Store used to resolve the signed-in sender's display name.</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="users"/> is null.</exception>
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="users"/> or <paramref name="timeProvider"/> is null.</exception>
     public SendTransferHandler(
         ISendStore store,
         ITransferStore transferStore,
@@ -44,7 +46,8 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
         IEventPublisher eventPublisher,
         WaTelemetryReporter telemetry,
         ILogger<SendTransferHandler> logger,
-        IAppUserStore users)   // T-008-08 (FR-008-7): session-owner display-name resolution — registered singleton at Program.cs L107
+        IAppUserStore users,
+        TimeProvider timeProvider)   // T-008-08 (FR-008-7): session-owner display-name resolution — registered singleton at Program.cs L107
     {
         _store = store;
         _transferStore = transferStore;
@@ -53,6 +56,7 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
         _telemetry = telemetry;
         _logger = logger;
         _users = users ?? throw new ArgumentNullException(nameof(users));
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
     }
 
     /// <inheritdoc />
@@ -91,7 +95,7 @@ public sealed class SendTransferHandler : IRequestHandler<SendTransferCommand, S
             throw new ScheduleForbiddenException();
 
         // 3e. US-022-03 (FR-022-2): window re-validated against SERVER time (client clock skew defense), inclusive, before mutation.
-        var now = DateTime.UtcNow;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         if (request.ScheduledSendAtUtc is { } due && !ScheduleWindow.Contains(due, now))
             throw new ScheduleOutOfWindowException();
 

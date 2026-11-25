@@ -42,14 +42,14 @@ public class ExpiryJobIntegrationTests : IAsyncLifetime
         _publisher = new SbEventPublisher(
             sbConfig,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<SbEventPublisher>.Instance,
-            new WaDbContextFactory(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(_connString).Options));
+            new WaDbContextFactory(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(_connString).Options), TimeProvider.System);
     }
 
     public async Task DisposeAsync() => await _db.DisposeAsync();
 
     private ExpireTransfersHandler BuildHandler(WaDbContext db)
     {
-        var store = new ExpiryStore(db);
+        var store = new ExpiryStore(db, TimeProvider.System);
         // Outbox-backed publisher (T-054): writes the TA-5.2 envelope into DomainEvent via its own context, then publishes to an unreachable broker — row stays unpublished but committed.
         var telemetry = new wa.application.Telemetry.WaTelemetryReporter(
             Microsoft.Extensions.Logging.Abstractions.NullLogger<wa.application.Telemetry.WaTelemetryReporter>.Instance,

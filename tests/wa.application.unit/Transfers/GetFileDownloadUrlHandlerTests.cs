@@ -34,7 +34,7 @@ public class GetFileDownloadUrlHandlerTests
             _minter,
             _tokens,
             new WaTelemetryReporter(_telemetryLogger, Encoding.UTF8.GetBytes(UnitTestKey)),
-            NullLogger<GetFileDownloadUrlHandler>.Instance);
+            NullLogger<GetFileDownloadUrlHandler>.Instance, TimeProvider.System);
     }
 
     // ---- Ok path: mint called with the exact RFC 5987 disposition; store recorded with PII-transformed values (TA-9.4) ----
@@ -70,6 +70,29 @@ public class GetFileDownloadUrlHandlerTests
 
         // download_started emitted at mint time (MVP: no client pipeline observes download_completed — documented deviation).
         Assert.Contains(_telemetryLogger.RenderedTexts, e => e == TelemetryEvents.DownloadStarted);
+    }
+
+    // ---- CHORE-code-style-2: the 30-minute window is measured from the injected clock, exactly ----
+
+    [Fact]
+    public async Task Handle_Ok_ExpiresAtIsInjectedNowPlus30Minutes()
+    {
+        var fixedNow = new DateTimeOffset(2026, 11, 25, 12, 0, 0, TimeSpan.Zero);
+        var handler = new GetFileDownloadUrlHandler(
+            _store,
+            _minter,
+            _tokens,
+            new WaTelemetryReporter(_telemetryLogger, Encoding.UTF8.GetBytes(UnitTestKey)),
+            NullLogger<GetFileDownloadUrlHandler>.Instance,
+            new ManualTimeProvider(fixedNow));
+        var fileId = Guid.NewGuid();
+        _store.SetupActive(files: [new PublicFileItem(fileId, "a.txt", 10)], maxDownloads: 5, downloadsCount: 0);
+
+        var result = await handler.Handle(
+            new GetFileDownloadUrlQuery("abcdefgh", fileId.ToString("n"), ClientIp: "1.2.3.4", UserAgent: "ua-xyz"), CancellationToken.None);
+
+        Assert.Equal(FileDownloadState.Ok, result.State);
+        Assert.Equal(fixedNow.AddMinutes(30), result.ExpiresAt);
     }
 
     [Fact]

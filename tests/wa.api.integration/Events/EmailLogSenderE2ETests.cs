@@ -266,7 +266,7 @@ public class EmailLogSenderE2ETests : IAsyncLifetime
             new SenderBrandingStore(workerDb),
             new FeaturesProvider(
                 new PlansCache(new PlansStore(workerDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow),
-                new FlagsCache(new FlagsStore(workerDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow)));
+                new FlagsCache(new FlagsStore(workerDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow)), TimeProvider.System);
         await handler.HandleAsync(envelope, 1, 5, CancellationToken.None);
     }
 

@@ -8,7 +8,7 @@ namespace wa.application.UseCases.Admin;
 
 /// <summary>
 /// T-011-05 (TA-4.2a): mirrors DeleteTransferHandler at src/wa.application/UseCases/Transfers/DeleteTransferCommand.cs:34
-/// verbatim except reason pinned to "admin" and the store call is AdminMarkDeletedAsync(Id, DateTime.UtcNow, ct).
+/// verbatim except reason pinned to "admin" and the store call is AdminMarkDeletedAsync(Id, now, ct) with now read from the injected TimeProvider.
 /// null → return null (endpoint maps to NOT_FOUND); non-null → EventEnvelope { Type=EventType.TransferDeleted, Version=1,
 /// PartitionKey=result.LinkId, Payload={transferId=Id, reason="admin"} } → PublishAsync.
 /// </summary>
@@ -16,22 +16,25 @@ public sealed class AdminDeleteTransferHandler : IRequestHandler<AdminDeleteTran
 {
     private readonly IAdminTransferStore _store;
     private readonly IEventPublisher _eventPublisher;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="AdminDeleteTransferHandler"/> class.</summary>
     /// <param name="store">Platform-scoped store that soft-deletes any transfer.</param>
     /// <param name="eventPublisher">Publishes the <c>transfer.deleted</c> event.</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="store"/> or <paramref name="eventPublisher"/> is null.</exception>
-    public AdminDeleteTransferHandler(IAdminTransferStore store, IEventPublisher eventPublisher)
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="store"/>, <paramref name="eventPublisher"/> or <paramref name="timeProvider"/> is null.</exception>
+    public AdminDeleteTransferHandler(IAdminTransferStore store, IEventPublisher eventPublisher, TimeProvider timeProvider)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _eventPublisher = eventPublisher ?? throw new ArgumentNullException(nameof(eventPublisher));
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
     }
 
     /// <inheritdoc />
     public async Task<MarkDeleteResult?> Handle(AdminDeleteTransferCommand request, CancellationToken cancellationToken)
     {
         // 1. Store: platform-scoped predicate (Id=@id AND Status != 4) in ONE query → null on no match.
-        var result = await _store.AdminMarkDeletedAsync(request.Id, DateTime.UtcNow, cancellationToken);
+        var result = await _store.AdminMarkDeletedAsync(request.Id, _timeProvider.GetUtcNow().UtcDateTime, cancellationToken);
         if (result is null)
             return null;   // endpoint maps to NOT_FOUND — EC-009-2: a second delete returns the identical body as a first
 

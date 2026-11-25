@@ -33,7 +33,7 @@ public class RedeemMagicLinkTests
             _users,
             _plans,
             new WaTelemetryReporter(_telemetryLogger, System.Text.Encoding.UTF8.GetBytes("unit-test-key")),
-            _minter);
+            _minter, TimeProvider.System);
     }
 
     private string GenerateRawToken() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));

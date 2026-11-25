@@ -18,7 +18,7 @@ public class AuditWriterTests
     {
         _store = new StubAuditStore();
         _eventPublisher = new StubEventPublisher();
-        _writer = new AuditWriter(_store, _eventPublisher);
+        _writer = new AuditWriter(_store, _eventPublisher, TimeProvider.System);
     }
 
     // ---- Exit check 1: one call → exactly one AuditLog row, columns verbatim (AC-011-2 audit half) ----
@@ -82,7 +82,7 @@ public class AuditWriterTests
         // Fresh stubs; a read path performs no WriteAsync call at all.
         var store = new StubAuditStore();
         var publisher = new StubEventPublisher();
-        var writer = new AuditWriter(store, publisher);
+        var writer = new AuditWriter(store, publisher, TimeProvider.System);
 
         // No call — the read path never touches the helper.
         await Task.CompletedTask;

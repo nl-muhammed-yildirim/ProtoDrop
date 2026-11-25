@@ -15,7 +15,7 @@ public class ActivateScheduledTransfersHandlerTests
     private readonly ActivateScheduledTransfersHandler _handler;
 
     public ActivateScheduledTransfersHandlerTests() =>
-        _handler = new ActivateScheduledTransfersHandler(_store, _publisher, NullLogger<ActivateScheduledTransfersHandler>.Instance);
+        _handler = new ActivateScheduledTransfersHandler(_store, _publisher, NullLogger<ActivateScheduledTransfersHandler>.Instance, TimeProvider.System);
 
     private static ActivatedTransfer Activated(Guid id) =>
         new(id, "LINK" + id.ToString("N")[..4], 2048, 2, "s@x.com", Now.AddMinutes(-5), ["a@x.com", "b@y.com"]);

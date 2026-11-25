@@ -54,7 +54,7 @@ public class ApplyAtFinalizeIntegrationTests : IAsyncLifetime
             _publisher,
             new WaTelemetryReporter(NullLogger<WaTelemetryReporter>.Instance, Encoding.UTF8.GetBytes("test-key")),
             NullLogger<SendTransferHandler>.Instance,
-            new AppUserStore(_storeDb));
+            new AppUserStore(_storeDb), TimeProvider.System);
     }
 
     public async Task DisposeAsync()
