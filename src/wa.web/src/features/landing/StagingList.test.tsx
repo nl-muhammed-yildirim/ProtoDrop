@@ -309,7 +309,11 @@ describe('StagingList', () => {
         act(() => { void root.render(createElement(StagingList)) })
         const send = host.querySelector('.sl-send') as HTMLButtonElement
         await act(async () => { send.click() })
-        await act(async () => { await new Promise((r) => setTimeout(r, 0)) })
+        await act(async () => {
+          await vi.waitFor(() => {
+            if (!seen.some((c) => c.url.endsWith('/finalize'))) throw new Error('finalize not called yet')
+          })
+        })
 
         const draft = seen.find((c) => c.url.endsWith('/api/v1/transfers/draft'))
         const fin = seen.find((c) => c.url.endsWith('/finalize'))
