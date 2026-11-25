@@ -24,7 +24,7 @@ public static class TelemetryEvents
     public const string PasswordWrong = "password_wrong";
     /// <summary>Event <c>download_started</c>: a recipient started downloading a file or the zip.</summary>
     public const string DownloadStarted = "download_started";
-    /// <summary>Event <c>download_completed</c> (client-emitted): the recipient's browser finished downloading a file; carries fileId, bytes and durationMs. The server cannot observe completion.</summary>
+    /// <summary>Event <c>download_completed</c> (client-emitted): the recipient's browser was sent to the minted download URL of a file or of the zip (fileId null for the zip); carries fileId, bytes and durationMs. Neither side observes the byte transfer actually finishing.</summary>
     public const string DownloadCompleted = "download_completed";
     /// <summary>Event <c>zip_generated</c>: the zip of a multi-file transfer was built successfully.</summary>
     public const string ZipGenerated = "zip_generated";

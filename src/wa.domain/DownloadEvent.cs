@@ -13,7 +13,7 @@ public class DownloadEvent
     public string? IpHash { get; set; }
     /// <summary>Two-letter ISO country code of the downloader; nullable and not populated by the current code (analytics shows "??" when null).</summary>
     public string? Country { get; set; }
-    /// <summary>Hash of the raw User-Agent; nullable, not populated or read by the current code, and never exposed (the raw value is never stored).</summary>
+    /// <summary>Keyed hash (HMAC-SHA256) of the downloader's User-Agent, written on each recorded download; nullable, not read by the current code, and the raw value is never stored.</summary>
     public string? UaHash { get; set; }
     /// <summary>UA family at write time (F-PRF-003), never the raw UA.</summary>
     public string? UserAgentFamily { get; set; }
