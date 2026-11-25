@@ -380,8 +380,11 @@ function scanLoggerMessage(file, text) {
       r7(m.index, 'could not find the closing paren of [LoggerMessage(..)] — scan is unreliable here')
       continue
     }
-    const lit = /\bMessage\s*=\s*"((?:[^"\\]|\\.)*)"/.exec(nc.slice(attr.start, attr.end))
-    if (!lit) {
+    const attrText = nc.slice(attr.start, attr.end)
+    const lit = /\bMessage\s*=\s*"((?:[^"\\]|\\.)*)"/.exec(attrText)
+    if (lit && attrText.slice(lit.index + lit[0].length).trimStart().startsWith('+')) {
+      r7(m.index, 'unreadable [LoggerMessage] (concatenated Message template — use a single "<literal>" so the guard reads the whole template)')
+    } else if (!lit) {
       r7(m.index, 'unreadable [LoggerMessage] (use the named Message = "<literal>" argument so the guard can read the template)')
     } else {
       const template = lit[1]
@@ -681,6 +684,7 @@ function runSelfTest() {
     ['S29', 'logmsg', 'R7', '[LoggerMessage(1, LogLevel.Warning, "failed {Id}")]\nprivate static partial void LogFailed(ILogger logger, Guid id);'],
     ['S30', 'logmsg', 'R7', '[LoggerMessage(Level = LogLevel.Warning, Message = "failed {Id}")]\npublic static partial void LogFailed(ILogger logger, Guid id);'],
     ['S31', 'logmsg', 'R7', '[LoggerMessage(Level = LogLevel.Error, Message = "Unhandled on {Route}")]\nprivate static partial void LogFailed(ILogger logger, Exception exception, string route);\nvoid M() { LogFailed(_logger, ex, context.Request.Path); }'],
+    ['S32', 'logmsg', 'R7', '[LoggerMessage(Level = LogLevel.Warning, Message = "sent " + "{RecipientEmail}")]\nprivate static partial void LogSent(ILogger logger, string id);'],
   ]
   const clean = [
     ['C1', 'ts', "if (x) {\n  trackClientEvent('upload_failed', { fileId: id, retries: fileAttempts.get(id)?.retries, ...(isBlobUnavailable ? { reason: 'blob_unavailable' } : {}) })\n}"],

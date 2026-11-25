@@ -1,6 +1,6 @@
 using wa.application.UseCases.Admin; // T-011-01: AdminRolePolicy (gate + role field)
 using wa.application.UseCases.Auth;
-using wa.domain.Errors; // T-056-02: /health catch writes through ProblemWriter (closed code list)
+using wa.domain.Errors;
 using wa.api.Middleware;
 
 namespace wa.api.Endpoints;
@@ -17,7 +17,7 @@ internal sealed class AdminGate
         OperatorEmails = operatorEmails;
     }
 
-    /// <summary>Gets the lower-cased admin emails from <c>Wa:AdminEmails</c> (case-insensitive set).</summary>
+    /// <summary>Gets the admin emails from <c>Wa:AdminEmails</c> as written in configuration (matched case-insensitively).</summary>
     public IReadOnlySet<string> AdminEmails { get; }
 
     /// <summary>Gets the operator emails from <c>Wa:OperatorEmails</c> (case-insensitive set); empty means every admin is a SuperAdmin.</summary>
@@ -39,11 +39,12 @@ internal sealed class AdminGate
         return new AdminGate(adminEmails, operatorEmails);
     }
 
-    // T-011-01 gate helper — the contract endpoints 20–23 call as their routes land (T-011-03…T-011-09). Session read → 401 UNAUTHENTICATED inline
-    // (same idiom as /auth/me L578); unknown email OR not in Wa:AdminEmails → FORBIDDEN; SuperAdmin-only route with an Operator role → same FORBIDDEN.
-    // Returns the role (US-047-03 email reveal). No audit row for a rejected gate — the suppression DELETE emits TelemetryEvents.AdminAction AFTER the gate passes (T-006-03).
-
     /// <summary>Resolves the session user's admin role or throws the closed-set 401 / 403 Problem.</summary>
+    /// <remarks>
+    /// T-011-01 gate helper for the admin endpoints. Session read gives 401 UNAUTHENTICATED; an unknown email, an email not in
+    /// <c>Wa:AdminEmails</c>, or an Operator on a SuperAdmin-only route gives FORBIDDEN. Returns the role (US-047-03 email reveal).
+    /// No audit row for a rejected gate: the suppression DELETE emits <c>TelemetryEvents.AdminAction</c> only AFTER the gate passes (T-006-03).
+    /// </remarks>
     /// <param name="ctx">The current HTTP context (carries the session user id).</param>
     /// <param name="users">Store used to load the session user's email.</param>
     /// <param name="superadminOnly">True when only a SuperAdmin may pass.</param>
