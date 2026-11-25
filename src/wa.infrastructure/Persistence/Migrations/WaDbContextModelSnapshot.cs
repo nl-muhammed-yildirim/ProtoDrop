@@ -47,6 +47,9 @@ namespace wa.infrastructure.Persistence.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(false, "DF_AppUser_Conf");
 
+                    b.Property<bool?>("EmailNotificationsEnabled")
+                        .HasColumnType("BIT");
+
                     b.Property<string>("OrgLogoBlobPath")
                         .HasColumnType("VARCHAR(400)");
 

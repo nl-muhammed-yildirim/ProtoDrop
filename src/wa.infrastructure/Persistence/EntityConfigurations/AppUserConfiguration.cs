@@ -43,5 +43,8 @@ public sealed class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
         // F-PRF-001 (US-021-01): nullable org branding columns.
         b.Property(u => u.OrgName).HasColumnType($"NVARCHAR({AppUser.OrgNameMaxLength})");
         b.Property(u => u.OrgLogoBlobPath).HasColumnType("VARCHAR(400)");
+
+        // F-XCT-003 (FR-046-1): BIT NULL, no default — null = on; the three states stay distinguishable.
+        b.Property(u => u.EmailNotificationsEnabled).HasColumnType("BIT");
     }
 }

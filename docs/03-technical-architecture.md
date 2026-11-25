@@ -244,6 +244,7 @@ CREATE TABLE dbo.AppUser (
     Theme          VARCHAR(16)    NOT NULL CONSTRAINT DF_AppUser_Theme DEFAULT 'system',
     OrgName        NVARCHAR(60)   NULL,   -- F-PRF-001 (FR-021-5)
     OrgLogoBlobPath VARCHAR(400)  NULL,   -- F-PRF-001 (avatars/{userId:N}/logo, TA-3.5)
+    EmailNotificationsEnabled BIT NULL,   -- F-XCT-003 (FR-046-1): NULL=on, 0=off, 1=explicit on; no default constraint
     CreatedAtUtc   DATETIME2      NOT NULL,
     DeletedAtUtc   DATETIME2      NULL
 );
@@ -495,7 +496,7 @@ Machine `code` values (all of them, no others in MVP):
 | 10 | `POST /api/v1/auth/magic-link/redeem` | none | token → session | `login_success` |
 | 11 | `POST /api/v1/auth/forgot-password` | none | magic link email | metrics |
 | 12 | `POST /api/v1/auth/logout` | cookie | clear session | metrics |
-| 13 | `GET /api/v1/auth/me` · `PATCH /api/v1/auth/me` · `DELETE /api/v1/auth/me` · `GET /api/v1/auth/me/logo` · `PUT /api/v1/auth/me/logo` · `DELETE /api/v1/auth/me/logo` | cookie | profile (name, theme; GDPR delete). `PATCH` body gains `orgName` (absent = unchanged; null/blank = clear; max 60; no CR/LF; Pro+ only to set). Logo (F-PRF-001): `GET` owner view; `PUT` raw body, content-sniffed PNG/JPEG/WebP/SVG, size <= `MAX_LOGO_SIZE`, Pro+; `DELETE` idempotent | `account_deleted` |
+| 13 | `GET /api/v1/auth/me` · `PATCH /api/v1/auth/me` · `DELETE /api/v1/auth/me` · `GET /api/v1/auth/me/logo` · `PUT /api/v1/auth/me/logo` · `DELETE /api/v1/auth/me/logo` | cookie | profile (name, theme; GDPR delete). `PATCH` body gains `orgName` (absent = unchanged; null/blank = clear; max 60; no CR/LF; Pro+ only to set) and `emailNotifications` (bool?, absent = unchanged — F-XCT-003 FR-046-2); `GET` returns the effective value (`AppUser.EmailNotificationsOn`, NULL→true). Logo (F-PRF-001): `GET` owner view; `PUT` raw body, content-sniffed PNG/JPEG/WebP/SVG, size <= `MAX_LOGO_SIZE`, Pro+; `DELETE` idempotent | `account_deleted` |
 | 14 | `GET /api/v1/transfers?q=&status=&cursor=` | cookie | My Files (q: F-XCT-002, feature.search gate) | — |
 | 15 | `GET /api/v1/transfers/{id}` | owner | detail | — |
 | 16 | `POST /api/v1/transfers/{id}/resend` | owner | pre-filled new draft (BlobRef share) | metrics |

@@ -21,4 +21,10 @@ public class AppUser
     public const int OrgNameMaxLength = 60;
     /// <summary>F-PRF-001: blob path of the org logo (TA-3.5 avatars/{userId}/logo); set by US-021-04.</summary>
     public string? OrgLogoBlobPath { get; set; }
+
+    /// <summary>F-XCT-003 FR-046-1: owner notification emails. Null = never touched = on; false = off; true = explicitly on.</summary>
+    public bool? EmailNotificationsEnabled { get; set; }
+
+    /// <summary>FR-046-2: the effective setting — null means on. The single NULL→true rule (GET, f-email gate).</summary>
+    public static bool EmailNotificationsOn(bool? stored) => stored ?? true;
 }

@@ -408,6 +408,16 @@ describe('ProfilePage (T-008-07)', () => {
     })
   })
 
+  describe('US-046-01: notification switch behind feature.emailSettings', () => {
+    it('gate off (default): the notification switch is absent', async () => {
+      stubFetch({}, () => Promise.resolve(new Response(null, { status: 204 })))
+      const { host, cleanup } = renderProfilePage(BASE_PROFILE)
+      await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() })
+      expect(host.querySelector('#pf-notify-switch')).toBeNull() // US-044-02 contract: absent unless the gate is on
+      cleanup()
+    })
+  })
+
   describe('T-015-02 (F-TRF-015): theme select + live system OS tracking', () => {
     it("System mode follows the OS preference — resolved-set path, no removeAttribute fallback to :root light", async () => {
       mqStub.flipMatches(true)   // OS prefers dark.

@@ -3,6 +3,7 @@ using wa.application.Limits;
 using wa.application.Ports;
 using wa.application.UseCases.Auth;
 using wa.domain;
+using wa.application.unit.EmailSettings;
 
 namespace wa.application.unit.Auth;
 
@@ -22,7 +23,7 @@ public class MeProfileOrgNameTests
         var plan = _plan;
         _users.User = new AppUser { Id = _userId, Email = "ada@example.com", DisplayName = "Ada", Theme = "system", PlanId = plan.Id, OrgName = "Old" };
         _orgNames.Users = _users;
-        _handler = new UpdateProfileHandler(_users, new Plans(plan), _orgNames, new StubPlanContext(branding));
+        _handler = new UpdateProfileHandler(_users, new Plans(plan), _orgNames, new StubPlanContext(branding), new StubEmailNotificationsStore());
     }
 
     private Task<GetProfileResult> Patch(OrgNamePatch org) =>

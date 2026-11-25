@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using wa.application.Limits;
 using wa.application.Ports;
 using wa.application.Telemetry;
+using wa.application.unit.EmailSettings;
 using wa.application.UseCases.Auth;
 using wa.domain;
 using wa.domain.Telemetry;
@@ -75,7 +76,7 @@ public class MeProfileTests
         var userId = Guid.NewGuid();
         _users.UserById[userId] = SeedRealAppUser(userId);
 
-        var handler = new UpdateProfileHandler(_users, _plans, new StubOrgNames(), new StubPlanContext(true));
+        var handler = new UpdateProfileHandler(_users, _plans, new StubOrgNames(), new StubPlanContext(true), new StubEmailNotificationsStore());
 
         // Case A: normal displayName — trimmed; theme untouched (null passed through).
         var result = await handler.Handle(new UpdateProfileCommand(userId, "  Grace Hopper ", null), CancellationToken.None);
@@ -96,7 +97,7 @@ public class MeProfileTests
         var userId = Guid.NewGuid();
         _users.UserById[userId] = SeedRealAppUser(userId);
 
-        var handler = new UpdateProfileHandler(_users, _plans, new StubOrgNames(), new StubPlanContext(true));
+        var handler = new UpdateProfileHandler(_users, _plans, new StubOrgNames(), new StubPlanContext(true), new StubEmailNotificationsStore());
         await Assert.ThrowsAsync<MeProfileException>(async () =>
             await handler.Handle(new UpdateProfileCommand(userId, null, "purple"), CancellationToken.None));
     }
@@ -109,7 +110,7 @@ public class MeProfileTests
         var userId = Guid.NewGuid();
         _users.UserById[userId] = SeedRealAppUser(userId);
 
-        var handler = new UpdateProfileHandler(_users, _plans, new StubOrgNames(), new StubPlanContext(true));
+        var handler = new UpdateProfileHandler(_users, _plans, new StubOrgNames(), new StubPlanContext(true), new StubEmailNotificationsStore());
         await Assert.ThrowsAsync<MeProfileException>(async () =>
             await handler.Handle(new UpdateProfileCommand(userId, null, null), CancellationToken.None));
     }

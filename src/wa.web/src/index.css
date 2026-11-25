@@ -1023,6 +1023,21 @@ main:has(.sl) .dz {
   text-align: left;
 }
 
+/* US-046-01: notification preferences switch — the input carries the 44 px tap floor (T-017-03 check). */
+.pf-switch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: var(--fs-body);
+  text-align: left;
+}
+
+.pf-switch-input {
+  min-width: 44px;
+  min-height: 44px;
+  margin: 0;
+}
+
 /* T-008-09 (FR-008-8, UI-Reference §5.5 danger zone): ghost-danger button + confirm modal */
 .pf-delete-btn {
   min-height: 44px; /* F-TRF-017-4 touch targets — mirrors .au-ghost-btn */

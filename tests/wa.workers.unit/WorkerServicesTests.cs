@@ -3,8 +3,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using wa.application.Events;
+using wa.application.Limits;
 using wa.application.Ports;
 using wa.application.Telemetry;
+using wa.application.UseCases.EmailSettings;
 using wa.domain.Telemetry;
 using wa.infrastructure.Events;
 
@@ -91,6 +93,16 @@ public class WorkerServicesTests
         using var sp = Build(InMemory(BaseSettings()));
 
         Assert.NotNull(sp.GetRequiredService<wa.application.UseCases.Gdpr.SweepErasedTelemetryHandler>());
+    }
+
+    [Fact]
+    public void OwnerNotificationGate_Resolves() // F-XCT-003 (FR-046-3): the f-email send-time gate is composed with its store + flag resolver
+    {
+        using var sp = Build(InMemory(BaseSettings()));
+
+        Assert.NotNull(sp.GetRequiredService<wa.application.UseCases.EmailSettings.OwnerNotificationGate>());
+        Assert.IsType<wa.infrastructure.Persistence.EmailNotificationsStore>(sp.GetRequiredService<IEmailNotificationsStore>());
+        Assert.NotNull(sp.GetRequiredService<IFlagResolver>()); // LimitsProvider implements both — the gate's flag source
     }
 
     [Fact]

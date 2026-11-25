@@ -8,6 +8,7 @@ using wa.application.Ports;
 using wa.application.UseCases.Auth;
 using wa.application.UseCases.Billing;
 using wa.application.UseCases.DataExport;
+using wa.application.UseCases.EmailSettings;
 using wa.application.UseCases.Gdpr;
 using wa.application.UseCases.Transfers;
 using wa.infrastructure.Blob;
@@ -52,6 +53,7 @@ public static class WorkerServices
         services.AddSingleton(sp => new PlansCache(sp.GetRequiredService<IPlansStore>(), limitsTtl, () => DateTimeOffset.UtcNow));
         services.AddSingleton(sp => new FlagsCache(sp.GetRequiredService<IFlagsStore>(), limitsTtl, () => DateTimeOffset.UtcNow));
         services.AddSingleton<ILimitsProvider>(sp => new LimitsProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
+        services.AddSingleton<IFlagResolver>(sp => (IFlagResolver)sp.GetRequiredService<ILimitsProvider>()); // LimitsProvider implements both (API precedent Program.cs L113)
         services.AddSingleton<IFeaturesProvider>(sp => new FeaturesProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
         services.AddSingleton<ISenderBrandingStore>(sp => new SenderBrandingStore(sp.GetRequiredService<WaDbContext>()));
 
@@ -145,6 +147,12 @@ public static class WorkerServices
         // T-006-01: f-email consumer
         services.AddSingleton<EventDeduplicator>(sp => new EventDeduplicator(() => DateTimeOffset.UtcNow));
         services.AddSingleton<IEmailStore>(sp => new EmailStore(sp.GetRequiredService<WaDbContext>()));
+        // F-XCT-003 (FR-046-3): send-time owner-notification gate — every owner email handler calls MaySendAsync before sending.
+        services.AddSingleton<IEmailNotificationsStore>(sp => new EmailNotificationsStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+        services.AddSingleton<OwnerNotificationGate>(sp => new OwnerNotificationGate(
+            sp.GetRequiredService<IEmailNotificationsStore>(),
+            sp.GetRequiredService<IFlagResolver>(),
+            sp.GetRequiredService<ILogger<OwnerNotificationGate>>()));
         services.AddSingleton<ITemplateRenderer>(sp => new StubbleTemplateRenderer(
             sp.GetRequiredService<ILogger<StubbleTemplateRenderer>>(),
             sp.GetRequiredService<wa.application.Telemetry.WaTelemetryReporter>())); // T-014-04: fallback telemetry event
