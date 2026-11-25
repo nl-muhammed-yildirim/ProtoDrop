@@ -13,7 +13,7 @@ namespace wa.workers;
 /// Host.json settings: concurrency 1, timeout 30 min.
 /// T-005-04: HTTP trigger for E2E manual invocation.
 /// </summary>
-public class DeleteBlobsFunction
+public partial class DeleteBlobsFunction
 {
     private readonly DeleteOrphanBlobsHandler _handler;
     private readonly ILogger<DeleteBlobsFunction> _logger;
@@ -49,11 +49,11 @@ public class DeleteBlobsFunction
         try
         {
             var count = await _handler.RunAsync(now, context.CancellationToken);
-            _logger.LogInformation("f-delete-blobs completed: {Count} blobs deleted", count);
+            LogCompleted(_logger, count);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "f-delete-blobs failed");
+            LogFailed(_logger, ex);
             throw; // Azure Functions retries on unhandled exception; JobRun claim prevents double-processing.
         }
     }
@@ -73,4 +73,10 @@ public class DeleteBlobsFunction
         var count = await _handler.RunAsync(_timeProvider.GetUtcNow().UtcDateTime, context.CancellationToken);
         return JobAuth.CreateSuccess(req, new { deleted = count });
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "f-delete-blobs completed: {Count} blobs deleted")]
+    private static partial void LogCompleted(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "f-delete-blobs failed")]
+    private static partial void LogFailed(ILogger logger, Exception exception);
 }

@@ -17,7 +17,7 @@ namespace wa.infrastructure.Events;
 /// — no silent drop (EC-054-1). MVP simplification per TA-4.1.7: at-most-once accepted for non-critical events;
 /// the outbox row + alert cover the rest. <b>Assumes a non-empty connection string</b>: Program.cs selects this adapter only when <c>Wa:ServiceBus:ConnectionString</c> is present, so the ctor input is guaranteed non-null in production (a direct construction with a missing key throws from the ServiceBusClient ctor at publish time — acceptable for M0).
 /// </summary>
-public sealed class SbEventPublisher : IEventPublisher
+public sealed partial class SbEventPublisher : IEventPublisher
 {
     private const string TopicName = "core";
 
@@ -80,10 +80,13 @@ public sealed class SbEventPublisher : IEventPublisher
         catch (Exception ex)
         {
             // Row stays unpublished — re-publish picks it up (TA-4.1.7). This log line is the M0 alert path.
-            _logger.LogError(ex, "PUBLISH_FAILED eventId={EventId} eventType={EventType}", envelope.EventId, row.EventType);
+            LogPublishFailed(_logger, ex, envelope.EventId, row.EventType);
         }
 
         await db.SaveChangesAsync(cancellationToken); // persist the publish flag; no-op save when it stayed false
         return new DomainEventRecord { EventId = envelope.EventId, IsPublished = row.IsPublished };
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "PUBLISH_FAILED eventId={EventId} eventType={EventType}")]
+    private static partial void LogPublishFailed(ILogger logger, Exception exception, Guid eventId, string eventType);
 }

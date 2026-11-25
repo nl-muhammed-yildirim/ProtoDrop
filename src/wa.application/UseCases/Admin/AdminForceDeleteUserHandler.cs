@@ -12,7 +12,7 @@ namespace wa.application.UseCases.Admin;
 /// (T-008-06, already exists), then emit account_deleted via the outbox EXACTLY as DeleteAccountHandler does.
 /// null result → endpoint maps to 404 NOT_FOUND; non-null → endpoint audits {email} + returns 204 No Content.
 /// </summary>
-public sealed class AdminForceDeleteUserHandler : IRequestHandler<AdminForceDeleteUserCommand, AdminForceDeleteResult?>
+public sealed partial class AdminForceDeleteUserHandler : IRequestHandler<AdminForceDeleteUserCommand, AdminForceDeleteResult?>
 {
     private readonly IAppUserStore _users;
     private readonly IEventPublisher _eventPublisher;
@@ -80,7 +80,7 @@ public sealed class AdminForceDeleteUserHandler : IRequestHandler<AdminForceDele
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger?.LogWarning("Org logo blob delete failed after account deletion for user {UserId}.", user.Id);
+                if (_logger is not null) LogOrgLogoDeleteFailed(_logger, user.Id);
             }
         }
 
@@ -100,4 +100,7 @@ public sealed class AdminForceDeleteUserHandler : IRequestHandler<AdminForceDele
         }
         return Guid.NewGuid();
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Org logo blob delete failed after account deletion for user {UserId}.")]
+    private static partial void LogOrgLogoDeleteFailed(ILogger logger, Guid userId);
 }

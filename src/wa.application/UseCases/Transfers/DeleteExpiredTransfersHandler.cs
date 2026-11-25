@@ -11,7 +11,7 @@ namespace wa.application.UseCases.Transfers;
 /// marks them Deleted, decrements BlobRef.RefCount per FileItem, deletes FileItem + EmailRecipient rows, and emits transfer.deleted per row.
 /// Claim via JobRun prevents double-processing in scale-out (FR-005-9).
 /// </summary>
-public sealed class DeleteExpiredTransfersHandler
+public sealed partial class DeleteExpiredTransfersHandler
 {
     private const int BatchSize = 100; // TA-6.4 architecture constant, not a plan limit
     private const int GraceDays = 3;   // TA-6.4, all plans (FR-005-3)
@@ -77,7 +77,7 @@ public sealed class DeleteExpiredTransfersHandler
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
-                        _logger.LogWarning(ex, "f-delete-transfers: zip blob delete failed for transfer {TransferId}", id);
+                        LogZipBlobDeleteFailed(_logger, ex, id);
                     }
                 }
 
@@ -107,4 +107,7 @@ public sealed class DeleteExpiredTransfersHandler
             await _store.CompleteClaimAsync(runWindowStart, ct);
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "f-delete-transfers: zip blob delete failed for transfer {TransferId}")]
+    private static partial void LogZipBlobDeleteFailed(ILogger logger, Exception exception, Guid transferId);
 }

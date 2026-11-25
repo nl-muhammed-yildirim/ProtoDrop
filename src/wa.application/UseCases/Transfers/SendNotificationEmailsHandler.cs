@@ -16,7 +16,7 @@ namespace wa.application.UseCases.Transfers;
 /// T-006-01: f-email consumer handler — sends notification emails for transfer.created events.
 /// Two-layer dedup: EventDeduplicator (eventId, 15-min window) + NotifiedAtUtc null check per recipient row.
 /// </summary>
-public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth.IEmailEventHandler
+public sealed partial class SendNotificationEmailsHandler : wa.application.UseCases.Auth.IEmailEventHandler
 {
     private readonly IEmailStore _store;
     private readonly IEmailSender _emailSender;
@@ -79,7 +79,7 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
         if (!root.TryGetProperty("transferId", out var transferIdEl) ||
             !transferIdEl.TryGetGuid(out var transferId))
         {
-            _logger.LogWarning("f-email: missing or invalid transferId in payload");
+            LogMissingTransferId(_logger);
             return;
         }
 
@@ -95,7 +95,7 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
         var context = await _store.GetTransferWithFilesAsync(transferId, ct);
         if (context is null)
         {
-            _logger.LogWarning("f-email: transfer {TransferId} not found", transferId);
+            LogTransferNotFound(_logger, transferId);
             return;
         }
 
@@ -103,14 +103,14 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
         // skipped delivery is not recorded as seen; returns (no throw) so the message completes. The timer re-emits transfer.created on flip.
         if (!ScheduledSend.MayNotify(context.Status, context.ScheduledSendAtUtc))
         {
-            _logger.LogInformation("f-email: transfer {TransferId} is not due for notification, skipping", transferId);
+            LogTransferNotDue(_logger, transferId);
             return;
         }
 
         // 4. Dedup: if already seen → return (fast-path skip).
         if (_deduplicator.AlreadySeen(envelope.EventId))
         {
-            _logger.LogInformation("f-email: event {EventId} already processed, skipping", envelope.EventId);
+            LogEventAlreadyProcessed(_logger, envelope.EventId);
             return;
         }
 
@@ -201,7 +201,7 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "f-email: failed to send email to recipient {RecipientId} attempt {Attempt}", recipient.Id, attempt);
+                LogSendFailed(_logger, ex, recipient.Id, attempt);
 
                 if (attempt == maxDeliveryCount)
                 {
@@ -248,4 +248,19 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
         var token = UnsubscribeToken.Create(address, senderEmail, Encoding.UTF8.GetBytes(secret));
         return $"{publicOrigin}/unsubscribe/{token}";
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "f-email: missing or invalid transferId in payload")]
+    private static partial void LogMissingTransferId(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "f-email: transfer {TransferId} not found")]
+    private static partial void LogTransferNotFound(ILogger logger, Guid transferId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "f-email: transfer {TransferId} is not due for notification, skipping")]
+    private static partial void LogTransferNotDue(ILogger logger, Guid transferId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "f-email: event {EventId} already processed, skipping")]
+    private static partial void LogEventAlreadyProcessed(ILogger logger, Guid eventId);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "f-email: failed to send email to recipient {RecipientId} attempt {Attempt}")]
+    private static partial void LogSendFailed(ILogger logger, Exception exception, Guid recipientId, int attempt);
 }

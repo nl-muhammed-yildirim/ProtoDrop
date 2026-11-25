@@ -14,7 +14,7 @@ namespace wa.application.UseCases.Billing;
 /// Same send / email.sent / email.failed / rethrow shape as SendForgotPasswordEmailHandler; SB redelivers up to MaxDeliveryCount, then DLQ.
 /// Billing mail is transactional — no suppression check. Logs never carry the address (TA-9.4).
 /// </summary>
-public sealed class SendBillingEmailHandler : IEmailEventHandler
+public sealed partial class SendBillingEmailHandler : IEmailEventHandler
 {
     private static readonly string[] Subjects =
     [
@@ -86,7 +86,7 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
             ? emailEl.GetString() : null;
         if (string.IsNullOrWhiteSpace(email))
         {
-            _logger.LogWarning("f-email: missing or invalid email in billing payload");
+            LogMissingEmail(_logger);
             return;
         }
 
@@ -100,7 +100,7 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
             if (!root.TryGetProperty("step", out var stepEl) || stepEl.ValueKind != JsonValueKind.Number
                 || !stepEl.TryGetInt32(out step) || step < 1 || step > BillingEmailSchedule.StepCount)
             {
-                _logger.LogWarning("f-email: missing or invalid step in billing payload");
+                LogMissingStep(_logger);
                 return;
             }
             subject = Subjects[step - 1];
@@ -113,7 +113,7 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
         }
         else
         {
-            _logger.LogWarning("f-email: unknown billing email kind {Kind}", kind);
+            LogUnknownBillingKind(_logger, kind);
             return;
         }
 
@@ -143,7 +143,7 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "f-email: failed to send billing email step {Step} attempt {Attempt}", step, attempt);
+            LogSendFailed(_logger, ex, step, attempt);
 
             if (attempt == maxDeliveryCount)
             {
@@ -168,4 +168,16 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
 
     private static string Render(string template, int step, string ctaUrl) =>
         template.Replace("{{Step}}", step.ToString()).Replace("{{CtaUrl}}", ctaUrl);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "f-email: missing or invalid email in billing payload")]
+    private static partial void LogMissingEmail(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "f-email: missing or invalid step in billing payload")]
+    private static partial void LogMissingStep(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "f-email: unknown billing email kind {Kind}")]
+    private static partial void LogUnknownBillingKind(ILogger logger, string? kind);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "f-email: failed to send billing email step {Step} attempt {Attempt}")]
+    private static partial void LogSendFailed(ILogger logger, Exception exception, int step, int attempt);
 }

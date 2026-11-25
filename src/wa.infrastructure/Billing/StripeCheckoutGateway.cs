@@ -9,7 +9,7 @@ namespace wa.infrastructure.Billing;
 /// US-019-01 (D-1, TA-7.5 step 1): Stripe Checkout Session creation over plain HttpClient (no Stripe package).
 /// Logs only the Stripe status code + request id (TA-9.4: never the key, never an email).
 /// </summary>
-public sealed class StripeCheckoutGateway : IStripeCheckoutGateway, IStripeSubscriptionSource
+public sealed partial class StripeCheckoutGateway : IStripeCheckoutGateway, IStripeSubscriptionSource
 {
     private readonly HttpClient _http;
     private readonly string? _secretKey;
@@ -92,8 +92,7 @@ public sealed class StripeCheckoutGateway : IStripeCheckoutGateway, IStripeSubsc
                 return null;
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning("Stripe {Operation} fetch failed: status {StatusCode}, request id {StripeRequestId}",
-                    operation, (int)response.StatusCode, requestId);
+                LogFetchFailed(_logger, operation, (int)response.StatusCode, requestId);
                 throw new BillingUnavailableException($"Stripe returned {(int)response.StatusCode}.");
             }
 
@@ -102,12 +101,12 @@ public sealed class StripeCheckoutGateway : IStripeCheckoutGateway, IStripeSubsc
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogWarning("Stripe {Operation} transport failure", operation);
+            LogTransportFailure(_logger, operation);
             throw new BillingUnavailableException("Stripe is unreachable.", ex);
         }
         catch (TaskCanceledException ex) when (!ct.IsCancellationRequested)
         {
-            _logger.LogWarning("Stripe {Operation} timed out", operation);
+            LogTimedOut(_logger, operation);
             throw new BillingUnavailableException("Stripe request timed out.", ex);
         }
         catch (JsonException ex)
@@ -133,8 +132,7 @@ public sealed class StripeCheckoutGateway : IStripeCheckoutGateway, IStripeSubsc
             var requestId = response.Headers.TryGetValues("Request-Id", out var ids) ? ids.FirstOrDefault() : null;
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning("Stripe {Operation} session creation failed: status {StatusCode}, request id {StripeRequestId}",
-                    operation, (int)response.StatusCode, requestId);
+                LogSessionCreationFailed(_logger, operation, (int)response.StatusCode, requestId);
                 throw new BillingUnavailableException($"Stripe returned {(int)response.StatusCode}.");
             }
 
@@ -145,7 +143,7 @@ public sealed class StripeCheckoutGateway : IStripeCheckoutGateway, IStripeSubsc
             var url = root.TryGetProperty("url", out var urlEl) && urlEl.ValueKind == JsonValueKind.String ? urlEl.GetString() : null;
             if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(url))
             {
-                _logger.LogWarning("Stripe {Operation} session response missing id/url: request id {StripeRequestId}", operation, requestId);
+                LogSessionResponseMissing(_logger, operation, requestId);
                 throw new BillingUnavailableException("Stripe response did not include a session url.");
             }
 
@@ -153,12 +151,12 @@ public sealed class StripeCheckoutGateway : IStripeCheckoutGateway, IStripeSubsc
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogWarning("Stripe {Operation} transport failure", operation);
+            LogTransportFailure(_logger, operation);
             throw new BillingUnavailableException("Stripe is unreachable.", ex);
         }
         catch (TaskCanceledException ex) when (!ct.IsCancellationRequested)
         {
-            _logger.LogWarning("Stripe {Operation} timed out", operation);
+            LogTimedOut(_logger, operation);
             throw new BillingUnavailableException("Stripe request timed out.", ex);
         }
         catch (JsonException ex)
@@ -166,4 +164,19 @@ public sealed class StripeCheckoutGateway : IStripeCheckoutGateway, IStripeSubsc
             throw new BillingUnavailableException("Stripe response was not valid JSON.", ex);
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Stripe {Operation} fetch failed: status {StatusCode}, request id {StripeRequestId}")]
+    private static partial void LogFetchFailed(ILogger logger, string operation, int statusCode, string? stripeRequestId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Stripe {Operation} transport failure")]
+    private static partial void LogTransportFailure(ILogger logger, string operation);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Stripe {Operation} timed out")]
+    private static partial void LogTimedOut(ILogger logger, string operation);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Stripe {Operation} session creation failed: status {StatusCode}, request id {StripeRequestId}")]
+    private static partial void LogSessionCreationFailed(ILogger logger, string operation, int statusCode, string? stripeRequestId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Stripe {Operation} session response missing id/url: request id {StripeRequestId}")]
+    private static partial void LogSessionResponseMissing(ILogger logger, string operation, string? stripeRequestId);
 }

@@ -13,7 +13,7 @@ namespace wa.application.UseCases.Auth;
 /// T-008-06 (FR-008-8 / TA-4.2#13): DELETE /api/v1/auth/me — soft-delete + re-home transfers in one transaction (D-1),
 /// emit account_deleted via the outbox, then telemetry. Mirror RequestMagicLink's two-steps-in-one-handler shape (insert → publish).
 /// </summary>
-public sealed class DeleteAccountHandler : IRequestHandler<DeleteAccountCommand, DeleteAccountResult>
+public sealed partial class DeleteAccountHandler : IRequestHandler<DeleteAccountCommand, DeleteAccountResult>
 {
     private readonly IAppUserStore _users;
     private readonly IEventPublisher _eventPublisher;
@@ -88,7 +88,7 @@ public sealed class DeleteAccountHandler : IRequestHandler<DeleteAccountCommand,
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger?.LogWarning("Org logo blob delete failed after account deletion for user {UserId}.", user.Id);
+                if (_logger is not null) LogOrgLogoDeleteFailed(_logger, user.Id);
             }
         }
 
@@ -107,4 +107,7 @@ public sealed class DeleteAccountHandler : IRequestHandler<DeleteAccountCommand,
         }
         return Guid.NewGuid();
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Org logo blob delete failed after account deletion for user {UserId}.")]
+    private static partial void LogOrgLogoDeleteFailed(ILogger logger, Guid userId);
 }

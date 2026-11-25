@@ -7,7 +7,7 @@ namespace wa.application.UseCases.Transfers;
 /// T-005-03: f-delete-blobs timer job handler (TA-6.5). Selects BlobRef rows with RefCount=0 AND PhysicallyDeletedAtUtc &lt; now,
 /// deletes the blob from storage (swallowing BlobNotFound), then removes the row. Hourly JobRun claim (TA-6.1).
 /// </summary>
-public sealed class DeleteOrphanBlobsHandler
+public sealed partial class DeleteOrphanBlobsHandler
 {
     private const int BatchSize = 200; // TA-6.5 — no explicit batch size in spec; 200 is a reasonable default for hourly sweep
 
@@ -56,7 +56,7 @@ public sealed class DeleteOrphanBlobsHandler
                     //    Still delete the row to prevent infinite re-scan (FR-005-7).
                     if (!blob.BlobPath.StartsWith("transfers/", StringComparison.Ordinal))
                     {
-                        _logger.LogWarning("UNEXPECTED_BLOB_PATH: {BlobPath} does not start with 'transfers/'", blob.BlobPath);
+                        LogUnexpectedBlobPath(_logger, blob.BlobPath);
                         await _store.DeleteRowAsync(blob.Id, ct);
                         continue;
                     }
@@ -68,7 +68,7 @@ public sealed class DeleteOrphanBlobsHandler
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
-                        _logger.LogWarning(ex, "f-delete-blobs: blob delete failed for {BlobPath}", blob.BlobPath);
+                        LogBlobDeleteFailed(_logger, ex, blob.BlobPath);
                     }
 
                     // 5. Remove the row (always proceeds even if blob was already gone).
@@ -91,4 +91,10 @@ public sealed class DeleteOrphanBlobsHandler
     /// <returns><paramref name="utc"/> rounded down to the full hour, with UTC kind.</returns>
     public static DateTime TruncateToHour(DateTime utc) =>
         new(utc.Year, utc.Month, utc.Day, utc.Hour, 0, 0, DateTimeKind.Utc);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "UNEXPECTED_BLOB_PATH: {BlobPath} does not start with 'transfers/'")]
+    private static partial void LogUnexpectedBlobPath(ILogger logger, string blobPath);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "f-delete-blobs: blob delete failed for {BlobPath}")]
+    private static partial void LogBlobDeleteFailed(ILogger logger, Exception exception, string blobPath);
 }

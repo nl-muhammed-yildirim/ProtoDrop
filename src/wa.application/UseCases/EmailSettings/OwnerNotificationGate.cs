@@ -8,7 +8,7 @@ namespace wa.application.UseCases.EmailSettings;
 /// F-XCT-003 (FR-046-3/5/6, EC-046-1): f-email's send-time check for OWNER notification emails only — recipient, auth and
 /// billing emails never call it (FR-046-4). No publisher or telemetry dependency: a skipped send emits nothing (TA-10.2 closed list).
 /// </summary>
-public sealed class OwnerNotificationGate
+public sealed partial class OwnerNotificationGate
 {
     private readonly IEmailNotificationsStore _store;
     private readonly IFlagResolver _flags;
@@ -38,7 +38,10 @@ public sealed class OwnerNotificationGate
         if (AppUser.EmailNotificationsOn(await _store.GetAsync(ownerId, ct)))
             return true;
 
-        _logger.LogInformation("f-email: owner notification skipped for {OwnerAppUserId}, suppressedReason=email_setting", ownerId);
+        LogNotificationSkipped(_logger, ownerId);
         return false;
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "f-email: owner notification skipped for {OwnerAppUserId}, suppressedReason=email_setting")]
+    private static partial void LogNotificationSkipped(ILogger logger, Guid ownerAppUserId);
 }

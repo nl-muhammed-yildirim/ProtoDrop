@@ -9,7 +9,7 @@ namespace wa.api.Middleware;
 /// 500 INTERNAL with the full stack in Serilog but none in the body (TA-10.5); logs carry the route template (never the raw path) and business codes (never their message) per TA-9.4. Minimal APIs answer unknown routes with an empty-body 404 —
 /// rewritten here to a proper NOT_FOUND Problem so every 404/500 has the exact field set + correlationId.
 /// </summary>
-public sealed class GlobalErrorMiddleware
+public sealed partial class GlobalErrorMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly ILogger<GlobalErrorMiddleware> _logger;
@@ -36,12 +36,12 @@ public sealed class GlobalErrorMiddleware
             if (!context.Response.HasStarted)
                 await ProblemWriter.WriteAsync(context, business.Status, business.Code, business.Message, business.Errors);
             // TA-9.4: the message can carry a file name — it stays in the Problem body only; the log gets code + status (correlationId links them).
-            _logger.LogWarning("Business error {Code} (HTTP {Status})", business.Code, business.Status);
+            LogBusinessError(_logger, business.Code, business.Status);
             return;
         }
         catch (Exception unhandled) // non-business: 500 INTERNAL — stack stays in Serilog (TA-10.5), body gets the generic detail
         {
-            _logger.LogError(unhandled, "Unhandled exception on {Route} — mapped to 500 INTERNAL", LogRoute.Of(context)); // TA-9.4: route template, never the raw path
+            LogUnhandledException(_logger, unhandled, LogRoute.Of(context)); // TA-9.4: route template, never the raw path
             if (!context.Response.HasStarted)
                 await ProblemWriter.WriteAsync(context, ProblemCodes.StatusOf(ProblemCodes.Internal), ProblemCodes.Internal, "An internal server error occurred.");
             return;
@@ -57,4 +57,10 @@ public sealed class GlobalErrorMiddleware
                 await ProblemWriter.WriteAsync(context, ProblemCodes.StatusOf(ProblemCodes.NotFound), ProblemCodes.NotFound, "No route matches this request.");
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Business error {Code} (HTTP {Status})")]
+    private static partial void LogBusinessError(ILogger logger, string code, int status);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Unhandled exception on {Route} — mapped to 500 INTERNAL")]
+    private static partial void LogUnhandledException(ILogger logger, Exception exception, string route);
 }

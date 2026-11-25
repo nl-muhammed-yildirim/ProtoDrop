@@ -16,7 +16,7 @@ namespace wa.api.Middleware;
 /// response is written directly (bypassing error handling); on miss the full pipeline runs and
 /// the resulting status + body are captured for future replays.
 /// </summary>
-public sealed class IdempotencyMiddleware
+public sealed partial class IdempotencyMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly IIdempotencyStore _store;
@@ -66,7 +66,7 @@ public sealed class IdempotencyMiddleware
         var entry = await _store.FindAsync(key, context.RequestAborted);
         if (entry is not null && entry.ExpiresAtUtc > _timeProvider.GetUtcNow().UtcDateTime)
         {
-            _logger.LogDebug("Idempotency hit for key {Key} — replaying {Status}", key, entry.StatusCode);
+            LogIdempotentReplay(_logger, key, entry.StatusCode);
             context.Response.StatusCode = entry.StatusCode;
             context.Response.ContentType = "application/json";
             await context.Response.WriteAsync(entry.ResultJson, Encoding.UTF8);
@@ -115,4 +115,7 @@ public sealed class IdempotencyMiddleware
 
         return false;
     }
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Idempotency hit for key {Key} — replaying {Status}")]
+    private static partial void LogIdempotentReplay(ILogger logger, string key, int status);
 }

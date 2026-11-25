@@ -11,7 +11,7 @@ namespace wa.workers;
 /// US-047-02 (FR-047-5/8, TA-6.2): f-gdpr-sweep Azure Function — nightly 02:00 UTC, concurrency 1.
 /// Claims its window via JobRun (TA-6.1); sweeps Erasure markers older than 24 h. The signed HTTP trigger lets E2E/QA run a pass on demand.
 /// </summary>
-public class GdprSweepFunction
+public partial class GdprSweepFunction
 {
     private readonly SweepErasedTelemetryHandler _handler;
     private readonly ILogger<GdprSweepFunction> _logger;
@@ -46,11 +46,11 @@ public class GdprSweepFunction
         try
         {
             var count = await _handler.RunAsync(_timeProvider.GetUtcNow().UtcDateTime, context.CancellationToken);
-            _logger.LogInformation("f-gdpr-sweep completed: {Count} markers swept", count);
+            LogCompleted(_logger, count);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "f-gdpr-sweep failed");
+            LogFailed(_logger, ex);
             throw; // JobRun claim prevents double-processing on retry.
         }
     }
@@ -70,4 +70,10 @@ public class GdprSweepFunction
         var count = await _handler.RunAsync(_timeProvider.GetUtcNow().UtcDateTime, context.CancellationToken);
         return JobAuth.CreateSuccess(req, new { swept = count });
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "f-gdpr-sweep completed: {Count} markers swept")]
+    private static partial void LogCompleted(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "f-gdpr-sweep failed")]
+    private static partial void LogFailed(ILogger logger, Exception exception);
 }

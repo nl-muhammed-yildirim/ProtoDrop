@@ -19,7 +19,7 @@ namespace wa.workers;
 /// IEmailEventHandler? (shared interface in wa.application), which also fixes the pre-existing CS8506 build defect.
 /// US-019-04 (FR-019-7): BillingEmailRequested → SendBillingEmailHandler (billing_payment_failed, steps 1..3).
 /// </summary>
-public class EmailFunction
+public partial class EmailFunction
 {
     /// <summary>MaxDeliveryCount for the core/email subscription (TA-5.1) — broker-side; passed to the handler as a plain int so wa.application stays SB-free.</summary>
     private const int MaxDeliveryCount = 5;
@@ -90,7 +90,7 @@ public class EmailFunction
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "f-email failed for event {EventId} attempt {Attempt}", envelope.EventId, message.DeliveryCount);
+            LogEventFailed(_logger, ex, envelope.EventId, message.DeliveryCount);
             throw; // SB retries on unhandled exception
         }
     }
@@ -105,4 +105,7 @@ public class EmailFunction
         using var doc = JsonDocument.Parse(json);
         return doc.RootElement.TryGetProperty("purpose", out var p) && p.ValueKind == JsonValueKind.Number && p.GetInt32() == 2;
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "f-email failed for event {EventId} attempt {Attempt}")]
+    private static partial void LogEventFailed(ILogger logger, Exception exception, Guid eventId, int attempt);
 }

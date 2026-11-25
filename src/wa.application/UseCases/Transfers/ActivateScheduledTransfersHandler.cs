@@ -10,7 +10,7 @@ namespace wa.application.UseCases.Transfers;
 /// TA-6.1); the per-row conditional UPDATE is the second guard. The scan is stateless, so a missed run is caught by the next.
 /// Ignores the feature.scheduling gate on purpose: already-scheduled rows must still go out if the gate is later switched off.
 /// </summary>
-public sealed class ActivateScheduledTransfersHandler
+public sealed partial class ActivateScheduledTransfersHandler
 {
     private const int BatchSize = 500; // TA-6.3 architecture constant, not a plan limit
 
@@ -91,7 +91,7 @@ public sealed class ActivateScheduledTransfersHandler
                 if (activatedInBatch == 0 || batch.Count < BatchSize) break;
             }
 
-            _logger.LogInformation("f-expire schedule: {Count} scheduled transfers activated", total);
+            LogTransfersActivated(_logger, total);
             return total;
         }
         finally
@@ -99,4 +99,7 @@ public sealed class ActivateScheduledTransfersHandler
             await _store.CompleteClaimAsync(runWindowStart, _timeProvider.GetUtcNow().UtcDateTime, ct);
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "f-expire schedule: {Count} scheduled transfers activated")]
+    private static partial void LogTransfersActivated(ILogger logger, int count);
 }

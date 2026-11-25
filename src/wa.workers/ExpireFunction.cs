@@ -14,7 +14,7 @@ namespace wa.workers;
 /// T-005-04: HTTP trigger for E2E manual invocation.
 /// US-022-04: also runs the schedule sub-step (Scheduled → Active + transfer.created re-emit) after expiry.
 /// </summary>
-public class ExpireFunction
+public partial class ExpireFunction
 {
     private readonly ExpireTransfersHandler _handler;
     private readonly ActivateScheduledTransfersHandler _scheduled;
@@ -66,24 +66,24 @@ public class ExpireFunction
         try
         {
             var count = await _handler.RunAsync(now, context.CancellationToken);
-            _logger.LogInformation("f-expire completed: {Count} transfers expired", count);
+            LogExpired(_logger, count);
 
             // US-022-04 (D-2): flip due Scheduled transfers to Active and re-emit transfer.created. After expiry so an
             // expired Scheduled row is swept first (AC-022-5); own JobRun claim.
             var activated = await _scheduled.RunAsync(now, context.CancellationToken);
-            _logger.LogInformation("f-expire schedule: {Count} transfers activated", activated);
+            LogScheduleActivated(_logger, activated);
 
             // US-019-04 (D-6): billing email sub-step; each send is gated by its own JobRun step claim.
             var billingCount = await _billingEmails.RunAsync(now, context.CancellationToken);
-            _logger.LogInformation("f-expire billing emails: {Count} queued", billingCount);
+            LogBillingEmailsQueued(_logger, billingCount);
 
             // US-019-05 (D-4): end expired billing grace periods (downgrade to Free), after the email step.
             var graceCount = await _billingGrace.RunAsync(now, context.CancellationToken);
-            _logger.LogInformation("f-expire billing grace: {Count} downgraded", graceCount);
+            LogBillingGraceDowngraded(_logger, graceCount);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "f-expire failed");
+            LogFailed(_logger, ex);
             throw; // Azure Functions retries on unhandled exception; JobRun claim prevents double-processing.
         }
     }
@@ -106,4 +106,19 @@ public class ExpireFunction
         var activated = await _scheduled.RunAsync(now, context.CancellationToken);
         return JobAuth.CreateSuccess(req, new { expired = count, activated });
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "f-expire completed: {Count} transfers expired")]
+    private static partial void LogExpired(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "f-expire schedule: {Count} transfers activated")]
+    private static partial void LogScheduleActivated(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "f-expire billing emails: {Count} queued")]
+    private static partial void LogBillingEmailsQueued(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "f-expire billing grace: {Count} downgraded")]
+    private static partial void LogBillingGraceDowngraded(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "f-expire failed")]
+    private static partial void LogFailed(ILogger logger, Exception exception);
 }

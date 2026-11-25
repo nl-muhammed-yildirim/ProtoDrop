@@ -9,7 +9,7 @@ namespace wa.application.UseCases.DataExport;
 /// past retention (ready zips of deleted accounts are purged on the next pass), then builds every processing export into exports/{userId}/{exportId}.zip. No events, no telemetry (FR-047-8).
 /// The feature flag is deliberately not checked: the gate stops creation, not completion (FR-047-4).
 /// </summary>
-public sealed class BuildDataExportsHandler
+public sealed partial class BuildDataExportsHandler
 {
     private readonly IDataExportJobStore _store;
     private readonly IBlobStore _blobs;
@@ -49,7 +49,7 @@ public sealed class BuildDataExportsHandler
                     if (snapshot is null)
                     {
                         // EC-047-3: user deleted mid-flight — fail cleanly.
-                        _logger.LogInformation("f-data-export: user gone, failing export {ExportId}", row.Id);
+                        LogUserGone(_logger, row.Id);
                         await _store.MarkFailedAsync(row.Id, ct);
                         continue;
                     }
@@ -63,7 +63,7 @@ public sealed class BuildDataExportsHandler
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     // EC-047-2: the row fails, the user can retry; the pass continues.
-                    _logger.LogError(ex, "f-data-export failed for export {ExportId}", row.Id);
+                    LogExportFailed(_logger, ex, row.Id);
                     await _store.MarkFailedAsync(row.Id, ct);
                 }
             }
@@ -85,7 +85,7 @@ public sealed class BuildDataExportsHandler
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogWarning(ex, "f-data-export: blob delete failed for export {ExportId}", item.Id);
+                LogBlobDeleteFailed(_logger, ex, item.Id);
                 // keep the row: next pass retries (DeleteIfExists is idempotent), so a zip never outlives its row
                 continue;
             }
@@ -98,4 +98,13 @@ public sealed class BuildDataExportsHandler
     /// <returns><paramref name="utc"/> rounded down to the previous five-minute mark, with UTC kind.</returns>
     public static DateTime TruncateTo5Min(DateTime utc) =>
         new(utc.Year, utc.Month, utc.Day, utc.Hour, (utc.Minute / 5) * 5, 0, DateTimeKind.Utc);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "f-data-export: user gone, failing export {ExportId}")]
+    private static partial void LogUserGone(ILogger logger, Guid exportId);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "f-data-export failed for export {ExportId}")]
+    private static partial void LogExportFailed(ILogger logger, Exception exception, Guid exportId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "f-data-export: blob delete failed for export {ExportId}")]
+    private static partial void LogBlobDeleteFailed(ILogger logger, Exception exception, Guid exportId);
 }

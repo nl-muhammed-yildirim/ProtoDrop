@@ -29,7 +29,7 @@ namespace wa.infrastructure.Blob;
 /// </list>
 /// Each unsupported bit is a logged note so a later task can add a REST round-trip without changing the contract.
 /// </remarks>
-public sealed class BlobContainerBootstrap : BackgroundService
+public sealed partial class BlobContainerBootstrap : BackgroundService
 {
     private readonly BlobServiceClient _svc;
     private readonly ILogger<BlobContainerBootstrap> _logger;
@@ -54,12 +54,12 @@ public sealed class BlobContainerBootstrap : BackgroundService
             {
                 await _svc.GetBlobContainerClient(name)
                     .CreateIfNotExistsAsync(PublicAccessType.None, null, stoppingToken);
-                _logger.LogInformation("Blob container '{C}' ensured", name);
+                LogContainerEnsured(_logger, name);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 // Don't stall the host: log and move on.
-                _logger.LogWarning(ex, "Could not ensure container '{C}'", name);
+                LogContainerEnsureFailed(_logger, ex, name);
             }
         }
 
@@ -73,15 +73,29 @@ public sealed class BlobContainerBootstrap : BackgroundService
                 Days = 14,
             };
             await _svc.SetPropertiesAsync(props.Value, stoppingToken);
-            _logger.LogInformation("Blob service: soft-delete 14 d ON (TA-3.5 transfers)");
+            LogSoftDeleteEnabled(_logger);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Could not apply 14 d soft-delete (Azurite may not support service properties)");
+            LogSoftDeleteNotApplied(_logger, ex);
         }
 
         // Not expressible in Azure.Storage.Blobs 12.29.2 (no container lifecycle API, no versioning toggle): log, don't stall.
-        _logger.LogInformation(
-            "Blob lifecycle (TA-3.5, 12.29.2 not expressible): staging/* 24 h, transfers/* 30 d, exports/* 7 d (f-data-export purge is primary), avatars/* no lifecycle (deleted with the account), transfers versioning OFF, GRS (prod)");
+        LogLifecycleNotes(_logger);
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Blob container '{C}' ensured")]
+    private static partial void LogContainerEnsured(ILogger logger, string c);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not ensure container '{C}'")]
+    private static partial void LogContainerEnsureFailed(ILogger logger, Exception exception, string c);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Blob service: soft-delete 14 d ON (TA-3.5 transfers)")]
+    private static partial void LogSoftDeleteEnabled(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not apply 14 d soft-delete (Azurite may not support service properties)")]
+    private static partial void LogSoftDeleteNotApplied(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Blob lifecycle (TA-3.5, 12.29.2 not expressible): staging/* 24 h, transfers/* 30 d, exports/* 7 d (f-data-export purge is primary), avatars/* no lifecycle (deleted with the account), transfers versioning OFF, GRS (prod)")]
+    private static partial void LogLifecycleNotes(ILogger logger);
 }

@@ -7,7 +7,7 @@ namespace wa.infrastructure.Email;
 /// T-006-01: Log-only email sender (dev switch: Wa:Email:Sender=log).
 /// Visible in dev run for T-019 exit check.
 /// </summary>
-public sealed class LogEmailSender : IEmailSender
+public sealed partial class LogEmailSender : IEmailSender
 {
     private readonly ILogger<LogEmailSender> _logger;
 
@@ -18,15 +18,11 @@ public sealed class LogEmailSender : IEmailSender
     /// <inheritdoc />
     public Task SendAsync(EmailMessage message, CancellationToken ct)
     {
-        _logger.LogInformation(
-            "EMAIL SENT\nTo: {To}\nFrom: {From}\nReplyTo: {ReplyTo}\nSubject: {Subject}\n\nHTML:\n{HtmlBody}\n\nText:\n{TextBody}",
-            message.To,
-            message.From,
-            message.ReplyTo ?? "(none)",
-            message.Subject,
-            message.HtmlBody,
-            message.TextBody);
+        LogEmailSent(_logger, message.To, message.From, message.ReplyTo ?? "(none)", message.Subject, message.HtmlBody, message.TextBody);
 
         return Task.CompletedTask;
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "EMAIL SENT\nTo: {To}\nFrom: {From}\nReplyTo: {ReplyTo}\nSubject: {Subject}\n\nHTML:\n{HtmlBody}\n\nText:\n{TextBody}")]
+    private static partial void LogEmailSent(ILogger logger, string to, string from, string replyTo, string subject, string htmlBody, string textBody);
 }

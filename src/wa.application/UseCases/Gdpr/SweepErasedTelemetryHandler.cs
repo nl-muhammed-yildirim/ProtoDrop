@@ -7,7 +7,7 @@ namespace wa.application.UseCases.Gdpr;
 /// their Erasure marker swept. Idempotent per userId (a swept marker is never due again); emits no event (FR-047-8).
 /// No log template carries a userId — logging it would itself create a userId-keyed trace after the sweep.
 /// </summary>
-public sealed class SweepErasedTelemetryHandler
+public sealed partial class SweepErasedTelemetryHandler
 {
     private readonly IGdprSweepStore _store;
     private readonly ITelemetryEraser _eraser;
@@ -50,12 +50,12 @@ public sealed class SweepErasedTelemetryHandler
                 catch (TelemetryUnavailableException)
                 {
                     // EC-047-4: telemetry store down — mark nothing more, the next night retries.
-                    _logger.LogWarning("f-gdpr-sweep: telemetry store unavailable, {Count} markers stay pending", due.Count - i);
+                    LogTelemetryStoreUnavailable(_logger, due.Count - i);
                     break;
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    _logger.LogError(ex, "f-gdpr-sweep: erase failed, marker stays pending");
+                    LogEraseFailed(_logger, ex);
                 }
             }
 
@@ -72,4 +72,10 @@ public sealed class SweepErasedTelemetryHandler
     /// <returns><paramref name="utc"/> rounded down to the full hour, with UTC kind.</returns>
     public static DateTime TruncateToHour(DateTime utc) =>
         new(utc.Year, utc.Month, utc.Day, utc.Hour, 0, 0, DateTimeKind.Utc);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "f-gdpr-sweep: telemetry store unavailable, {Count} markers stay pending")]
+    private static partial void LogTelemetryStoreUnavailable(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "f-gdpr-sweep: erase failed, marker stays pending")]
+    private static partial void LogEraseFailed(ILogger logger, Exception exception);
 }

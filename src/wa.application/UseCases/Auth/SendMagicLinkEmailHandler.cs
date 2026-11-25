@@ -13,7 +13,7 @@ namespace wa.application.UseCases.Auth;
 /// Loads the magic-link template from Emails/templates/magic-link/ and renders it with manual variable substitution.
 /// Self-contained: no DB context needed — payload carries email + token + expiry.
 /// </summary>
-public sealed class SendMagicLinkEmailHandler : IEmailEventHandler
+public sealed partial class SendMagicLinkEmailHandler : IEmailEventHandler
 {
     private const string Subject = "Your ProtoDrop sign-in link";
 
@@ -71,14 +71,14 @@ public sealed class SendMagicLinkEmailHandler : IEmailEventHandler
         if (!root.TryGetProperty("email", out var emailEl) ||
             string.IsNullOrWhiteSpace(emailEl.GetString()))
         {
-            _logger.LogWarning("f-email: missing or invalid email in magic-link payload");
+            LogMissingEmail(_logger);
             return;
         }
 
         if (!root.TryGetProperty("token", out var tokenEl) ||
             string.IsNullOrWhiteSpace(tokenEl.GetString()))
         {
-            _logger.LogWarning("f-email: missing or invalid token in magic-link payload");
+            LogMissingToken(_logger);
             return;
         }
 
@@ -138,7 +138,7 @@ public sealed class SendMagicLinkEmailHandler : IEmailEventHandler
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "f-email: failed to send magic-link email attempt {Attempt}", attempt);
+            LogSendFailed(_logger, ex, attempt);
 
             if (attempt == maxDeliveryCount)
             {
@@ -175,4 +175,13 @@ public sealed class SendMagicLinkEmailHandler : IEmailEventHandler
             .Replace("{{Email}}", email)
             .Replace("{{CtaUrl}}", ctaUrl)
             .Replace("{{MinutesRemaining}}", minutesRemaining.ToString());
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "f-email: missing or invalid email in magic-link payload")]
+    private static partial void LogMissingEmail(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "f-email: missing or invalid token in magic-link payload")]
+    private static partial void LogMissingToken(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "f-email: failed to send magic-link email attempt {Attempt}")]
+    private static partial void LogSendFailed(ILogger logger, Exception exception, int attempt);
 }

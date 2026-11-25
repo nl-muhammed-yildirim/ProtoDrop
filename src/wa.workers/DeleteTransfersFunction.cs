@@ -13,7 +13,7 @@ namespace wa.workers;
 /// Host.json settings: concurrency 1, timeout 10 min.
 /// T-005-04: HTTP trigger for E2E manual invocation.
 /// </summary>
-public class DeleteTransfersFunction
+public partial class DeleteTransfersFunction
 {
     private readonly DeleteExpiredTransfersHandler _handler;
     private readonly ILogger<DeleteTransfersFunction> _logger;
@@ -49,11 +49,11 @@ public class DeleteTransfersFunction
         try
         {
             var count = await _handler.RunAsync(now, context.CancellationToken);
-            _logger.LogInformation("f-delete-transfers completed: {Count} transfers deleted", count);
+            LogCompleted(_logger, count);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "f-delete-transfers failed");
+            LogFailed(_logger, ex);
             throw; // Azure Functions retries on unhandled exception; JobRun claim prevents double-processing.
         }
     }
@@ -73,4 +73,10 @@ public class DeleteTransfersFunction
         var count = await _handler.RunAsync(_timeProvider.GetUtcNow().UtcDateTime, context.CancellationToken);
         return JobAuth.CreateSuccess(req, new { deleted = count });
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "f-delete-transfers completed: {Count} transfers deleted")]
+    private static partial void LogCompleted(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "f-delete-transfers failed")]
+    private static partial void LogFailed(ILogger logger, Exception exception);
 }

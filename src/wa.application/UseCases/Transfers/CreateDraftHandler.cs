@@ -10,7 +10,7 @@ namespace wa.application.UseCases.Transfers;
 /// <summary>
 /// TA-4.2a — the only business logic behind POST /api/v1/transfers/draft: resolve the request's plan limits via PlanContext (never literals), check the whole selection against MAX_TRANSFER_SIZE and per-file MAX_SINGLE_FILE, mint one staging SAS per file, emit upload_started once. Returns null when oversized — the endpoint throws BusinessException(ProblemCodes.TransferSizeExceeded) from there; no new tables/migrations (T-001-05).
 /// </summary>
-public sealed class CreateDraftHandler : IRequestHandler<CreateDraftCommand, CreateDraftResult>
+public sealed partial class CreateDraftHandler : IRequestHandler<CreateDraftCommand, CreateDraftResult>
 {
     private readonly IPlanContextAccessor _planContext;
     private readonly IBlobSasMinter _minter;
@@ -54,7 +54,7 @@ public sealed class CreateDraftHandler : IRequestHandler<CreateDraftCommand, Cre
             var detail = overIndex < 0
                 ? $"total {totalBytes} exceeds transfer limit {free.MaxTransferSize}"
                 : $"file '{_telemetry.FileNameSlot(request.Files[overIndex].Name)}' is {request.Files[overIndex].SizeBytes} bytes, limit is {free.MaxSingleFile}";
-            _logger.LogWarning("Draft rejected: {Detail}", detail);
+            LogDraftRejected(_logger, detail);
 
             throw new TransferSizeExceededException(
                 totalBytes, free.MaxTransferSize,
@@ -76,4 +76,7 @@ public sealed class CreateDraftHandler : IRequestHandler<CreateDraftCommand, Cre
 
         return new CreateDraftResult(draftId, 7200, files); // 7200 = TA-3.6's 2 h draft-upload TTL in seconds (constant, not a plan limit).
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Draft rejected: {Detail}")]
+    private static partial void LogDraftRejected(ILogger logger, string detail);
 }

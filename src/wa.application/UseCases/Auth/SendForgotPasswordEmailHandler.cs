@@ -15,7 +15,7 @@ namespace wa.application.UseCases.Auth;
 /// Emails/templates/forgot-password/, kind="forgot_password" in email.sent/email.failed payloads.
 /// Self-contained: no DB context needed — payload carries email + token + expiry.
 /// </summary>
-public sealed class SendForgotPasswordEmailHandler : IEmailEventHandler
+public sealed partial class SendForgotPasswordEmailHandler : IEmailEventHandler
 {
     private const string Subject = "Your ProtoDrop link"; // FR-008-6: the forgot-password subject (magic-link's is "Your ProtoDrop sign-in link")
 
@@ -74,14 +74,14 @@ public sealed class SendForgotPasswordEmailHandler : IEmailEventHandler
         if (!root.TryGetProperty("email", out var emailEl) ||
             string.IsNullOrWhiteSpace(emailEl.GetString()))
         {
-            _logger.LogWarning("f-email: missing or invalid email in forgot-password payload");
+            LogMissingEmail(_logger);
             return;
         }
 
         if (!root.TryGetProperty("token", out var tokenEl) ||
             string.IsNullOrWhiteSpace(tokenEl.GetString()))
         {
-            _logger.LogWarning("f-email: missing or invalid token in forgot-password payload");
+            LogMissingToken(_logger);
             return;
         }
 
@@ -141,7 +141,7 @@ public sealed class SendForgotPasswordEmailHandler : IEmailEventHandler
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "f-email: failed to send forgot-password email attempt {Attempt}", attempt);
+            LogSendFailed(_logger, ex, attempt);
 
             if (attempt == maxDeliveryCount)
             {
@@ -178,4 +178,13 @@ public sealed class SendForgotPasswordEmailHandler : IEmailEventHandler
             .Replace("{{Email}}", email)
             .Replace("{{CtaUrl}}", ctaUrl)
             .Replace("{{MinutesRemaining}}", minutesRemaining.ToString());
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "f-email: missing or invalid email in forgot-password payload")]
+    private static partial void LogMissingEmail(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "f-email: missing or invalid token in forgot-password payload")]
+    private static partial void LogMissingToken(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "f-email: failed to send forgot-password email attempt {Attempt}")]
+    private static partial void LogSendFailed(ILogger logger, Exception exception, int attempt);
 }

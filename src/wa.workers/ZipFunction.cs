@@ -19,7 +19,7 @@ namespace wa.workers;
 /// <summary>
 /// T-004-01: f-zip Azure Function — generates a ZIP of all files in a transfer, streamed to blob storage.
 /// </summary>
-public class ZipFunction
+public partial class ZipFunction
 {
     private readonly IBlobStore _blobStore;
     private readonly IBlobSasMinter _sasMinter;
@@ -143,7 +143,7 @@ public class ZipFunction
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to generate zip for transfer {TransferId}", id);
+            LogZipGenerationFailed(_logger, ex, id);
             _telemetry.LogEvent(TelemetryEvents.ZipFailed);
 
             // Failure cleanup: delete partial blob
@@ -153,7 +153,7 @@ public class ZipFunction
             }
             catch (Exception deleteEx)
             {
-                _logger.LogWarning(deleteEx, "Failed to delete partial zip for transfer {TransferId}", id);
+                LogPartialZipDeleteFailed(_logger, deleteEx, id);
             }
 
             return CreateProblemResponse(req, 500, ProblemCodes.Internal, "Failed to generate zip.");
@@ -169,7 +169,7 @@ public class ZipFunction
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to delete temp file {TempPath}", tempPath);
+                    LogTempFileDeleteFailed(_logger, ex, tempPath);
                 }
             }
         }
@@ -232,4 +232,13 @@ public class ZipFunction
         response.Body = stream;
         return response;
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to generate zip for transfer {TransferId}")]
+    private static partial void LogZipGenerationFailed(ILogger logger, Exception exception, Guid transferId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to delete partial zip for transfer {TransferId}")]
+    private static partial void LogPartialZipDeleteFailed(ILogger logger, Exception exception, Guid transferId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to delete temp file {TempPath}")]
+    private static partial void LogTempFileDeleteFailed(ILogger logger, Exception exception, string tempPath);
 }

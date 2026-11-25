@@ -12,7 +12,7 @@ namespace wa.workers;
 /// Claims its window via JobRun (TA-6.1); builds processing exports and purges ready ones past 7 days.
 /// The signed HTTP trigger lets E2E/QA run a pass on demand.
 /// </summary>
-public class DataExportFunction
+public partial class DataExportFunction
 {
     private readonly BuildDataExportsHandler _handler;
     private readonly ILogger<DataExportFunction> _logger;
@@ -47,11 +47,11 @@ public class DataExportFunction
         try
         {
             var count = await _handler.RunAsync(_timeProvider.GetUtcNow().UtcDateTime, context.CancellationToken);
-            _logger.LogInformation("f-data-export completed: {Count} exports built", count);
+            LogCompleted(_logger, count);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "f-data-export failed");
+            LogFailed(_logger, ex);
             throw; // JobRun claim prevents double-processing on retry.
         }
     }
@@ -71,4 +71,10 @@ public class DataExportFunction
         var count = await _handler.RunAsync(_timeProvider.GetUtcNow().UtcDateTime, context.CancellationToken);
         return JobAuth.CreateSuccess(req, new { built = count });
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "f-data-export completed: {Count} exports built")]
+    private static partial void LogCompleted(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "f-data-export failed")]
+    private static partial void LogFailed(ILogger logger, Exception exception);
 }

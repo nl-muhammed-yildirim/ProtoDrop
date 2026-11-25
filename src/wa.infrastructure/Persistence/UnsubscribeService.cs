@@ -9,7 +9,7 @@ namespace wa.infrastructure.Persistence;
 /// T-006-03 (FR-006-5, TA-6.7): Unsubscribe handler — verify token + insert EmailSuppression idempotently.
 /// Plain sealed class (no MediatR) following the T-006-01 pattern; called directly from Program.cs's MapGet.
 /// </summary>
-public sealed class UnsubscribeService
+public sealed partial class UnsubscribeService
 {
     private readonly WaDbContext _db;
     private readonly byte[] _hmacKey;
@@ -41,7 +41,7 @@ public sealed class UnsubscribeService
         if (UnsubscribeToken.Verify(token, _hmacKey) is not (string Address, string SenderEmail))
         {
             // TA-9.6: tampered/unknown → 404 (don't leak "token invalid" detail). Warn telemetry for admin alerting.
-            _logger.LogWarning("Unsubscribe token verification failed — returning 404");
+            LogTokenVerificationFailed(_logger);
             return new UnsubscribeResult(false);
         }
 
@@ -63,8 +63,14 @@ public sealed class UnsubscribeService
         {
             // UQ_ES unique constraint violation — the row already exists (double-click / stale token).
             // Idempotent: treat as success. EC-006-3 documented.
-            _logger.LogInformation("Unsubscribe idempotent no-op — suppression row already exists (UQ_ES)");
+            LogAlreadySuppressed(_logger);
             return new UnsubscribeResult(true);
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Unsubscribe token verification failed — returning 404")]
+    private static partial void LogTokenVerificationFailed(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Unsubscribe idempotent no-op — suppression row already exists (UQ_ES)")]
+    private static partial void LogAlreadySuppressed(ILogger logger);
 }

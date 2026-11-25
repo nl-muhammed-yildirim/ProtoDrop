@@ -9,7 +9,7 @@ namespace wa.application.UseCases.Billing;
 /// US-019-05 (D-4, TA-6.3, FR-019-6): f-expire sub-step — downgrades users to Free once a paused subscription's grace has ended.
 /// The store re-reads the subscription under a row lock and claims the JobRun (EC-019-3 / TA-6.1); events publish after commit.
 /// </summary>
-public sealed class EndBillingGraceHandler
+public sealed partial class EndBillingGraceHandler
 {
     private readonly IBillingGraceStore _store;
     private readonly IEventPublisher _events;
@@ -43,8 +43,7 @@ public sealed class EndBillingGraceHandler
             var result = await _store.TryDowngradeAsync(candidate.SubscriptionId, candidate.GraceEndsAtUtc, nowUtc, ct);
             if (result.Outcome != GraceDowngradeOutcome.Downgraded)
             {
-                _logger.LogInformation(
-                    "Billing grace skipped: subscription {SubscriptionId} outcome {Outcome}", candidate.SubscriptionId, result.Outcome);
+                LogGraceSkipped(_logger, candidate.SubscriptionId, result.Outcome);
                 continue;
             }
 
@@ -58,8 +57,14 @@ public sealed class EndBillingGraceHandler
                     result.UserId, result.Email, candidate.SubscriptionId, nowUtc, correlationId), ct);
 
             downgraded++;
-            _logger.LogInformation("Billing grace ended: subscription {SubscriptionId} downgraded", candidate.SubscriptionId);
+            LogGraceEnded(_logger, candidate.SubscriptionId);
         }
         return downgraded;
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Billing grace skipped: subscription {SubscriptionId} outcome {Outcome}")]
+    private static partial void LogGraceSkipped(ILogger logger, Guid subscriptionId, GraceDowngradeOutcome outcome);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Billing grace ended: subscription {SubscriptionId} downgraded")]
+    private static partial void LogGraceEnded(ILogger logger, Guid subscriptionId);
 }
