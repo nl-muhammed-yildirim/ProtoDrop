@@ -20,7 +20,7 @@ public class AdminForceDeleteUserCommandTests
     {
         _users = new StubAppUserStore();
         _eventPublisher = new StubEventPublisher();
-        _handler = new AdminForceDeleteUserHandler(_users, _eventPublisher, _blobs);
+        _handler = new AdminForceDeleteUserHandler(_users, _eventPublisher, _blobs, TimeProvider.System);
     }
 
     // ---- Exit check: unknown user → null (endpoint → 404 NOT_FOUND) ----

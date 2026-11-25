@@ -19,7 +19,7 @@ public class ForgotPasswordTests
         _users = new StubAppUserStore();
         _tokens = new StubAuthTokenStore();
         _publisher = new StubEventPublisher();
-        _handler = new ForgotPasswordHandler(_users, _tokens, _publisher);
+        _handler = new ForgotPasswordHandler(_users, _tokens, _publisher, TimeProvider.System);
     }
 
     // ---- FR-008-6 exit check 1: registered email → Purpose=2 row + event with purpose=2 in payload ----

@@ -28,7 +28,7 @@ public class SetFlagCommandTests
                 new FeatureFlag { Key = "feature.ads", Value = "false" }
             }
         };
-        _handler = new SetFlagCommandHandler(_flags, _store);
+        _handler = new SetFlagCommandHandler(_flags, _store, TimeProvider.System);
     }
 
     // ---- AC-044-3 (a): unknown key → FLAG_UNKNOWN, store NOT written ----

@@ -17,7 +17,7 @@ namespace wa.infrastructure.Events;
 /// — no silent drop (EC-054-1). MVP simplification per TA-4.1.7: at-most-once accepted for non-critical events;
 /// the outbox row + alert cover the rest. <b>Assumes a non-empty connection string</b>: Program.cs selects this adapter only when <c>Wa:ServiceBus:ConnectionString</c> is present, so the ctor input is guaranteed non-null in production (a direct construction with a missing key throws from the ServiceBusClient ctor at publish time — acceptable for M0).
 /// </summary>
-public sealed class SbEventPublisher : IEventPublisher
+public sealed partial class SbEventPublisher : IEventPublisher
 {
     private const string TopicName = "core";
 
@@ -27,17 +27,20 @@ public sealed class SbEventPublisher : IEventPublisher
     private readonly string _connectionString;
     private readonly ILogger<SbEventPublisher> _logger;
     private readonly IDbContextFactory<WaDbContext> _dbFactory;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="SbEventPublisher"/> class.</summary>
     /// <param name="configuration">Configuration source; supplies the Service Bus connection string.</param>
     /// <param name="logger">Logger for publish failures (the row stays unpublished for re-publish).</param>
     /// <param name="dbFactory">Factory for the database context that holds the outbox table.</param>
-    public SbEventPublisher(IConfiguration configuration, ILogger<SbEventPublisher> logger, IDbContextFactory<WaDbContext> dbFactory)
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+    public SbEventPublisher(IConfiguration configuration, ILogger<SbEventPublisher> logger, IDbContextFactory<WaDbContext> dbFactory, TimeProvider timeProvider)
     {
         // Cached for publish-time use. DI selects this adapter only when the key exists (Program.cs), so production never sees a null here; direct constructions with an empty config throw at publish time from the ServiceBusClient ctor — OutboxRetryTests relies on that path.
         _connectionString = configuration["Wa:ServiceBus:ConnectionString"]!;
         _logger = logger;
         _dbFactory = dbFactory;
+        _timeProvider = timeProvider;
     }
 
     /// <inheritdoc />
@@ -56,7 +59,7 @@ public sealed class SbEventPublisher : IEventPublisher
             PartitionKey = envelope.PartitionKey,
             OccurredAtUtc = envelope.OccurredAtUtc,
             IsPublished = false,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = _timeProvider.GetUtcNow().UtcDateTime
         };
         db.Set<DomainEvent>().Add(row);
         await db.SaveChangesAsync(cancellationToken); // outbox row committed (same change tracker as business data once use cases exist)
@@ -77,10 +80,13 @@ public sealed class SbEventPublisher : IEventPublisher
         catch (Exception ex)
         {
             // Row stays unpublished — re-publish picks it up (TA-4.1.7). This log line is the M0 alert path.
-            _logger.LogError(ex, "PUBLISH_FAILED eventId={EventId} eventType={EventType}", envelope.EventId, row.EventType);
+            LogPublishFailed(_logger, ex, envelope.EventId, row.EventType);
         }
 
         await db.SaveChangesAsync(cancellationToken); // persist the publish flag; no-op save when it stayed false
         return new DomainEventRecord { EventId = envelope.EventId, IsPublished = row.IsPublished };
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "PUBLISH_FAILED eventId={EventId} eventType={EventType}")]
+    private static partial void LogPublishFailed(ILogger logger, Exception exception, Guid eventId, string eventType);
 }

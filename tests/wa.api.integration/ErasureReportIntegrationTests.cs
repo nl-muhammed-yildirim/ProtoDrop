@@ -18,7 +18,7 @@ public class ErasureReportIntegrationTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        _sql = new MsSqlBuilder().WithImage("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
         await _sql.StartAsync();
         _options = new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(_sql.GetConnectionString()).Options;
         _db = new WaDbContext(_options);
@@ -96,7 +96,7 @@ public class ErasureReportIntegrationTests : IAsyncLifetime
         await DeleteAsync(a);
         var sweptAt = DateTime.UtcNow;
 
-        await new GdprSweepStore(new WaDbContextFactory(_options)).MarkSweptAsync(a, sweptAt, CancellationToken.None);
+        await new GdprSweepStore(new WaDbContextFactory(_options), TimeProvider.System).MarkSweptAsync(a, sweptAt, CancellationToken.None);
 
         var (items, _) = await Store().GetPageAsync(null, null, 25, CancellationToken.None);
         var row = Assert.Single(items);

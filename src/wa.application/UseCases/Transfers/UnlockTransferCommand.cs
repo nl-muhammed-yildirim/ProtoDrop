@@ -1,7 +1,4 @@
 using MediatR;
-using wa.application.Telemetry;
-using wa.domain.Telemetry;
-using wa.domain.ValueObjects;
 
 namespace wa.application.UseCases.Transfers;
 

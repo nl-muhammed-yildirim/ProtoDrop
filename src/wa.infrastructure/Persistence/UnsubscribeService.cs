@@ -9,22 +9,16 @@ namespace wa.infrastructure.Persistence;
 /// T-006-03 (FR-006-5, TA-6.7): Unsubscribe handler — verify token + insert EmailSuppression idempotently.
 /// Plain sealed class (no MediatR) following the T-006-01 pattern; called directly from Program.cs's MapGet.
 /// </summary>
-public sealed class UnsubscribeService
+/// <param name="db">Database context that stores the suppression rows.</param>
+/// <param name="hmacKey">Secret key bytes the unsubscribe tokens are signed with.</param>
+/// <param name="logger">Logger for diagnostics (never logs the address).</param>
+/// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+public sealed partial class UnsubscribeService(WaDbContext db, byte[] hmacKey, ILogger<UnsubscribeService> logger, TimeProvider timeProvider)
 {
-    private readonly WaDbContext _db;
-    private readonly byte[] _hmacKey;
-    private readonly ILogger<UnsubscribeService> _logger;
-
-    /// <summary>Initializes a new instance of the <see cref="UnsubscribeService"/> class.</summary>
-    /// <param name="db">Database context that stores the suppression rows.</param>
-    /// <param name="hmacKey">Secret key bytes the unsubscribe tokens are signed with.</param>
-    /// <param name="logger">Logger for diagnostics (never logs the address).</param>
-    public UnsubscribeService(WaDbContext db, byte[] hmacKey, ILogger<UnsubscribeService> logger)
-    {
-        _db = db;
-        _hmacKey = hmacKey;
-        _logger = logger;
-    }
+    private readonly WaDbContext _db = db;
+    private readonly byte[] _hmacKey = hmacKey;
+    private readonly ILogger<UnsubscribeService> _logger = logger;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <summary>
     /// Verify the token and insert an EmailSuppression row (idempotent via UQ_ES unique constraint).
@@ -38,7 +32,7 @@ public sealed class UnsubscribeService
         if (UnsubscribeToken.Verify(token, _hmacKey) is not (string Address, string SenderEmail))
         {
             // TA-9.6: tampered/unknown → 404 (don't leak "token invalid" detail). Warn telemetry for admin alerting.
-            _logger.LogWarning("Unsubscribe token verification failed — returning 404");
+            LogTokenVerificationFailed(_logger);
             return new UnsubscribeResult(false);
         }
 
@@ -51,7 +45,7 @@ public sealed class UnsubscribeService
             {
                 Address = address,
                 SenderEmail = senderEmail,
-                CreatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = _timeProvider.GetUtcNow().UtcDateTime
             });
             await _db.SaveChangesAsync(ct);
             return new UnsubscribeResult(true);
@@ -60,8 +54,14 @@ public sealed class UnsubscribeService
         {
             // UQ_ES unique constraint violation — the row already exists (double-click / stale token).
             // Idempotent: treat as success. EC-006-3 documented.
-            _logger.LogInformation("Unsubscribe idempotent no-op — suppression row already exists (UQ_ES)");
+            LogAlreadySuppressed(_logger);
             return new UnsubscribeResult(true);
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Unsubscribe token verification failed — returning 404")]
+    private static partial void LogTokenVerificationFailed(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Unsubscribe idempotent no-op — suppression row already exists (UQ_ES)")]
+    private static partial void LogAlreadySuppressed(ILogger logger);
 }

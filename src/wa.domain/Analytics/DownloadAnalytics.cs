@@ -135,7 +135,7 @@ public static class DownloadAnalytics
 
     private static bool IsAsciiLetter(char ch) => ch is (>= 'a' and <= 'z') or (>= 'A' and <= 'Z');
 
-    private static IReadOnlyList<BucketCount> Top(IEnumerable<(string? Key, int Count)> raw, Func<string?, string> normalize)
+    private static List<BucketCount> Top(IEnumerable<(string? Key, int Count)> raw, Func<string?, string> normalize)
     {
         var merged = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var (key, count) in raw)

@@ -16,7 +16,7 @@ public class RequestMagicLinkTests
     {
         _tokens = new StubAuthTokenStore();
         _publisher = new StubEventPublisher();
-        _handler = new RequestMagicLinkHandler(_tokens, _publisher);
+        _handler = new RequestMagicLinkHandler(_tokens, _publisher, TimeProvider.System);
     }
 
     // ---- FR-008-1: token stored as SHA-256 hex with Purpose=1 and 10-min TTL ----

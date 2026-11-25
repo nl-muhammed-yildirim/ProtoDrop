@@ -9,13 +9,10 @@ namespace wa.infrastructure.Persistence;
 /// T-011-06 (TA-4.2#22 / FR-011-2): admin users list — single bounded query over WaDbContext.
 /// Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext).
 /// </summary>
-public sealed class AdminUserStore : IAdminUserStore
+/// <param name="db">Database context that backs the store.</param>
+public sealed class AdminUserStore(WaDbContext db) : IAdminUserStore
 {
-    private readonly WaDbContext _db;
-
-    /// <summary>Initializes a new instance of the <see cref="AdminUserStore"/> class.</summary>
-    /// <param name="db">Database context that backs the store.</param>
-    public AdminUserStore(WaDbContext db) => _db = db;
+    private readonly WaDbContext _db = db;
 
     /// <inheritdoc />
     /// <remarks>

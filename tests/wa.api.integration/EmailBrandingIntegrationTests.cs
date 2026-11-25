@@ -29,7 +29,7 @@ public class EmailBrandingIntegrationTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        _sql = new MsSqlBuilder().WithImage("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
         await _sql.StartAsync();
         _options = new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(_sql.GetConnectionString()).Options;
         _db = new WaDbContext(_options);
@@ -128,7 +128,7 @@ public class EmailBrandingIntegrationTests : IAsyncLifetime
             new SenderBrandingStore(workerDb),
             new FeaturesProvider(
                 new PlansCache(new PlansStore(workerDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow),
-                new FlagsCache(new FlagsStore(workerDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow)));
+                new FlagsCache(new FlagsStore(workerDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow)), TimeProvider.System);
 
         var envelope = new EventEnvelope
         {

@@ -14,37 +14,29 @@ namespace wa.workers;
 /// T-005-04: HTTP trigger for E2E manual invocation.
 /// US-022-04: also runs the schedule sub-step (Scheduled → Active + transfer.created re-emit) after expiry.
 /// </summary>
-public class ExpireFunction
+/// <param name="handler">Handler that marks overdue transfers expired.</param>
+/// <param name="scheduled">Handler that activates scheduled transfers that are due.</param>
+/// <param name="billingEmails">Handler that queues the payment-failed reminder emails.</param>
+/// <param name="billingGrace">Handler that downgrades users whose billing grace ended.</param>
+/// <param name="logger">Logger for the job run (carries the generated correlation ids).</param>
+/// <param name="config">Configuration source for the <c>Wa:Jobs:SignKey</c> that guards the HTTP trigger.</param>
+/// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+public partial class ExpireFunction(
+    ExpireTransfersHandler handler,
+    ActivateScheduledTransfersHandler scheduled,
+    SendBillingEmailsHandler billingEmails,
+    EndBillingGraceHandler billingGrace,
+    ILogger<ExpireFunction> logger,
+    IConfiguration config,
+    TimeProvider timeProvider)
 {
-    private readonly ExpireTransfersHandler _handler;
-    private readonly ActivateScheduledTransfersHandler _scheduled;
-    private readonly SendBillingEmailsHandler _billingEmails;
-    private readonly EndBillingGraceHandler _billingGrace;
-    private readonly ILogger<ExpireFunction> _logger;
-    private readonly IConfiguration _config;
-
-    /// <summary>Initializes a new instance of the <see cref="ExpireFunction"/> class.</summary>
-    /// <param name="handler">Handler that marks overdue transfers expired.</param>
-    /// <param name="scheduled">Handler that activates scheduled transfers that are due.</param>
-    /// <param name="billingEmails">Handler that queues the payment-failed reminder emails.</param>
-    /// <param name="billingGrace">Handler that downgrades users whose billing grace ended.</param>
-    /// <param name="logger">Logger for the job run (carries the generated correlation ids).</param>
-    /// <param name="config">Configuration source for the <c>Wa:Jobs:SignKey</c> that guards the HTTP trigger.</param>
-    public ExpireFunction(
-        ExpireTransfersHandler handler,
-        ActivateScheduledTransfersHandler scheduled,
-        SendBillingEmailsHandler billingEmails,
-        EndBillingGraceHandler billingGrace,
-        ILogger<ExpireFunction> logger,
-        IConfiguration config)
-    {
-        _handler = handler;
-        _scheduled = scheduled;
-        _billingEmails = billingEmails;
-        _billingGrace = billingGrace;
-        _logger = logger;
-        _config = config;
-    }
+    private readonly ExpireTransfersHandler _handler = handler;
+    private readonly ActivateScheduledTransfersHandler _scheduled = scheduled;
+    private readonly SendBillingEmailsHandler _billingEmails = billingEmails;
+    private readonly EndBillingGraceHandler _billingGrace = billingGrace;
+    private readonly ILogger<ExpireFunction> _logger = logger;
+    private readonly IConfiguration _config = config;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <summary>Timer entry point (every 15 minutes): expires overdue transfers, then runs the scheduled-send, billing-email and billing-grace sub-steps in that order inside one try block; an exception in any step is logged and rethrown, so the remaining steps are skipped until the next run.</summary>
     /// <param name="context">Function invocation context.</param>
@@ -58,28 +50,28 @@ public class ExpireFunction
         var tp = W3CTraceParser.New();
         using var scope = _logger.BeginScope(new Dictionary<string, object?> { ["CorrelationId"] = tp.CorrelationId, ["TraceParent"] = tp.ToHeader() });
 
-        var now = DateTime.UtcNow;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         try
         {
             var count = await _handler.RunAsync(now, context.CancellationToken);
-            _logger.LogInformation("f-expire completed: {Count} transfers expired", count);
+            LogExpired(_logger, count);
 
             // US-022-04 (D-2): flip due Scheduled transfers to Active and re-emit transfer.created. After expiry so an
             // expired Scheduled row is swept first (AC-022-5); own JobRun claim.
             var activated = await _scheduled.RunAsync(now, context.CancellationToken);
-            _logger.LogInformation("f-expire schedule: {Count} transfers activated", activated);
+            LogScheduleActivated(_logger, activated);
 
             // US-019-04 (D-6): billing email sub-step; each send is gated by its own JobRun step claim.
             var billingCount = await _billingEmails.RunAsync(now, context.CancellationToken);
-            _logger.LogInformation("f-expire billing emails: {Count} queued", billingCount);
+            LogBillingEmailsQueued(_logger, billingCount);
 
             // US-019-05 (D-4): end expired billing grace periods (downgrade to Free), after the email step.
             var graceCount = await _billingGrace.RunAsync(now, context.CancellationToken);
-            _logger.LogInformation("f-expire billing grace: {Count} downgraded", graceCount);
+            LogBillingGraceDowngraded(_logger, graceCount);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "f-expire failed");
+            LogFailed(_logger, ex);
             throw; // Azure Functions retries on unhandled exception; JobRun claim prevents double-processing.
         }
     }
@@ -96,10 +88,25 @@ public class ExpireFunction
         if (!JobAuth.Verify(_config, req))
             return JobAuth.CreateProblem(req, 401, "Unauthenticated", "Invalid or missing signature.");
 
-        var now = DateTime.UtcNow;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var count = await _handler.RunAsync(now, context.CancellationToken);
         // US-022-04: same order as the timer — expiry first, then the schedule step (its own "schedule" JobRun claim).
         var activated = await _scheduled.RunAsync(now, context.CancellationToken);
         return JobAuth.CreateSuccess(req, new { expired = count, activated });
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "f-expire completed: {Count} transfers expired")]
+    private static partial void LogExpired(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "f-expire schedule: {Count} transfers activated")]
+    private static partial void LogScheduleActivated(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "f-expire billing emails: {Count} queued")]
+    private static partial void LogBillingEmailsQueued(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "f-expire billing grace: {Count} downgraded")]
+    private static partial void LogBillingGraceDowngraded(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "f-expire failed")]
+    private static partial void LogFailed(ILogger logger, Exception exception);
 }

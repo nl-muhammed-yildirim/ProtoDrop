@@ -180,7 +180,7 @@ public static class PlanDefinition
             if (!expectedKeys.Contains(actual.Name)) errors.Add($"{name}.{actual.Name} is not a known key.");
     }
 
-    private static IReadOnlyList<PropertyInfo> Fields(Type type) => type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+    private static PropertyInfo[] Fields(Type type) => type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
 
     private static string KeyOf(PropertyInfo property) => property.GetCustomAttribute<JsonPropertyNameAttribute>()?.Name ?? property.Name;
 }

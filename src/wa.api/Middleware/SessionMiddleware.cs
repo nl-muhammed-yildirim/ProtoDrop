@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http;
 using wa.application.UseCases.Auth;
 
 namespace wa.api.Middleware;
@@ -16,15 +15,18 @@ public sealed class SessionMiddleware
 
     private readonly RequestDelegate _next;
     private readonly ISessionTokenMinter _tokens; // production = SessionTokenService (minter + reader in one class so format can't drift)
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="SessionMiddleware"/> class.</summary>
     /// <param name="next">Next middleware in the pipeline.</param>
     /// <param name="tokens">Reads session cookies and decides when a cookie needs renewal.</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="tokens"/> is null.</exception>
-    public SessionMiddleware(RequestDelegate next, ISessionTokenMinter tokens)
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="tokens"/> or <paramref name="timeProvider"/> is null.</exception>
+    public SessionMiddleware(RequestDelegate next, ISessionTokenMinter tokens, TimeProvider timeProvider)
     {
         _next = next;
         _tokens = tokens ?? throw new ArgumentNullException(nameof(tokens));
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
     }
 
     /// <summary>Reads the session cookie, publishes the user id for later middleware and endpoints, and renews the cookie when it is close to expiry.</summary>
@@ -40,7 +42,7 @@ public sealed class SessionMiddleware
             context.Items[SessionUserIdKey] = userId;
 
             // FR-008-2 / TA-9.1 30-day rolling: re-mint when remaining lifetime < RenewRemainingDays (frozen threshold).
-            if (_tokens.NeedsRenewal(expUtc, DateTime.UtcNow))
+            if (_tokens.NeedsRenewal(expUtc, _timeProvider.GetUtcNow().UtcDateTime))
             {
                 var newToken = _tokens.Mint(userId);
                 SetSessionCookie(context, newToken);

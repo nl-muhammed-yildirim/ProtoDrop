@@ -43,7 +43,7 @@ public abstract class TransferAnalyticsEndpointTestsBase(bool gateOn) : IAsyncLi
         Environment.SetEnvironmentVariable("Wa__Url__Public", "http://localhost:5173");
         Environment.SetEnvironmentVariable("Wa__ServiceBus__ConnectionString", "Endpoint=" + accountUrl + ";SharedAccessKeyName=Dummy;SharedAccessKey=dummy");
 
-        Sql = new MsSqlBuilder().WithImage("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        Sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
         await Sql.StartAsync();
         var connString = Sql.GetConnectionString();
         Environment.SetEnvironmentVariable("ConnectionStrings__WaDb", connString);

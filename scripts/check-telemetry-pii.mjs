@@ -29,6 +29,10 @@
  *                            email / mail / address / ip / password / passwd / secret / sas / sig / signature, or a file / sender / display /
  *                            user / recipient / owner name (bare `name` is NOT flagged — container / account / event names are config, not PII).
  *                            Sanctioned slot-wrapped spans (FileNameSlot / IpSlot / PiiTransforms.*) are stripped first. Log an id instead (TA-9.4).
+ *                            CHORE-code-style-2: source-generated logging is covered too. Every `[LoggerMessage(Level = .., Message = "..")]` template gets the same
+ *                            template checks (email literal, {placeholder} identifiers); the declaration must be `private static partial void Name(ILogger ..`
+ *                            (anything else lets call sites escape the scan and is a finding); every parameter other than the logger / the exception is
+ *                            checked by name; and every in-file call `Name(logger, ..)` gets the argument checks above on the arguments after the logger.
  *
  * Allowlists are CLOSED sets: adding a telemetry property means editing one list below — that diff is the PR-visible review point (EC-012-3).
  *
@@ -41,6 +45,8 @@
  * a destructured / namespace alias other than the two shapes R6 flags escapes R5. T-069 owns the [Pii] attribute and event-DTO convention tests.
  * R7 also flags `.Path`/`.PathBase`/`.QueryString`/`.Message` member arguments (T-012-07: raw request path / exception message in a neutral slot).
  * R7 is a text scan too: a PII value laundered through a neutrally named local (`var x = user.Email; _logger.LogX("{X}", x)`) escapes it.
+ * [LoggerMessage] limits: the attribute must use the named `Message = "<literal>"` argument (positional / const messages are findings), and the
+ * generated method must be private static partial so every call site sits in the same file as its declaration.
  * Node built-ins only (TA-17: no new packages).
  */
 
@@ -334,6 +340,100 @@ function isLogPiiIdentifier(id) {
   return words.includes('name') && words.some((w) => NAME_QUALIFIERS.has(w))
 }
 
+/** R7 argument checks shared by `.LogX(..)` calls and [LoggerMessage] call sites. argText = comments-blanked text, argCode = strings blanked too. */
+function logArgReasons(argText, argCode) {
+  const reasons = []
+  if (EMAIL_RE.test(argText)) reasons.push('raw email literal')
+  for (const ph of argText.matchAll(/\{(\w+)(?::[^}]*)?\}/g)) {
+    if (isLogPiiIdentifier(ph[1])) reasons.push(`placeholder {${ph[1]}}`)
+  }
+  const stripped = stripSanctioned(argCode)
+  const ids = new Set()
+  for (const im of stripped.matchAll(/[A-Za-z_][A-Za-z0-9_]*/g)) if (isLogPiiIdentifier(im[0])) ids.add(im[0])
+  for (const id of ids) reasons.push(`argument ${id}`)
+  if (/\.\s*Name\b/.test(stripped)) reasons.push('argument .Name member')
+  const member = /\.\s*(Path|PathBase|QueryString|Message)\b/.exec(stripped)
+  if (member) reasons.push(`argument .${member[1]} member (raw request path / exception message — log LogRoute.Of(..) / a code instead)`)
+  return reasons
+}
+
+/**
+ * R7 for source-generated logging (CHORE-code-style-2): `[LoggerMessage(Level = .., Message = "..")] private static partial void LogX(ILogger logger, ..);`
+ * 1. the attribute needs a named `Message = "<literal>"`; its template gets the email / placeholder checks;
+ * 2. the declaration must be `private static partial void Name(` (so every call site is in this file and scanned);
+ *    every parameter that is not the logger / an Exception is checked by name;
+ * 3. every in-file call `Name(logger, args..)` gets the shared argument checks on the args after the logger.
+ * Pure: text in, findings + counts out.
+ */
+function scanLoggerMessage(file, text) {
+  const { nc, code } = mask(text, 'cs')
+  const findings = []
+  const names = new Set()
+  let messages = 0
+  let calls = 0
+  const r7 = (idx, why) => findings.push(finding(file, lineOf(text, idx), 'R7', why))
+  for (const m of code.matchAll(/\[\s*LoggerMessage\s*\(/g)) {
+    messages++
+    const open = m.index + m[0].length - 1
+    const attr = extractCall(code, open)
+    if (!attr) {
+      r7(m.index, 'could not find the closing paren of [LoggerMessage(..)] — scan is unreliable here')
+      continue
+    }
+    const attrText = nc.slice(attr.start, attr.end)
+    const lit = /\bMessage\s*=\s*"((?:[^"\\]|\\.)*)"/.exec(attrText)
+    if (lit && attrText.slice(lit.index + lit[0].length).trimStart().startsWith('+')) {
+      r7(m.index, 'unreadable [LoggerMessage] (concatenated Message template — use a single "<literal>" so the guard reads the whole template)')
+    } else if (!lit) {
+      r7(m.index, 'unreadable [LoggerMessage] (use the named Message = "<literal>" argument so the guard can read the template)')
+    } else {
+      const template = lit[1]
+      if (EMAIL_RE.test(template)) r7(m.index, '[LoggerMessage] template carries a raw email literal (TA-9.4)')
+      for (const ph of template.matchAll(/\{(\w+)(?::[^}]*)?\}/g)) {
+        if (isLogPiiIdentifier(ph[1])) r7(m.index, `[LoggerMessage] template placeholder {${ph[1]}} names PII — log an id instead (TA-9.4)`)
+      }
+    }
+    // The declaration: everything after the attribute's closing `]` up to the first `;`.
+    const close = code.indexOf(']', attr.end)
+    const semi = code.indexOf(';', attr.end)
+    const declText = close < 0 || semi < 0 ? '' : code.slice(close + 1, semi + 1)
+    const decl = /^\s*private\s+static\s+partial\s+void\s+(\w+)\s*\(/.exec(declText)
+    if (!decl) {
+      r7(m.index, '[LoggerMessage] method must be `private static partial void` (call sites outside the file escape the scan)')
+      continue
+    }
+    names.add(decl[1])
+    const paramsOpen = close + 1 + decl[0].length - 1
+    const params = extractCall(code, paramsOpen)
+    if (!params) continue
+    for (const seg of splitTopLevel(code, params.start, params.end)) {
+      const toks = code.slice(seg.s, seg.e).trim().split(/\s+/)
+      const name = toks[toks.length - 1]
+      const type = toks.slice(0, -1).join(' ')
+      if (toks.length < 2 || /^ILogger\b/.test(type) || /\bException\b/.test(type)) continue
+      if (isLogPiiIdentifier(name)) r7(m.index, `[LoggerMessage] parameter ${name} names PII — log an id instead (TA-9.4)`)
+    }
+  }
+  for (const name of names) {
+    for (const m of code.matchAll(new RegExp(`(?<![\\w.])${name}\\s*\\(`, 'g'))) {
+      if (/\bvoid\s+$/.test(code.slice(0, m.index))) continue // the declaration itself
+      const open = m.index + m[0].length - 1
+      const call = extractCall(code, open)
+      if (!call) {
+        r7(m.index, `could not find the closing paren of ${name}(..) — scan is unreliable here`)
+        continue
+      }
+      calls++
+      const args = splitTopLevel(code, call.start, call.end)
+      if (args.length < 2) continue // logger only
+      const from = args[1].s
+      const reasons = logArgReasons(nc.slice(from, call.end), code.slice(from, call.end))
+      if (reasons.length > 0) r7(m.index, `${name}(..) call carries PII (${reasons.join('; ')}) — log an id instead; never a raw email/sender name/file name/IP (TA-9.4)`)
+    }
+  }
+  return { findings, messages, calls }
+}
+
 /** R7: ILogger calls over one C# file (any receiver). Pure: text in, findings + call count out. */
 function scanLog(file, text) {
   const { nc, code } = mask(text, 'cs')
@@ -350,18 +450,7 @@ function scanLog(file, text) {
     calls++
     const argText = nc.slice(call.start, call.end)
     const argCode = code.slice(call.start, call.end)
-    const reasons = []
-    if (EMAIL_RE.test(argText)) reasons.push('raw email literal')
-    for (const ph of argText.matchAll(/\{(\w+)(?::[^}]*)?\}/g)) {
-      if (isLogPiiIdentifier(ph[1])) reasons.push(`placeholder {${ph[1]}}`)
-    }
-    const stripped = stripSanctioned(argCode)
-    const ids = new Set()
-    for (const im of stripped.matchAll(/[A-Za-z_][A-Za-z0-9_]*/g)) if (isLogPiiIdentifier(im[0])) ids.add(im[0])
-    for (const id of ids) reasons.push(`argument ${id}`)
-    if (/\.\s*Name\b/.test(stripped)) reasons.push('argument .Name member')
-    const member = /\.\s*(Path|PathBase|QueryString|Message)\b/.exec(stripped)
-    if (member) reasons.push(`argument .${member[1]} member (raw request path / exception message — log LogRoute.Of(..) / a code instead)`)
+    const reasons = logArgReasons(argText, argCode)
     if (reasons.length > 0) {
       findings.push(finding(file, line, 'R7', `logger call carries PII (${reasons.join('; ')}) — log an id instead; never a raw email/sender name/file name/IP (TA-9.4)`))
     }
@@ -498,7 +587,7 @@ function* walk(dir) {
 
 function scanTree() {
   const findings = []
-  const counts = { csFiles: 0, tsFiles: 0, serverCalls: 0, clientCalls: 0, templates: 0, logCalls: 0 }
+  const counts = { csFiles: 0, tsFiles: 0, serverCalls: 0, clientCalls: 0, templates: 0, logCalls: 0, loggerMessages: 0, loggerMessageCalls: 0 }
   for (const full of walk(SRC)) {
     const r = rel(full)
     const isCs = full.endsWith('.cs')
@@ -510,6 +599,10 @@ function scanTree() {
       const lr = scanLog(r, text)
       findings.push(...lr.findings)
       counts.logCalls += lr.calls
+      const lm = scanLoggerMessage(r, text)
+      findings.push(...lm.findings)
+      counts.loggerMessages += lm.messages
+      counts.loggerMessageCalls += lm.calls
       if (r === REPORTER_CS) {
         const res = scanReporter(r, text)
         findings.push(...res.findings)
@@ -534,7 +627,7 @@ function scanTree() {
 function runScan() {
   console.log('Telemetry PII guard (T-012-05 / T-012-06, EC-012-3 / AC-012-3):')
   const { findings, counts } = scanTree()
-  console.log(`  scanned ${counts.csFiles} C# files, ${counts.tsFiles} web files: ${counts.serverCalls} server helper calls, ${counts.templates} reporter templates, ${counts.clientCalls} client trackClientEvent calls, ${counts.logCalls} logger calls`)
+  console.log(`  scanned ${counts.csFiles} C# files, ${counts.tsFiles} web files: ${counts.serverCalls} server helper calls, ${counts.templates} reporter templates, ${counts.clientCalls} client trackClientEvent calls, ${counts.logCalls} logger calls, ${counts.loggerMessages} [LoggerMessage] methods, ${counts.loggerMessageCalls} [LoggerMessage] call sites`)
   findings.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line)
   for (const f of findings) console.error(`  ${f.file}:${f.line}  ${f.rule}  ${f.message}`)
   console.log('  rule  findings')
@@ -542,7 +635,7 @@ function runScan() {
     const n = findings.filter((f) => f.rule === rule).length
     if (rule !== 'R0' || n > 0) console.log(`  ${rule}    ${n}`)
   }
-  if (counts.serverCalls === 0 || counts.templates === 0 || counts.clientCalls === 0 || counts.logCalls === 0) {
+  if (counts.serverCalls === 0 || counts.templates === 0 || counts.clientCalls === 0 || counts.logCalls === 0 || counts.loggerMessages === 0) {
     console.error('\nFAIL — scan found no call sites on a surface (path or pattern drift): the guard would pass vacuously.')
     process.exit(1)
   }
@@ -558,7 +651,7 @@ function runScan() {
 // ---------------------------------------------------------------------------------------------------------------------
 
 function runSelfTest() {
-  const scan = { cs: (c) => scanCs('selftest.cs', c).findings, reporter: (c) => scanReporter('selftest.cs', c).findings, ts: (c) => scanTs('selftest.ts', c).findings, log: (c) => scanLog('selftest.cs', c).findings }
+  const scan = { cs: (c) => scanCs('selftest.cs', c).findings, reporter: (c) => scanReporter('selftest.cs', c).findings, ts: (c) => scanTs('selftest.ts', c).findings, log: (c) => scanLog('selftest.cs', c).findings, logmsg: (c) => scanLoggerMessage('selftest.cs', c).findings }
   const seeded = [
     ['S1', 'cs', 'R1', '_telemetry.TransferPageViewed(PiiTransforms.FileName("dev@example.com"));'],
     ['S2', 'cs', 'R2', '_telemetry.StorageBytesActive(user.Email.Length);'],
@@ -584,6 +677,14 @@ function runSelfTest() {
     ['S22', 'log', 'R7', '_logger.LogInformation("{F}", file.Name);'],
     ['S23', 'log', 'R7', '_logger.LogError(ex, "Unhandled on {P}", context.Request.Path);'],
     ['S24', 'log', 'R7', '_logger.LogWarning("Business error {Code}: {Detail}", ex.Code, ex.Message);'],
+    ['S25', 'logmsg', 'R7', '[LoggerMessage(Level = LogLevel.Warning, Message = "sent to {RecipientEmail}")]\nprivate static partial void LogSent(ILogger logger, string recipientEmail);'],
+    ['S26', 'logmsg', 'R7', '[LoggerMessage(Level = LogLevel.Warning, Message = "sent {Count}")]\nprivate static partial void LogSent(ILogger logger, string recipientEmail);'],
+    ['S27', 'logmsg', 'R7', '[LoggerMessage(Level = LogLevel.Information, Message = "sent {Count}")]\nprivate static partial void LogSent(ILogger logger, string count);\nvoid M() { LogSent(_logger, user.Email); }'],
+    ['S28', 'logmsg', 'R7', '[LoggerMessage(Level = LogLevel.Warning, Message = "failed for dev@example.com")]\nprivate static partial void LogFailed(ILogger logger);'],
+    ['S29', 'logmsg', 'R7', '[LoggerMessage(1, LogLevel.Warning, "failed {Id}")]\nprivate static partial void LogFailed(ILogger logger, Guid id);'],
+    ['S30', 'logmsg', 'R7', '[LoggerMessage(Level = LogLevel.Warning, Message = "failed {Id}")]\npublic static partial void LogFailed(ILogger logger, Guid id);'],
+    ['S31', 'logmsg', 'R7', '[LoggerMessage(Level = LogLevel.Error, Message = "Unhandled on {Route}")]\nprivate static partial void LogFailed(ILogger logger, Exception exception, string route);\nvoid M() { LogFailed(_logger, ex, context.Request.Path); }'],
+    ['S32', 'logmsg', 'R7', '[LoggerMessage(Level = LogLevel.Warning, Message = "sent " + "{RecipientEmail}")]\nprivate static partial void LogSent(ILogger logger, string id);'],
   ]
   const clean = [
     ['C1', 'ts', "if (x) {\n  trackClientEvent('upload_failed', { fileId: id, retries: fileAttempts.get(id)?.retries, ...(isBlobUnavailable ? { reason: 'blob_unavailable' } : {}) })\n}"],
@@ -599,6 +700,8 @@ function runSelfTest() {
     ['C12', 'log', '_telemetry.LogEvent(TelemetryEvents.UserCreated);'],
     ['C13', 'log', '_logger.LogWarning("blob delete failed for {BlobPath}", blob.BlobPath);'],
     ['C14', 'log', '_logger.LogError(ex, "Unhandled exception on {Route}", LogRoute.Of(context));'],
+    ['C15', 'logmsg', '[LoggerMessage(Level = LogLevel.Information, Message = "transfer {TransferId} expired")]\nprivate static partial void LogExpired(ILogger logger, Guid transferId);\nvoid M() { LogExpired(_logger, transfer.Id); }'],
+    ['C16', 'logmsg', '[LoggerMessage(Level = LogLevel.Error, Message = "Unhandled exception on {Route} — mapped to 500 INTERNAL")]\nprivate static partial void LogUnhandled(ILogger logger, Exception exception, string route);\nvoid M() { LogUnhandled(_logger, unhandled, LogRoute.Of(context)); }'],
     ['C5', 'cs', '_telemetry.UploadCompleted(\n    totalBytes,\n    stopwatch.ElapsedMilliseconds,\n    totalRetries);'],
   ]
   let caught = 0

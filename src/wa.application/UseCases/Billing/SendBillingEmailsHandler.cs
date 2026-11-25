@@ -7,7 +7,7 @@ namespace wa.application.UseCases.Billing;
 /// US-019-04 (D-6, TA-6.3): f-expire sub-step — queues billing email #2 (+3 d) and #3 (+7 d). Each send is gated by its own
 /// JobRun step claim, so scale-out and retries never double-send.
 /// </summary>
-public sealed class SendBillingEmailsHandler
+public sealed partial class SendBillingEmailsHandler
 {
     private readonly IBillingSequenceStore _store;
     private readonly IEventPublisher _events;
@@ -46,9 +46,11 @@ public sealed class SendBillingEmailsHandler
             await _events.PublishAsync(envelope, ct);
             queued++;
 
-            _logger.LogInformation(
-                "Billing email queued: subscription {SubscriptionId} step {Step}", row.SubscriptionId, step.Value);
+            LogBillingEmailQueued(_logger, row.SubscriptionId, step.Value);
         }
         return queued;
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Billing email queued: subscription {SubscriptionId} step {Step}")]
+    private static partial void LogBillingEmailQueued(ILogger logger, Guid subscriptionId, int step);
 }

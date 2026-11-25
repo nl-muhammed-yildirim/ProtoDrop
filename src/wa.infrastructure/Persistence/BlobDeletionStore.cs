@@ -8,13 +8,12 @@ namespace wa.infrastructure.Persistence;
 /// <summary>
 /// T-005-03: thin adapter over WaDbContext implementing IBlobDeletionStore — the f-delete-blobs job's DB surface (TA-6.5).
 /// </summary>
-public sealed class BlobDeletionStore : IBlobDeletionStore
+/// <param name="db">Database context that backs the store.</param>
+/// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+public sealed class BlobDeletionStore(WaDbContext db, TimeProvider timeProvider) : IBlobDeletionStore
 {
-    private readonly WaDbContext _db;
-
-    /// <summary>Initializes a new instance of the <see cref="BlobDeletionStore"/> class.</summary>
-    /// <param name="db">Database context that backs the store.</param>
-    public BlobDeletionStore(WaDbContext db) => _db = db;
+    private readonly WaDbContext _db = db;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <inheritdoc />
     public async Task<bool> TryClaimAsync(DateTime runWindowStartUtc, DateTime lockUntilUtc, CancellationToken ct)
@@ -60,7 +59,7 @@ public sealed class BlobDeletionStore : IBlobDeletionStore
         var jobRun = _db.Set<JobRun>().Find("delete-blobs", runWindowStartUtc);
         if (jobRun is not null)
         {
-            jobRun.FinishedAtUtc = DateTime.UtcNow;
+            jobRun.FinishedAtUtc = _timeProvider.GetUtcNow().UtcDateTime;
             await _db.SaveChangesAsync(ct);
         }
     }

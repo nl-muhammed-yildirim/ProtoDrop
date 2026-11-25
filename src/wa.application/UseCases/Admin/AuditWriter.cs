@@ -14,15 +14,18 @@ public sealed class AuditWriter : IAuditWriter
 {
     private readonly IAuditStore _store;
     private readonly IEventPublisher _eventPublisher;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="AuditWriter"/> class.</summary>
     /// <param name="store">Store that persists the audit log row.</param>
     /// <param name="eventPublisher">Publishes the <c>admin.action</c> event.</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="store"/> or <paramref name="eventPublisher"/> is null.</exception>
-    public AuditWriter(IAuditStore store, IEventPublisher eventPublisher)
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="store"/>, <paramref name="eventPublisher"/> or <paramref name="timeProvider"/> is null.</exception>
+    public AuditWriter(IAuditStore store, IEventPublisher eventPublisher, TimeProvider timeProvider)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _eventPublisher = eventPublisher ?? throw new ArgumentNullException(nameof(eventPublisher));
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
     }
 
     /// <inheritdoc />
@@ -36,7 +39,7 @@ public sealed class AuditWriter : IAuditWriter
             EntityType = entityType,
             EntityId = entityId,
             DetailsJson = details is null ? null : JsonSerializer.Serialize(details),
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = _timeProvider.GetUtcNow().UtcDateTime
         };
         await _store.AddAsync(row, ct);
 

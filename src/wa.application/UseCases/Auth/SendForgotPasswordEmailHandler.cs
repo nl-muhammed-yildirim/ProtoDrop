@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -15,7 +16,7 @@ namespace wa.application.UseCases.Auth;
 /// Emails/templates/forgot-password/, kind="forgot_password" in email.sent/email.failed payloads.
 /// Self-contained: no DB context needed — payload carries email + token + expiry.
 /// </summary>
-public sealed class SendForgotPasswordEmailHandler : IEmailEventHandler
+public sealed partial class SendForgotPasswordEmailHandler : IEmailEventHandler
 {
     private const string Subject = "Your ProtoDrop link"; // FR-008-6: the forgot-password subject (magic-link's is "Your ProtoDrop sign-in link")
 
@@ -25,6 +26,7 @@ public sealed class SendForgotPasswordEmailHandler : IEmailEventHandler
     private readonly WaTelemetryReporter _telemetry;
     private readonly ILogger<SendForgotPasswordEmailHandler> _logger;
     private readonly (string Html, string Txt) _templates;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="SendForgotPasswordEmailHandler"/> class.</summary>
     /// <param name="emailSender">Port that delivers the rendered email.</param>
@@ -32,13 +34,15 @@ public sealed class SendForgotPasswordEmailHandler : IEmailEventHandler
     /// <param name="config">Configuration source for the public site URL and sender address.</param>
     /// <param name="telemetry">Reporter for the email and dead-letter telemetry events.</param>
     /// <param name="logger">Logger for payload problems and send failures.</param>
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
     /// <exception cref="InvalidOperationException">Thrown when the forgot-password templates are not found next to the worker binaries.</exception>
     public SendForgotPasswordEmailHandler(
         IEmailSender emailSender,
         IEventPublisher eventPublisher,
         IConfiguration config,
         WaTelemetryReporter telemetry,
-        ILogger<SendForgotPasswordEmailHandler> logger)
+        ILogger<SendForgotPasswordEmailHandler> logger,
+        TimeProvider timeProvider)
     {
         _emailSender = emailSender;
         _eventPublisher = eventPublisher;
@@ -56,6 +60,7 @@ public sealed class SendForgotPasswordEmailHandler : IEmailEventHandler
             throw new InvalidOperationException(
                 $"Forgot-password email templates not found. Expected: {htmlPath} and {txtPath}. " +
                 "Verify the workers csproj Content Include for Emails\\templates\\**\\*.");
+        _timeProvider = timeProvider;
     }
 
     /// <inheritdoc />
@@ -70,14 +75,14 @@ public sealed class SendForgotPasswordEmailHandler : IEmailEventHandler
         if (!root.TryGetProperty("email", out var emailEl) ||
             string.IsNullOrWhiteSpace(emailEl.GetString()))
         {
-            _logger.LogWarning("f-email: missing or invalid email in forgot-password payload");
+            LogMissingEmail(_logger);
             return;
         }
 
         if (!root.TryGetProperty("token", out var tokenEl) ||
             string.IsNullOrWhiteSpace(tokenEl.GetString()))
         {
-            _logger.LogWarning("f-email: missing or invalid token in forgot-password payload");
+            LogMissingToken(_logger);
             return;
         }
 
@@ -87,14 +92,14 @@ public sealed class SendForgotPasswordEmailHandler : IEmailEventHandler
         if (root.TryGetProperty("expiresAtUtc", out var expiryEl) && expiryEl.TryGetDateTime(out var expiry))
             expiresAtUtc = expiry;
         else
-            expiresAtUtc = DateTime.UtcNow.AddMinutes(10); // fallback
+            expiresAtUtc = _timeProvider.GetUtcNow().UtcDateTime.AddMinutes(10); // fallback
 
         // 2. Build CTA URL: {publicOrigin}/auth?ml={rawToken} — same as magic-link (redeem endpoint 10 is purpose-agnostic).
         var publicOrigin = _config["Wa:Url:Public"] ?? "http://localhost:5173";
         var ctaUrl = $"{publicOrigin}/auth?ml={rawToken}";
 
         // 3. Compute remaining minutes for the expiry note.
-        var minutesRemaining = (int)Math.Ceiling((expiresAtUtc - DateTime.UtcNow).TotalMinutes);
+        var minutesRemaining = (int)Math.Ceiling((expiresAtUtc - _timeProvider.GetUtcNow().UtcDateTime).TotalMinutes);
 
         // 4. Render templates with manual variable substitution.
         var htmlBody = RenderTemplate(_templates.Html, email, ctaUrl, minutesRemaining);
@@ -120,7 +125,7 @@ public sealed class SendForgotPasswordEmailHandler : IEmailEventHandler
                 EventId = Guid.NewGuid(),
                 Type = EventType.EmailSent,
                 Version = 1,
-                OccurredAtUtc = DateTime.UtcNow,
+                OccurredAtUtc = _timeProvider.GetUtcNow().UtcDateTime,
                 CorrelationId = envelope.CorrelationId,
                 PartitionKey = email,
                 Payload = new
@@ -137,7 +142,7 @@ public sealed class SendForgotPasswordEmailHandler : IEmailEventHandler
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "f-email: failed to send forgot-password email attempt {Attempt}", attempt);
+            LogSendFailed(_logger, ex, attempt);
 
             if (attempt == maxDeliveryCount)
             {
@@ -148,7 +153,7 @@ public sealed class SendForgotPasswordEmailHandler : IEmailEventHandler
                     EventId = Guid.NewGuid(),
                     Type = EventType.EmailFailed,
                     Version = 1,
-                    OccurredAtUtc = DateTime.UtcNow,
+                    OccurredAtUtc = _timeProvider.GetUtcNow().UtcDateTime,
                     CorrelationId = envelope.CorrelationId,
                     PartitionKey = email,
                     Payload = new
@@ -173,5 +178,14 @@ public sealed class SendForgotPasswordEmailHandler : IEmailEventHandler
         template
             .Replace("{{Email}}", email)
             .Replace("{{CtaUrl}}", ctaUrl)
-            .Replace("{{MinutesRemaining}}", minutesRemaining.ToString());
+            .Replace("{{MinutesRemaining}}", minutesRemaining.ToString(CultureInfo.InvariantCulture));
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "f-email: missing or invalid email in forgot-password payload")]
+    private static partial void LogMissingEmail(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "f-email: missing or invalid token in forgot-password payload")]
+    private static partial void LogMissingToken(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "f-email: failed to send forgot-password email attempt {Attempt}")]
+    private static partial void LogSendFailed(ILogger logger, Exception exception, int attempt);
 }

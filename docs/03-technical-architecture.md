@@ -130,7 +130,8 @@ IDE: Visual Studio 2026, .NET 10 SDK via global.json.
 │  │  ├─ Endpoints/                  # TransferEndpoints.cs, AuthEndpoints.cs, AdminEndpoints.cs
 │  │  ├─ Pipeline/                   # correlation, error mapping (Problem+JSON), validation
 │  │  ├─ Caches/                     # PlansCache, FlagsCache (30 s TTL)
-│  │  └─ Program.cs                  # host wiring: AddMediatR, DI, Serilog, CORS, rate limit
+│  │  ├─ ApiServices.cs              # DI: AddMediatR, services, Serilog, CORS, rate limit (CHORE-code-style-2)
+│  │  └─ Program.cs                  # host wiring + middleware order + Map*Endpoints calls
 │  ├─ wa.workers/                    # references: wa.infrastructure (own host for jobs)
 │     ├─ Functions/
 │     │  ├─ EmailFunctions.cs

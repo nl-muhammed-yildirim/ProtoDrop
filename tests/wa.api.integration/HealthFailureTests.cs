@@ -20,7 +20,7 @@ public class HealthFailureTests
         Environment.SetEnvironmentVariable("Wa__Jwt__Secret", "test-jwt-secret");
     }
 
-    private static readonly TestFactory factory = new();
+    private static readonly TestFactory Factory = new();
 
     private sealed class TestFactory : WebApplicationFactory<Program>
     {
@@ -38,7 +38,7 @@ public class HealthFailureTests
     [Fact]
     public async Task Health_DatabaseDown_Returns503WithProblemJson()
     {
-        var client = factory.CreateClient();
+        var client = Factory.CreateClient();
 
         var response = await client.GetAsync("/health");
 

@@ -37,7 +37,7 @@ public class SignupEndpointTests : IAsyncLifetime
         Environment.SetEnvironmentVariable("Wa__Jwt__Secret", "test-jwt-secret");
 
         // Fresh SQL + migrations: seeds the free plan row (TA-3.4) and creates dbo.AppUser (T-052).
-        _sql = new MsSqlBuilder().WithImage("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
         await _sql.StartAsync();
         var connString = _sql.GetConnectionString();
         Environment.SetEnvironmentVariable("ConnectionStrings__WaDb", connString);
@@ -77,7 +77,7 @@ public class SignupEndpointTests : IAsyncLifetime
         // The row exists and is lowercased (EC-008-1) — one AppUser row for this email.
         var row = await _db.Set<AppUser>().FirstOrDefaultAsync(u => u.Email == Email.ToLowerInvariant());
         Assert.NotNull(row);
-        Assert.NotEmpty(row!.PasswordHash); // PBKDF2 hashed (TA-9.1) — never the raw password
+        Assert.NotEmpty(row!.PasswordHash!); // PBKDF2 hashed (TA-9.1) — never the raw password
 
         // AC-018-1: a new AppUser starts on the seeded default (Free) plan.
         var defaultPlan = await _db.Set<Plan>().SingleAsync(p => p.Code == Plan.DefaultCode);

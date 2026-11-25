@@ -1,8 +1,4 @@
 using MediatR;
-using Microsoft.Extensions.Logging;
-using wa.application.Ports;
-using wa.application.Telemetry;
-using wa.domain.Telemetry;
 
 namespace wa.application.UseCases.Transfers;
 

@@ -34,7 +34,7 @@ public class ScheduledSendTimerIntegrationTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        _sql = new MsSqlBuilder().WithImage("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
         await _sql.StartAsync();
         _options = new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(_sql.GetConnectionString()).Options;
         _db = new WaDbContext(_options);
@@ -44,7 +44,7 @@ public class ScheduledSendTimerIntegrationTests : IAsyncLifetime
         {
             ["Wa:ServiceBus:ConnectionString"] = "Endpoint=tcp://127.0.0.1:9;SharedAccessKeyName=Dummy;SharedAccessKey=dummy" // unreachable: the outbox row still commits (TA-4.1.7)
         }).Build();
-        _publisher = new SbEventPublisher(sbConfig, NullLogger<SbEventPublisher>.Instance, new WaDbContextFactory(_options));
+        _publisher = new SbEventPublisher(sbConfig, NullLogger<SbEventPublisher>.Instance, new WaDbContextFactory(_options), TimeProvider.System);
     }
 
     public async Task DisposeAsync()
@@ -54,7 +54,7 @@ public class ScheduledSendTimerIntegrationTests : IAsyncLifetime
     }
 
     private ActivateScheduledTransfersHandler BuildTimer() =>
-        new(new ScheduledSendStore(new WaDbContextFactory(_options)), _publisher, NullLogger<ActivateScheduledTransfersHandler>.Instance);
+        new(new ScheduledSendStore(new WaDbContextFactory(_options)), _publisher, NullLogger<ActivateScheduledTransfersHandler>.Instance, TimeProvider.System);
 
     /// <summary>f-email handler on a fresh context per call (EmailStore reads tracked rows; a long-lived context would return stale status).</summary>
     private async Task DeliverToEmailAsync(EventEnvelope envelope)
@@ -78,7 +78,7 @@ public class ScheduledSendTimerIntegrationTests : IAsyncLifetime
             new SenderBrandingStore(workerDb),
             new FeaturesProvider(
                 new PlansCache(new PlansStore(workerDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow),
-                new FlagsCache(new FlagsStore(workerDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow)));
+                new FlagsCache(new FlagsStore(workerDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow)), TimeProvider.System);
         await handler.HandleAsync(envelope, 1, 5, CancellationToken.None);
     }
 
@@ -182,7 +182,7 @@ public class ScheduledSendTimerIntegrationTests : IAsyncLifetime
         var original = CreatedEnvelope(id, "SCHED02A", due);
 
         var telemetry = new WaTelemetryReporter(NullLogger<WaTelemetryReporter>.Instance, new byte[32]);
-        var expired = await new ExpireTransfersHandler(new ExpiryStore(new WaDbContext(_options)), _publisher, telemetry,
+        var expired = await new ExpireTransfersHandler(new ExpiryStore(new WaDbContext(_options), TimeProvider.System), _publisher, telemetry,
             NullLogger<ExpireTransfersHandler>.Instance).RunAsync(T0, CancellationToken.None);
         Assert.Equal(1, expired);
         Assert.Equal(TransferStatus.Expired, await StatusAsync(id));
@@ -238,7 +238,7 @@ public class ScheduledSendTimerIntegrationTests : IAsyncLifetime
     {
         var id = await SeedAsync("SCHED06A", TransferStatus.Scheduled, T0.AddHours(1), T0.AddDays(7), maxDownloads: 1, downloads: 1);
 
-        var result = await new PublicTransferStore(new WaDbContext(_options))
+        var result = await new PublicTransferStore(new WaDbContext(_options), TimeProvider.System)
             .RecordSingleFileDownloadAsync(id, Guid.NewGuid(), null, null, null, CancellationToken.None);
 
         Assert.Equal(SingleFileDownloadOutcome.CapReached, result.Outcome);

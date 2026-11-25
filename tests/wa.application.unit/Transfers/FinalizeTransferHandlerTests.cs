@@ -36,7 +36,7 @@ public class FinalizeTransferHandlerTests
             new StubLimitsProvider(),
             config,
             telemetry,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<FinalizeTransferHandler>.Instance);
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<FinalizeTransferHandler>.Instance, TimeProvider.System);
     }
 
     [Fact]
@@ -260,7 +260,7 @@ public class FinalizeTransferHandlerTests
                 .AddInMemoryCollection(new Dictionary<string, string?> { ["Wa:Url:Public"] = "http://localhost:5173" })
                 .Build(),
             new WaTelemetryReporter(_logger, Encoding.UTF8.GetBytes("test-key")),
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<FinalizeTransferHandler>.Instance);
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<FinalizeTransferHandler>.Instance, TimeProvider.System);
 
         var result = await handler.Handle(new FinalizeTransferCommand(draftId, "key-pro", [file1], ownerId), CancellationToken.None);
 
@@ -304,7 +304,7 @@ public class FinalizeTransferHandlerTests
                 .AddInMemoryCollection(new Dictionary<string, string?> { ["Wa:Url:Public"] = "http://localhost:5173" })
                 .Build(),
             new WaTelemetryReporter(_logger, Encoding.UTF8.GetBytes("test-key")),
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<FinalizeTransferHandler>.Instance);
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<FinalizeTransferHandler>.Instance, TimeProvider.System);
 
         var result = await handler.Handle(new FinalizeTransferCommand(draftId, "key-guest", [file1]), CancellationToken.None);
 

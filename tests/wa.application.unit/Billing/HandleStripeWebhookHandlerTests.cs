@@ -32,7 +32,7 @@ public class HandleStripeWebhookHandlerTests
         }
 
         public HandleStripeWebhookHandler Handler() =>
-            new(Store, Sequence, Plans, Source, Events, new WaTelemetryReporter(TelemetryLog, [1, 2, 3]), HandlerLog);
+            new(Store, Sequence, Plans, Source, Events, new WaTelemetryReporter(TelemetryLog, [1, 2, 3]), HandlerLog, TimeProvider.System);
 
         /// <summary>Sends the payload; unless a test pinned Snapshot/NotFound/Throw, Stripe "echoes" the event's own data.object.</summary>
         public Task<StripeWebhookOutcome> Send(string payload)

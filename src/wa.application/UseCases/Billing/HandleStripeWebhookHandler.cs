@@ -10,7 +10,7 @@ using wa.domain.Telemetry;
 namespace wa.application.UseCases.Billing;
 
 /// <summary>Handles <see cref="HandleStripeWebhookCommand"/>: applies subscription and invoice events to the billing mirror and the user's plan exactly once (deduplicated by Stripe event id) and publishes the resulting events.</summary>
-public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWebhookCommand, StripeWebhookOutcome>
+public sealed partial class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWebhookCommand, StripeWebhookOutcome>
 {
     private const string SubscriptionCreated = "customer.subscription.created";
     private const string SubscriptionUpdated = "customer.subscription.updated";
@@ -31,6 +31,7 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
     private readonly IEventPublisher _events;
     private readonly WaTelemetryReporter _telemetry;
     private readonly ILogger<HandleStripeWebhookHandler> _logger;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="HandleStripeWebhookHandler"/> class.</summary>
     /// <param name="store">Store that mirrors subscriptions and records processed events.</param>
@@ -40,6 +41,7 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
     /// <param name="events">Publishes plan and billing email events.</param>
     /// <param name="telemetry">Reporter for the <c>plan_changed</c> telemetry event.</param>
     /// <param name="logger">Logger for diagnostics (never logs emails).</param>
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
     /// <exception cref="ArgumentNullException">Thrown when any argument is null.</exception>
     public HandleStripeWebhookHandler(
         IStripeBillingStore store,
@@ -48,7 +50,8 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
         IStripeSubscriptionSource source,
         IEventPublisher events,
         WaTelemetryReporter telemetry,
-        ILogger<HandleStripeWebhookHandler> logger)
+        ILogger<HandleStripeWebhookHandler> logger,
+        TimeProvider timeProvider)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
         _store = store ?? throw new ArgumentNullException(nameof(store));
@@ -57,6 +60,7 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
         _events = events ?? throw new ArgumentNullException(nameof(events));
         _telemetry = telemetry ?? throw new ArgumentNullException(nameof(telemetry));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
     }
 
     /// <inheritdoc />
@@ -86,7 +90,7 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
                 && type != SubscriptionResumed && type != SubscriptionDeleted)
             {
                 // AC-019-4: unknown type → 200 + log line, no mirror change, no StripeEvent row. Stripe ids only (TA-9.4).
-                _logger.LogInformation("Stripe webhook event ignored: {StripeEventId} {StripeEventType}", eventId, type);
+                LogEventIgnored(_logger, eventId, type);
                 return StripeWebhookOutcome.Ignored;
             }
 
@@ -111,7 +115,7 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
             }
 
             if (fetched is null)
-                _logger.LogInformation("Stripe subscription not found on re-fetch, applying canceled: {StripeEventId} {StripeSubId}", eventId, subId);
+                LogSubscriptionNotFound(_logger, eventId, subId);
 
             var state = fetched ?? eventState with { Status = CanceledStatus };
             var change = new StripeSubscriptionChange(
@@ -123,7 +127,7 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
             // D-4: status → target plan.
             var targetPlanId = await ResolveTargetPlanAsync(change, ct);
 
-            var result = await _store.ApplySubscriptionAsync(change, targetPlanId, DateTime.UtcNow, ct);
+            var result = await _store.ApplySubscriptionAsync(change, targetPlanId, _timeProvider.GetUtcNow().UtcDateTime, ct);
             switch (result.Outcome)
             {
                 case StripeApplyOutcome.Duplicate:
@@ -140,7 +144,7 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
                     EventId = Guid.NewGuid(),
                     Type = EventType.PlanChanged,
                     Version = 1,
-                    OccurredAtUtc = DateTime.UtcNow,
+                    OccurredAtUtc = _timeProvider.GetUtcNow().UtcDateTime,
                     CorrelationId = GetCorrelationGuid(),
                     PartitionKey = result.UserId.ToString("n"),
                     Payload = new
@@ -176,15 +180,13 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
         if (string.IsNullOrEmpty(subId))
         {
             // One-off invoice, not a subscription invoice.
-            _logger.LogInformation(
-                "Stripe webhook event ignored (no subscription): {StripeEventId} {StripeEventType} {StripeInvoiceId}",
-                eventId, type, invoiceId);
+            LogEventIgnoredNoSubscription(_logger, eventId, type, invoiceId);
             return StripeWebhookOutcome.Ignored;
         }
 
         if (type == InvoicePaid)
         {
-            var paid = await _sequence.CancelSequenceAsync(eventId, subId, DateTime.UtcNow, ct);
+            var paid = await _sequence.CancelSequenceAsync(eventId, subId, _timeProvider.GetUtcNow().UtcDateTime, ct);
             switch (paid)
             {
                 case InvoicePaidOutcome.DuplicateEvent:
@@ -197,7 +199,7 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
             }
         }
 
-        var now = DateTime.UtcNow;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var result = await _sequence.StartPaymentFailedAsync(eventId, invoiceId, subId, now, ct);
         switch (result.Outcome)
         {
@@ -206,9 +208,7 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
                 return StripeWebhookOutcome.Duplicate;
             case PaymentFailedOutcome.Ineligible:
                 // EC-019-2: canceled / incomplete / unpaid / paused subscriptions get no sequence. Stripe ids only (TA-9.4).
-                _logger.LogInformation(
-                    "Stripe invoice.payment_failed ignored (subscription not eligible): {StripeEventId} {StripeInvoiceId} {StripeSubId}",
-                    eventId, invoiceId, subId);
+                LogInvoicePaymentFailedIgnored(_logger, eventId, invoiceId, subId);
                 return StripeWebhookOutcome.Ignored;
             case PaymentFailedOutcome.SubscriptionUnresolved:
                 throw StripeWebhookException.ForRetryable(
@@ -220,8 +220,7 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
             var envelope = BillingEmailSchedule.BuildEnvelope(
                 result.UserId, result.Email, result.SubscriptionId, 1, now, GetCorrelationGuid());
             await _events.PublishAsync(envelope, ct);
-            _logger.LogInformation(
-                "Billing email queued: subscription {SubscriptionId} step {Step}", result.SubscriptionId, 1);
+            LogBillingEmailQueued(_logger, result.SubscriptionId, 1);
         }
         return StripeWebhookOutcome.Applied;
     }
@@ -264,4 +263,19 @@ public sealed class HandleStripeWebhookHandler : IRequestHandler<HandleStripeWeb
         }
         return Guid.NewGuid();
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Stripe webhook event ignored: {StripeEventId} {StripeEventType}")]
+    private static partial void LogEventIgnored(ILogger logger, string stripeEventId, string stripeEventType);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Stripe subscription not found on re-fetch, applying canceled: {StripeEventId} {StripeSubId}")]
+    private static partial void LogSubscriptionNotFound(ILogger logger, string stripeEventId, string stripeSubId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Stripe webhook event ignored (no subscription): {StripeEventId} {StripeEventType} {StripeInvoiceId}")]
+    private static partial void LogEventIgnoredNoSubscription(ILogger logger, string stripeEventId, string stripeEventType, string stripeInvoiceId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Stripe invoice.payment_failed ignored (subscription not eligible): {StripeEventId} {StripeInvoiceId} {StripeSubId}")]
+    private static partial void LogInvoicePaymentFailedIgnored(ILogger logger, string stripeEventId, string stripeInvoiceId, string stripeSubId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Billing email queued: subscription {SubscriptionId} step {Step}")]
+    private static partial void LogBillingEmailQueued(ILogger logger, Guid subscriptionId, int step);
 }

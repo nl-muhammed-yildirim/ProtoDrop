@@ -1,8 +1,3 @@
-using Microsoft.Extensions.Configuration;
-using wa.application.Ports;
-using wa.application.UseCases.Auth;
-using wa.domain;
-
 namespace wa.application.UseCases.Billing;
 
 /// <summary>US-019-01: house style — private ctor + static factories. NotFound → 404; InvalidPlan / AlreadySubscribed → 400 VALIDATION.</summary>

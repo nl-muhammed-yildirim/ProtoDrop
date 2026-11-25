@@ -12,36 +12,29 @@ namespace wa.application.UseCases.Auth;
 /// Unknown email → create AppUser on redeem (sign-up is sign-in); user_created emitted BEFORE login_success.
 /// Expired/redeemed/unknown → LinkExpiredException (410 Gone at endpoint).
 /// </summary>
-public sealed class RedeemMagicLinkHandler : IRequestHandler<RedeemMagicLinkCommand, RedeemMagicLinkResult>
+/// <param name="tokens">Store that looks up and redeems the token row.</param>
+/// <param name="users">Store used to find or create the account.</param>
+/// <param name="plans">Store used to resolve the default plan and the plan code.</param>
+/// <param name="telemetry">Reporter for the <c>user_created</c> and <c>login_success</c> events.</param>
+/// <param name="minter">Mints the session token returned to the caller.</param>
+/// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+public sealed class RedeemMagicLinkHandler(
+    IAuthTokenStore tokens,
+    IAppUserStore users,
+    IPlansStore plans,
+    WaTelemetryReporter telemetry,
+    ISessionTokenMinter minter,
+    TimeProvider timeProvider) : IRequestHandler<RedeemMagicLinkCommand, RedeemMagicLinkResult>
 {
     /// <summary>Lifetime of a magic link in seconds (10 minutes, frozen in Open-Decisions-and-Constants Part 2 and TA-9.1).</summary>
     public const int TtlSeconds = 600;
 
-    private readonly IAuthTokenStore _tokens;
-    private readonly IAppUserStore _users;
-    private readonly IPlansStore _plans;
-    private readonly WaTelemetryReporter _telemetry;
-    private readonly ISessionTokenMinter _minter;
-
-    /// <summary>Initializes a new instance of the <see cref="RedeemMagicLinkHandler"/> class.</summary>
-    /// <param name="tokens">Store that looks up and redeems the token row.</param>
-    /// <param name="users">Store used to find or create the account.</param>
-    /// <param name="plans">Store used to resolve the default plan and the plan code.</param>
-    /// <param name="telemetry">Reporter for the <c>user_created</c> and <c>login_success</c> events.</param>
-    /// <param name="minter">Mints the session token returned to the caller.</param>
-    public RedeemMagicLinkHandler(
-        IAuthTokenStore tokens,
-        IAppUserStore users,
-        IPlansStore plans,
-        WaTelemetryReporter telemetry,
-        ISessionTokenMinter minter)
-    {
-        _tokens = tokens;
-        _users = users;
-        _plans = plans;
-        _telemetry = telemetry;
-        _minter = minter;
-    }
+    private readonly IAuthTokenStore _tokens = tokens;
+    private readonly IAppUserStore _users = users;
+    private readonly IPlansStore _plans = plans;
+    private readonly WaTelemetryReporter _telemetry = telemetry;
+    private readonly ISessionTokenMinter _minter = minter;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <inheritdoc />
     public async Task<RedeemMagicLinkResult> Handle(RedeemMagicLinkCommand request, CancellationToken cancellationToken)
@@ -58,11 +51,11 @@ public sealed class RedeemMagicLinkHandler : IRequestHandler<RedeemMagicLinkComm
         var authToken = await _tokens.FindByHashAsync(tokenHashHex, cancellationToken);
 
         // 3. EC-008-3: null (unknown hash), expired, OR already redeemed → same LinkExpiredException (don't leak which).
-        if (authToken is null || authToken.RedeemedAtUtc is not null || DateTime.UtcNow > authToken.ExpiresAtUtc)
+        if (authToken is null || authToken.RedeemedAtUtc is not null || _timeProvider.GetUtcNow().UtcDateTime > authToken.ExpiresAtUtc)
             throw LinkExpiredException.ForLinkExpired();
 
         // 4. Mark the token redeemed (single-use, first redeem wins — AC-008-2).
-        await _tokens.MarkRedeemedAsync(authToken.Id, DateTime.UtcNow, cancellationToken);
+        await _tokens.MarkRedeemedAsync(authToken.Id, _timeProvider.GetUtcNow().UtcDateTime, cancellationToken);
 
         // 5. Look up the user by email (already lowercased + stored in AuthToken row).
         var email = authToken.Email;
@@ -82,7 +75,7 @@ public sealed class RedeemMagicLinkHandler : IRequestHandler<RedeemMagicLinkComm
                 PasswordHash = null,
                 PlanId = freePlan.Id,
                 Theme = "system",
-                CreatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = _timeProvider.GetUtcNow().UtcDateTime
             };
             await _users.CreateAsync(user, cancellationToken);
             _telemetry.LogEvent(TelemetryEvents.UserCreated); // user_created emitted BEFORE login_success (plan D-2)
@@ -112,8 +105,7 @@ public sealed class RedeemMagicLinkHandler : IRequestHandler<RedeemMagicLinkComm
     /// <summary>Compute SHA-256 hex (64 chars) of the raw token string — same algorithm as RequestMagicLinkHandler (TA-9.1).</summary>
     private static string ComputeSha256Hex(string token)
     {
-        using var sha = SHA256.Create();
-        var bytes = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(token));
+        var bytes = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token));
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 

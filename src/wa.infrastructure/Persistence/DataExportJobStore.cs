@@ -11,12 +11,17 @@ public sealed class DataExportJobStore : IDataExportJobStore
     private const string JobKey = "data-export";
 
     private readonly IDbContextFactory<WaDbContext> _factory;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="DataExportJobStore"/> class.</summary>
     /// <param name="factory">Factory that creates a short-lived database context per call.</param>
-    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
-    public DataExportJobStore(IDbContextFactory<WaDbContext> factory) =>
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="factory"/> or <paramref name="timeProvider"/> is null.</exception>
+    public DataExportJobStore(IDbContextFactory<WaDbContext> factory, TimeProvider timeProvider)
+    {
         _factory = factory ?? throw new ArgumentNullException(nameof(factory));
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+    }
 
     /// <inheritdoc />
     public async Task<bool> TryClaimAsync(DateTime windowStartUtc, DateTime lockUntilUtc, CancellationToken ct)
@@ -42,7 +47,7 @@ public sealed class DataExportJobStore : IDataExportJobStore
         var jobRun = await db.Set<JobRun>().FindAsync([JobKey, windowStartUtc], ct);
         if (jobRun is not null)
         {
-            jobRun.FinishedAtUtc = DateTime.UtcNow;
+            jobRun.FinishedAtUtc = _timeProvider.GetUtcNow().UtcDateTime;
             await db.SaveChangesAsync(ct);
         }
     }

@@ -12,22 +12,20 @@ namespace wa.workers;
 /// Claims its window via JobRun (TA-6.1); builds processing exports and purges ready ones past 7 days.
 /// The signed HTTP trigger lets E2E/QA run a pass on demand.
 /// </summary>
-public class DataExportFunction
+/// <param name="handler">Handler that builds pending exports and purges old ones.</param>
+/// <param name="logger">Logger for the job run (carries the generated correlation ids).</param>
+/// <param name="config">Configuration source for the <c>Wa:Jobs:SignKey</c> that guards the HTTP trigger.</param>
+/// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+public partial class DataExportFunction(
+    BuildDataExportsHandler handler,
+    ILogger<DataExportFunction> logger,
+    IConfiguration config,
+    TimeProvider timeProvider)
 {
-    private readonly BuildDataExportsHandler _handler;
-    private readonly ILogger<DataExportFunction> _logger;
-    private readonly IConfiguration _config;
-
-    /// <summary>Initializes a new instance of the <see cref="DataExportFunction"/> class.</summary>
-    /// <param name="handler">Handler that builds pending exports and purges old ones.</param>
-    /// <param name="logger">Logger for the job run (carries the generated correlation ids).</param>
-    /// <param name="config">Configuration source for the <c>Wa:Jobs:SignKey</c> that guards the HTTP trigger.</param>
-    public DataExportFunction(BuildDataExportsHandler handler, ILogger<DataExportFunction> logger, IConfiguration config)
-    {
-        _handler = handler;
-        _logger = logger;
-        _config = config;
-    }
+    private readonly BuildDataExportsHandler _handler = handler;
+    private readonly ILogger<DataExportFunction> _logger = logger;
+    private readonly IConfiguration _config = config;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <summary>Timer entry point (every 5 minutes): runs one build and purge pass under a freshly generated traceparent.</summary>
     /// <param name="context">Function invocation context.</param>
@@ -43,12 +41,12 @@ public class DataExportFunction
 
         try
         {
-            var count = await _handler.RunAsync(DateTime.UtcNow, context.CancellationToken);
-            _logger.LogInformation("f-data-export completed: {Count} exports built", count);
+            var count = await _handler.RunAsync(_timeProvider.GetUtcNow().UtcDateTime, context.CancellationToken);
+            LogCompleted(_logger, count);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "f-data-export failed");
+            LogFailed(_logger, ex);
             throw; // JobRun claim prevents double-processing on retry.
         }
     }
@@ -65,7 +63,13 @@ public class DataExportFunction
         if (!JobAuth.Verify(_config, req))
             return JobAuth.CreateProblem(req, 401, "Unauthenticated", "Invalid or missing signature.");
 
-        var count = await _handler.RunAsync(DateTime.UtcNow, context.CancellationToken);
+        var count = await _handler.RunAsync(_timeProvider.GetUtcNow().UtcDateTime, context.CancellationToken);
         return JobAuth.CreateSuccess(req, new { built = count });
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "f-data-export completed: {Count} exports built")]
+    private static partial void LogCompleted(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "f-data-export failed")]
+    private static partial void LogFailed(ILogger logger, Exception exception);
 }

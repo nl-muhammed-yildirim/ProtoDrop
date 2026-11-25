@@ -8,13 +8,10 @@ namespace wa.infrastructure.Persistence;
 /// T-011-08 (TA-4.2#23 / FR-011-2): admin flag write surface — single-key PK upsert over WaDbContext.
 /// Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext).
 /// </summary>
-public sealed class AdminFlagStore : IAdminFlagStore
+/// <param name="db">Database context that backs the store.</param>
+public sealed class AdminFlagStore(WaDbContext db) : IAdminFlagStore
 {
-    private readonly WaDbContext _db;
-
-    /// <summary>Initializes a new instance of the <see cref="AdminFlagStore"/> class.</summary>
-    /// <param name="db">Database context that backs the store.</param>
-    public AdminFlagStore(WaDbContext db) => _db = db;
+    private readonly WaDbContext _db = db;
 
     /// <inheritdoc />
     /// <remarks>

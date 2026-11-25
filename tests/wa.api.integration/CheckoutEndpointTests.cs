@@ -48,7 +48,7 @@ public class CheckoutEndpointTests : IAsyncLifetime
         Environment.SetEnvironmentVariable("Wa__Jwt__Secret", TestSecret);
         Environment.SetEnvironmentVariable("Wa__Url__Public", "http://localhost:5173");
 
-        _sql = new MsSqlBuilder().WithImage("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
         await _sql.StartAsync();
         var connString = _sql.GetConnectionString();
         Environment.SetEnvironmentVariable("ConnectionStrings__WaDb", connString);
@@ -195,10 +195,9 @@ public class CheckoutEndpointTests : IAsyncLifetime
             throw new NotSupportedException();
     }
 
-    private sealed class TestFactory : WebApplicationFactory<Program>
+    private sealed class TestFactory(IStripeCheckoutGateway gateway) : WebApplicationFactory<Program>
     {
-        private readonly IStripeCheckoutGateway _gateway;
-        public TestFactory(IStripeCheckoutGateway gateway) => _gateway = gateway;
+        private readonly IStripeCheckoutGateway _gateway = gateway;
 
         protected override void ConfigureWebHost(IWebHostBuilder builder) =>
             builder.ConfigureServices(services =>

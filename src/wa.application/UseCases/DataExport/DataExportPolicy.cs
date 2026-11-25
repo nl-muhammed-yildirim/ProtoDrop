@@ -1,7 +1,3 @@
-using wa.application.Ports;
-using wa.application.UseCases.Auth;
-using wa.domain;
-
 namespace wa.application.UseCases.DataExport;
 
 /// <summary>US-047-01: architecture constants for the export feature (TA-6.3 style, not plan limits). D-22 retention default.</summary>

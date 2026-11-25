@@ -16,53 +16,41 @@ namespace wa.application.UseCases.Transfers;
 /// T-006-01: f-email consumer handler — sends notification emails for transfer.created events.
 /// Two-layer dedup: EventDeduplicator (eventId, 15-min window) + NotifiedAtUtc null check per recipient row.
 /// </summary>
-public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth.IEmailEventHandler
+/// <param name="store">Store that reads the transfer, recipients and suppressions and records notifications.</param>
+/// <param name="emailSender">Port that delivers the rendered emails.</param>
+/// <param name="templateRenderer">Renders the email in the recipient's language.</param>
+/// <param name="eventPublisher">Publishes the <c>email.sent</c> and <c>email.failed</c> events.</param>
+/// <param name="deduplicator">Skips events that were already handled in the dedup window.</param>
+/// <param name="telemetry">Reporter for the email telemetry events.</param>
+/// <param name="config">Configuration source for the public site URL, sender address and unsubscribe signing key.</param>
+/// <param name="logger">Logger for diagnostics (never logs addresses).</param>
+/// <param name="branding">Store that reads the sender's organization name.</param>
+/// <param name="features">Provider of the sender plan's feature toggles.</param>
+/// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+public sealed partial class SendNotificationEmailsHandler(
+    IEmailStore store,
+    IEmailSender emailSender,
+    ITemplateRenderer templateRenderer,
+    IEventPublisher eventPublisher,
+    EventDeduplicator deduplicator,
+    WaTelemetryReporter telemetry,
+    IConfiguration config,
+    ILogger<SendNotificationEmailsHandler> logger,
+    ISenderBrandingStore branding,
+    IFeaturesProvider features,
+    TimeProvider timeProvider) : wa.application.UseCases.Auth.IEmailEventHandler
 {
-    private readonly IEmailStore _store;
-    private readonly IEmailSender _emailSender;
-    private readonly ITemplateRenderer _templateRenderer;
-    private readonly IEventPublisher _eventPublisher;
-    private readonly EventDeduplicator _deduplicator;
-    private readonly WaTelemetryReporter _telemetry;
-    private readonly IConfiguration _config;
-    private readonly ILogger<SendNotificationEmailsHandler> _logger;
-    private readonly ISenderBrandingStore _branding;
-    private readonly IFeaturesProvider _features;
-
-    /// <summary>Initializes a new instance of the <see cref="SendNotificationEmailsHandler"/> class.</summary>
-    /// <param name="store">Store that reads the transfer, recipients and suppressions and records notifications.</param>
-    /// <param name="emailSender">Port that delivers the rendered emails.</param>
-    /// <param name="templateRenderer">Renders the email in the recipient's language.</param>
-    /// <param name="eventPublisher">Publishes the <c>email.sent</c> and <c>email.failed</c> events.</param>
-    /// <param name="deduplicator">Skips events that were already handled in the dedup window.</param>
-    /// <param name="telemetry">Reporter for the email telemetry events.</param>
-    /// <param name="config">Configuration source for the public site URL, sender address and unsubscribe signing key.</param>
-    /// <param name="logger">Logger for diagnostics (never logs addresses).</param>
-    /// <param name="branding">Store that reads the sender's organization name.</param>
-    /// <param name="features">Provider of the sender plan's feature toggles.</param>
-    public SendNotificationEmailsHandler(
-        IEmailStore store,
-        IEmailSender emailSender,
-        ITemplateRenderer templateRenderer,
-        IEventPublisher eventPublisher,
-        EventDeduplicator deduplicator,
-        WaTelemetryReporter telemetry,
-        IConfiguration config,
-        ILogger<SendNotificationEmailsHandler> logger,
-        ISenderBrandingStore branding,
-        IFeaturesProvider features)
-    {
-        _branding = branding;
-        _features = features;
-        _store = store;
-        _emailSender = emailSender;
-        _templateRenderer = templateRenderer;
-        _eventPublisher = eventPublisher;
-        _deduplicator = deduplicator;
-        _telemetry = telemetry;
-        _config = config;
-        _logger = logger;
-    }
+    private readonly IEmailStore _store = store;
+    private readonly IEmailSender _emailSender = emailSender;
+    private readonly ITemplateRenderer _templateRenderer = templateRenderer;
+    private readonly IEventPublisher _eventPublisher = eventPublisher;
+    private readonly EventDeduplicator _deduplicator = deduplicator;
+    private readonly WaTelemetryReporter _telemetry = telemetry;
+    private readonly IConfiguration _config = config;
+    private readonly ILogger<SendNotificationEmailsHandler> _logger = logger;
+    private readonly ISenderBrandingStore _branding = branding;
+    private readonly IFeaturesProvider _features = features;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <inheritdoc />
     public async Task HandleAsync(EventEnvelope envelope, int attempt, int maxDeliveryCount, CancellationToken ct)
@@ -75,7 +63,7 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
         if (!root.TryGetProperty("transferId", out var transferIdEl) ||
             !transferIdEl.TryGetGuid(out var transferId))
         {
-            _logger.LogWarning("f-email: missing or invalid transferId in payload");
+            LogMissingTransferId(_logger);
             return;
         }
 
@@ -91,7 +79,7 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
         var context = await _store.GetTransferWithFilesAsync(transferId, ct);
         if (context is null)
         {
-            _logger.LogWarning("f-email: transfer {TransferId} not found", transferId);
+            LogTransferNotFound(_logger, transferId);
             return;
         }
 
@@ -99,14 +87,14 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
         // skipped delivery is not recorded as seen; returns (no throw) so the message completes. The timer re-emits transfer.created on flip.
         if (!ScheduledSend.MayNotify(context.Status, context.ScheduledSendAtUtc))
         {
-            _logger.LogInformation("f-email: transfer {TransferId} is not due for notification, skipping", transferId);
+            LogTransferNotDue(_logger, transferId);
             return;
         }
 
         // 4. Dedup: if already seen → return (fast-path skip).
         if (_deduplicator.AlreadySeen(envelope.EventId))
         {
-            _logger.LogInformation("f-email: event {EventId} already processed, skipping", envelope.EventId);
+            LogEventAlreadyProcessed(_logger, envelope.EventId);
             return;
         }
 
@@ -121,7 +109,7 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
         var suppressed = await _store.GetSuppressedAddressesAsync(addressesToCheck, context.SenderEmail, ct);
 
         // 7. Prepare template data (same for all recipients; rendered per-recipient with their locale — T-006-04).
-        var expiryDays = (int)Math.Ceiling((context.ExpiresAtUtc - DateTime.UtcNow).TotalDays);
+        var expiryDays = (int)Math.Ceiling((context.ExpiresAtUtc - _timeProvider.GetUtcNow().UtcDateTime).TotalDays);
         var publicOrigin = _config["Wa:Url:Public"] ?? "http://localhost:5173";
         var ctaUrl = $"{publicOrigin}/t/{context.LinkId}";
         // F-PRF-001 US-021-02 (D-1): org resolved once at dispatch; the rendered email is the send-time snapshot. Never logged (D-6).
@@ -179,7 +167,7 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
                     EventId = Guid.NewGuid(),
                     Type = EventType.EmailSent,
                     Version = 1,
-                    OccurredAtUtc = DateTime.UtcNow,
+                    OccurredAtUtc = _timeProvider.GetUtcNow().UtcDateTime,
                     CorrelationId = envelope.CorrelationId,
                     PartitionKey = context.LinkId,
                     Payload = new
@@ -197,7 +185,7 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "f-email: failed to send email to recipient {RecipientId} attempt {Attempt}", recipient.Id, attempt);
+                LogSendFailed(_logger, ex, recipient.Id, attempt);
 
                 if (attempt == maxDeliveryCount)
                 {
@@ -208,7 +196,7 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
                         EventId = Guid.NewGuid(),
                         Type = EventType.EmailFailed,
                         Version = 1,
-                        OccurredAtUtc = DateTime.UtcNow,
+                        OccurredAtUtc = _timeProvider.GetUtcNow().UtcDateTime,
                         CorrelationId = envelope.CorrelationId,
                         PartitionKey = context.LinkId,
                         Payload = new
@@ -231,7 +219,7 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
         // 9. MarkNotifiedAsync for all successfully sent.
         if (notifiedIds.Count > 0)
         {
-            await _store.MarkNotifiedAsync(notifiedIds, DateTime.UtcNow, ct);
+            await _store.MarkNotifiedAsync(notifiedIds, _timeProvider.GetUtcNow().UtcDateTime, ct);
         }
     }
 
@@ -244,4 +232,19 @@ public sealed class SendNotificationEmailsHandler : wa.application.UseCases.Auth
         var token = UnsubscribeToken.Create(address, senderEmail, Encoding.UTF8.GetBytes(secret));
         return $"{publicOrigin}/unsubscribe/{token}";
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "f-email: missing or invalid transferId in payload")]
+    private static partial void LogMissingTransferId(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "f-email: transfer {TransferId} not found")]
+    private static partial void LogTransferNotFound(ILogger logger, Guid transferId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "f-email: transfer {TransferId} is not due for notification, skipping")]
+    private static partial void LogTransferNotDue(ILogger logger, Guid transferId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "f-email: event {EventId} already processed, skipping")]
+    private static partial void LogEventAlreadyProcessed(ILogger logger, Guid eventId);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "f-email: failed to send email to recipient {RecipientId} attempt {Attempt}")]
+    private static partial void LogSendFailed(ILogger logger, Exception exception, Guid recipientId, int attempt);
 }

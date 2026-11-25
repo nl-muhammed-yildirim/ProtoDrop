@@ -7,13 +7,10 @@ namespace wa.infrastructure.Persistence;
 /// <summary>
 /// T-004-01: thin adapter over WaDbContext implementing IZipFileSource — loads files by transfer Id for the f-zip function.
 /// </summary>
-public sealed class ZipFileSource : IZipFileSource
+/// <param name="db">Database context that backs the store.</param>
+public sealed class ZipFileSource(WaDbContext db) : IZipFileSource
 {
-    private readonly WaDbContext _db;
-
-    /// <summary>Initializes a new instance of the <see cref="ZipFileSource"/> class.</summary>
-    /// <param name="db">Database context that backs the store.</param>
-    public ZipFileSource(WaDbContext db) => _db = db;
+    private readonly WaDbContext _db = db;
 
     /// <inheritdoc />
     public async Task<(bool Found, IReadOnlyList<PublicFileItem> Files)> GetFilesByTransferIdAsync(Guid transferId, CancellationToken ct)

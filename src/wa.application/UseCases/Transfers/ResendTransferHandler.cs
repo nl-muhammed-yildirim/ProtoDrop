@@ -13,20 +13,24 @@ public sealed class ResendTransferHandler : IRequestHandler<ResendTransferComman
     private readonly ISendStore _store;
     private readonly ITransferStore _transferStore;
     private readonly IPlanContextAccessor _planContext;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="ResendTransferHandler"/> class.</summary>
     /// <param name="store">Send-side store that reads the original and saves the new draft.</param>
     /// <param name="transferStore">Store used to check that a new link id is unused.</param>
     /// <param name="planContext">Accessor for the request's plan limits.</param>
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
     /// <exception cref="ArgumentNullException">Thrown when any argument is null.</exception>
     public ResendTransferHandler(
         ISendStore store,
         ITransferStore transferStore,
-        IPlanContextAccessor planContext)
+        IPlanContextAccessor planContext,
+        TimeProvider timeProvider)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _transferStore = transferStore ?? throw new ArgumentNullException(nameof(transferStore));
         _planContext = planContext ?? throw new ArgumentNullException(nameof(planContext));
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
     }
 
     /// <inheritdoc />
@@ -60,7 +64,7 @@ public sealed class ResendTransferHandler : IRequestHandler<ResendTransferComman
         // Resolve plan limits — never a literal (TA-3.4).
         var limits = (await _planContext.GetAsync(cancellationToken)).Limits; // FR-020-6: the session user's current plan
 
-        var now = DateTime.UtcNow;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var transferId = Guid.NewGuid();
 
         // 5. Build new Transfer (Status=0 Draft). Copies verbatim from the original (FR-010-2): TotalBytes/FileCount,

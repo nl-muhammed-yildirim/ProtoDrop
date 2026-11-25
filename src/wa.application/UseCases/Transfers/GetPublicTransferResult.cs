@@ -1,11 +1,3 @@
-using Microsoft.Extensions.Logging;
-using wa.application.Blob;
-using wa.application.Limits;
-using wa.application.Ports;
-using wa.application.Telemetry;
-using wa.domain.Telemetry;
-using wa.domain.ValueObjects;
-
 namespace wa.application.UseCases.Transfers;
 
 /// <summary>Result of GetPublicTransferQuery — the endpoint maps this to HTTP; the handler stays pure CQRS. Only the Active branch carries payload fields; terminal states never do (no byte leak).</summary>

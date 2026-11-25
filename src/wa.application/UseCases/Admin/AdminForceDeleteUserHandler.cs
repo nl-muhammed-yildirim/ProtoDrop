@@ -12,26 +12,32 @@ namespace wa.application.UseCases.Admin;
 /// (T-008-06, already exists), then emit account_deleted via the outbox EXACTLY as DeleteAccountHandler does.
 /// null result → endpoint maps to 404 NOT_FOUND; non-null → endpoint audits {email} + returns 204 No Content.
 /// </summary>
-public sealed class AdminForceDeleteUserHandler : IRequestHandler<AdminForceDeleteUserCommand, AdminForceDeleteResult?>
+public sealed partial class AdminForceDeleteUserHandler : IRequestHandler<AdminForceDeleteUserCommand, AdminForceDeleteResult?>
 {
     private readonly IAppUserStore _users;
     private readonly IEventPublisher _eventPublisher;
     private readonly IBlobStore _blobs;
     private readonly ILogger<AdminForceDeleteUserHandler>? _logger;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="AdminForceDeleteUserHandler"/> class.</summary>
     /// <param name="users">Store that soft-deletes the account and re-homes its transfers.</param>
     /// <param name="eventPublisher">Publishes the <c>account.deleted</c> event.</param>
     /// <param name="blobs">Blob store used to remove the user's organization logo.</param>
     /// <param name="logger">Optional logger for the best-effort logo cleanup warning.</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="users"/>, <paramref name="eventPublisher"/> or <paramref name="blobs"/> is null.</exception>
-    public AdminForceDeleteUserHandler(IAppUserStore users, IEventPublisher eventPublisher, IBlobStore blobs,
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="users"/>, <paramref name="eventPublisher"/>, <paramref name="blobs"/> or <paramref name="timeProvider"/> is null.</exception>
+    public AdminForceDeleteUserHandler(IAppUserStore users,
+        IEventPublisher eventPublisher,
+        IBlobStore blobs,
+        TimeProvider timeProvider,
         ILogger<AdminForceDeleteUserHandler>? logger = null)
     {
         _logger = logger;
         _blobs = blobs ?? throw new ArgumentNullException(nameof(blobs));
         _users = users ?? throw new ArgumentNullException(nameof(users));
         _eventPublisher = eventPublisher ?? throw new ArgumentNullException(nameof(eventPublisher));
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
     }
 
     /// <inheritdoc />
@@ -43,7 +49,7 @@ public sealed class AdminForceDeleteUserHandler : IRequestHandler<AdminForceDele
             return null;
 
         // 2. Soft-delete + transfer re-home in ONE transaction (T-008-06 / FR-008-8 — same store call as the GDPR self-delete).
-        var deletedAtUtc = DateTime.UtcNow;
+        var deletedAtUtc = _timeProvider.GetUtcNow().UtcDateTime;
         var ok = await _users.SoftDeleteWithReHomeAsync(user.Id, deletedAtUtc, cancellationToken);
         if (!ok)
             return null; // race where a concurrent DELETE already committed — same not-found shape
@@ -74,7 +80,7 @@ public sealed class AdminForceDeleteUserHandler : IRequestHandler<AdminForceDele
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger?.LogWarning("Org logo blob delete failed after account deletion for user {UserId}.", user.Id);
+                if (_logger is not null) LogOrgLogoDeleteFailed(_logger, user.Id);
             }
         }
 
@@ -94,4 +100,7 @@ public sealed class AdminForceDeleteUserHandler : IRequestHandler<AdminForceDele
         }
         return Guid.NewGuid();
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Org logo blob delete failed after account deletion for user {UserId}.")]
+    private static partial void LogOrgLogoDeleteFailed(ILogger logger, Guid userId);
 }

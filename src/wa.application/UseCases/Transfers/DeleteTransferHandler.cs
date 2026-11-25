@@ -15,22 +15,25 @@ public sealed class DeleteTransferHandler : IRequestHandler<DeleteTransferComman
 {
     private readonly ITransferStore _store;
     private readonly IEventPublisher _eventPublisher;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="DeleteTransferHandler"/> class.</summary>
     /// <param name="store">Store that soft-deletes the transfer and releases its blob references.</param>
     /// <param name="eventPublisher">Publishes the <c>transfer.deleted</c> event.</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="store"/> or <paramref name="eventPublisher"/> is null.</exception>
-    public DeleteTransferHandler(ITransferStore store, IEventPublisher eventPublisher)
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="store"/>, <paramref name="eventPublisher"/> or <paramref name="timeProvider"/> is null.</exception>
+    public DeleteTransferHandler(ITransferStore store, IEventPublisher eventPublisher, TimeProvider timeProvider)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _eventPublisher = eventPublisher ?? throw new ArgumentNullException(nameof(eventPublisher));
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
     }
 
     /// <inheritdoc />
     public async Task<MarkDeleteResult?> Handle(DeleteTransferCommand request, CancellationToken cancellationToken)
     {
         // 1. Store: owner+not-deleted predicate in ONE query → null on no match (owner scope / already-deleted / unknown).
-        var result = await _store.MarkDeletedAsync(request.Id, request.OwnerId, DateTime.UtcNow, cancellationToken);
+        var result = await _store.MarkDeletedAsync(request.Id, request.OwnerId, _timeProvider.GetUtcNow().UtcDateTime, cancellationToken);
         if (result is null)
             return null;   // endpoint maps to NOT_FOUND — EC-009-2: a second delete returns the identical body as a first
 

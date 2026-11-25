@@ -14,33 +14,23 @@ namespace wa.application.UseCases.Auth;
 /// Unknown email → create AppUser (lowercased + trimmed email, DisplayName from local part, plan Free); known email (any case) → sign into that same row.
 /// user_created emitted once on create; login_success emitted on both branches (US-008-01 edge-case note).
 /// </summary>
-public sealed class SignupHandler : IRequestHandler<SignupCommand, SignupResult>
+/// <param name="users">Store used to find or create the account.</param>
+/// <param name="plans">Store used to resolve the default plan and the plan code.</param>
+/// <param name="telemetry">Reporter for the <c>user_created</c> and <c>login_success</c> events.</param>
+/// <param name="tokens">Mints the session token returned to the caller.</param>
+/// <param name="logger">Logger used to log the id of a newly created user.</param>
+public sealed partial class SignupHandler(
+    IAppUserStore users,
+    IPlansStore plans,
+    WaTelemetryReporter telemetry,
+    ISessionTokenMinter tokens,
+    ILogger<SignupHandler> logger) : IRequestHandler<SignupCommand, SignupResult>
 {
-    private readonly IAppUserStore _users;
-    private readonly IPlansStore _plans;
-    private readonly WaTelemetryReporter _telemetry;
-    private readonly ISessionTokenMinter _tokens;
-    private readonly ILogger<SignupHandler> _logger;
-
-    /// <summary>Initializes a new instance of the <see cref="SignupHandler"/> class.</summary>
-    /// <param name="users">Store used to find or create the account.</param>
-    /// <param name="plans">Store used to resolve the default plan and the plan code.</param>
-    /// <param name="telemetry">Reporter for the <c>user_created</c> and <c>login_success</c> events.</param>
-    /// <param name="tokens">Mints the session token returned to the caller.</param>
-    /// <param name="logger">Logger used to log the id of a newly created user.</param>
-    public SignupHandler(
-        IAppUserStore users,
-        IPlansStore plans,
-        WaTelemetryReporter telemetry,
-        ISessionTokenMinter tokens,
-        ILogger<SignupHandler> logger)
-    {
-        _users = users;
-        _plans = plans;
-        _telemetry = telemetry;
-        _tokens = tokens;
-        _logger = logger;
-    }
+    private readonly IAppUserStore _users = users;
+    private readonly IPlansStore _plans = plans;
+    private readonly WaTelemetryReporter _telemetry = telemetry;
+    private readonly ISessionTokenMinter _tokens = tokens;
+    private readonly ILogger<SignupHandler> _logger = logger;
 
     /// <inheritdoc />
     public async Task<SignupResult> Handle(SignupCommand request, CancellationToken cancellationToken)
@@ -74,7 +64,7 @@ public sealed class SignupHandler : IRequestHandler<SignupCommand, SignupResult>
             };
             await _users.CreateAsync(user, cancellationToken);
             _telemetry.LogEvent(TelemetryEvents.UserCreated); // AC-008-1: user_created emitted exactly once
-            _logger.LogInformation("User created {UserId}", userId);
+            LogUserCreated(_logger, userId);
         }
         else
         {
@@ -111,4 +101,7 @@ public sealed class SignupHandler : IRequestHandler<SignupCommand, SignupResult>
             return false;
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "User created {UserId}")]
+    private static partial void LogUserCreated(ILogger logger, Guid userId);
 }

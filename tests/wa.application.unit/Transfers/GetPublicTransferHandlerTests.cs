@@ -671,16 +671,10 @@ public class GetPublicTransferHandlerTests
 
     private static ILimitsProvider NewLimits(long maxZipSize, int maxDownloads = 100) => new StubLimitsProvider(maxZipSize, maxDownloads);
 
-    private sealed class StubLimitsProvider : ILimitsProvider
+    private sealed class StubLimitsProvider(long maxZipSize, int maxDownloads) : ILimitsProvider
     {
-        public long MaxZipSize { get; }
-        public int MaxDownloads { get; }
-
-        public StubLimitsProvider(long maxZipSize, int maxDownloads)
-        {
-            MaxZipSize = maxZipSize;
-            MaxDownloads = maxDownloads;
-        }
+        public long MaxZipSize { get; } = maxZipSize;
+        public int MaxDownloads { get; } = maxDownloads;
 
         public Task<LimitsRecord> Resolve(string? planCode, CancellationToken cancellationToken) =>
             Task.FromResult(new LimitsRecord { MaxZipSize = MaxZipSize, MaxDownloads = MaxDownloads });

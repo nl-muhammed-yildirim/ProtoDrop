@@ -240,7 +240,7 @@ public class SendTransferHandlerTests
     }
 
     private SendTransferHandler NewHandler(StubLimitsProvider limits) =>
-        new SendTransferHandler(_store, _meterStore, limits, _eventPublisher, _telemetry, Microsoft.Extensions.Logging.Abstractions.NullLogger<SendTransferHandler>.Instance, _users);
+        new SendTransferHandler(_store, _meterStore, limits, _eventPublisher, _telemetry, Microsoft.Extensions.Logging.Abstractions.NullLogger<SendTransferHandler>.Instance, _users, TimeProvider.System);
 
     // ---- T-007-05 / AC-007-2 (meter): storage_bytes_active on send ----
 

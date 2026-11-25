@@ -127,7 +127,7 @@ public class MeProfileTests
             _users,
             publisher,
             new WaTelemetryReporter(_telemetryLogger, System.Text.Encoding.UTF8.GetBytes("unit-test-key")),
-            new RecordingBlobs());
+            new RecordingBlobs(), TimeProvider.System);
 
         await handler.Handle(new DeleteAccountCommand(userId), CancellationToken.None);
 
@@ -157,7 +157,7 @@ public class MeProfileTests
             _users,
             new StubEventPublisher(),
             new WaTelemetryReporter(_telemetryLogger, System.Text.Encoding.UTF8.GetBytes("unit-test-key")),
-            new RecordingBlobs());
+            new RecordingBlobs(), TimeProvider.System);
 
         await Assert.ThrowsAsync<MeProfileException>(async () =>
             await handler.Handle(new DeleteAccountCommand(userId), CancellationToken.None));
@@ -180,7 +180,7 @@ public class MeProfileTests
             _users,
             new StubEventPublisher(),
             new WaTelemetryReporter(_telemetryLogger, System.Text.Encoding.UTF8.GetBytes("unit-test-key")),
-            blobs);
+            blobs, TimeProvider.System);
 
         await handler.Handle(new DeleteAccountCommand(userId), CancellationToken.None);
 
@@ -199,7 +199,7 @@ public class MeProfileTests
             _users,
             publisher,
             new WaTelemetryReporter(_telemetryLogger, System.Text.Encoding.UTF8.GetBytes("unit-test-key")),
-            new RecordingBlobs { Throw = true });
+            new RecordingBlobs { Throw = true }, TimeProvider.System);
 
         var result = await handler.Handle(new DeleteAccountCommand(userId), CancellationToken.None);
 

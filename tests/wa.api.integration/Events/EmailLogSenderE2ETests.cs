@@ -72,7 +72,7 @@ public class EmailLogSenderE2ETests : IAsyncLifetime
         // is built so DI picks InMemoryEventPublisher (TA-0.2 rule 7).
         Environment.SetEnvironmentVariable("Wa__ServiceBus__ConnectionString", null);
 
-        _sql = new MsSqlBuilder().WithImage("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
         await _sql.StartAsync();
         _connString = _sql.GetConnectionString();
         Environment.SetEnvironmentVariable("ConnectionStrings__WaDb", _connString);
@@ -266,7 +266,7 @@ public class EmailLogSenderE2ETests : IAsyncLifetime
             new SenderBrandingStore(workerDb),
             new FeaturesProvider(
                 new PlansCache(new PlansStore(workerDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow),
-                new FlagsCache(new FlagsStore(workerDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow)));
+                new FlagsCache(new FlagsStore(workerDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow)), TimeProvider.System);
         await handler.HandleAsync(envelope, 1, 5, CancellationToken.None);
     }
 

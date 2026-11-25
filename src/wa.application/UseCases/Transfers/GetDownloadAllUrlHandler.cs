@@ -1,7 +1,6 @@
 using MediatR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using System.Text;
 using wa.application.Blob;
 using wa.application.Ports;
 using wa.application.Telemetry;
@@ -17,41 +16,29 @@ namespace wa.application.UseCases.Transfers;
 /// If the zip doesn't exist yet, trigger f-zip generation via fire-and-forget HTTP POST and return Generating (202).
 /// Reuses T-003-04's unlock-token verification; D6 rule: status wins over credentials.
 /// </summary>
-public sealed class GetDownloadAllUrlHandler : IRequestHandler<GetDownloadAllUrlQuery, DownloadAllResult>
+/// <param name="store">Store that reads the transfer and records the download.</param>
+/// <param name="minter">Mints the 30-minute read URL of the zip.</param>
+/// <param name="blobStore">Blob store used to check whether the zip exists.</param>
+/// <param name="tokens">Verifies the unlock token of password-protected transfers.</param>
+/// <param name="telemetry">Reporter whose PII slots hash the client IP and User-Agent.</param>
+/// <param name="config">Configuration source for the zip function URL and signing key.</param>
+/// <param name="logger">Logger for zip-trigger warnings and failures.</param>
+public sealed partial class GetDownloadAllUrlHandler(
+    IPublicTransferStore store,
+    IBlobSasMinter minter,
+    IBlobStore blobStore,
+    IUnlockTokenMinter tokens,
+    WaTelemetryReporter telemetry,
+    IConfiguration config,
+    ILogger<GetDownloadAllUrlHandler> logger) : IRequestHandler<GetDownloadAllUrlQuery, DownloadAllResult>
 {
-    private readonly IPublicTransferStore _store;
-    private readonly IBlobSasMinter _minter;
-    private readonly IBlobStore _blobStore;
-    private readonly IUnlockTokenMinter _tokens;
-    private readonly WaTelemetryReporter _telemetry;
-    private readonly IConfiguration _config;
-    private readonly ILogger<GetDownloadAllUrlHandler> _logger;
-
-    /// <summary>Initializes a new instance of the <see cref="GetDownloadAllUrlHandler"/> class.</summary>
-    /// <param name="store">Store that reads the transfer and records the download.</param>
-    /// <param name="minter">Mints the 30-minute read URL of the zip.</param>
-    /// <param name="blobStore">Blob store used to check whether the zip exists.</param>
-    /// <param name="tokens">Verifies the unlock token of password-protected transfers.</param>
-    /// <param name="telemetry">Reporter whose PII slots hash the client IP and User-Agent.</param>
-    /// <param name="config">Configuration source for the zip function URL and signing key.</param>
-    /// <param name="logger">Logger for zip-trigger warnings and failures.</param>
-    public GetDownloadAllUrlHandler(
-        IPublicTransferStore store,
-        IBlobSasMinter minter,
-        IBlobStore blobStore,
-        IUnlockTokenMinter tokens,
-        WaTelemetryReporter telemetry,
-        IConfiguration config,
-        ILogger<GetDownloadAllUrlHandler> logger)
-    {
-        _store = store;
-        _minter = minter;
-        _blobStore = blobStore;
-        _tokens = tokens;
-        _telemetry = telemetry;
-        _config = config;
-        _logger = logger;
-    }
+    private readonly IPublicTransferStore _store = store;
+    private readonly IBlobSasMinter _minter = minter;
+    private readonly IBlobStore _blobStore = blobStore;
+    private readonly IUnlockTokenMinter _tokens = tokens;
+    private readonly WaTelemetryReporter _telemetry = telemetry;
+    private readonly IConfiguration _config = config;
+    private readonly ILogger<GetDownloadAllUrlHandler> _logger = logger;
 
     /// <inheritdoc />
     public async Task<DownloadAllResult> Handle(GetDownloadAllUrlQuery request, CancellationToken cancellationToken)
@@ -107,7 +94,7 @@ public sealed class GetDownloadAllUrlHandler : IRequestHandler<GetDownloadAllUrl
         }
 
         // Zip doesn't exist yet — trigger f-zip generation (fire-and-forget) and return Generating (202).
-        _ = Task.Run(() => TriggerZipGeneration(transfer.Id, cancellationToken));
+        _ = Task.Run(() => TriggerZipGeneration(transfer.Id, cancellationToken), CancellationToken.None); // intentionally not tied to the request token: the zip trigger must outlive the request
 
         return new DownloadAllResult(DownloadAllState.Generating, PollAfterSec: 2);
     }
@@ -124,7 +111,7 @@ public sealed class GetDownloadAllUrlHandler : IRequestHandler<GetDownloadAllUrl
             var baseUrl = _config["Wa:ZipFunction:BaseUrl"];
             if (string.IsNullOrEmpty(baseUrl))
             {
-                _logger.LogWarning("Wa:ZipFunction:BaseUrl not configured — cannot trigger zip generation for transfer {TransferId}", transferId);
+                LogZipBaseUrlNotConfigured(_logger, transferId);
                 return;
             }
 
@@ -140,7 +127,7 @@ public sealed class GetDownloadAllUrlHandler : IRequestHandler<GetDownloadAllUrl
         catch (Exception ex)
         {
             // Non-fatal: the zip will be generated by whoever gets there first (idempotent).
-            _logger.LogWarning(ex, "Failed to trigger zip generation for transfer {TransferId}", transferId);
+            LogZipTriggerFailed(_logger, ex, transferId);
         }
     }
 
@@ -155,4 +142,10 @@ public sealed class GetDownloadAllUrlHandler : IRequestHandler<GetDownloadAllUrl
     /// <summary>8 chars from the LinkId charset (TA-9.6) — same filter as GetPublicTransferHandler's private helper.</summary>
     private static bool IsWellFormedLinkId(string linkId) =>
         linkId.Length == LinkId.Length && Enumerable.All(linkId, c => LinkId.Charset.Contains(c));
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Wa:ZipFunction:BaseUrl not configured — cannot trigger zip generation for transfer {TransferId}")]
+    private static partial void LogZipBaseUrlNotConfigured(ILogger logger, Guid transferId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to trigger zip generation for transfer {TransferId}")]
+    private static partial void LogZipTriggerFailed(ILogger logger, Exception exception, Guid transferId);
 }

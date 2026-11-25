@@ -9,13 +9,10 @@ namespace wa.infrastructure.Persistence;
 /// US-023-01 (F-PRF-003): thin adapter over WaDbContext for the analytics read path. Three GROUP BY queries, all
 /// WHERE TransferId = @id AND CreatedAtUtc >= @since (seek on IX_DownEvent_T), AsNoTracking; no raw rows leave SQL (EC-023-4).
 /// </summary>
-public sealed class TransferAnalyticsStore : ITransferAnalyticsStore
+/// <param name="db">Database context that backs the store.</param>
+public sealed class TransferAnalyticsStore(WaDbContext db) : ITransferAnalyticsStore
 {
-    private readonly WaDbContext _db;
-
-    /// <summary>Initializes a new instance of the <see cref="TransferAnalyticsStore"/> class.</summary>
-    /// <param name="db">Database context that backs the store.</param>
-    public TransferAnalyticsStore(WaDbContext db) => _db = db;
+    private readonly WaDbContext _db = db;
 
     /// <inheritdoc />
     public Task<AnalyticsTransfer?> GetOwnedTransferAsync(Guid ownerId, Guid transferId, CancellationToken ct) =>

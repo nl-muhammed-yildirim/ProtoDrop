@@ -13,22 +13,20 @@ namespace wa.workers;
 /// Host.json settings: concurrency 1, timeout 30 min.
 /// T-005-04: HTTP trigger for E2E manual invocation.
 /// </summary>
-public class DeleteBlobsFunction
+/// <param name="handler">Handler that deletes blobs that nothing references any more.</param>
+/// <param name="logger">Logger for the job run (carries the generated correlation ids).</param>
+/// <param name="config">Configuration source for the <c>Wa:Jobs:SignKey</c> that guards the HTTP trigger.</param>
+/// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+public partial class DeleteBlobsFunction(
+    DeleteOrphanBlobsHandler handler,
+    ILogger<DeleteBlobsFunction> logger,
+    IConfiguration config,
+    TimeProvider timeProvider)
 {
-    private readonly DeleteOrphanBlobsHandler _handler;
-    private readonly ILogger<DeleteBlobsFunction> _logger;
-    private readonly IConfiguration _config;
-
-    /// <summary>Initializes a new instance of the <see cref="DeleteBlobsFunction"/> class.</summary>
-    /// <param name="handler">Handler that deletes blobs that nothing references any more.</param>
-    /// <param name="logger">Logger for the job run (carries the generated correlation ids).</param>
-    /// <param name="config">Configuration source for the <c>Wa:Jobs:SignKey</c> that guards the HTTP trigger.</param>
-    public DeleteBlobsFunction(DeleteOrphanBlobsHandler handler, ILogger<DeleteBlobsFunction> logger, IConfiguration config)
-    {
-        _handler = handler;
-        _logger = logger;
-        _config = config;
-    }
+    private readonly DeleteOrphanBlobsHandler _handler = handler;
+    private readonly ILogger<DeleteBlobsFunction> _logger = logger;
+    private readonly IConfiguration _config = config;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <summary>Timer entry point (hourly): runs one orphan-blob deletion pass under a freshly generated traceparent.</summary>
     /// <param name="context">Function invocation context.</param>
@@ -42,15 +40,15 @@ public class DeleteBlobsFunction
         var tp = W3CTraceParser.New();
         using var scope = _logger.BeginScope(new Dictionary<string, object?> { ["CorrelationId"] = tp.CorrelationId, ["TraceParent"] = tp.ToHeader() });
 
-        var now = DateTime.UtcNow;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         try
         {
             var count = await _handler.RunAsync(now, context.CancellationToken);
-            _logger.LogInformation("f-delete-blobs completed: {Count} blobs deleted", count);
+            LogCompleted(_logger, count);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "f-delete-blobs failed");
+            LogFailed(_logger, ex);
             throw; // Azure Functions retries on unhandled exception; JobRun claim prevents double-processing.
         }
     }
@@ -67,7 +65,13 @@ public class DeleteBlobsFunction
         if (!JobAuth.Verify(_config, req))
             return JobAuth.CreateProblem(req, 401, "Unauthenticated", "Invalid or missing signature.");
 
-        var count = await _handler.RunAsync(DateTime.UtcNow, context.CancellationToken);
+        var count = await _handler.RunAsync(_timeProvider.GetUtcNow().UtcDateTime, context.CancellationToken);
         return JobAuth.CreateSuccess(req, new { deleted = count });
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "f-delete-blobs completed: {Count} blobs deleted")]
+    private static partial void LogCompleted(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "f-delete-blobs failed")]
+    private static partial void LogFailed(ILogger logger, Exception exception);
 }

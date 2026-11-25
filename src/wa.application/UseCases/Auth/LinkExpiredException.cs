@@ -1,8 +1,3 @@
-using System.Security.Cryptography;
-using MediatR;
-using wa.application.Ports;
-using wa.application.Telemetry;
-using wa.domain;
 using wa.domain.Errors;
 
 namespace wa.application.UseCases.Auth;

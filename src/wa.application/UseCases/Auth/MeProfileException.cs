@@ -1,10 +1,3 @@
-using System.Text.Json.Serialization;
-using MediatR;
-using Microsoft.Extensions.Logging;
-using wa.application.Limits;
-using wa.application.Ports;
-using wa.application.Telemetry;
-using wa.application.UseCases.EmailSettings;
 using wa.domain;
 using wa.domain.Errors;
 

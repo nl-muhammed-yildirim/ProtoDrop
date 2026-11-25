@@ -18,8 +18,7 @@ public class OutboxRetryTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        var container = new MsSqlBuilder()
-            .WithImage("mcr.microsoft.com/mssql/server:2022-latest")
+        var container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest")
             .Build();
         await container.StartAsync();
 
@@ -69,7 +68,7 @@ public class OutboxRetryTests : IAsyncLifetime
         var publisher = new SbEventPublisher(
             new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<SbEventPublisher>.Instance,
-            new AppDbContextFactory(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(connString).Options));
+            new AppDbContextFactory(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(connString).Options), TimeProvider.System);
         var envelope = CreateEnvelope();
 
         // First publish: row committed via the change tracker, broker unreachable → stays unpublished.

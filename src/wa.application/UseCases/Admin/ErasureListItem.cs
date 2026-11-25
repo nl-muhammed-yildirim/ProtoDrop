@@ -1,6 +1,3 @@
-using wa.domain.Privacy;
-using wa.domain.Transfers;
-
 namespace wa.application.UseCases.Admin;
 
 /// <summary>One row of the admin erasure report as returned by the API, with the email masked unless the caller may see it.</summary>

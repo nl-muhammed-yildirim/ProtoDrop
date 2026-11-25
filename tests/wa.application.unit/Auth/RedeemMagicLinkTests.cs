@@ -33,7 +33,7 @@ public class RedeemMagicLinkTests
             _users,
             _plans,
             new WaTelemetryReporter(_telemetryLogger, System.Text.Encoding.UTF8.GetBytes("unit-test-key")),
-            _minter);
+            _minter, TimeProvider.System);
     }
 
     private string GenerateRawToken() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
@@ -82,7 +82,7 @@ public class RedeemMagicLinkTests
         _users.ExistingUser = SeedRealAppUser(Guid.NewGuid(), planId);
         var tokenRow = SeedLiveToken("real@example.com");
 
-        var result = await _handler.Handle(new RedeemMagicLinkCommand(_tokens.Raw), CancellationToken.None);
+        var result = await _handler.Handle(new RedeemMagicLinkCommand(_tokens.Raw!), CancellationToken.None);
 
         Assert.NotNull(result); // D-4: result carries profile + SessionToken (minted by ISessionTokenMinter)
         Assert.False(string.IsNullOrWhiteSpace(result.SessionToken));

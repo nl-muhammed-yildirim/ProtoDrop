@@ -13,7 +13,7 @@ namespace wa.infrastructure.Blob;
 /// <see cref="wa.application.Blob.BlobPaths"/> — the first segment is the
 /// container, the rest the blob name.
 /// </summary>
-public sealed class AzureBlobStore : IBlobStore, IBlobContentWriter
+public sealed partial class AzureBlobStore : IBlobStore, IBlobContentWriter
 {
     private readonly BlobServiceClient _svc;
 
@@ -30,7 +30,7 @@ public sealed class AzureBlobStore : IBlobStore, IBlobContentWriter
         Uri accountUrl, string accountKey, ILogger<AzureBlobStore> logger)
     {
         var accountName = AccountNameFrom(accountUrl);
-        logger.LogDebug("Blob: account {Account} from {Url}", accountName, accountUrl);
+        LogBlobAccount(logger, accountName, accountUrl);
         _svc = new BlobServiceClient(
             accountUrl,
             new Azure.Storage.StorageSharedKeyCredential(accountName, accountKey));
@@ -152,4 +152,7 @@ public sealed class AzureBlobStore : IBlobStore, IBlobContentWriter
                 nameof(path));
         return (path[..cut], path[(cut + 1)..]);
     }
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Blob: account {Account} from {Url}")]
+    private static partial void LogBlobAccount(ILogger logger, string account, Uri url);
 }

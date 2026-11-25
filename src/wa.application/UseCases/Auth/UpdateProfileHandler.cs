@@ -1,11 +1,9 @@
-using System.Text.Json.Serialization;
+using System.Globalization;
 using MediatR;
 using wa.application.Limits;
 using wa.application.Ports;
 using wa.application.UseCases.EmailSettings;
 using wa.domain;
-using wa.domain.Errors;
-using wa.domain.Telemetry;
 
 namespace wa.application.UseCases.Auth;
 
@@ -13,34 +11,29 @@ namespace wa.application.UseCases.Auth;
 /// T-008-06 (FR-008-4 / TA-4.2#13): PATCH /api/v1/auth/me — partial profile update. Only provided fields change;
 /// null argument = leave the column alone (D-1 UpdateProfileAsync contract).
 /// </summary>
-public sealed class UpdateProfileHandler : IRequestHandler<UpdateProfileCommand, GetProfileResult>
+/// <param name="users">Store used to read and update the user row.</param>
+/// <param name="plans">Store used to resolve the plan code for the returned profile.</param>
+/// <param name="orgNames">Store that writes the organization name.</param>
+/// <param name="plan">Accessor used to check that the plan includes branding.</param>
+/// <param name="emailNotifications">Store that writes the owner-notification setting.</param>
+public sealed class UpdateProfileHandler(
+    IAppUserStore users,
+    IPlansStore plans,
+    IOrgNameStore orgNames,
+    IPlanContextAccessor plan,
+    IEmailNotificationsStore emailNotifications) : IRequestHandler<UpdateProfileCommand, GetProfileResult>
 {
-    private readonly IAppUserStore _users;
-    private readonly IPlansStore _plans;
-    private readonly IOrgNameStore _orgNames;
-    private readonly IPlanContextAccessor _plan;
-    private readonly IEmailNotificationsStore _emailNotifications;
+    private readonly IAppUserStore _users = users;
+    private readonly IPlansStore _plans = plans;
+    private readonly IOrgNameStore _orgNames = orgNames;
+    private readonly IPlanContextAccessor _plan = plan;
+    private readonly IEmailNotificationsStore _emailNotifications = emailNotifications;
 
     /// <summary>Maximum display-name length after trimming; matches the NVARCHAR(100) column width (TA-3.2).</summary>
     public const int DisplayNameMaxLength = 100;
 
     /// <summary>The three closed theme values (spec + entity only — NOT in the frozen Open-Decisions-and-Constants registry).</summary>
     private static readonly string[] AllowedThemes = ["system", "light", "dark"];
-
-    /// <summary>Initializes a new instance of the <see cref="UpdateProfileHandler"/> class.</summary>
-    /// <param name="users">Store used to read and update the user row.</param>
-    /// <param name="plans">Store used to resolve the plan code for the returned profile.</param>
-    /// <param name="orgNames">Store that writes the organization name.</param>
-    /// <param name="plan">Accessor used to check that the plan includes branding.</param>
-    /// <param name="emailNotifications">Store that writes the owner-notification setting.</param>
-    public UpdateProfileHandler(IAppUserStore users, IPlansStore plans, IOrgNameStore orgNames, IPlanContextAccessor plan, IEmailNotificationsStore emailNotifications)
-    {
-        _users = users;
-        _plans = plans;
-        _orgNames = orgNames;
-        _plan = plan;
-        _emailNotifications = emailNotifications;
-    }
 
     /// <inheritdoc />
     public async Task<GetProfileResult> Handle(UpdateProfileCommand request, CancellationToken cancellationToken)
@@ -63,7 +56,7 @@ public sealed class UpdateProfileHandler : IRequestHandler<UpdateProfileCommand,
         {
             var trimmed = request.DisplayName.Trim();
             if (trimmed.Length > DisplayNameMaxLength)
-                throw MeProfileException.ForDisplayNameTooLong(DisplayNameMaxLength.ToString());
+                throw MeProfileException.ForDisplayNameTooLong(DisplayNameMaxLength.ToString(CultureInfo.InvariantCulture));
         }
 
         // 4b. orgName validation (only when present in the body): no CR/LF, <= ORG_NAME_MAX_LENGTH after trim; blank = clear.

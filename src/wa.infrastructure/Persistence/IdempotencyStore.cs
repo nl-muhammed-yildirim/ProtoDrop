@@ -9,13 +9,12 @@ namespace wa.infrastructure.Persistence;
 /// the generic HTTP-level idempotency storage used by IdempotencyMiddleware.
 /// Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext).
 /// </summary>
-public sealed class IdempotencyStore : IIdempotencyStore
+/// <param name="db">Database context that backs the store.</param>
+/// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+public sealed class IdempotencyStore(WaDbContext db, TimeProvider timeProvider) : IIdempotencyStore
 {
-    private readonly WaDbContext _db;
-
-    /// <summary>Initializes a new instance of the <see cref="IdempotencyStore"/> class.</summary>
-    /// <param name="db">Database context that backs the store.</param>
-    public IdempotencyStore(WaDbContext db) => _db = db;
+    private readonly WaDbContext _db = db;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <inheritdoc />
     public async Task<IdempotencyEntry?> FindAsync(string key, CancellationToken ct)
@@ -40,11 +39,11 @@ public sealed class IdempotencyStore : IIdempotencyStore
             // Overwrite with the middleware-captured outcome (actual status + body).
             existing.ResultJson = resultJson;
             existing.StatusCode = statusCode;
-            existing.ExpiresAtUtc = DateTime.UtcNow.AddHours(24); // TA-4.1.5: 24 h TTL from first use
+            existing.ExpiresAtUtc = _timeProvider.GetUtcNow().UtcDateTime.AddHours(24); // TA-4.1.5: 24 h TTL from first use
         }
         else
         {
-            var now = DateTime.UtcNow;
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
             _db.Set<IdempotencyKey>().Add(new IdempotencyKey
             {
                 Key = key,

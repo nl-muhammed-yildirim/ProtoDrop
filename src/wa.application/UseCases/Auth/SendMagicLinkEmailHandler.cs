@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -13,7 +14,7 @@ namespace wa.application.UseCases.Auth;
 /// Loads the magic-link template from Emails/templates/magic-link/ and renders it with manual variable substitution.
 /// Self-contained: no DB context needed — payload carries email + token + expiry.
 /// </summary>
-public sealed class SendMagicLinkEmailHandler : IEmailEventHandler
+public sealed partial class SendMagicLinkEmailHandler : IEmailEventHandler
 {
     private const string Subject = "Your ProtoDrop sign-in link";
 
@@ -23,6 +24,7 @@ public sealed class SendMagicLinkEmailHandler : IEmailEventHandler
     private readonly WaTelemetryReporter _telemetry;
     private readonly ILogger<SendMagicLinkEmailHandler> _logger;
     private readonly (string Html, string Txt) _templates;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="SendMagicLinkEmailHandler"/> class.</summary>
     /// <param name="emailSender">Port that delivers the rendered email.</param>
@@ -30,13 +32,15 @@ public sealed class SendMagicLinkEmailHandler : IEmailEventHandler
     /// <param name="config">Configuration source for the public site URL and sender address.</param>
     /// <param name="telemetry">Reporter for the email and dead-letter telemetry events.</param>
     /// <param name="logger">Logger for payload problems and send failures.</param>
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
     /// <exception cref="InvalidOperationException">Thrown when the magic-link templates are not found next to the worker binaries.</exception>
     public SendMagicLinkEmailHandler(
         IEmailSender emailSender,
         IEventPublisher eventPublisher,
         IConfiguration config,
         WaTelemetryReporter telemetry,
-        ILogger<SendMagicLinkEmailHandler> logger)
+        ILogger<SendMagicLinkEmailHandler> logger,
+        TimeProvider timeProvider)
     {
         _emailSender = emailSender;
         _eventPublisher = eventPublisher;
@@ -54,6 +58,7 @@ public sealed class SendMagicLinkEmailHandler : IEmailEventHandler
             throw new InvalidOperationException(
                 $"Magic-link email templates not found. Expected: {htmlPath} and {txtPath}. " +
                 "Verify the workers csproj Content Include for Emails\\templates\\**\\*.");
+        _timeProvider = timeProvider;
     }
 
     /// <inheritdoc />
@@ -67,14 +72,14 @@ public sealed class SendMagicLinkEmailHandler : IEmailEventHandler
         if (!root.TryGetProperty("email", out var emailEl) ||
             string.IsNullOrWhiteSpace(emailEl.GetString()))
         {
-            _logger.LogWarning("f-email: missing or invalid email in magic-link payload");
+            LogMissingEmail(_logger);
             return;
         }
 
         if (!root.TryGetProperty("token", out var tokenEl) ||
             string.IsNullOrWhiteSpace(tokenEl.GetString()))
         {
-            _logger.LogWarning("f-email: missing or invalid token in magic-link payload");
+            LogMissingToken(_logger);
             return;
         }
 
@@ -84,14 +89,14 @@ public sealed class SendMagicLinkEmailHandler : IEmailEventHandler
         if (root.TryGetProperty("expiresAtUtc", out var expiryEl) && expiryEl.TryGetDateTime(out var expiry))
             expiresAtUtc = expiry;
         else
-            expiresAtUtc = DateTime.UtcNow.AddMinutes(10); // fallback
+            expiresAtUtc = _timeProvider.GetUtcNow().UtcDateTime.AddMinutes(10); // fallback
 
         // 2. Build CTA URL: {publicOrigin}/auth?ml={rawToken}
         var publicOrigin = _config["Wa:Url:Public"] ?? "http://localhost:5173";
         var ctaUrl = $"{publicOrigin}/auth?ml={rawToken}";
 
         // 3. Compute remaining minutes for the expiry note.
-        var minutesRemaining = (int)Math.Ceiling((expiresAtUtc - DateTime.UtcNow).TotalMinutes);
+        var minutesRemaining = (int)Math.Ceiling((expiresAtUtc - _timeProvider.GetUtcNow().UtcDateTime).TotalMinutes);
 
         // 4. Render templates with manual variable substitution.
         var htmlBody = RenderTemplate(_templates.Html, email, ctaUrl, minutesRemaining);
@@ -117,7 +122,7 @@ public sealed class SendMagicLinkEmailHandler : IEmailEventHandler
                 EventId = Guid.NewGuid(),
                 Type = EventType.EmailSent,
                 Version = 1,
-                OccurredAtUtc = DateTime.UtcNow,
+                OccurredAtUtc = _timeProvider.GetUtcNow().UtcDateTime,
                 CorrelationId = envelope.CorrelationId,
                 PartitionKey = email,
                 Payload = new
@@ -134,7 +139,7 @@ public sealed class SendMagicLinkEmailHandler : IEmailEventHandler
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "f-email: failed to send magic-link email attempt {Attempt}", attempt);
+            LogSendFailed(_logger, ex, attempt);
 
             if (attempt == maxDeliveryCount)
             {
@@ -145,7 +150,7 @@ public sealed class SendMagicLinkEmailHandler : IEmailEventHandler
                     EventId = Guid.NewGuid(),
                     Type = EventType.EmailFailed,
                     Version = 1,
-                    OccurredAtUtc = DateTime.UtcNow,
+                    OccurredAtUtc = _timeProvider.GetUtcNow().UtcDateTime,
                     CorrelationId = envelope.CorrelationId,
                     PartitionKey = email,
                     Payload = new
@@ -170,5 +175,14 @@ public sealed class SendMagicLinkEmailHandler : IEmailEventHandler
         template
             .Replace("{{Email}}", email)
             .Replace("{{CtaUrl}}", ctaUrl)
-            .Replace("{{MinutesRemaining}}", minutesRemaining.ToString());
+            .Replace("{{MinutesRemaining}}", minutesRemaining.ToString(CultureInfo.InvariantCulture));
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "f-email: missing or invalid email in magic-link payload")]
+    private static partial void LogMissingEmail(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "f-email: missing or invalid token in magic-link payload")]
+    private static partial void LogMissingToken(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "f-email: failed to send magic-link email attempt {Attempt}")]
+    private static partial void LogSendFailed(ILogger logger, Exception exception, int attempt);
 }

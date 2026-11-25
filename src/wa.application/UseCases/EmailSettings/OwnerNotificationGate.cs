@@ -8,22 +8,14 @@ namespace wa.application.UseCases.EmailSettings;
 /// F-XCT-003 (FR-046-3/5/6, EC-046-1): f-email's send-time check for OWNER notification emails only — recipient, auth and
 /// billing emails never call it (FR-046-4). No publisher or telemetry dependency: a skipped send emits nothing (TA-10.2 closed list).
 /// </summary>
-public sealed class OwnerNotificationGate
+/// <param name="store">Store that holds the owner's notification choice.</param>
+/// <param name="flags">Resolver for the email-settings feature gate.</param>
+/// <param name="logger">Logger for the skipped-send message.</param>
+public sealed partial class OwnerNotificationGate(IEmailNotificationsStore store, IFlagResolver flags, ILogger<OwnerNotificationGate> logger)
 {
-    private readonly IEmailNotificationsStore _store;
-    private readonly IFlagResolver _flags;
-    private readonly ILogger<OwnerNotificationGate> _logger;
-
-    /// <summary>Initializes a new instance of the <see cref="OwnerNotificationGate"/> class.</summary>
-    /// <param name="store">Store that holds the owner's notification choice.</param>
-    /// <param name="flags">Resolver for the email-settings feature gate.</param>
-    /// <param name="logger">Logger for the skipped-send message.</param>
-    public OwnerNotificationGate(IEmailNotificationsStore store, IFlagResolver flags, ILogger<OwnerNotificationGate> logger)
-    {
-        _store = store;
-        _flags = flags;
-        _logger = logger;
-    }
+    private readonly IEmailNotificationsStore _store = store;
+    private readonly IFlagResolver _flags = flags;
+    private readonly ILogger<OwnerNotificationGate> _logger = logger;
 
     /// <summary>True when the owner notification may be sent. Reads the column on every call (send time, no cache).</summary>
     /// <param name="ownerAppUserId">The transfer owner; null for anonymous transfers.</param>
@@ -38,7 +30,10 @@ public sealed class OwnerNotificationGate
         if (AppUser.EmailNotificationsOn(await _store.GetAsync(ownerId, ct)))
             return true;
 
-        _logger.LogInformation("f-email: owner notification skipped for {OwnerAppUserId}, suppressedReason=email_setting", ownerId);
+        LogNotificationSkipped(_logger, ownerId);
         return false;
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "f-email: owner notification skipped for {OwnerAppUserId}, suppressedReason=email_setting")]
+    private static partial void LogNotificationSkipped(ILogger logger, Guid ownerAppUserId);
 }

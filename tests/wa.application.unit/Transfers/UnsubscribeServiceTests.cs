@@ -17,8 +17,8 @@ public class UnsubscribeServiceTests : IDisposable
 {
     private static readonly byte[] Key = Encoding.UTF8.GetBytes("unit-test-key");
 
-    private WaDbContext _db;
-    private UnsubscribeService _service;
+    private readonly WaDbContext _db;
+    private readonly UnsubscribeService _service;
 
     public UnsubscribeServiceTests()
     {
@@ -27,7 +27,7 @@ public class UnsubscribeServiceTests : IDisposable
             .Options;
         _db = new WaDbContext(options);
         _db.Database.EnsureCreated();
-        _service = new UnsubscribeService(_db, Key, NullLogger<UnsubscribeService>.Instance);
+        _service = new UnsubscribeService(_db, Key, NullLogger<UnsubscribeService>.Instance, TimeProvider.System);
     }
 
     public void Dispose() => _db.Dispose();
@@ -117,7 +117,7 @@ public class UnsubscribeServiceTests : IDisposable
             .Options;
         using var db = new WaDbContext(options);
         var log = new CapturingLogger<UnsubscribeService>();
-        var service = new UnsubscribeService(db, Key, log);
+        var service = new UnsubscribeService(db, Key, log, TimeProvider.System);
         var token = UnsubscribeToken.Create("dup@x.com", "sender@y.com", Key);
 
         var result = await service.HandleAsync(token, CancellationToken.None);

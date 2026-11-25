@@ -1,10 +1,4 @@
 using MediatR;
-using System.Security.Cryptography;
-using System.Text;
-using wa.application.Ports;
-using wa.application.Telemetry;
-using wa.domain.Telemetry;
-using wa.domain.ValueObjects;
 
 namespace wa.application.UseCases.Transfers;
 

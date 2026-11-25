@@ -1,6 +1,3 @@
-using wa.application.Limits;
-using wa.application.UseCases.Transfers;
-
 namespace wa.application.UseCases.Billing;
 
 /// <summary>The plan screen's current plan and live usage versus limits. <paramref name="ActiveTransfersAllowed"/> is null when unlimited; storage has no unlimited sentinel.</summary>

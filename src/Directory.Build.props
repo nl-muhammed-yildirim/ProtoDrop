@@ -2,6 +2,12 @@
   <!-- CHORE-code-style: XML docs on src/ C# projects only (tests/ do not inherit this file; wa.web.esproj is excluded by the condition). -->
   <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.csproj'">
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <!-- Pinned, not latest-recommended: a local SDK 11 and the CI SDK 10 resolve latest differently (3 vs 196 hits). Matches net10.0. -->
+    <AnalysisLevel>10.0-recommended</AnalysisLevel>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- A newly published package CVE must not break unrelated PRs; these stay visible warnings. -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
     <WarningsAsErrors>$(WarningsAsErrors);CS1570;CS1572;CS1573;CS1574;CS1587;CS1591</WarningsAsErrors>
   </PropertyGroup>
 </Project>

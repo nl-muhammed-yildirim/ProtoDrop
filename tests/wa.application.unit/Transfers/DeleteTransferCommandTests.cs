@@ -17,7 +17,7 @@ public class DeleteTransferCommandTests
     {
         _store = new StubDeleteStore();
         _eventPublisher = new StubEventPublisher();
-        _handler = new DeleteTransferHandler(_store, _eventPublisher);
+        _handler = new DeleteTransferHandler(_store, _eventPublisher, TimeProvider.System);
     }
 
     // ---- Exit check 1: happy path — Status=4 + DeletedAtUtc set, event emitted once ----
@@ -255,7 +255,7 @@ public class DeleteTransferCommandTests
                 }
             }
 
-            return Task.FromResult(new MarkDeleteResult(deletedAtUtc, t.LinkId));
+            return Task.FromResult<MarkDeleteResult?>(new MarkDeleteResult(deletedAtUtc, t.LinkId));
         }
     }
 }

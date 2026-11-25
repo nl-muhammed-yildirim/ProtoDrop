@@ -14,7 +14,7 @@ public class GetTransferAnalyticsHandlerTests
     private static LimitsRecord Limits() => new() { RetentionDays = 30, GraceDays = 3 };
 
     private static GetTransferAnalyticsHandler Handler(bool analytics, StubStore store) =>
-        new(new StubPlanContext(Limits(), new PlanFeatures { Analytics = analytics }), store);
+        new(new StubPlanContext(Limits(), new PlanFeatures { Analytics = analytics }), store, TimeProvider.System);
 
     [Fact]
     public async Task Handle_FreePlan_ThrowsForbidden_NoStoreCall()

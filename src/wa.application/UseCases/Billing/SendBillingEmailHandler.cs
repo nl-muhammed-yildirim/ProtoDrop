@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -14,7 +15,7 @@ namespace wa.application.UseCases.Billing;
 /// Same send / email.sent / email.failed / rethrow shape as SendForgotPasswordEmailHandler; SB redelivers up to MaxDeliveryCount, then DLQ.
 /// Billing mail is transactional — no suppression check. Logs never carry the address (TA-9.4).
 /// </summary>
-public sealed class SendBillingEmailHandler : IEmailEventHandler
+public sealed partial class SendBillingEmailHandler : IEmailEventHandler
 {
     private static readonly string[] Subjects =
     [
@@ -32,6 +33,7 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
     private readonly (string Html, string Txt) _graceTemplates;
 
     private const string GraceEndedSubject = "You're back on ProtoDrop Free";
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="SendBillingEmailHandler"/> class.</summary>
     /// <param name="emailSender">Port that delivers the rendered email.</param>
@@ -40,13 +42,15 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
     /// <param name="telemetry">Reporter for the email and dead-letter telemetry events.</param>
     /// <param name="logger">Logger for diagnostics (never logs the address).</param>
     /// <param name="templateRoot">Directory that holds the per-kind template folders.</param>
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
     public SendBillingEmailHandler(
         IEmailSender emailSender,
         IEventPublisher eventPublisher,
         IConfiguration config,
         WaTelemetryReporter telemetry,
         ILogger<SendBillingEmailHandler> logger,
-        string templateRoot)
+        string templateRoot,
+        TimeProvider timeProvider)
     {
         _emailSender = emailSender;
         _eventPublisher = eventPublisher;
@@ -56,6 +60,7 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
 
         _templates = LoadTemplates(templateRoot, "billing-payment-failed");
         _graceTemplates = LoadTemplates(templateRoot, "billing-grace-ended"); // US-019-05 (D-5)
+        _timeProvider = timeProvider;
     }
 
     private static (string Html, string Txt) LoadTemplates(string templateRoot, string folder)
@@ -82,7 +87,7 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
             ? emailEl.GetString() : null;
         if (string.IsNullOrWhiteSpace(email))
         {
-            _logger.LogWarning("f-email: missing or invalid email in billing payload");
+            LogMissingEmail(_logger);
             return;
         }
 
@@ -96,7 +101,7 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
             if (!root.TryGetProperty("step", out var stepEl) || stepEl.ValueKind != JsonValueKind.Number
                 || !stepEl.TryGetInt32(out step) || step < 1 || step > BillingEmailSchedule.StepCount)
             {
-                _logger.LogWarning("f-email: missing or invalid step in billing payload");
+                LogMissingStep(_logger);
                 return;
             }
             subject = Subjects[step - 1];
@@ -109,7 +114,7 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
         }
         else
         {
-            _logger.LogWarning("f-email: unknown billing email kind {Kind}", kind);
+            LogUnknownBillingKind(_logger, kind);
             return;
         }
 
@@ -129,7 +134,7 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
                 EventId = Guid.NewGuid(),
                 Type = EventType.EmailSent,
                 Version = 1,
-                OccurredAtUtc = DateTime.UtcNow,
+                OccurredAtUtc = _timeProvider.GetUtcNow().UtcDateTime,
                 CorrelationId = envelope.CorrelationId,
                 PartitionKey = email,
                 Payload = new { to = email, attempt, kind, step }
@@ -139,7 +144,7 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "f-email: failed to send billing email step {Step} attempt {Attempt}", step, attempt);
+            LogSendFailed(_logger, ex, step, attempt);
 
             if (attempt == maxDeliveryCount)
             {
@@ -149,7 +154,7 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
                     EventId = Guid.NewGuid(),
                     Type = EventType.EmailFailed,
                     Version = 1,
-                    OccurredAtUtc = DateTime.UtcNow,
+                    OccurredAtUtc = _timeProvider.GetUtcNow().UtcDateTime,
                     CorrelationId = envelope.CorrelationId,
                     PartitionKey = email,
                     Payload = new { to = email, attempt = maxDeliveryCount, reason = ex.GetType().Name, kind, step }
@@ -163,5 +168,17 @@ public sealed class SendBillingEmailHandler : IEmailEventHandler
     }
 
     private static string Render(string template, int step, string ctaUrl) =>
-        template.Replace("{{Step}}", step.ToString()).Replace("{{CtaUrl}}", ctaUrl);
+        template.Replace("{{Step}}", step.ToString(CultureInfo.InvariantCulture)).Replace("{{CtaUrl}}", ctaUrl);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "f-email: missing or invalid email in billing payload")]
+    private static partial void LogMissingEmail(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "f-email: missing or invalid step in billing payload")]
+    private static partial void LogMissingStep(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "f-email: unknown billing email kind {Kind}")]
+    private static partial void LogUnknownBillingKind(ILogger logger, string? kind);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "f-email: failed to send billing email step {Step} attempt {Attempt}")]
+    private static partial void LogSendFailed(ILogger logger, Exception exception, int step, int attempt);
 }

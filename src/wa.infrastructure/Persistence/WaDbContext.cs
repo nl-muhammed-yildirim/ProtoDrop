@@ -23,7 +23,7 @@ public sealed class WaDbContext : DbContext
         // TA-3.2 defines no FK-side indexes for PlanId/BlobRefId/AppUserId/SupersededBy — strip the convention that
         // auto-creates them (EF Core has no per-index suppression API). Removing it drops exactly those 4 unnamed
         // indexes and nothing else (verified by A/B build against a live DB before this migration was locked in).
-        configurationBuilder.Conventions.Remove(typeof(ForeignKeyIndexConvention));
+        configurationBuilder.Conventions.Remove<ForeignKeyIndexConvention>();
     }
 
     /// <inheritdoc />

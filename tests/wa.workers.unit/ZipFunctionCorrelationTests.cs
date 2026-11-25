@@ -173,7 +173,7 @@ public class ZipFunctionCorrelationTests
         public override TraceContext TraceContext => new StubTraceContext();
         public override BindingContext BindingContext => new StubBindingContext();
         public override RetryContext RetryContext => new StubRetryContext();
-        public override IServiceProvider? InstanceServices { get; set; }
+        public override IServiceProvider InstanceServices { get; set; } = null!; // never read by the function under test
         public override FunctionDefinition FunctionDefinition => new StubFunctionDefinition();
         public override IDictionary<object, object> Items { get; set; } = new Dictionary<object, object>();
         public override IInvocationFeatures Features => throw new NotImplementedException();
@@ -181,13 +181,13 @@ public class ZipFunctionCorrelationTests
 
     private sealed class StubTraceContext : TraceContext
     {
-        public override string? TraceParent => null;
-        public override string? TraceState => null;
+        public override string TraceParent => null!; // keeps today's runtime value (null) — the stub feeds TraceContext parsing exactly as before
+        public override string TraceState => null!; // same: null at runtime, base type is non-nullable
     }
 
     private sealed class StubBindingContext : BindingContext
     {
-        public override IReadOnlyDictionary<string, object> BindingData => new Dictionary<string, object>();
+        public override IReadOnlyDictionary<string, object?> BindingData => new Dictionary<string, object?>();
     }
 
     private sealed class StubRetryContext : RetryContext

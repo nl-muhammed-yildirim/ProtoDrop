@@ -49,7 +49,7 @@ public class SendTransferFilesGoneTests
             _eventPublisher,
             telemetry,
             NullLogger<SendTransferHandler>.Instance,
-            _users);
+            _users, TimeProvider.System);
     }
 
     // ---- EC-010-2: blob row missing (f-delete-blobs removed it) → gate fires at send time → no orphan rows ----

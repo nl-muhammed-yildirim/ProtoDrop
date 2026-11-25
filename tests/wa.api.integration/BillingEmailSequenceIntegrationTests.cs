@@ -28,7 +28,7 @@ public class BillingEmailSequenceIntegrationTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        _sql = new MsSqlBuilder().WithImage("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
         await _sql.StartAsync();
 
         var options = new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(_sql.GetConnectionString()).Options;

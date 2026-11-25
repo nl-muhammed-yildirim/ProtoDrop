@@ -43,7 +43,7 @@ public class SendBillingEmailHandlerTests : IDisposable
             if (from is not null) settings["Wa:Email:FromAddress"] = from;
             var config = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
             return new SendBillingEmailHandler(
-                Sender, Events, config, new WaTelemetryReporter(new CapturingLogger<WaTelemetryReporter>(), [1, 2, 3]), Log, root);
+                Sender, Events, config, new WaTelemetryReporter(new CapturingLogger<WaTelemetryReporter>(), [1, 2, 3]), Log, root, TimeProvider.System);
         }
     }
 

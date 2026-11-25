@@ -8,13 +8,10 @@ namespace wa.infrastructure.Persistence;
 /// T-011-09 (TA-4.2#24 / FR-011-2): admin suppressions adapter over WaDbContext (mirrors AdminFlagStore).
 /// Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext).
 /// </summary>
-public sealed class AdminSuppressionStore : IAdminSuppressionStore
+/// <param name="db">Database context that backs the store.</param>
+public sealed class AdminSuppressionStore(WaDbContext db) : IAdminSuppressionStore
 {
-    private readonly WaDbContext _db;
-
-    /// <summary>Initializes a new instance of the <see cref="AdminSuppressionStore"/> class.</summary>
-    /// <param name="db">Database context that backs the store.</param>
-    public AdminSuppressionStore(WaDbContext db) => _db = db;
+    private readonly WaDbContext _db = db;
 
     /// <inheritdoc />
     /// <remarks>T-011-09 (TA-4.2#24): list all rows — no order contract (the handler orders).</remarks>

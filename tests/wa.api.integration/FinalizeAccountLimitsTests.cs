@@ -50,7 +50,7 @@ public class FinalizeAccountLimitsTests : IAsyncLifetime
         Environment.SetEnvironmentVariable("Wa__Jwt__Secret", JwtSecret);
         Environment.SetEnvironmentVariable("Wa__Url__Public", "http://localhost:5173");
 
-        _sql = new MsSqlBuilder().WithImage("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
         await _sql.StartAsync();
         var connString = _sql.GetConnectionString();
         Environment.SetEnvironmentVariable("ConnectionStrings__WaDb", connString);

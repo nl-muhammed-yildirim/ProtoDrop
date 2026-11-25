@@ -1,7 +1,6 @@
 using MediatR;
 using wa.application.Limits;
 using wa.application.Ports;
-using wa.domain.Errors;
 
 namespace wa.application.UseCases.Admin;
 
@@ -14,15 +13,18 @@ public sealed class SetFlagCommandHandler : IRequestHandler<SetFlagCommand, SetF
 {
     private readonly IAdminFlagStore _flags;
     private readonly IFlagsStore _store;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="SetFlagCommandHandler"/> class.</summary>
     /// <param name="flags">Admin store that upserts the flag value.</param>
     /// <param name="store">Store used to check, uncached, that the key is a seeded flag.</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="flags"/> or <paramref name="store"/> is null.</exception>
-    public SetFlagCommandHandler(IAdminFlagStore flags, IFlagsStore store)
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="flags"/>, <paramref name="store"/> or <paramref name="timeProvider"/> is null.</exception>
+    public SetFlagCommandHandler(IAdminFlagStore flags, IFlagsStore store, TimeProvider timeProvider)
     {
         _flags = flags ?? throw new ArgumentNullException(nameof(flags));
         _store = store ?? throw new ArgumentNullException(nameof(store));
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
     }
 
     /// <inheritdoc />
@@ -38,7 +40,7 @@ public sealed class SetFlagCommandHandler : IRequestHandler<SetFlagCommand, SetF
         if (!FlagValueRules.IsValid(request.Key, value))
             throw SetFlagException.ForInvalid(); // 400 — no write, no audit (EC-044-1)
 
-        var old = await _flags.UpsertAsync(request.Key, value, DateTime.UtcNow, cancellationToken)
+        var old = await _flags.UpsertAsync(request.Key, value, _timeProvider.GetUtcNow().UtcDateTime, cancellationToken)
             ?? throw SetFlagException.ForUnknown(); // row removed between read and write
 
         return new SetFlagResult(request.Key, old.Value, value);

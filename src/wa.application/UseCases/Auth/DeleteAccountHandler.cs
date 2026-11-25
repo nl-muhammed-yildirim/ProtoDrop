@@ -1,4 +1,3 @@
-using System.Text.Json.Serialization;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using wa.application.Ports;
@@ -13,29 +12,26 @@ namespace wa.application.UseCases.Auth;
 /// T-008-06 (FR-008-8 / TA-4.2#13): DELETE /api/v1/auth/me — soft-delete + re-home transfers in one transaction (D-1),
 /// emit account_deleted via the outbox, then telemetry. Mirror RequestMagicLink's two-steps-in-one-handler shape (insert → publish).
 /// </summary>
-public sealed class DeleteAccountHandler : IRequestHandler<DeleteAccountCommand, DeleteAccountResult>
+/// <param name="users">Store that soft-deletes the account and re-homes its transfers.</param>
+/// <param name="eventPublisher">Publishes the <c>account.deleted</c> event.</param>
+/// <param name="telemetry">Reporter for the <c>account_deleted</c> telemetry event.</param>
+/// <param name="blobs">Blob store used to remove the user's organization logo.</param>
+/// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+/// <param name="logger">Optional logger for the best-effort logo cleanup warning.</param>
+public sealed partial class DeleteAccountHandler(
+    IAppUserStore users,
+    IEventPublisher eventPublisher,
+    WaTelemetryReporter telemetry,
+    IBlobStore blobs,
+    TimeProvider timeProvider,
+    ILogger<DeleteAccountHandler>? logger = null) : IRequestHandler<DeleteAccountCommand, DeleteAccountResult>
 {
-    private readonly IAppUserStore _users;
-    private readonly IEventPublisher _eventPublisher;
-    private readonly WaTelemetryReporter _telemetry;
-    private readonly IBlobStore _blobs;
-    private readonly ILogger<DeleteAccountHandler>? _logger;
-
-    /// <summary>Initializes a new instance of the <see cref="DeleteAccountHandler"/> class.</summary>
-    /// <param name="users">Store that soft-deletes the account and re-homes its transfers.</param>
-    /// <param name="eventPublisher">Publishes the <c>account.deleted</c> event.</param>
-    /// <param name="telemetry">Reporter for the <c>account_deleted</c> telemetry event.</param>
-    /// <param name="blobs">Blob store used to remove the user's organization logo.</param>
-    /// <param name="logger">Optional logger for the best-effort logo cleanup warning.</param>
-    public DeleteAccountHandler(IAppUserStore users, IEventPublisher eventPublisher, WaTelemetryReporter telemetry, IBlobStore blobs,
-        ILogger<DeleteAccountHandler>? logger = null)
-    {
-        _logger = logger;
-        _users = users;
-        _eventPublisher = eventPublisher;
-        _telemetry = telemetry;
-        _blobs = blobs;
-    }
+    private readonly IAppUserStore _users = users;
+    private readonly IEventPublisher _eventPublisher = eventPublisher;
+    private readonly WaTelemetryReporter _telemetry = telemetry;
+    private readonly IBlobStore _blobs = blobs;
+    private readonly ILogger<DeleteAccountHandler>? _logger = logger;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <inheritdoc />
     public async Task<DeleteAccountResult> Handle(DeleteAccountCommand request, CancellationToken cancellationToken)
@@ -47,7 +43,7 @@ public sealed class DeleteAccountHandler : IRequestHandler<DeleteAccountCommand,
 
         // 2. Soft-delete + transfer re-home in ONE transaction (D-1). The event publish happens AFTER this commits —
         //    the row is already soft-deleted at that point; EC-054-1's outbox re-publish covers broker failure.
-        var deletedAtUtc = DateTime.UtcNow;
+        var deletedAtUtc = _timeProvider.GetUtcNow().UtcDateTime;
         var ok = await _users.SoftDeleteWithReHomeAsync(user.Id, deletedAtUtc, cancellationToken);
         if (!ok)
             throw MeProfileException.ForNotFound(); // race where a concurrent DELETE already committed — same not-found shape
@@ -81,7 +77,7 @@ public sealed class DeleteAccountHandler : IRequestHandler<DeleteAccountCommand,
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger?.LogWarning("Org logo blob delete failed after account deletion for user {UserId}.", user.Id);
+                if (_logger is not null) LogOrgLogoDeleteFailed(_logger, user.Id);
             }
         }
 
@@ -100,4 +96,7 @@ public sealed class DeleteAccountHandler : IRequestHandler<DeleteAccountCommand,
         }
         return Guid.NewGuid();
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Org logo blob delete failed after account deletion for user {UserId}.")]
+    private static partial void LogOrgLogoDeleteFailed(ILogger logger, Guid userId);
 }

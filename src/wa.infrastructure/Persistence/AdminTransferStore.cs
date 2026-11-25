@@ -10,13 +10,10 @@ namespace wa.infrastructure.Persistence;
 /// Mirrors TransferStore.MarkDeletedAsync at src/wa.infrastructure/Persistence/TransferStore.cs:143 with the owner predicate
 /// removed (platform-scoped: Id=@id AND Status != 4). Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext).
 /// </summary>
-public sealed class AdminTransferStore : IAdminTransferStore
+/// <param name="db">Database context that backs the store.</param>
+public sealed class AdminTransferStore(WaDbContext db) : IAdminTransferStore
 {
-    private readonly WaDbContext _db;
-
-    /// <summary>Initializes a new instance of the <see cref="AdminTransferStore"/> class.</summary>
-    /// <param name="db">Database context that backs the store.</param>
-    public AdminTransferStore(WaDbContext db) => _db = db;
+    private readonly WaDbContext _db = db;
 
     /// <inheritdoc />
     /// <remarks>

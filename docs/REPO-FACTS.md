@@ -33,7 +33,7 @@ Colors: `--bg #FFFFFF`, `--bg-subtle #F5F6F8`, `--bg-elevated #FFFFFF`, `--fg #1
 Typography/shape: `--fs-display 40px`, `--fs-h1 28px`, `--fs-body 16px`, `--fs-small 14px`,
 `--fs-tiny 12px`, `--radius-sm 6px`, `--radius-md 10px`, `--radius-lg 16px`.
 
-## 2. API surface (`src/wa.api/Program.cs`) — **43 route+method mappings** (end of Phase 0 = 36; +3 F-BIL-002: checkout, portal, Stripe webhook; +1 F-BIL-003 US-020-03: `GET /billing/plan`; 39 always-on + 1 Development-only; +3 F-PRF-001 US-021-04: `GET/PUT/DELETE /auth/me/logo` = 42 always-on + 1 Development-only)
+## 2. API surface (`src/wa.api/Endpoints/*Endpoints.cs`, mapped from `Program.cs` since CHORE-code-style-2; DI in `ApiServices.cs`) — **43 route+method mappings** (end of Phase 0 = 36; +3 F-BIL-002: checkout, portal, Stripe webhook; +1 F-BIL-003 US-020-03: `GET /billing/plan`; 39 always-on + 1 Development-only; +3 F-PRF-001 US-021-04: `GET/PUT/DELETE /auth/me/logo` = 42 always-on + 1 Development-only)
 
 | Area | Route | Method |
 |---|---|---|
@@ -61,7 +61,7 @@ Typography/shape: `--fs-display 40px`, `--fs-h1 28px`, `--fs-body 16px`, `--fs-s
 ## 3. Auth & session wiring facts
 
 - **Session cookie:** name `wa.session`, HttpOnly, set by endpoints (NOT middleware); JS cannot read it. Client mirrors the profile DTO in localStorage under key **`protoDrop.session`** (`src/wa.web/src/core/auth/session.ts:18`).
-- **Middleware order** (`Program.cs:163–171`): Cors → Correlation → IpRateLimiting → Idempotency → Session (reads cookie, sets `HttpContext.Items['wa.session.userId']`, refreshes < 15 d remaining) → GlobalError (business codes keep status; others 500 INTERNAL) → SerilogRequestLogging.
+- **Middleware order** (`Program.cs:24–33`): Cors → Correlation → IpRateLimiting → Idempotency → Session (reads cookie, sets `HttpContext.Items['wa.session.userId']`, refreshes < 15 d remaining) → GlobalError (business codes keep status; others 500 INTERNAL) → PlanContext → SerilogRequestLogging. `TimeProvider.System` is registered in both composition roots (`ApiServices.cs`, `WorkerServices.cs`); `[LoggerMessage]` log events carry `EventId`/`EventName`.
 - **CORS** (`src/wa.api/Middleware/CorsAllowListMiddleware.cs`): allowlist from config key `Wa:Cors:AllowedOrigins` (comma-separated); echoes exact origin + `Vary: Origin`, never `*`; preflight answered by middleware with 1 h cache, allowed headers `Authorization, Content-Type, Idempotency-Key`.
 - **Stores:** `IAppUserStore` (`src/wa.application/UseCases/Auth/Interfaces/IAppUserStore.cs`) — `FindByEmailAsync`, `CreateAsync`, `GetByIdAsync` (null when unknown OR soft-deleted), `UpdateProfileAsync` (null arg = leave column alone; empty displayName → email local part), `SoftDeleteWithReHomeAsync` (one transaction, returns false on unknown id).
   `IAuthTokenStore` — `FindByHashAsync(sha256Hex)`, `CreateAsync(AuthToken)`, `MarkRedeemedAsync` (first redeem wins).

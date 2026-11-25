@@ -18,6 +18,7 @@ Cycle per task: **architect (plan) → coder (develop) → reviewer (review)** �
 ## C# code style (enforced by the build since 2026-11-25)
 - One top-level type per file, file named after the type; interfaces in `wa.application/Ports/` or `<Area>/Interfaces/` (namespace unchanged).
 - Every public/internal type and member in `src/` needs meaningful XML docs (`<summary>`, `<param>`, `<returns>`, …). Missing/malformed docs (CS1591 etc.) are **build errors** via `src/Directory.Build.props`. Full rule: `docs/AGENT.md` §3 rule 10.
+- **Zero warnings** (`TreatWarningsAsErrors` in src + tests, analyzers `10.0-recommended`, code style enforced): run `dotnet format src/wa.slnx` before committing. Use injected `TimeProvider`, never `DateTime.UtcNow`. Logging = `[LoggerMessage] private static partial void LogX(ILogger logger, …)`. Primary constructors keep `private readonly` fields. New endpoints go in `src/wa.api/Endpoints/`, DI in `src/wa.api/ApiServices.cs`. Full rule: `docs/AGENT.md` §3 rule 11.
 
 ## Role separation (director vs writer)
 - **Only the Coder writes code and tests**: every file under `src/`, `tests/` (source + unit/integration/e2e tests) is written by a Coder subagent — never by the Orchestrator.

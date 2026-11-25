@@ -1,28 +1,16 @@
-using System.Text.Json.Serialization;
 using MediatR;
-using wa.application.Limits;
 using wa.application.Ports;
-using wa.application.UseCases.EmailSettings;
 using wa.domain;
-using wa.domain.Errors;
-using wa.domain.Telemetry;
 
 namespace wa.application.UseCases.Auth;
 
 /// <summary>T-008-06 (TA-4.2#13): GET /api/v1/auth/me — returns the profile DTO verbatim from the session user's row.</summary>
-public sealed class GetProfileHandler : IRequestHandler<GetProfileCommand, GetProfileResult>
+/// <param name="users">Store used to read the user row.</param>
+/// <param name="plans">Store used to resolve the plan code of the user.</param>
+public sealed class GetProfileHandler(IAppUserStore users, IPlansStore plans) : IRequestHandler<GetProfileCommand, GetProfileResult>
 {
-    private readonly IAppUserStore _users;
-    private readonly IPlansStore _plans;
-
-    /// <summary>Initializes a new instance of the <see cref="GetProfileHandler"/> class.</summary>
-    /// <param name="users">Store used to read the user row.</param>
-    /// <param name="plans">Store used to resolve the plan code of the user.</param>
-    public GetProfileHandler(IAppUserStore users, IPlansStore plans)
-    {
-        _users = users;
-        _plans = plans;
-    }
+    private readonly IAppUserStore _users = users;
+    private readonly IPlansStore _plans = plans;
 
     /// <inheritdoc />
     public async Task<GetProfileResult> Handle(GetProfileCommand request, CancellationToken cancellationToken)

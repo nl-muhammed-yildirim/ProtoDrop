@@ -13,29 +13,20 @@ namespace wa.application.UseCases.Auth;
 /// Normalize email (same form as SignupHandler.NormalizeEmail — EC-008-1); no row OR failed hash verify → one single
 /// use-case exception mapped to WRONG_PASSWORD at the endpoint — never "user not found" (EC: don't leak which emails exist).
 /// </summary>
-public sealed class LoginHandler : IRequestHandler<LoginCommand, LoginResult>
+/// <param name="users">Store used to look up the account by email.</param>
+/// <param name="plans">Store used to resolve the plan code of the account.</param>
+/// <param name="telemetry">Reporter for the <c>login_success</c> and <c>login_failed</c> events.</param>
+/// <param name="tokens">Mints the session token returned to the caller.</param>
+public sealed class LoginHandler(
+    IAppUserStore users,
+    IPlansStore plans,
+    WaTelemetryReporter telemetry,
+    ISessionTokenMinter tokens) : IRequestHandler<LoginCommand, LoginResult>
 {
-    private readonly IAppUserStore _users;
-    private readonly IPlansStore _plans;
-    private readonly WaTelemetryReporter _telemetry;
-    private readonly ISessionTokenMinter _tokens;
-
-    /// <summary>Initializes a new instance of the <see cref="LoginHandler"/> class.</summary>
-    /// <param name="users">Store used to look up the account by email.</param>
-    /// <param name="plans">Store used to resolve the plan code of the account.</param>
-    /// <param name="telemetry">Reporter for the <c>login_success</c> and <c>login_failed</c> events.</param>
-    /// <param name="tokens">Mints the session token returned to the caller.</param>
-    public LoginHandler(
-        IAppUserStore users,
-        IPlansStore plans,
-        WaTelemetryReporter telemetry,
-        ISessionTokenMinter tokens)
-    {
-        _users = users;
-        _plans = plans;
-        _telemetry = telemetry;
-        _tokens = tokens;
-    }
+    private readonly IAppUserStore _users = users;
+    private readonly IPlansStore _plans = plans;
+    private readonly WaTelemetryReporter _telemetry = telemetry;
+    private readonly ISessionTokenMinter _tokens = tokens;
 
     /// <inheritdoc />
     public async Task<LoginResult> Handle(LoginCommand request, CancellationToken cancellationToken)
@@ -55,7 +46,9 @@ public sealed class LoginHandler : IRequestHandler<LoginCommand, LoginResult>
 
         // TA-9.1: PBKDF2-SHA256 via ASP.NET Identity PasswordHasher<string>, keyed by userId.ToString("n") — same keying as signup.
         var hasher = new PasswordHasher<string>();
-        if (hasher.VerifyHashedPassword(user.Id.ToString("n"), user.PasswordHash, request.Password) is not
+        // A magic-link-only account has no PasswordHash: nothing to verify, so it is a failed verify (same shape as no row — no 500, no leak).
+        if (user.PasswordHash is null
+            || hasher.VerifyHashedPassword(user.Id.ToString("n"), user.PasswordHash, request.Password) is not
             (PasswordVerificationResult.Success or PasswordVerificationResult.SuccessRehashNeeded))
         {
             _telemetry.LogEvent(TelemetryEvents.LoginFailed); // AC-008-1 / task §4: login_failed on the wrong-password path

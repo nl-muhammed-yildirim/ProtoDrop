@@ -29,7 +29,7 @@ public class ApplyAtFinalizeIntegrationTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        _sql = new MsSqlBuilder().WithImage("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
         await _sql.StartAsync();
         _options = new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(_sql.GetConnectionString()).Options;
         _storeDb = new WaDbContext(_options);
@@ -54,7 +54,7 @@ public class ApplyAtFinalizeIntegrationTests : IAsyncLifetime
             _publisher,
             new WaTelemetryReporter(NullLogger<WaTelemetryReporter>.Instance, Encoding.UTF8.GetBytes("test-key")),
             NullLogger<SendTransferHandler>.Instance,
-            new AppUserStore(_storeDb));
+            new AppUserStore(_storeDb), TimeProvider.System);
     }
 
     public async Task DisposeAsync()

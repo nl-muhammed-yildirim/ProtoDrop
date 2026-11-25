@@ -42,7 +42,7 @@ public class DraftEndpointTests : IAsyncLifetime
         Environment.SetEnvironmentVariable("Wa__Jwt__Secret", "test-jwt-secret");
 
         // Fresh SQL + migrations: the SeedPlansAndFeatureFlags migration seeds the free plan row the handler resolves.
-        _sql = new MsSqlBuilder().WithImage("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
         await _sql.StartAsync();
         var connString = _sql.GetConnectionString();
         Environment.SetEnvironmentVariable("ConnectionStrings__WaDb", connString);
@@ -88,7 +88,7 @@ public class DraftEndpointTests : IAsyncLifetime
         // Every uploadUrl is a minted draft SAS — sv=2024 + sp=cwr, the TA-3.6 pair (T-055 pins the full string-to-sign shape in units).
         foreach (var file in files.EnumerateArray())
         {
-            var url = new Uri(file.GetProperty("uploadUrl").GetString());
+            var url = new Uri(file.GetProperty("uploadUrl").GetString()!);
             Assert.Contains("sv=2024", url.Query);
             Assert.Contains("sp=cwr", url.Query);
         }
@@ -111,7 +111,7 @@ public class DraftEndpointTests : IAsyncLifetime
             var draftId = root.GetProperty("draftId").GetString()!; // :N format — the minter's string form.
             var fileRow = root.GetProperty("files")[0];
             var fileId = fileRow.GetProperty("fileId").GetString()!;
-            var minted = new Uri(fileRow.GetProperty("uploadUrl").GetString());
+            var minted = new Uri(fileRow.GetProperty("uploadUrl").GetString()!);
 
             // The browser's upload: a block blob PUT via plain HTTP — the SAS URL is the only credential; nothing in headers.
             using var http = new HttpClient();

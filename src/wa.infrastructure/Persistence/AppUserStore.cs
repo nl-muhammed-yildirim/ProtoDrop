@@ -8,13 +8,10 @@ namespace wa.infrastructure.Persistence;
 /// T-008-01: thin adapter over WaDbContext implementing IAppUserStore — the only DB surface signup needs.
 /// Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext).
 /// </summary>
-public sealed class AppUserStore : IAppUserStore
+/// <param name="db">Database context that backs the store.</param>
+public sealed class AppUserStore(WaDbContext db) : IAppUserStore
 {
-    private readonly WaDbContext _db;
-
-    /// <summary>Initializes a new instance of the <see cref="AppUserStore"/> class.</summary>
-    /// <param name="db">Database context that backs the store.</param>
-    public AppUserStore(WaDbContext db) => _db = db;
+    private readonly WaDbContext _db = db;
 
     /// <inheritdoc />
     public Task<AppUser?> FindByEmailAsync(string lowercasedEmail, CancellationToken ct) =>

@@ -24,6 +24,7 @@ public sealed class FinalizeTransferHandler : IRequestHandler<FinalizeTransferCo
     private readonly string _publicUrl;
     private readonly WaTelemetryReporter _telemetry;
     private readonly ILogger<FinalizeTransferHandler> _logger;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="FinalizeTransferHandler"/> class.</summary>
     /// <param name="store">Store that persists the draft transfer and its files.</param>
@@ -32,13 +33,15 @@ public sealed class FinalizeTransferHandler : IRequestHandler<FinalizeTransferCo
     /// <param name="configuration">Configuration source for the public site URL used in the result.</param>
     /// <param name="telemetry">Reporter for the upload and storage telemetry.</param>
     /// <param name="logger">Logger injected for the handler (currently unused).</param>
+    /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
     public FinalizeTransferHandler(
         ITransferStore store,
         IBlobStore blobStore,
         IPlanContextAccessor planContext,
         IConfiguration configuration,
         WaTelemetryReporter telemetry,
-        ILogger<FinalizeTransferHandler> logger)
+        ILogger<FinalizeTransferHandler> logger,
+        TimeProvider timeProvider)
     {
         _store = store;
         _blobStore = blobStore;
@@ -46,6 +49,7 @@ public sealed class FinalizeTransferHandler : IRequestHandler<FinalizeTransferCo
         _publicUrl = configuration["Wa:Url:Public"] ?? "http://localhost:5173";
         _telemetry = telemetry;
         _logger = logger;
+        _timeProvider = timeProvider;
     }
 
     /// <inheritdoc />
@@ -53,7 +57,7 @@ public sealed class FinalizeTransferHandler : IRequestHandler<FinalizeTransferCo
     {
         // 1. Idempotency check first (EC-002-1): if the key exists and is not expired, return the stored result.
         var existing = await _store.FindByIdempotencyKeyAsync(request.IdempotencyKey, cancellationToken);
-        if (existing is not null && existing.ExpiresAtUtc > DateTime.UtcNow)
+        if (existing is not null && existing.ExpiresAtUtc > _timeProvider.GetUtcNow().UtcDateTime)
         {
             var cached = JsonSerializer.Deserialize<FinalizeTransferResult>(existing.ResultJson!);
             return cached;
@@ -73,7 +77,7 @@ public sealed class FinalizeTransferHandler : IRequestHandler<FinalizeTransferCo
         }
 
         var transferId = Guid.NewGuid();
-        var now = DateTime.UtcNow;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var totalBytes = request.Files.Sum(f => f.SizeBytes);
         var totalRetries = request.Files.Sum(f => f.Retries);
 

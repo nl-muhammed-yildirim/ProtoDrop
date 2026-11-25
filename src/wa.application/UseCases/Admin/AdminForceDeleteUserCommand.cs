@@ -1,8 +1,4 @@
 using MediatR;
-using wa.application.Ports;
-using wa.application.UseCases.Auth;
-using wa.domain;
-using wa.domain.Correlation;
 
 namespace wa.application.UseCases.Admin;
 

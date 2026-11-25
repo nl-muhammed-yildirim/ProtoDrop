@@ -35,7 +35,7 @@ public class SendNotificationEmailsHandlerTests
             new byte[32]);
 
         var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string>
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Wa:Email:FromAddress"] = "no-reply@protodrop.com",
                 ["Wa:Url:Public"] = "https://protodrop.com"
@@ -52,7 +52,7 @@ public class SendNotificationEmailsHandlerTests
             config,
             _log,
             _branding,
-            new StubFeaturesProvider());
+            new StubFeaturesProvider(), TimeProvider.System);
     }
 
     [Fact]
@@ -535,7 +535,7 @@ public class SendNotificationEmailsHandlerTests
             new ConfigurationBuilder().AddInMemoryCollection(values).Build(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<SendNotificationEmailsHandler>.Instance,
             _branding,
-            new StubFeaturesProvider());
+            new StubFeaturesProvider(), TimeProvider.System);
     }
 
     private EventEnvelope ArrangeTwoRecipients(string? senderEmail)

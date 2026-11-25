@@ -367,7 +367,7 @@ public class TransferAnalyticsEndpointTests() : TransferAnalyticsEndpointTestsBa
     {
         var id = await SeedTransferAsync(null);
 
-        await new PublicTransferStore(Db).RecordSingleFileDownloadAsync(id, Guid.NewGuid(), null, null, "Firefox", CancellationToken.None);
+        await new PublicTransferStore(Db, TimeProvider.System).RecordSingleFileDownloadAsync(id, Guid.NewGuid(), null, null, "Firefox", CancellationToken.None);
 
         var family = await Db.Set<DownloadEvent>().AsNoTracking().Where(e => e.TransferId == id).Select(e => e.UserAgentFamily).SingleAsync();
         Assert.Equal("Firefox", family);

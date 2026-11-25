@@ -1,6 +1,5 @@
 using MediatR;
 using wa.application.UseCases.Transfers;
-using wa.domain.Correlation;
 
 namespace wa.application.UseCases.Admin;
 

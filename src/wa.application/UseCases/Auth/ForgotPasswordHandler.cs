@@ -16,28 +16,23 @@ namespace wa.application.UseCases.Auth;
 /// with an extra purpose=2 payload field — the D-3 discriminator EmailFunction routes on (D-2: event reuse).
 /// Redeem (endpoint 10) filters on TokenHash only — no Purpose check — so Purpose=2 signs in exactly like Purpose=1.
 /// </summary>
-public sealed class ForgotPasswordHandler : IRequestHandler<ForgotPasswordCommand, ForgotPasswordResult>
+/// <param name="users">Store used to look up the account by email.</param>
+/// <param name="tokens">Store that persists the single-use reset token.</param>
+/// <param name="eventPublisher">Publishes the <c>auth.magic_link_requested</c> event that triggers the email.</param>
+/// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+public sealed class ForgotPasswordHandler(
+    IAppUserStore users,
+    IAuthTokenStore tokens,
+    IEventPublisher eventPublisher,
+    TimeProvider timeProvider) : IRequestHandler<ForgotPasswordCommand, ForgotPasswordResult>
 {
     /// <summary>Purpose code for forgot-password tokens (TA-3.2: AuthToken.Purpose; 2=forgot-password).</summary>
     private const byte PurposeForgotPassword = 2;
 
-    private readonly IAppUserStore _users;
-    private readonly IAuthTokenStore _tokens;
-    private readonly IEventPublisher _eventPublisher;
-
-    /// <summary>Initializes a new instance of the <see cref="ForgotPasswordHandler"/> class.</summary>
-    /// <param name="users">Store used to look up the account by email.</param>
-    /// <param name="tokens">Store that persists the single-use reset token.</param>
-    /// <param name="eventPublisher">Publishes the <c>auth.magic_link_requested</c> event that triggers the email.</param>
-    public ForgotPasswordHandler(
-        IAppUserStore users,
-        IAuthTokenStore tokens,
-        IEventPublisher eventPublisher)
-    {
-        _users = users;
-        _tokens = tokens;
-        _eventPublisher = eventPublisher;
-    }
+    private readonly IAppUserStore _users = users;
+    private readonly IAuthTokenStore _tokens = tokens;
+    private readonly IEventPublisher _eventPublisher = eventPublisher;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <inheritdoc />
     public async Task<ForgotPasswordResult> Handle(ForgotPasswordCommand request, CancellationToken cancellationToken)
@@ -58,7 +53,7 @@ public sealed class ForgotPasswordHandler : IRequestHandler<ForgotPasswordComman
         var tokenHashHex = ComputeSha256Hex(rawToken); // only the hash is persisted (TA-9.1)
 
         // 4. Persist the AuthToken row with Purpose=2 and the frozen 10-minute TTL.
-        var nowUtc = DateTime.UtcNow;
+        var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
         var authToken = new AuthToken
         {
             Id = Guid.NewGuid(),
@@ -101,8 +96,7 @@ public sealed class ForgotPasswordHandler : IRequestHandler<ForgotPasswordComman
     /// <summary>Compute SHA-256 hex (64 chars) of a raw token string.</summary>
     private static string ComputeSha256Hex(string token)
     {
-        using var sha = SHA256.Create();
-        var bytes = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(token));
+        var bytes = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token));
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 

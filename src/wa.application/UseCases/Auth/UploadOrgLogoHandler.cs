@@ -10,36 +10,29 @@ namespace wa.application.UseCases.Auth;
 /// bounded read, size (422) → content sniff (415) → blob write → path update → delete the superseded blob. Every rejection
 /// happens before any write; a failed path update removes the just-written blob unless it replaced the canonical one.
 /// </summary>
-public sealed class UploadOrgLogoHandler : IRequestHandler<UploadOrgLogoCommand, OrgLogoView>
+/// <param name="users">Store used to read the user's current logo path.</param>
+/// <param name="plan">Accessor used to read the plan's branding feature and logo size limit.</param>
+/// <param name="writer">Blob writer that stores the logo with its detected Content-Type.</param>
+/// <param name="blobs">Blob store used to delete a superseded or orphaned logo.</param>
+/// <param name="logos">Store that records the new logo path on the user row.</param>
+/// <param name="minter">Mints the preview URL returned to the caller.</param>
+public sealed class UploadOrgLogoHandler(
+    IAppUserStore users,
+    IPlanContextAccessor plan,
+    IBlobContentWriter writer,
+    IBlobStore blobs,
+    IOrgLogoStore logos,
+    IOrgLogoSasMinter minter) : IRequestHandler<UploadOrgLogoCommand, OrgLogoView>
 {
     private const int ReadChunk = 81920;
     private const int SniffBytes = 1024;
 
-    private readonly IAppUserStore _users;
-    private readonly IPlanContextAccessor _plan;
-    private readonly IBlobContentWriter _writer;
-    private readonly IBlobStore _blobs;
-    private readonly IOrgLogoStore _logos;
-    private readonly IOrgLogoSasMinter _minter;
-
-    /// <summary>Initializes a new instance of the <see cref="UploadOrgLogoHandler"/> class.</summary>
-    /// <param name="users">Store used to read the user's current logo path.</param>
-    /// <param name="plan">Accessor used to read the plan's branding feature and logo size limit.</param>
-    /// <param name="writer">Blob writer that stores the logo with its detected Content-Type.</param>
-    /// <param name="blobs">Blob store used to delete a superseded or orphaned logo.</param>
-    /// <param name="logos">Store that records the new logo path on the user row.</param>
-    /// <param name="minter">Mints the preview URL returned to the caller.</param>
-    public UploadOrgLogoHandler(
-        IAppUserStore users, IPlanContextAccessor plan, IBlobContentWriter writer,
-        IBlobStore blobs, IOrgLogoStore logos, IOrgLogoSasMinter minter)
-    {
-        _users = users;
-        _plan = plan;
-        _writer = writer;
-        _blobs = blobs;
-        _logos = logos;
-        _minter = minter;
-    }
+    private readonly IAppUserStore _users = users;
+    private readonly IPlanContextAccessor _plan = plan;
+    private readonly IBlobContentWriter _writer = writer;
+    private readonly IBlobStore _blobs = blobs;
+    private readonly IOrgLogoStore _logos = logos;
+    private readonly IOrgLogoSasMinter _minter = minter;
 
     /// <inheritdoc />
     public async Task<OrgLogoView> Handle(UploadOrgLogoCommand request, CancellationToken cancellationToken)

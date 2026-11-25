@@ -11,29 +11,20 @@ namespace wa.application.UseCases.Transfers;
 /// PBKDF2-SHA256 verify against Transfer.PasswordHash with the SAME PasswordHasher + user-id keying as SendTransfer (transfer.Id.ToString("n"));
 /// correct → mint the 7-day unlock JWT. Status always wins over credentials (D6/US-003-05) — terminal rows never reach the password logic.
 /// </summary>
-public sealed class UnlockTransferHandler : IRequestHandler<UnlockTransferCommand, UnlockTransferResult>
+/// <param name="store">Store that reads the transfer by link id.</param>
+/// <param name="minter">Mints the unlock token returned on a correct password.</param>
+/// <param name="telemetry">Reporter for the <c>password_correct</c> and <c>password_wrong</c> events.</param>
+/// <param name="logger">Logger injected for the handler (currently unused).</param>
+public sealed class UnlockTransferHandler(
+    IPublicTransferStore store,
+    IUnlockTokenMinter minter,
+    WaTelemetryReporter telemetry,
+    ILogger<UnlockTransferHandler> logger) : IRequestHandler<UnlockTransferCommand, UnlockTransferResult>
 {
-    private readonly IPublicTransferStore _store;
-    private readonly IUnlockTokenMinter _minter;
-    private readonly WaTelemetryReporter _telemetry;
-    private readonly ILogger<UnlockTransferHandler> _logger;
-
-    /// <summary>Initializes a new instance of the <see cref="UnlockTransferHandler"/> class.</summary>
-    /// <param name="store">Store that reads the transfer by link id.</param>
-    /// <param name="minter">Mints the unlock token returned on a correct password.</param>
-    /// <param name="telemetry">Reporter for the <c>password_correct</c> and <c>password_wrong</c> events.</param>
-    /// <param name="logger">Logger injected for the handler (currently unused).</param>
-    public UnlockTransferHandler(
-        IPublicTransferStore store,
-        IUnlockTokenMinter minter,
-        WaTelemetryReporter telemetry,
-        ILogger<UnlockTransferHandler> logger)
-    {
-        _store = store;
-        _minter = minter;
-        _telemetry = telemetry;
-        _logger = logger;
-    }
+    private readonly IPublicTransferStore _store = store;
+    private readonly IUnlockTokenMinter _minter = minter;
+    private readonly WaTelemetryReporter _telemetry = telemetry;
+    private readonly ILogger<UnlockTransferHandler> _logger = logger;
 
     /// <inheritdoc />
     public async Task<UnlockTransferResult> Handle(UnlockTransferCommand request, CancellationToken cancellationToken)

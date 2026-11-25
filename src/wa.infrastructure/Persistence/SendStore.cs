@@ -9,19 +9,12 @@ namespace wa.infrastructure.Persistence;
 /// T-002-04: thin adapter over WaDbContext implementing ISendStore — the only DB surface the send handler needs.
 /// Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext).
 /// </summary>
-public sealed class SendStore : ISendStore
+/// <param name="db">Database context that backs the store.</param>
+/// <param name="blobs">Blob store used to check that re-sent files still physically exist.</param>
+public sealed class SendStore(WaDbContext db, IBlobStore blobs) : ISendStore
 {
-    private readonly WaDbContext _db;
-    private readonly IBlobStore _blobs;   // T-010-02: the gate primitive — physical-presence checks via ExistsAsync.
-
-    /// <summary>Initializes a new instance of the <see cref="SendStore"/> class.</summary>
-    /// <param name="db">Database context that backs the store.</param>
-    /// <param name="blobs">Blob store used to check that re-sent files still physically exist.</param>
-    public SendStore(WaDbContext db, IBlobStore blobs)
-    {
-        _db = db;
-        _blobs = blobs;
-    }
+    private readonly WaDbContext _db = db;
+    private readonly IBlobStore _blobs = blobs;   // T-010-02: the gate primitive — physical-presence checks via ExistsAsync.
 
     /// <inheritdoc />
     public Task<Transfer?> FindByIdAsync(Guid id, CancellationToken ct) =>
@@ -136,7 +129,7 @@ public sealed class SendStore : ISendStore
     /// a FilesGoneException throw rolls it back → zero new rows, no RefCount change (AC-010-2). An empty id collection
     /// returns early (a SourcedFrom draft with no file rows must not fire the gate).
     /// </summary>
-    private async Task AssertBlobsPhysicallyPresentAsync(IReadOnlyCollection<Guid> blobRefIds, CancellationToken ct)
+    private async Task AssertBlobsPhysicallyPresentAsync(List<Guid> blobRefIds, CancellationToken ct)
     {
         if (blobRefIds.Count == 0)
             return;

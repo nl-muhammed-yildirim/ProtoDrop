@@ -1,7 +1,4 @@
 using MediatR;
-using wa.application.UseCases.Auth;
-using wa.domain;
-using wa.domain.Errors;
 
 namespace wa.application.UseCases.Admin;
 

@@ -13,7 +13,7 @@ namespace wa.infrastructure.Email;
 /// Loads all supported locale templates from Emails/templates/transfer/. Emits email.template_fallback on unknown locale,
 /// template_render_error when unreplaced Stubble variables are detected in output.
 /// </summary>
-public sealed class StubbleTemplateRenderer : ITemplateRenderer
+public sealed partial class StubbleTemplateRenderer : ITemplateRenderer
 {
     private readonly Dictionary<string, (string Html, string Txt)> _templates;
     private readonly ILogger<StubbleTemplateRenderer> _logger;
@@ -70,7 +70,7 @@ public sealed class StubbleTemplateRenderer : ITemplateRenderer
         // Resolve locale with fallback to English.
         if (!_templates.TryGetValue(locale, out var templates))
         {
-            _logger.LogInformation("email.template_fallback: locale={Locale}", locale);
+            LogTemplateFallback(_logger, locale);
 
             // T-014-04: Emit as proper telemetry event (TA-10.2), not just a log line.
             _telemetry?.LogEvent(TelemetryEvents.EmailTemplateFallback);
@@ -89,7 +89,7 @@ public sealed class StubbleTemplateRenderer : ITemplateRenderer
         // Detect unreplaced Stubble variables ({{...}} patterns in output).
         if (Regex.IsMatch(htmlBody + textBody, @"\{\{[^}]+\}\}") || Regex.IsMatch(subject, @"\{\{"))
         {
-            _logger.LogInformation("template_render_error");
+            LogTemplateRenderError(_logger);
         }
 
         return (subject, htmlBody, textBody);
@@ -137,4 +137,10 @@ public sealed class StubbleTemplateRenderer : ITemplateRenderer
         public string? UnsubscribeUrl { get; init; } = UnsubscribeUrl;
         public bool HasUnsubscribeUrl => !string.IsNullOrEmpty(UnsubscribeUrl);
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "email.template_fallback: locale={Locale}")]
+    private static partial void LogTemplateFallback(ILogger logger, string locale);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "template_render_error")]
+    private static partial void LogTemplateRenderError(ILogger logger);
 }

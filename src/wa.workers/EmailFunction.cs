@@ -19,36 +19,26 @@ namespace wa.workers;
 /// IEmailEventHandler? (shared interface in wa.application), which also fixes the pre-existing CS8506 build defect.
 /// US-019-04 (FR-019-7): BillingEmailRequested → SendBillingEmailHandler (billing_payment_failed, steps 1..3).
 /// </summary>
-public class EmailFunction
+/// <param name="notificationHandler">Handler for <c>transfer.created</c> recipient notifications.</param>
+/// <param name="magicLinkHandler">Handler for sign-in link emails.</param>
+/// <param name="forgotPasswordHandler">Handler for password-reset emails.</param>
+/// <param name="billingHandler">Handler for billing emails.</param>
+/// <param name="logger">Logger for the correlation scope and dispatch failures (never logs addresses).</param>
+public partial class EmailFunction(
+    SendNotificationEmailsHandler notificationHandler,
+    SendMagicLinkEmailHandler magicLinkHandler,
+    SendForgotPasswordEmailHandler forgotPasswordHandler,
+    SendBillingEmailHandler billingHandler,
+    ILogger<EmailFunction> logger)
 {
     /// <summary>MaxDeliveryCount for the core/email subscription (TA-5.1) — broker-side; passed to the handler as a plain int so wa.application stays SB-free.</summary>
     private const int MaxDeliveryCount = 5;
 
-    private readonly SendNotificationEmailsHandler _notificationHandler;
-    private readonly SendMagicLinkEmailHandler _magicLinkHandler;
-    private readonly SendForgotPasswordEmailHandler _forgotPasswordHandler;
-    private readonly SendBillingEmailHandler _billingHandler;
-    private readonly ILogger<EmailFunction> _logger;
-
-    /// <summary>Initializes a new instance of the <see cref="EmailFunction"/> class.</summary>
-    /// <param name="notificationHandler">Handler for <c>transfer.created</c> recipient notifications.</param>
-    /// <param name="magicLinkHandler">Handler for sign-in link emails.</param>
-    /// <param name="forgotPasswordHandler">Handler for password-reset emails.</param>
-    /// <param name="billingHandler">Handler for billing emails.</param>
-    /// <param name="logger">Logger for the correlation scope and dispatch failures (never logs addresses).</param>
-    public EmailFunction(
-        SendNotificationEmailsHandler notificationHandler,
-        SendMagicLinkEmailHandler magicLinkHandler,
-        SendForgotPasswordEmailHandler forgotPasswordHandler,
-        SendBillingEmailHandler billingHandler,
-        ILogger<EmailFunction> logger)
-    {
-        _billingHandler = billingHandler;
-        _notificationHandler = notificationHandler;
-        _magicLinkHandler = magicLinkHandler;
-        _forgotPasswordHandler = forgotPasswordHandler;
-        _logger = logger;
-    }
+    private readonly SendNotificationEmailsHandler _notificationHandler = notificationHandler;
+    private readonly SendMagicLinkEmailHandler _magicLinkHandler = magicLinkHandler;
+    private readonly SendForgotPasswordEmailHandler _forgotPasswordHandler = forgotPasswordHandler;
+    private readonly SendBillingEmailHandler _billingHandler = billingHandler;
+    private readonly ILogger<EmailFunction> _logger = logger;
 
     /// <summary>Service Bus entry point for the <c>email</c> subscription: deserializes the envelope and dispatches it to the handler for its event type, passing the delivery attempt so the last attempt can report a failure before the broker dead-letters the message.</summary>
     /// <param name="context">Function invocation context; supplies the cancellation token.</param>
@@ -90,7 +80,7 @@ public class EmailFunction
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "f-email failed for event {EventId} attempt {Attempt}", envelope.EventId, message.DeliveryCount);
+            LogEventFailed(_logger, ex, envelope.EventId, message.DeliveryCount);
             throw; // SB retries on unhandled exception
         }
     }
@@ -105,4 +95,7 @@ public class EmailFunction
         using var doc = JsonDocument.Parse(json);
         return doc.RootElement.TryGetProperty("purpose", out var p) && p.ValueKind == JsonValueKind.Number && p.GetInt32() == 2;
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "f-email failed for event {EventId} attempt {Attempt}")]
+    private static partial void LogEventFailed(ILogger logger, Exception exception, Guid eventId, int attempt);
 }

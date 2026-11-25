@@ -9,32 +9,23 @@ namespace wa.application.UseCases.Transfers;
 /// T-005-01: f-expire timer job handler (TA-6.3). Scans for Active transfers past their expiry and marks them Expired,
 /// emitting transfer.expired per row. Claim via JobRun prevents double-processing in scale-out (FR-005-9).
 /// </summary>
-public sealed class ExpireTransfersHandler
+/// <param name="store">Store that claims the window and marks transfers expired.</param>
+/// <param name="eventPublisher">Publishes the <c>transfer.expired</c> event for each expired transfer.</param>
+/// <param name="telemetry">Reporter for the expiry-lag telemetry metric.</param>
+/// <param name="logger">Logger injected for the handler (currently unused; the calling function logs the result).</param>
+public sealed class ExpireTransfersHandler(
+    IExpiryStore store,
+    IEventPublisher eventPublisher,
+    WaTelemetryReporter telemetry,
+    ILogger<ExpireTransfersHandler> logger)
 {
     private const int BatchSize = 500; // TA-6.3 architecture constant, not a plan limit
     private static readonly TimeSpan SkewTolerance = TimeSpan.FromMinutes(2); // EC-005-1
 
-    private readonly IExpiryStore _store;
-    private readonly IEventPublisher _eventPublisher;
-    private readonly WaTelemetryReporter _telemetry;
-    private readonly ILogger<ExpireTransfersHandler> _logger;
-
-    /// <summary>Initializes a new instance of the <see cref="ExpireTransfersHandler"/> class.</summary>
-    /// <param name="store">Store that claims the window and marks transfers expired.</param>
-    /// <param name="eventPublisher">Publishes the <c>transfer.expired</c> event for each expired transfer.</param>
-    /// <param name="telemetry">Reporter for the expiry-lag telemetry metric.</param>
-    /// <param name="logger">Logger injected for the handler (currently unused; the calling function logs the result).</param>
-    public ExpireTransfersHandler(
-        IExpiryStore store,
-        IEventPublisher eventPublisher,
-        WaTelemetryReporter telemetry,
-        ILogger<ExpireTransfersHandler> logger)
-    {
-        _store = store;
-        _eventPublisher = eventPublisher;
-        _telemetry = telemetry;
-        _logger = logger;
-    }
+    private readonly IExpiryStore _store = store;
+    private readonly IEventPublisher _eventPublisher = eventPublisher;
+    private readonly WaTelemetryReporter _telemetry = telemetry;
+    private readonly ILogger<ExpireTransfersHandler> _logger = logger;
 
     /// <summary>Run the expiry job. Returns the number of transfers expired (0 if claim was lost or no rows).</summary>
     /// <param name="nowUtc">Current UTC time; defines the 15-minute claim window and the expiry cutoff.</param>

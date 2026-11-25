@@ -1,3 +1,25 @@
 # CHORE-code-style §2.3: interfaces live in Interfaces/ folders but keep their area namespace (no .Interfaces suffix).
 [**/Interfaces/*.cs]
 dotnet_style_namespace_match_folder = false
+
+[*.cs]
+# Analyzer configuration lives here (not in the root .editorconfig): the Docker builds copy only src/.
+dotnet_diagnostic.CA1725.severity = none   # ct / b parameter abbreviations are the repo convention; no named-argument callers
+dotnet_diagnostic.CA1716.severity = none   # VB keyword clash only; no VB consumers
+dotnet_diagnostic.CA1711.severity = none   # IEmailEventHandler is a handler contract by design
+dotnet_diagnostic.CA2007.severity = none   # no SynchronizationContext in ASP.NET Core / Functions
+dotnet_diagnostic.IDE0005.severity = warning  # unnecessary usings; src-only because it needs GenerateDocumentationFile (tests would raise CS1591-class doc warnings)
+
+[wa.application/Telemetry/WaTelemetryReporter.cs]
+# The single telemetry exit (AC-056-4): templates are the TA-10.2 wire contract, LogEvent's template is the event name by design,
+# lower-case placeholders are TA-10.2 property names, FileNameSlot is instance API keyed on by the PII guard (R4).
+dotnet_diagnostic.CA1848.severity = none
+dotnet_diagnostic.CA1873.severity = none
+dotnet_diagnostic.CA2254.severity = none
+dotnet_diagnostic.CA1727.severity = none
+dotnet_diagnostic.CA1822.severity = none
+
+[wa.infrastructure/Persistence/Migrations/**.cs]
+# EF-generated (BOM, array literals) — not linted or reformatted.
+generated_code = true
+charset = unset

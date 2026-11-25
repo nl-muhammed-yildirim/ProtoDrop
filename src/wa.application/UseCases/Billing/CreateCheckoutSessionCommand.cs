@@ -1,6 +1,4 @@
 using MediatR;
-using wa.application.Ports;
-using wa.application.UseCases.Auth;
 using wa.domain;
 
 namespace wa.application.UseCases.Billing;

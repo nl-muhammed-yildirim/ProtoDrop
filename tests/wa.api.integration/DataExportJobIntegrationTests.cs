@@ -24,7 +24,7 @@ public class DataExportJobIntegrationTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        _sql = new MsSqlBuilder().WithImage("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
         await _sql.StartAsync();
         _options = new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(_sql.GetConnectionString()).Options;
         _db = new WaDbContext(_options);
@@ -84,7 +84,7 @@ public class DataExportJobIntegrationTests : IAsyncLifetime
         return row;
     }
 
-    private DataExportJobStore Store() => new(new WaDbContextFactory(_options));
+    private DataExportJobStore Store() => new(new WaDbContextFactory(_options), TimeProvider.System);
 
     private BuildDataExportsHandler Handler(MemoryBlobStore blobs) =>
         new(Store(), blobs, Microsoft.Extensions.Logging.Abstractions.NullLogger<BuildDataExportsHandler>.Instance);
