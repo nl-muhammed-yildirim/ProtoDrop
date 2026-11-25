@@ -23,7 +23,7 @@ public class PlanFeaturesConsumerGuardTests
         "src/wa.application/UseCases/Transfers/RecipientAds.cs", // US-024-02: anonymous recipient page — ad slot follows the SENDER's plan (EC-024-6), no viewer PlanContext
         "src/wa.application/UseCases/Transfers/SendNotificationEmailsHandler.cs", // US-021-02: f-email handler passes the sender's features to SenderBranding
         "src/wa.workers/WorkerServices.cs", // US-021-02: worker DI wiring for the sender-plan features provider
-        "src/wa.api/Program.cs" // DI wiring
+        "src/wa.api/ApiServices.cs" // DI wiring (moved from Program.cs, CHORE-code-style-2)
     ];
 
     private static readonly string[] PlanCodeComparisonAllowList =
