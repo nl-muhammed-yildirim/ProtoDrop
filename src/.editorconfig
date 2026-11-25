@@ -1,0 +1,3 @@
+# CHORE-code-style §2.3: interfaces live in Interfaces/ folders but keep their area namespace (no .Interfaces suffix).
+[**/Interfaces/*.cs]
+dotnet_style_namespace_match_folder = false
