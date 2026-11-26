@@ -800,7 +800,7 @@ Admin endpoints reject non-admins with `FORBIDDEN`.
 - TLS 1.2+ (Front Door auto-terminate).
 - SQL: VNet + PIP (managed identity auth); firewall = Front Door service tag + VPN IP.
 - Blob: **no public network access**; all via SAS (browser) or managed identity (workers).
-- CORS per TA-4.1.6. CSP on `index.html`: `default-src 'self'; script-src 'self'; img-src 'self' data: {acct}.blob.core.windows.net; style-src 'self' 'unsafe-inline'; connect-src 'self' {api} {blobacct}.blob.core.windows.net`. F-PRF-001 adds the blob account host to `img-src` (org logo via 30-min read SAS). Note: no CSP header is emitted by code yet; this is spec text only.
+- CORS per TA-4.1.6. CSP on `index.html`: `default-src 'self'; script-src 'self'; img-src 'self' data: {acct}.blob.core.windows.net; style-src 'self' 'unsafe-inline'; connect-src 'self' {api} {blobacct}.blob.core.windows.net`. F-PRF-001 adds the blob account host to `img-src` (org logo via 30-min read SAS). Emitted since CHORE-deploy-hardening (2026-11-26): nginx template `src/wa.web/nginx.conf` (origins from `WA_API_ORIGIN` / `WA_BLOB_ORIGIN`, plus the client telemetry host and `frame-ancestors 'none'`); the API sends nosniff / `Referrer-Policy: no-referrer` / `X-Frame-Options: DENY` / HSTS outside Development/Local (`SecurityHeadersMiddleware`). Enabling ads (D-14) needs a CSP widening decision.
 - Rate limits (Front Door WAF, by IP): `/api/v1/auth/*` 10/min; `/api/v1/transfers/draft` 10/min; `/api/v1/public/*` 30/min; admin 60/min. API in-memory `AspNetCoreRateLimit` as second layer for `/auth` (5/min per IP).
 
 ### TA-9.6 Threat notes (design mitigations)
@@ -944,6 +944,16 @@ tag v* → cd-prod.yml: same as staging + manual approval + canary (20% → 100%
 | `Wa:AdminEmails` | ✓ | `ops@example.com` |
 | `Wa:Zip:SignKey` | ✓ (KV) | |
 | `Wa:Flags:TtlSeconds` | – | `30` |
+| `AZURE_FUNCTIONS_ENVIRONMENT` (wa-workers) | – | `Development` only where `Wa:Email:Sender=log`; unset = Production (log sender refused at startup) |
+
+**wa-web (CHORE-deploy-hardening, 2026-11-26):**
+
+| Variable | When | Example |
+|---|---|---|
+| `VITE_WA_API_BASE` | build arg | `/api/v1` behind Front Door; default `http://localhost:8080/api/v1` |
+| `WA_API_ORIGIN` | nginx runtime (CSP `connect-src`) | `'self'` behind Front Door; default `http://localhost:8080` |
+| `WA_BLOB_ORIGIN` | nginx runtime (CSP `img-src`/`connect-src`) | `https://<acct>.blob.core.windows.net`; default Azurite origins |
+| `VITE_WA_AI_KEY` | build arg (optional) | client telemetry ingestion key (2026-11-06 ADR) |
 
 App settings: `appsettings.json` (env-neutral defaults only) + `appsettings.{Environment}.json` (never committed with secrets — CI injects KV refs).
 
@@ -1034,6 +1044,7 @@ The table below is canonical. Full ADR files land in `docs/adr/` when an ADR is 
 | ADR-016 | **CQRS via MediatR 12.5**: one `IRequest`/handler per use case in `wa.application/UseCases/`; domain events via `IEventPublisher` (MediatR-free) (new v0.2) | MediatR `INotification` domain events; custom home-grown mediator | Frozen, known API; pipeline owns cross-cutting; 12.5 is the last stable line before 13.x breaking changes |
 | ADR-017 | Azure.Communication.Email SDK for f-email sender (v1.1.0) | Direct SMTP; SendGrid; raw REST calls | Azure-native (ADR-011), typed SDK, per-recipient attrs for i18n later |
 | ADR-018 | Stubble.Core for email template rendering (v1.10.8) | Razor templates; inline strings in code | Mustache is simple enough for M0 single-language; file-based templates live in Emails/templates/ (TA-6.7) |
+| ADR-019 | `BILLING_UNAVAILABLE` (503) added to the closed TA-4.1.3 Problem code list (US-019-01, AC-019-5): Stripe Checkout/Portal timeout or 5xx maps to it | Reuse `INTERNAL` (500); retry inside the API | Stable code the plan screen can show as "billing is temporarily unavailable" without hiding real 500s; written 2026-11-26, closing the Open-Decisions 2026-11-18 follow-up |
 
 ---
 
