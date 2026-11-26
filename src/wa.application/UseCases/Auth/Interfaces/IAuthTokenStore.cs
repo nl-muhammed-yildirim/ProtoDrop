@@ -4,7 +4,7 @@ namespace wa.application.UseCases.Auth;
 
 /// <summary>
 /// T-008-04 (TA-9.1): the only DB surface the magic-link use cases need — read/write of AuthToken rows.
-/// Implemented by a thin adapter in wa.infrastructure.Persistence registered as singleton over the adapter-owned WaDbContext.
+/// Implemented by a thin adapter in wa.infrastructure.Persistence registered as a singleton that opens a fresh WaDbContext per call.
 /// </summary>
 public interface IAuthTokenStore
 {

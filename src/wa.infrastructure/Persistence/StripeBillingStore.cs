@@ -6,8 +6,8 @@ using wa.domain;
 namespace wa.infrastructure.Persistence;
 
 /// <summary>
-/// US-019-03 (D-3): adapter for IStripeBillingStore. A fresh WaDbContext per call (the API's shared singleton context is not safe
-/// for concurrent webhook deliveries); dedup and mirror upsert share ONE transaction.
+/// US-019-03 (D-3): adapter for IStripeBillingStore. A fresh WaDbContext per call (a context is not safe
+/// for concurrent webhook deliveries to share); dedup and mirror upsert share ONE transaction.
 /// </summary>
 public sealed class StripeBillingStore : IStripeBillingStore
 {

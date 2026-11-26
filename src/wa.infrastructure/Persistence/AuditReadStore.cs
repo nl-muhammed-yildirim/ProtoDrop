@@ -6,12 +6,12 @@ namespace wa.infrastructure.Persistence;
 
 /// <summary>
 /// T-011-09 (TA-4.2#25 / US-011-04 happy path 5): read adapter over WaDbContext for AuditLog rows.
-/// Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext).
+/// Registered as a singleton; opens a fresh WaDbContext per call (CHORE-dbcontext-lifetime).
 /// </summary>
-/// <param name="db">Database context that backs the store.</param>
-public sealed class AuditReadStore(WaDbContext db) : IAuditReadStore
+/// <param name="factory">Factory that creates a short-lived database context per call.</param>
+public sealed class AuditReadStore(IDbContextFactory<WaDbContext> factory) : IAuditReadStore
 {
-    private readonly WaDbContext _db = db;
+    private readonly IDbContextFactory<WaDbContext> _factory = factory;
 
     /// <inheritdoc />
     /// <remarks>
@@ -20,7 +20,8 @@ public sealed class AuditReadStore(WaDbContext db) : IAuditReadStore
     /// </remarks>
     public async Task<IReadOnlyList<AuditLog>> GetRecentAsync(int count, CancellationToken ct)
     {
-        return await _db.Set<AuditLog>()
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        return await db.Set<AuditLog>()
             .AsNoTracking()
             .OrderByDescending(a => a.Id)
             .Take(count)

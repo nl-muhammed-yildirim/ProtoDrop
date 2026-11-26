@@ -4,7 +4,7 @@ namespace wa.application.UseCases.Auth;
 
 /// <summary>
 /// T-008-01 (TA-4.2a / EC-008-1): the AppUser surface signup needs — keep EF out of the application layer.
-/// Implemented by a thin singleton adapter over the adapter-owned WaDbContext (same style as IPublicTransferStore).
+/// Implemented by a thin singleton adapter that opens a fresh WaDbContext per call (same style as IPublicTransferStore).
 /// </summary>
 public interface IAppUserStore
 {

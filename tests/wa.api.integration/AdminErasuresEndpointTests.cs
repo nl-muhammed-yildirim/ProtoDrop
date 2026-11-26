@@ -58,10 +58,7 @@ public class AdminErasuresEndpointTests : IAsyncLifetime
         _superId = await AddUserAsync(SuperEmail, planId);
         _operatorId = await AddUserAsync(OperatorEmail, planId);
         var dana = await AddUserAsync("dana@x.com", planId);
-        await using (var ctx = new WaDbContext(options))
-        {
-            Assert.True(await new AppUserStore(ctx).SoftDeleteWithReHomeAsync(dana, DateTime.UtcNow, CancellationToken.None));
-        }
+        Assert.True(await new AppUserStore(new AppDbContextFactory(options)).SoftDeleteWithReHomeAsync(dana, DateTime.UtcNow, CancellationToken.None));
 
         _factory = new TestFactory();
         _client = _factory.CreateClient();

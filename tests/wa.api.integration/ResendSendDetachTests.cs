@@ -18,7 +18,7 @@ namespace wa.api.integration;
 
 /// <summary>
 /// T-003-10 (AC-010-1 send-time flip): POST /resend then POST /send on the re-send draft. SendStore.SaveSendAsync flips
-/// SupersededBy on the ORIGINAL via raw SQL; the original is tracked in the singleton context (the resend handler loaded it), so the
+/// SupersededBy on the ORIGINAL via raw SQL; the original may be tracked in the same call's context, so the
 /// tracker detach must be a real detach — Local.Remove marked it Deleted and the same method's SaveChanges tried to delete the row (500).
 /// Fresh Azurite + SQL 2022 per instance (TA-14.3).
 /// </summary>
@@ -79,13 +79,13 @@ public class ResendSendDetachTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ResendThenSend_201_OriginalKeptWithSupersededBy_ContextStaysHealthy()
+    public async Task ResendThenSend_201_OriginalKeptWithSupersededBy_Succeeds()
     {
         var ownerId = await SeedOwnerAsync();
         var origId = await SeedActiveOriginalWithBlobAsync(ownerId);
         var cookie = CookieValueFor(ownerId);
 
-        // Resend: the app's singleton context loads (and tracks) the original.
+        // Resend: the handler loads the original.
         using var resend = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/transfers/{origId:N}/resend");
         resend.Headers.TryAddWithoutValidation("Cookie", $"{CookieName}={cookie}");
         using var resendResponse = await _client.SendAsync(resend);
@@ -99,7 +99,7 @@ public class ResendSendDetachTests : IAsyncLifetime
         }
         var draftId = new Guid(draftIdText);
 
-        // Send the draft: SaveSendAsync flips SupersededBy on the tracked original (today: "association severed" 500).
+        // Send the draft: SaveSendAsync flips SupersededBy on the original (today: "association severed" 500).
         using var send = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/transfers/{draftId:N}/send")
         {
             Content = new StringContent(JsonSerializer.Serialize(new { emails = Array.Empty<string>(), senderName = "Alice" }), Encoding.UTF8, "application/json")
@@ -108,10 +108,6 @@ public class ResendSendDetachTests : IAsyncLifetime
         send.Headers.TryAddWithoutValidation("Cookie", $"{CookieName}={cookie}");
         using var sendResponse = await _client.SendAsync(send);
         Assert.Equal(HttpStatusCode.Created, sendResponse.StatusCode);
-
-        // Singleton context holds no Deleted entry (read between awaited calls only).
-        var appDb = _factory.Services.GetRequiredService<WaDbContext>();
-        Assert.DoesNotContain(appDb.ChangeTracker.Entries(), e => e.State == EntityState.Deleted);
 
         // The original row survives, flipped to SupersededBy = the new transfer, still Active.
         using var freshDb = new WaDbContext(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(_connString).Options);

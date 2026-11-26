@@ -31,7 +31,7 @@ public static class ApiServices
         services.AddSingleton(TimeProvider.System); // CHORE-code-style-2: the one clock — handlers/stores take TimeProvider instead of reading DateTime.UtcNow
         services.AddSingleton<wa.application.Ports.IDbHealthProbe, WaDbHealthProbe>();
         services.AddSingleton<wa.application.Ports.ISbHealthProbe, SbHealthProbe>();
-        // Adapter-owned contexts (no request scope in the current API surface).
+        // One options instance; stores open a fresh context per call via IDbContextFactory (CHORE-dbcontext-lifetime).
         services.AddSingleton(new DbContextOptionsBuilder<WaDbContext>()
             .UseSqlServer(configuration.GetConnectionString("WaDb")).Options);
         services.AddSingleton<wa.infrastructure.Persistence.AppDbContextFactory>();
@@ -59,51 +59,50 @@ public static class ApiServices
             new StorageSharedKeyCredential(AzureBlobStore.AccountNameFrom(new Uri(blobAccountUrl!)), blobAccountKey!)));
         services.AddHostedService<BlobContainerBootstrap>();
         // T-001-05 (TA-4.2#1): limits resolution + draft SAS minting — every read through the caches (FR-053-4); guest plan resolves via seeded rows, never literals.
-        services.AddSingleton(sp => new WaDbContext(sp.GetRequiredService<DbContextOptions<WaDbContext>>())); // adapter-owned context; no request scope in the current API surface (same style as L29 above).
         var limitsTtl = TimeSpan.FromSeconds(int.TryParse(configuration["Wa:Flags:TtlSeconds"], out var ttlSecs) ? ttlSecs : 30); // TA-3.4 — both caches share this value (Caches doc comment).
-        services.AddSingleton<IPlansStore>(sp => new PlansStore(sp.GetRequiredService<WaDbContext>()));
-        services.AddSingleton<IFlagsStore>(sp => new FlagsStore(sp.GetRequiredService<WaDbContext>()));
-        // T-001-10 (TA-4.2#2): finalize handler's DB surface — thin adapter over the adapter-owned WaDbContext.
-        services.AddSingleton<wa.application.UseCases.Transfers.ITransferStore>(sp => new wa.infrastructure.Persistence.TransferStore(sp.GetRequiredService<WaDbContext>()));
+        services.AddSingleton<IPlansStore>(sp => new PlansStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+        services.AddSingleton<IFlagsStore>(sp => new FlagsStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+        // T-001-10 (TA-4.2#2): finalize handler's DB surface — thin adapter over a per-call WaDbContext.
+        services.AddSingleton<wa.application.UseCases.Transfers.ITransferStore>(sp => new wa.infrastructure.Persistence.TransferStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
         // US-045-01 (FR-045-1/3/7): owner-scoped transfer search port — D-21 option B, literal substring match over FileItem.OriginalName / EmailRecipient.Address / Transfer.SenderName.
-        services.AddSingleton<wa.application.UseCases.Transfers.ITransferSearchStore>(sp => new wa.infrastructure.Persistence.TransferSearchStore(sp.GetRequiredService<WaDbContext>())); // US-045-01
-        // T-002-04 (TA-4.2#3): send handler's DB surface — thin adapter over the adapter-owned WaDbContext.
+        services.AddSingleton<wa.application.UseCases.Transfers.ITransferSearchStore>(sp => new wa.infrastructure.Persistence.TransferSearchStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>())); // US-045-01
+        // T-002-04 (TA-4.2#3): send handler's DB surface — thin adapter over a per-call WaDbContext.
         // T-010-02: IBlobStore (the gate primitive, registered as a singleton at L53) — SendStore's FILES_GONE gate checks physical presence via ExistsAsync.
-        services.AddSingleton<wa.application.UseCases.Transfers.ISendStore>(sp => new wa.infrastructure.Persistence.SendStore(sp.GetRequiredService<WaDbContext>(), sp.GetRequiredService<wa.application.Ports.IBlobStore>()));
-        // T-014 (TA-4.2#4): recipient-page handler's DB surface — thin adapter over the adapter-owned WaDbContext.
-        services.AddSingleton<wa.application.UseCases.Transfers.IPublicTransferStore>(sp => new wa.infrastructure.Persistence.PublicTransferStore(sp.GetRequiredService<WaDbContext>(), sp.GetRequiredService<TimeProvider>()));
+        services.AddSingleton<wa.application.UseCases.Transfers.ISendStore>(sp => new wa.infrastructure.Persistence.SendStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>(), sp.GetRequiredService<wa.application.Ports.IBlobStore>()));
+        // T-014 (TA-4.2#4): recipient-page handler's DB surface — thin adapter over a per-call WaDbContext.
+        services.AddSingleton<wa.application.UseCases.Transfers.IPublicTransferStore>(sp => new wa.infrastructure.Persistence.PublicTransferStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>(), sp.GetRequiredService<TimeProvider>()));
         // US-023-01 (F-PRF-003): download analytics read port (GET /transfers/{id}/analytics).
-        services.AddSingleton<wa.application.UseCases.Transfers.ITransferAnalyticsStore>(sp => new wa.infrastructure.Persistence.TransferAnalyticsStore(sp.GetRequiredService<WaDbContext>()));
+        services.AddSingleton<wa.application.UseCases.Transfers.ITransferAnalyticsStore>(sp => new wa.infrastructure.Persistence.TransferAnalyticsStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
         // US-021-01: sender branding read port (org name beside the sender on the recipient page).
-        services.AddSingleton<wa.application.UseCases.Transfers.ISenderBrandingStore>(sp => new wa.infrastructure.Persistence.SenderBrandingStore(sp.GetRequiredService<WaDbContext>()));
+        services.AddSingleton<wa.application.UseCases.Transfers.ISenderBrandingStore>(sp => new wa.infrastructure.Persistence.SenderBrandingStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
         // US-021-04: org logo path write port (DELETE /auth/me/logo).
-        services.AddSingleton<wa.application.UseCases.Auth.IOrgLogoStore>(sp => new wa.infrastructure.Persistence.OrgLogoStore(sp.GetRequiredService<WaDbContext>()));
+        services.AddSingleton<wa.application.UseCases.Auth.IOrgLogoStore>(sp => new wa.infrastructure.Persistence.OrgLogoStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
         // F-PRF-001: org name write port (PATCH /auth/me orgName).
-        services.AddSingleton<wa.application.UseCases.Auth.IOrgNameStore>(sp => new wa.infrastructure.Persistence.OrgNameStore(sp.GetRequiredService<WaDbContext>()));
+        services.AddSingleton<wa.application.UseCases.Auth.IOrgNameStore>(sp => new wa.infrastructure.Persistence.OrgNameStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
         // F-XCT-003: AppUser.EmailNotificationsEnabled port (PATCH /auth/me emailNotifications).
         services.AddSingleton<wa.application.UseCases.EmailSettings.IEmailNotificationsStore>(sp => new wa.infrastructure.Persistence.EmailNotificationsStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
         // T-002-02 (TA-4.1.5): generic HTTP idempotency store — used by IdempotencyMiddleware for finalize + send endpoints.
-        services.AddSingleton<IIdempotencyStore>(sp => new wa.infrastructure.Persistence.IdempotencyStore(sp.GetRequiredService<WaDbContext>(), sp.GetRequiredService<TimeProvider>()));
+        services.AddSingleton<IIdempotencyStore>(sp => new wa.infrastructure.Persistence.IdempotencyStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>(), sp.GetRequiredService<TimeProvider>()));
         // T-011-02 (FR-011-5 / TA-3.2): audit write helper — one AuditLog row + one admin.action domain event per mutation.
-        services.AddSingleton<wa.application.UseCases.Admin.IAuditStore>(sp => new wa.infrastructure.Persistence.AuditStore(sp.GetRequiredService<WaDbContext>()));
+        services.AddSingleton<wa.application.UseCases.Admin.IAuditStore>(sp => new wa.infrastructure.Persistence.AuditStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
         services.AddSingleton<wa.application.UseCases.Admin.IAuditWriter>(sp => new wa.application.UseCases.Admin.AuditWriter(sp.GetRequiredService<wa.application.UseCases.Admin.IAuditStore>(), sp.GetRequiredService<wa.application.Ports.IEventPublisher>(), sp.GetRequiredService<TimeProvider>()));
         services.AddSingleton(sp => new PlansCache(sp.GetRequiredService<IPlansStore>(), limitsTtl, sp.GetRequiredService<TimeProvider>().GetUtcNow));
         services.AddSingleton(sp => new FlagsCache(sp.GetRequiredService<IFlagsStore>(), limitsTtl, sp.GetRequiredService<TimeProvider>().GetUtcNow));
         // T-011-03 (TA-4.2#20 / FR-011-6): overview aggregates — store + 5-min snapshot cache (pinned by spec; not config-driven).
-        services.AddSingleton<wa.application.UseCases.Admin.IOverviewStore>(sp => new wa.infrastructure.Persistence.OverviewStore(sp.GetRequiredService<WaDbContext>()));
+        services.AddSingleton<wa.application.UseCases.Admin.IOverviewStore>(sp => new wa.infrastructure.Persistence.OverviewStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
         services.AddSingleton(sp => new wa.application.UseCases.Admin.OverviewSnapshotCache(sp.GetRequiredService<wa.application.UseCases.Admin.IOverviewStore>(), TimeSpan.FromMinutes(5), sp.GetRequiredService<TimeProvider>().GetUtcNow));
-        // T-011-04 (TA-4.2#21 / FR-011-3): admin transfer search — store over the adapter-owned WaDbContext.
-        services.AddSingleton<wa.application.UseCases.Admin.ISearchTransfersStore>(sp => new wa.infrastructure.Persistence.SearchTransfersStore(sp.GetRequiredService<WaDbContext>()));
-        // T-011-05 (TA-4.2#21 / FR-011-4): admin force-delete — store over the adapter-owned WaDbContext (platform-scoped predicate).
-        services.AddSingleton<wa.application.UseCases.Admin.IAdminTransferStore>(sp => new wa.infrastructure.Persistence.AdminTransferStore(sp.GetRequiredService<WaDbContext>()));
-        // T-011-06 (TA-4.2#22 / FR-011-2): admin users list — store over the adapter-owned WaDbContext (computed plan/storage/count).
-        services.AddSingleton<wa.application.UseCases.Admin.IAdminUserStore>(sp => new wa.infrastructure.Persistence.AdminUserStore(sp.GetRequiredService<WaDbContext>()));
-        // T-011-08 (TA-4.2#23 / FR-011-2): admin flag write surface — single-key PK upsert over the adapter-owned WaDbContext.
-        services.AddSingleton<wa.application.UseCases.Admin.IAdminFlagStore>(sp => new wa.infrastructure.Persistence.AdminFlagStore(sp.GetRequiredService<WaDbContext>()));
-        // T-011-09 (TA-4.2#24 / FR-011-2): admin suppressions surface — list + remove over the adapter-owned WaDbContext.
-        services.AddSingleton<wa.application.UseCases.Admin.IAdminSuppressionStore>(sp => new wa.infrastructure.Persistence.AdminSuppressionStore(sp.GetRequiredService<WaDbContext>()));
-        // T-011-09 (TA-4.2#25 / US-011-04 happy path 5): audit read surface — last count rows, newest first, over the adapter-owned WaDbContext.
-        services.AddSingleton<wa.application.UseCases.Admin.IAuditReadStore>(sp => new wa.infrastructure.Persistence.AuditReadStore(sp.GetRequiredService<WaDbContext>()));
+        // T-011-04 (TA-4.2#21 / FR-011-3): admin transfer search — store over a per-call WaDbContext.
+        services.AddSingleton<wa.application.UseCases.Admin.ISearchTransfersStore>(sp => new wa.infrastructure.Persistence.SearchTransfersStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+        // T-011-05 (TA-4.2#21 / FR-011-4): admin force-delete — store over a per-call WaDbContext (platform-scoped predicate).
+        services.AddSingleton<wa.application.UseCases.Admin.IAdminTransferStore>(sp => new wa.infrastructure.Persistence.AdminTransferStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+        // T-011-06 (TA-4.2#22 / FR-011-2): admin users list — store over a per-call WaDbContext (computed plan/storage/count).
+        services.AddSingleton<wa.application.UseCases.Admin.IAdminUserStore>(sp => new wa.infrastructure.Persistence.AdminUserStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+        // T-011-08 (TA-4.2#23 / FR-011-2): admin flag write surface — single-key PK upsert over a per-call WaDbContext.
+        services.AddSingleton<wa.application.UseCases.Admin.IAdminFlagStore>(sp => new wa.infrastructure.Persistence.AdminFlagStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+        // T-011-09 (TA-4.2#24 / FR-011-2): admin suppressions surface — list + remove over a per-call WaDbContext.
+        services.AddSingleton<wa.application.UseCases.Admin.IAdminSuppressionStore>(sp => new wa.infrastructure.Persistence.AdminSuppressionStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+        // T-011-09 (TA-4.2#25 / US-011-04 happy path 5): audit read surface — last count rows, newest first, over a per-call WaDbContext.
+        services.AddSingleton<wa.application.UseCases.Admin.IAuditReadStore>(sp => new wa.infrastructure.Persistence.AuditReadStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
         // US-047-03 (FR-047-6): erasure report read — fresh context per call (DataExportStore precedent).
         services.AddSingleton<wa.application.UseCases.Admin.IErasureReportStore>(sp => new wa.infrastructure.Persistence.ErasureReportStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
         services.AddSingleton(sp => new LimitsProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
@@ -112,7 +111,7 @@ public static class ApiServices
         // T-031-05 (US-018-05, TA-3.4): feature toggles — one resolver over the same caches.
         services.AddSingleton<IFeaturesProvider>(sp => new FeaturesProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
         // US-020-01 (FR-020-1): per-request PlanContext — user→plan-code port (singleton) + scoped accessor bound by PlanContextMiddleware.
-        services.AddSingleton<IUserPlanStore>(sp => new wa.infrastructure.Persistence.UserPlanStore(sp.GetRequiredService<WaDbContext>()));
+        services.AddSingleton<IUserPlanStore>(sp => new wa.infrastructure.Persistence.UserPlanStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
         services.AddScoped<PlanContextAccessor>();
         services.AddScoped<IPlanContextAccessor>(sp => sp.GetRequiredService<PlanContextAccessor>());
         // TA-3.6 — minting is pure HMAC (no network at request time); §5.2 account values already read above (T-055-02).
@@ -149,15 +148,15 @@ public static class ApiServices
         // Injectable clock arg is the registered TimeProvider's GetUtcNow in production; unit tests pin exp via their own instance (D3).
         services.AddSingleton<IUnlockTokenMinter>(sp => new UnlockTokenService(
             System.Text.Encoding.UTF8.GetBytes(configuration["Wa:Jwt:Secret"]!), sp.GetRequiredService<TimeProvider>().GetUtcNow));
-        // T-008-01 (TA-4.2#8): signup's DB surface — thin adapter over the adapter-owned WaDbContext, and its TA-9.1 session-token minter (30-day rolling).
-        services.AddSingleton<IAppUserStore>(sp => new wa.infrastructure.Persistence.AppUserStore(sp.GetRequiredService<WaDbContext>()));
-        // T-008-04 (TA-9.1): magic-link token store — thin adapter over the adapter-owned WaDbContext (single-use, hashed token).
-        services.AddSingleton<IAuthTokenStore>(sp => new wa.infrastructure.Persistence.AuthTokenStore(sp.GetRequiredService<WaDbContext>()));
+        // T-008-01 (TA-4.2#8): signup's DB surface — thin adapter over a per-call WaDbContext, and its TA-9.1 session-token minter (30-day rolling).
+        services.AddSingleton<IAppUserStore>(sp => new wa.infrastructure.Persistence.AppUserStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+        // T-008-04 (TA-9.1): magic-link token store — thin adapter over a per-call WaDbContext (single-use, hashed token).
+        services.AddSingleton<IAuthTokenStore>(sp => new wa.infrastructure.Persistence.AuthTokenStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
         services.AddSingleton<ISessionTokenMinter>(sp => new SessionTokenService(
             System.Text.Encoding.UTF8.GetBytes(configuration["Wa:Jwt:Secret"]!), sp.GetRequiredService<TimeProvider>().GetUtcNow));
         // T-006-03 (TA-6.7): unsubscribe token verification + suppression insert — BCL-only HMAC, same Wa:Jwt:Secret key bytes.
         services.AddSingleton<wa.infrastructure.Persistence.UnsubscribeService>(sp => new wa.infrastructure.Persistence.UnsubscribeService(
-            sp.GetRequiredService<WaDbContext>(),
+            sp.GetRequiredService<IDbContextFactory<WaDbContext>>(),
             System.Text.Encoding.UTF8.GetBytes(configuration["Wa:Jwt:Secret"]!),
             sp.GetRequiredService<ILogger<wa.infrastructure.Persistence.UnsubscribeService>>(), sp.GetRequiredService<TimeProvider>()));
         // US-019-03 (D-3): webhook dedup + mirror store — factory-based (fresh context per call; concurrent deliveries never share a context).
