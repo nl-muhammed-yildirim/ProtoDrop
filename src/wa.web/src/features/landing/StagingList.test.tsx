@@ -8,6 +8,7 @@ import StagingList from './StagingList'
 import { useUploadEngine, setSleepFnForTests, type Draft } from '../../core/upload/UploadEngine'
 import { formatBytes } from '../../core/upload/formatBytes'
 import { resetPlanLimits, setPlanLimits } from '../../core/upload/planLimits'
+import { useFinalize } from './finalizeState'
 
 ;(globalThis as unknown as Record<string, boolean>).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -321,6 +322,44 @@ describe('StagingList', () => {
         expect(draft?.credentials).toBe('include')
         expect(fin?.method).toBe('POST')
         expect(fin?.credentials).toBe('include')
+        host.remove()
+      } finally {
+        useUploadEngine.setState({ start: realStart })
+      }
+    })
+
+    it('a production (non-Azurite) uploadUrl reaches the engine start() verbatim (CHORE-staging-blockers)', async () => {
+      useFinalize.getState().clear() // the previous send-flow test left a finalized transfer (LinkScreen) in the shared store
+      stage('a.bin', 3)
+      const PROD = 'https://acct.blob.core.windows.net/staging/x?sv=2024&sp=cwr&sig=abc'
+      vi.stubGlobal('fetch', async (input: RequestInfo | URL): Promise<Response> => {
+        const url = String(input)
+        const body = url.endsWith('/finalize')
+          ? { id: 't1', linkId: 'Ab3dEf5g', status: 'Draft', expiresAt: '2026-01-01T00:00:00Z', totalBytes: 3, files: [] }
+          : makeDraft([PROD])
+        return new Response(JSON.stringify(body), { status: url.endsWith('/finalize') ? 200 : 201, headers: { 'Content-Type': 'application/json' } })
+      })
+      const realStart = useUploadEngine.getState().start
+      let started: Draft | null = null
+      useUploadEngine.setState({
+        start: async (d: Draft) => {
+          started = d
+          useUploadEngine.setState((s) => ({ files: s.files.map((f) => ({ ...f, status: 'done' as const })) }))
+        },
+      })
+      try {
+        const host = document.createElement('div')
+        document.body.appendChild(host)
+        const root = createRoot(host)
+        act(() => { void root.render(createElement(StagingList)) })
+        const send = host.querySelector('.sl-send') as HTMLButtonElement
+        await act(async () => { send.click() })
+        await act(async () => {
+          await vi.waitFor(() => {
+            if (started === null) throw new Error('start not called yet')
+          })
+        })
+        expect((started as unknown as Draft).files[0]?.uploadUrl).toBe(PROD)
         host.remove()
       } finally {
         useUploadEngine.setState({ start: realStart })
