@@ -1,6 +1,6 @@
-import { API_BASE } from '../../core/config/apiBase'
 import { useState } from 'react'
 
+import { API_BASE } from '../../core/config/apiBase'
 import type { StoredProfile } from '../../core/auth/session'
 import { writeSession } from '../../core/auth/session'
 // T-015-02 (F-TRF-015): resolve the explicit data-theme via the shared pure function — System mode no longer falls back to :root light.

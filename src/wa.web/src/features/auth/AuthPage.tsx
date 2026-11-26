@@ -1,6 +1,6 @@
-import { API_BASE } from '../../core/config/apiBase'
 import { useEffect, useRef, useState } from 'react'
 
+import { API_BASE } from '../../core/config/apiBase'
 import type { StoredProfile } from '../../core/auth/session'
 import { writeSession } from '../../core/auth/session'
 import { getTraceParent } from '../../core/traceparent'

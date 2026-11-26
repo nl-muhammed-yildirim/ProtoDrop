@@ -1,5 +1,5 @@
-import { API_BASE } from '../../core/config/apiBase'
 import { create } from 'zustand'
+import { API_BASE } from '../../core/config/apiBase'
 import { getTraceParent } from '../../core/traceparent'
 import { trackClientEvent } from '../../core/telemetry/clientTelemetry'
 

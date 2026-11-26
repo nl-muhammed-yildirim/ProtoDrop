@@ -1,7 +1,7 @@
-import { API_BASE } from '../../core/config/apiBase'
 import { Fragment, useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 
+import { API_BASE } from '../../core/config/apiBase'
 import { formatBytes } from '../../core/upload/formatBytes'
 import type { ListTransfersResponse, MyTransferRowDto } from './formatting'
 import { getTraceParent } from '../../core/traceparent'

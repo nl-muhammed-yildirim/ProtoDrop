@@ -1,6 +1,6 @@
-import { API_BASE } from '../../core/config/apiBase'
 import { useEffect, useState } from 'react'
 
+import { API_BASE } from '../../core/config/apiBase'
 import LinkScreen from './LinkScreen'
 import { getTraceParent } from '../../core/traceparent'
 import i18n from '../../core/i18n/init'

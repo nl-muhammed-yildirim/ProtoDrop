@@ -49,7 +49,7 @@ public static class EmailSenderSelector
 
         throw new InvalidOperationException(
             $"{SenderKey}={LogSender} is allowed only when the host environment is Local or Development "
-            + $"(AZURE_FUNCTIONS_ENVIRONMENT / DOTNET_ENVIRONMENT); current: '{environment ?? "(unset = Production)"}'.");
+            + $"(AZURE_FUNCTIONS_ENVIRONMENT / DOTNET_ENVIRONMENT / ASPNETCORE_ENVIRONMENT); current: '{environment ?? "(unset = Production)"}'.");
     }
 
     /// <summary>Builds the email sender that the configuration selects.</summary>

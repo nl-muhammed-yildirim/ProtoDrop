@@ -1,6 +1,6 @@
-import { API_BASE } from '../config/apiBase'
 import { create } from 'zustand'
 
+import { API_BASE } from '../config/apiBase'
 import { getTraceParent } from '../traceparent'
 
 /**
