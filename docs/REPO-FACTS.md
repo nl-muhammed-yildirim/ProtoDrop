@@ -24,8 +24,8 @@ Events: `upload_started`, `upload_completed`, `upload_failed`, `transfer_page_vi
 Metrics: `upload.success_rate`, `link_to_download_seconds`, `expiry_job_lag_seconds`,
 `email_failures_1h`, `active_transfers`, `storage_bytes_active`, `api.requests{status}`.
 
-### PII closed list (`src/wa.domain/Privacy/ErasureScope.cs`) — **14 columns** (T-069)
-`ErasureScope.AllColumns` = every `[Pii]` column (3 AccountSoftDelete, 2 TransferHardDelete, 9 Retained); `[NotPii]` only on `DownloadEvent.IpHash` and `Plan.Name`. Tests in `tests/wa.application.unit/Privacy/` pin the count and the two-way sync. Event payload keys allowed to carry a raw address (R8, `scripts/check-telemetry-pii.mjs`): **5** — `emails`, `senderEmail`, `email`, `to`, `actor`.
+### PII closed list (`src/wa.domain/Privacy/ErasureScope.cs`) — **15 columns** (T-069)
+`ErasureScope.AllColumns` = every `[Pii]` column (3 AccountSoftDelete, 2 TransferHardDelete, 10 Retained); `[NotPii]` only on `DownloadEvent.IpHash` and `Plan.Name`. Tests in `tests/wa.application.unit/Privacy/` pin the count and the two-way sync. Event payload keys allowed to carry a raw address (R8, `scripts/check-telemetry-pii.mjs`): **5** — `emails`, `senderEmail`, `email`, `to`, `actor`.
 
 ### CSS custom properties — **22 tokens** (14 color + 8 typography/shape)
 **Colors live in `src/wa.web/src/styles/tokens.css`** (T-015-01): all 14 defined in each of `:root` (light default), `html[data-theme='dark']` and `html[data-theme='light']`; gated by `scripts/check-theme-tokens.mjs` + `check-contrast.mjs`. Typography/shape stay in `src/wa.web/src/index.css` `:root`. Light values:
