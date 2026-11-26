@@ -11,7 +11,7 @@
 | | dev | staging | prod |
 |---|---|---|---|
 | Purpose | AI/local dev loop | Pre-prod, e2e gate | Live |
-| Domain | `*.dev.example.com` | `*.staging.example.com` | `example.com`, `www.`, `api.` |
+| Domain | `*.dev.protodrop.com` (default Azure hostnames first) | `*.staging.protodrop.com` (default Azure hostnames first) | `protodrop.com`, `www.`, `api.` (D-02/D-03) |
 | Sizing | local Docker (SQL + Azurite) per AGENT.md §5 | prod-shaped, ½ scale | TA-11.2 |
 | Data | seeded | synthetic, prod-shaped | live |
 | Promoted by | `main` (auto) | `main` (auto) | tag `v*` + approval |
@@ -73,7 +73,7 @@ Cost model: TA-16 (~$1,800/mo at 10 TB/day). Controls, in priority order:
 5. **SQL** — B-Server Auto; rightsizing review quarterly.
 
 **Cost gates:**
-- CG-1 (before T-019 load test): unit economics per 1 TB transferred must fit inside Pro pricing (decision D-09 in `Open-Decisions-and-Constants.md`).
+- CG-1 (before the T-029 load test): unit economics per 1 TB transferred must fit inside Pro pricing (decision D-09 in `Open-Decisions-and-Constants.md`).
 - CG-2 (first month in prod): actuals vs TA-16 within ±30 %, else re-forecast and document.
 
 ## 7. Data & DR
@@ -90,7 +90,7 @@ Cost model: TA-16 (~$1,800/mo at 10 TB/day). Controls, in priority order:
 - PII policy: TA-9.4. GDPR: account delete + erasure of `EmailSuppression` rows; data export P1.
 - Secrets: Key Vault only (TA-9.3/9.5); rotation per TA-9.3.
 - Rate limits: TA-9.5 (WAF + API layer).
-- Pen-test: before public launch (Preflight P-16).
+- Pen-test: before public launch (Preflight P-15).
 - **Data residency (Enterprise P3):** org-level region flag (TA-20, F-ENT-004).
 
 ## 9. Team & RACI (MVP)

@@ -1034,6 +1034,7 @@ The table below is canonical. Full ADR files land in `docs/adr/` when an ADR is 
 | ADR-016 | **CQRS via MediatR 12.5**: one `IRequest`/handler per use case in `wa.application/UseCases/`; domain events via `IEventPublisher` (MediatR-free) (new v0.2) | MediatR `INotification` domain events; custom home-grown mediator | Frozen, known API; pipeline owns cross-cutting; 12.5 is the last stable line before 13.x breaking changes |
 | ADR-017 | Azure.Communication.Email SDK for f-email sender (v1.1.0) | Direct SMTP; SendGrid; raw REST calls | Azure-native (ADR-011), typed SDK, per-recipient attrs for i18n later |
 | ADR-018 | Stubble.Core for email template rendering (v1.10.8) | Razor templates; inline strings in code | Mustache is simple enough for M0 single-language; file-based templates live in Emails/templates/ (TA-6.7) |
+| ADR-019 | `BILLING_UNAVAILABLE` (503) added to the closed TA-4.1.3 Problem code list (US-019-01, AC-019-5): Stripe Checkout/Portal timeout or 5xx maps to it | Reuse `INTERNAL` (500); retry inside the API | Stable code the plan screen can show as "billing is temporarily unavailable" without hiding real 500s; written 2026-11-26, closing the Open-Decisions 2026-11-18 follow-up |
 
 ---
 
