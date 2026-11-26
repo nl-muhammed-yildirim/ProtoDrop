@@ -13,6 +13,7 @@ public class PlanIdConsumerGuardTests
     [
         "src/wa.application/UseCases/Admin/SetUserPlanCommandHandler.cs", // admin plan write + audit
         "src/wa.application/UseCases/Auth/LoginHandler.cs", // LoginResult.PlanCode identity
+        "src/wa.application/UseCases/Auth/SignupHandler.cs", // signup on a known email = login: SignupResult.PlanCode identity (CHORE-staging-blockers)
         "src/wa.application/UseCases/Auth/GetProfileHandler.cs", // profile DTO plan code
         "src/wa.application/UseCases/Auth/UpdateProfileHandler.cs", // profile DTO plan code
         "src/wa.application/UseCases/Auth/RedeemMagicLinkHandler.cs", // login result plan code
