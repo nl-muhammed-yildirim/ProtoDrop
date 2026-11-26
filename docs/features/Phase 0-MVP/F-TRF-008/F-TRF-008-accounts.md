@@ -47,7 +47,7 @@ AC-008-3: Signed-in user creates a transfer
 | EC-008-1 | Email case-sensitivity | Stored lowercased; compare case-insensitive (`UQ_AppUser_Email` on the lowercase form) |
 | EC-008-2 | Account deleted while a transfer is active | Transfer survives as anonymous (recipient page unaffected); `account_deleted` event emitted |
 | EC-008-3 | Magic link expires (10 min) | "This link has expired" state + "Send a new link" button; token row still in `AuthToken` (not yet redeemed) |
-| EC-008-4 | Sign-up with a different case of an existing email | Signs the user *in* to the existing account (no "email taken" error — sign-up is sign-in) |
+| EC-008-4 | Sign-up with a different case of an existing email | Signs the user *in* to the existing account **only with that account's correct password**; otherwise 401 `WRONG_PASSWORD`, no session (same as login; soft-deleted and magic-link-only accounts also get 401). No "email taken" error. Changed 2026-11-26 (CHORE-staging-blockers): the original text let a known email sign in without a password check |
 
 ## UI notes (UI-Reference §5.5)
 
