@@ -944,6 +944,16 @@ tag v* → cd-prod.yml: same as staging + manual approval + canary (20% → 100%
 | `Wa:AdminEmails` | ✓ | `ops@example.com` |
 | `Wa:Zip:SignKey` | ✓ (KV) | |
 | `Wa:Flags:TtlSeconds` | – | `30` |
+| `AZURE_FUNCTIONS_ENVIRONMENT` (wa-workers) | – | `Development` only where `Wa:Email:Sender=log`; unset = Production (log sender refused at startup) |
+
+**wa-web (CHORE-deploy-hardening, 2026-11-26):**
+
+| Variable | When | Example |
+|---|---|---|
+| `VITE_WA_API_BASE` | build arg | `/api/v1` behind Front Door; default `http://localhost:8080/api/v1` |
+| `WA_API_ORIGIN` | nginx runtime (CSP `connect-src`) | `'self'` behind Front Door; default `http://localhost:8080` |
+| `WA_BLOB_ORIGIN` | nginx runtime (CSP `img-src`/`connect-src`) | `https://<acct>.blob.core.windows.net`; default Azurite origins |
+| `VITE_WA_AI_KEY` | build arg (optional) | client telemetry ingestion key (2026-11-06 ADR) |
 
 App settings: `appsettings.json` (env-neutral defaults only) + `appsettings.{Environment}.json` (never committed with secrets — CI injects KV refs).
 
