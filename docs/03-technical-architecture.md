@@ -800,7 +800,7 @@ Admin endpoints reject non-admins with `FORBIDDEN`.
 - TLS 1.2+ (Front Door auto-terminate).
 - SQL: VNet + PIP (managed identity auth); firewall = Front Door service tag + VPN IP.
 - Blob: **no public network access**; all via SAS (browser) or managed identity (workers).
-- CORS per TA-4.1.6. CSP on `index.html`: `default-src 'self'; script-src 'self'; img-src 'self' data: {acct}.blob.core.windows.net; style-src 'self' 'unsafe-inline'; connect-src 'self' {api} {blobacct}.blob.core.windows.net`. F-PRF-001 adds the blob account host to `img-src` (org logo via 30-min read SAS). Note: no CSP header is emitted by code yet; this is spec text only.
+- CORS per TA-4.1.6. CSP on `index.html`: `default-src 'self'; script-src 'self'; img-src 'self' data: {acct}.blob.core.windows.net; style-src 'self' 'unsafe-inline'; connect-src 'self' {api} {blobacct}.blob.core.windows.net`. F-PRF-001 adds the blob account host to `img-src` (org logo via 30-min read SAS). Emitted since CHORE-deploy-hardening (2026-11-26): nginx template `src/wa.web/nginx.conf` (origins from `WA_API_ORIGIN` / `WA_BLOB_ORIGIN`, plus the client telemetry host and `frame-ancestors 'none'`); the API sends nosniff / `Referrer-Policy: no-referrer` / `X-Frame-Options: DENY` / HSTS outside Development/Local (`SecurityHeadersMiddleware`). Enabling ads (D-14) needs a CSP widening decision.
 - Rate limits (Front Door WAF, by IP): `/api/v1/auth/*` 10/min; `/api/v1/transfers/draft` 10/min; `/api/v1/public/*` 30/min; admin 60/min. API in-memory `AspNetCoreRateLimit` as second layer for `/auth` (5/min per IP).
 
 ### TA-9.6 Threat notes (design mitigations)
