@@ -164,6 +164,12 @@ resource web 'Microsoft.App/containerApps@2024-03-01' = {
           name: 'wa-web'
           image: '${acrLoginServer}/wa-web:${imageTag}'
           resources: { cpu: json('0.25'), memory: '0.5Gi' }
+          // CHORE-deploy-hardening: nginx CSP template vars. Same-origin API behind Front Door ('self'),
+          // else the api Container App host; blob origin for direct SAS upload/download (ADR-002).
+          env: [
+            { name: 'WA_API_ORIGIN', value: empty(publicUrl) ? 'https://${apiFqdn}' : '\'self\'' }
+            { name: 'WA_BLOB_ORIGIN', value: blobAccountUrl }
+          ]
         }
       ]
       scale: { minReplicas: 1, maxReplicas: 3 }
@@ -252,6 +258,8 @@ resource fa 'Microsoft.Web/sites@2024-04-01' = {
         { name: 'Wa__ServiceBus__ConnectionString', value: '${kvRef}/${secretNames.sb})' }
         { name: 'Wa__CommunicationHub__Connection', value: '${kvRef}/${secretNames.ch})' }
         { name: 'Wa__Email__Sender', value: emailSender }
+        // CHORE-deploy-hardening: Sender=log is refused outside Development/Local (EnsureSenderAllowed).
+        { name: 'AZURE_FUNCTIONS_ENVIRONMENT', value: emailSender == 'log' ? 'Development' : aspnetEnvironment }
         { name: 'Wa__Email__FromAddress', value: emailFromAddress }
         { name: 'Wa__Url__Public', value: effectivePublicUrl }
       ]
