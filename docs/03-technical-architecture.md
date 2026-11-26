@@ -775,7 +775,7 @@ src/wa.web/src/
 
 ### TA-9.2 AuthZ
 
-Roles: `Guest` (cookieless), `User` (session), `Admin` (session + email in `Wa:AdminEmails` list, P0; Entra SSO P3).
+Roles: `Guest` (cookieless), `User` (session), `Admin` (session + email in `Wa:AdminEmails` list **and** `AppUser.EmailConfirmed` = true — set only by a magic-link redeem, so the mailbox is proven (CHORE-staging-blockers, 2026-11-26), P0; Entra SSO P3).
 Admin endpoints reject non-admins with `FORBIDDEN`.
 
 ### TA-9.3 Token & key inventory
@@ -941,7 +941,7 @@ tag v* → cd-prod.yml: same as staging + manual approval + canary (20% → 100%
 | `Wa:AppInsights:ConnectionString` | ✓ | |
 | `Wa:Url:Public` / `Wa:Url:Api` | ✓ | `https://w.example.com` / `https://api.example.com` |
 | `Wa:Cors:AllowedOrigins` | ✓ | `https://www.example.com` |
-| `Wa:AdminEmails` | ✓ | `ops@example.com` |
+| `Wa:AdminEmails` | ✓ | `ops@example.com` (role needs a confirmed email: first sign-in by magic link) |
 | `Wa:Zip:SignKey` | ✓ (KV) | |
 | `Wa:Flags:TtlSeconds` | – | `30` |
 | `AZURE_FUNCTIONS_ENVIRONMENT` (wa-workers) | – | `Development` only where `Wa:Email:Sender=log`; unset = Production (log sender refused at startup) |
