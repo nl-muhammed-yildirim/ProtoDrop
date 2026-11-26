@@ -4,7 +4,7 @@ namespace wa.application.UseCases.Transfers;
 
 /// <summary>
 /// T-014 (TA-4.2#4): the read surface for GET /api/v1/public/transfers/{linkId}.
-/// Implemented by a thin singleton adapter over the adapter-owned WaDbContext (same style as ITransferStore).
+/// Implemented by a thin singleton adapter that opens a fresh WaDbContext per call (same style as ITransferStore).
 /// </summary>
 public interface IPublicTransferStore
 {

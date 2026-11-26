@@ -9,13 +9,13 @@ namespace wa.infrastructure.Persistence;
 /// T-006-03 (FR-006-5, TA-6.7): Unsubscribe handler — verify token + insert EmailSuppression idempotently.
 /// Plain sealed class (no MediatR) following the T-006-01 pattern; called directly from Program.cs's MapGet.
 /// </summary>
-/// <param name="db">Database context that stores the suppression rows.</param>
+/// <param name="factory">Factory that creates a short-lived database context per call.</param>
 /// <param name="hmacKey">Secret key bytes the unsubscribe tokens are signed with.</param>
 /// <param name="logger">Logger for diagnostics (never logs the address).</param>
 /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
-public sealed partial class UnsubscribeService(WaDbContext db, byte[] hmacKey, ILogger<UnsubscribeService> logger, TimeProvider timeProvider)
+public sealed partial class UnsubscribeService(IDbContextFactory<WaDbContext> factory, byte[] hmacKey, ILogger<UnsubscribeService> logger, TimeProvider timeProvider)
 {
-    private readonly WaDbContext _db = db;
+    private readonly IDbContextFactory<WaDbContext> _factory = factory;
     private readonly byte[] _hmacKey = hmacKey;
     private readonly ILogger<UnsubscribeService> _logger = logger;
     private readonly TimeProvider _timeProvider = timeProvider;
@@ -29,6 +29,7 @@ public sealed partial class UnsubscribeService(WaDbContext db, byte[] hmacKey, I
     /// <returns>A successful result when the suppression exists afterwards; a failed result when the token is invalid.</returns>
     public async Task<UnsubscribeResult> HandleAsync(string token, CancellationToken ct)
     {
+        await using var db = await _factory.CreateDbContextAsync(ct);
         if (UnsubscribeToken.Verify(token, _hmacKey) is not (string Address, string SenderEmail))
         {
             // TA-9.6: tampered/unknown → 404 (don't leak "token invalid" detail). Warn telemetry for admin alerting.
@@ -41,13 +42,13 @@ public sealed partial class UnsubscribeService(WaDbContext db, byte[] hmacKey, I
 
         try
         {
-            _db.Set<EmailSuppression>().Add(new EmailSuppression
+            db.Set<EmailSuppression>().Add(new EmailSuppression
             {
                 Address = address,
                 SenderEmail = senderEmail,
                 CreatedAtUtc = _timeProvider.GetUtcNow().UtcDateTime
             });
-            await _db.SaveChangesAsync(ct);
+            await db.SaveChangesAsync(ct);
             return new UnsubscribeResult(true);
         }
         catch (DbUpdateException)

@@ -58,8 +58,8 @@ public class ResendMeterNoDoubleCountTests : IAsyncLifetime
         _db = new WaDbContext(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(connString).Options);
         await _db.Database.MigrateAsync();
 
-        // Store under test — the SAME context, so seeded rows are visible to GetActiveStorageBytesAsync / MarkDeletedAsync.
-        _store = new TransferStore(_db);
+        // Store under test — opens its own context per call; seeded rows are committed, so they are visible to GetActiveStorageBytesAsync / MarkDeletedAsync.
+        _store = new TransferStore(new AppDbContextFactory(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(connString).Options));
 
         _svc = new BlobServiceClient(
             _accountUrl,

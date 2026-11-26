@@ -7,19 +7,20 @@ namespace wa.infrastructure.Persistence;
 /// <summary>
 /// T-002-02 (TA-4.1.5): thin adapter over WaDbContext implementing IIdempotencyStore —
 /// the generic HTTP-level idempotency storage used by IdempotencyMiddleware.
-/// Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext).
+/// Registered as a singleton; opens a fresh WaDbContext per call (CHORE-dbcontext-lifetime).
 /// </summary>
-/// <param name="db">Database context that backs the store.</param>
+/// <param name="factory">Factory that creates a short-lived database context per call.</param>
 /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
-public sealed class IdempotencyStore(WaDbContext db, TimeProvider timeProvider) : IIdempotencyStore
+public sealed class IdempotencyStore(IDbContextFactory<WaDbContext> factory, TimeProvider timeProvider) : IIdempotencyStore
 {
-    private readonly WaDbContext _db = db;
+    private readonly IDbContextFactory<WaDbContext> _factory = factory;
     private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <inheritdoc />
     public async Task<IdempotencyEntry?> FindAsync(string key, CancellationToken ct)
     {
-        var entry = await _db.Set<IdempotencyKey>().AsNoTracking().FirstOrDefaultAsync(k => k.Key == key, ct);
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        var entry = await db.Set<IdempotencyKey>().AsNoTracking().FirstOrDefaultAsync(k => k.Key == key, ct);
         if (entry is null)
             return null;
         return new IdempotencyEntry(entry.Key, entry.ResultJson!, entry.StatusCode, entry.ExpiresAtUtc);
@@ -28,11 +29,10 @@ public sealed class IdempotencyStore(WaDbContext db, TimeProvider timeProvider) 
     /// <inheritdoc />
     public async Task SaveAsync(string key, string resultJson, int statusCode, CancellationToken ct)
     {
-        // Singleton context (adapter-owned): the finalize handler may already have tracked an
-        // IdempotencyKey row for this key in its own transaction. Reuse that instance instead of
-        // Add — a second tracked instance with the same PK ('Key') throws an EF identity conflict.
-        var existing = _db.Set<IdempotencyKey>().Local.FirstOrDefault(k => k.Key == key)
-            ?? await _db.Set<IdempotencyKey>().FirstOrDefaultAsync(k => k.Key == key, ct);
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        // An expired key row may already exist (pre-seeded by T-002-04, or written by the finalize transaction):
+        // update it instead of a blind INSERT (PK_Idem).
+        var existing = await db.Set<IdempotencyKey>().FirstOrDefaultAsync(k => k.Key == key, ct);
 
         if (existing is not null)
         {
@@ -44,7 +44,7 @@ public sealed class IdempotencyStore(WaDbContext db, TimeProvider timeProvider) 
         else
         {
             var now = _timeProvider.GetUtcNow().UtcDateTime;
-            _db.Set<IdempotencyKey>().Add(new IdempotencyKey
+            db.Set<IdempotencyKey>().Add(new IdempotencyKey
             {
                 Key = key,
                 ResultJson = resultJson,
@@ -54,6 +54,6 @@ public sealed class IdempotencyStore(WaDbContext db, TimeProvider timeProvider) 
             });
         }
 
-        await _db.SaveChangesAsync(ct);
+        await db.SaveChangesAsync(ct);
     }
 }

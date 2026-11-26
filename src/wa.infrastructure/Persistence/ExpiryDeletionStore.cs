@@ -8,20 +8,21 @@ namespace wa.infrastructure.Persistence;
 /// <summary>
 /// T-005-02: thin adapter over WaDbContext implementing IExpiryDeletionStore — the f-delete-transfers job's DB surface (TA-6.4).
 /// </summary>
-/// <param name="db">Database context that backs the store.</param>
+/// <param name="factory">Factory that creates a short-lived database context per call.</param>
 /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
-public sealed class ExpiryDeletionStore(WaDbContext db, TimeProvider timeProvider) : IExpiryDeletionStore
+public sealed class ExpiryDeletionStore(IDbContextFactory<WaDbContext> factory, TimeProvider timeProvider) : IExpiryDeletionStore
 {
-    private readonly WaDbContext _db = db;
+    private readonly IDbContextFactory<WaDbContext> _factory = factory;
     private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <inheritdoc />
     public async Task<bool> TryClaimAsync(DateTime runWindowStartUtc, DateTime lockUntilUtc, CancellationToken ct)
     {
+        await using var db = await _factory.CreateDbContextAsync(ct);
         try
         {
-            // Raw SQL INSERT — bypasses the EF change tracker (singleton DbContext shared across invocations).
-            await _db.Database.ExecuteSqlRawAsync(
+            // Raw SQL INSERT — bypasses the EF change tracker so the duplicate-PK race is caught by SqlException.
+            await db.Database.ExecuteSqlRawAsync(
                 "INSERT INTO [JobRun] ([JobKey], [RunAtUtc], [LockUntilUtc]) VALUES ({0}, {1}, {2})",
                 ["delete-transfers", runWindowStartUtc, lockUntilUtc], ct);
             return true;
@@ -36,7 +37,8 @@ public sealed class ExpiryDeletionStore(WaDbContext db, TimeProvider timeProvide
     /// <inheritdoc />
     public async Task<IReadOnlyList<TransferDeletionBatchRow>> GetNextBatchAsync(DateTime cutoffUtc, int batchSize, CancellationToken ct)
     {
-        return await _db.Set<Transfer>()
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        return await db.Set<Transfer>()
             .AsNoTracking()
             .Where(t => (t.Status == 2 || t.Status == 3) && t.ExpiredAtUtc < cutoffUtc)
             .OrderBy(t => t.ExpiredAtUtc)
@@ -48,16 +50,17 @@ public sealed class ExpiryDeletionStore(WaDbContext db, TimeProvider timeProvide
     /// <inheritdoc />
     public async Task<int> DeleteTransfersAsync(IReadOnlyList<Guid> transferIds, DateTime deletedAtUtc, CancellationToken ct)
     {
-        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
 
         // 1. Load FileItems for the affected transfers (need BlobRefId to decrement RefCount).
-        var fileItemBlobRefs = await _db.Set<FileItem>()
+        var fileItemBlobRefs = await db.Set<FileItem>()
             .Where(f => transferIds.Contains(f.TransferId))
             .Select(f => f.BlobRefId)
             .ToListAsync(ct);
 
         // 2. Mark transfers as deleted (guard: only Status IN (2,3)).
-        var updated = await _db.Set<Transfer>()
+        var updated = await db.Set<Transfer>()
             .Where(t => transferIds.Contains(t.Id) && (t.Status == 2 || t.Status == 3))
             .ExecuteUpdateAsync(s => s
                 .SetProperty(t => t.Status, (byte)4)
@@ -70,7 +73,7 @@ public sealed class ExpiryDeletionStore(WaDbContext db, TimeProvider timeProvide
             var nowPlusBuffer = deletedAtUtc.AddHours(24);
 
             // Get current RefCounts to determine which will hit zero.
-            var blobRefs = await _db.Set<BlobRef>()
+            var blobRefs = await db.Set<BlobRef>()
                 .Where(b => distinctBlobIds.Contains(b.Id))
                 .ToListAsync(ct);
 
@@ -85,25 +88,25 @@ public sealed class ExpiryDeletionStore(WaDbContext db, TimeProvider timeProvide
                 }
             }
 
-            await _db.SaveChangesAsync(ct);
+            await db.SaveChangesAsync(ct);
         }
 
         // 4. Delete EmailRecipient rows for the affected transfers.
-        var emailRecipients = await _db.Set<EmailRecipient>()
+        var emailRecipients = await db.Set<EmailRecipient>()
             .Where(e => transferIds.Contains(e.TransferId))
             .ToListAsync(ct);
-        _db.Set<EmailRecipient>().RemoveRange(emailRecipients);
-        await _db.SaveChangesAsync(ct);
+        db.Set<EmailRecipient>().RemoveRange(emailRecipients);
+        await db.SaveChangesAsync(ct);
 
         // 5. Delete FileItem rows for the affected transfers.
-        var fileItems = await _db.Set<FileItem>()
+        var fileItems = await db.Set<FileItem>()
             .Where(f => transferIds.Contains(f.TransferId))
             .ToListAsync(ct);
-        _db.Set<FileItem>().RemoveRange(fileItems);
-        await _db.SaveChangesAsync(ct);
+        db.Set<FileItem>().RemoveRange(fileItems);
+        await db.SaveChangesAsync(ct);
 
         // 6. US-023-04 (FR-023-6): hard-delete the transfers' DownloadEvent rows — analytics live exactly as long as the transfer.
-        await _db.Set<DownloadEvent>()
+        await db.Set<DownloadEvent>()
             .Where(e => transferIds.Contains(e.TransferId))
             .ExecuteDeleteAsync(ct);
 
@@ -114,11 +117,12 @@ public sealed class ExpiryDeletionStore(WaDbContext db, TimeProvider timeProvide
     /// <inheritdoc />
     public async Task CompleteClaimAsync(DateTime runWindowStartUtc, CancellationToken ct)
     {
-        var jobRun = _db.Set<JobRun>().Find("delete-transfers", runWindowStartUtc);
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        var jobRun = db.Set<JobRun>().Find("delete-transfers", runWindowStartUtc);
         if (jobRun is not null)
         {
             jobRun.FinishedAtUtc = _timeProvider.GetUtcNow().UtcDateTime;
-            await _db.SaveChangesAsync(ct);
+            await db.SaveChangesAsync(ct);
         }
     }
 }

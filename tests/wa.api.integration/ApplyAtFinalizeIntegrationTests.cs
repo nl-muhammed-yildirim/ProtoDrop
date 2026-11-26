@@ -21,8 +21,7 @@ public class ApplyAtFinalizeIntegrationTests : IAsyncLifetime
 {
     private MsSqlContainer _sql = null!;
     private DbContextOptions<WaDbContext> _options = null!;
-    private WaDbContext _storeDb = null!;
-    private WaDbContext _cacheDb = null!;
+    private AppDbContextFactory _factory = null!;
     private LimitsProvider _limits = null!;
     private FeaturesProvider _features = null!;
     private readonly RecordingPublisher _publisher = new();
@@ -32,12 +31,12 @@ public class ApplyAtFinalizeIntegrationTests : IAsyncLifetime
         _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
         await _sql.StartAsync();
         _options = new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(_sql.GetConnectionString()).Options;
-        _storeDb = new WaDbContext(_options);
-        await _storeDb.Database.MigrateAsync();
-        _cacheDb = new WaDbContext(_options);
+        await using (var migrateDb = new WaDbContext(_options))
+            await migrateDb.Database.MigrateAsync();
+        _factory = new AppDbContextFactory(_options);
 
-        var plansCache = new PlansCache(new PlansStore(_cacheDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow);
-        var flagsCache = new FlagsCache(new FlagsStore(_cacheDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow);
+        var plansCache = new PlansCache(new PlansStore(_factory), TimeSpan.Zero, () => DateTimeOffset.UtcNow);
+        var flagsCache = new FlagsCache(new FlagsStore(_factory), TimeSpan.Zero, () => DateTimeOffset.UtcNow);
         _limits = new LimitsProvider(plansCache, flagsCache);
         _features = new FeaturesProvider(plansCache, flagsCache);
     }
@@ -45,22 +44,20 @@ public class ApplyAtFinalizeIntegrationTests : IAsyncLifetime
     // US-020-02: one bound accessor per "request" (the real one is scoped + memoized) — a reused handler would pin the first resolution.
     private SendTransferHandler NewHandler()
     {
-        var accessor = new PlanContextAccessor(new UserPlanStore(_cacheDb), _limits, _features);
+        var accessor = new PlanContextAccessor(new UserPlanStore(_factory), _limits, _features);
         accessor.Bind(null); // guest -> Free, as before
         return new SendTransferHandler(
-            new SendStore(_storeDb, new ThrowingBlobStore()),
-            new TransferStore(_storeDb),
+            new SendStore(_factory, new ThrowingBlobStore()),
+            new TransferStore(_factory),
             accessor,
             _publisher,
             new WaTelemetryReporter(NullLogger<WaTelemetryReporter>.Instance, Encoding.UTF8.GetBytes("test-key")),
             NullLogger<SendTransferHandler>.Instance,
-            new AppUserStore(_storeDb), TimeProvider.System);
+            new AppUserStore(_factory), TimeProvider.System);
     }
 
     public async Task DisposeAsync()
     {
-        await _storeDb.DisposeAsync();
-        await _cacheDb.DisposeAsync();
         await _sql.DisposeAsync();
     }
 

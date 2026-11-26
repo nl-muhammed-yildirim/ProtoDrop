@@ -49,9 +49,9 @@ public class DeleteTransfersJobIntegrationTests : IAsyncLifetime
 
     public async Task DisposeAsync() => await _db.DisposeAsync();
 
-    private DeleteExpiredTransfersHandler BuildHandler(WaDbContext db)
+    private DeleteExpiredTransfersHandler BuildHandler()
     {
-        var store = new ExpiryDeletionStore(db, TimeProvider.System);
+        var store = new ExpiryDeletionStore(new AppDbContextFactory(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(_connString).Options), TimeProvider.System);
         // Outbox-backed publisher (T-054): writes the TA-5.2 envelope into DomainEvent via its own context, then publishes to an unreachable broker — row stays unpublished but committed.
         var telemetry = new wa.application.Telemetry.WaTelemetryReporter(
             Microsoft.Extensions.Logging.Abstractions.NullLogger<wa.application.Telemetry.WaTelemetryReporter>.Instance,
@@ -107,7 +107,7 @@ public class DeleteTransfersJobIntegrationTests : IAsyncLifetime
         });
         await _db.SaveChangesAsync();
 
-        var handler = BuildHandler(_db);
+        var handler = BuildHandler();
         var count = await handler.RunAsync(DateTime.UtcNow, CancellationToken.None);
 
         Assert.Equal(1, count);
@@ -198,7 +198,7 @@ public class DeleteTransfersJobIntegrationTests : IAsyncLifetime
         });
         await _db.SaveChangesAsync();
 
-        var handler = BuildHandler(_db);
+        var handler = BuildHandler();
         var count = await handler.RunAsync(DateTime.UtcNow, CancellationToken.None);
 
         Assert.Equal(1, count); // only transfer1 deleted
@@ -253,7 +253,7 @@ public class DeleteTransfersJobIntegrationTests : IAsyncLifetime
         await _db.SaveChangesAsync();
 
         var now = DateTime.UtcNow;
-        var handler = BuildHandler(_db);
+        var handler = BuildHandler();
 
         // First run: deletes the transfer.
         var count1 = await handler.RunAsync(now, CancellationToken.None);
@@ -294,7 +294,7 @@ public class DeleteTransfersJobIntegrationTests : IAsyncLifetime
         });
         await _db.SaveChangesAsync();
 
-        var handler = BuildHandler(_db);
+        var handler = BuildHandler();
         var count = await handler.RunAsync(DateTime.UtcNow, CancellationToken.None);
 
         Assert.Equal(1, count);
@@ -377,7 +377,7 @@ public class DeleteTransfersJobIntegrationTests : IAsyncLifetime
             _db.Set<DownloadEvent>().Add(NewDownloadEvent(controlId, null, i));
         await _db.SaveChangesAsync();
 
-        var count = await BuildHandler(_db).RunAsync(DateTime.UtcNow, CancellationToken.None);
+        var count = await BuildHandler().RunAsync(DateTime.UtcNow, CancellationToken.None);
 
         Assert.Equal(1, count);
 
@@ -408,7 +408,7 @@ public class DeleteTransfersJobIntegrationTests : IAsyncLifetime
             _db.Set<DownloadEvent>().Add(NewDownloadEvent(transferId, null, i));
         await _db.SaveChangesAsync();
 
-        var count = await BuildHandler(_db).RunAsync(DateTime.UtcNow, CancellationToken.None);
+        var count = await BuildHandler().RunAsync(DateTime.UtcNow, CancellationToken.None);
 
         Assert.Equal(0, count);
 

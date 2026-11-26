@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 namespace wa.infrastructure.Persistence;
 
 /// <summary>
-/// Runtime context factory (T-054-03): adapters own their contexts, no request scope in the current API surface.
+/// Runtime context factory (T-054-03): every store opens a fresh, short-lived context per call (CHORE-dbcontext-lifetime).
 /// Distinct from the design-time <c>DesignTime.WaDbContextFactory</c> used by dotnet-ef.
 /// </summary>
 /// <param name="options">EF Core options shared by every context this factory creates.</param>

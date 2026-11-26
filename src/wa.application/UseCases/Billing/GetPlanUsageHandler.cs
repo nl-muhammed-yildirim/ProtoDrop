@@ -25,7 +25,7 @@ public sealed class GetPlanUsageHandler : IRequestHandler<GetPlanUsageQuery, Pla
     {
         var plan = await _planContext.GetAsync(ct);   // FR-020-1: the only plan read
 
-        // Sequential: the singleton store shares one WaDbContext.
+        // Sequential keeps one DB round-trip at a time per request.
         var usedBytes = await _transfers.GetActiveStorageBytesAsync(request.UserId, ct);
         var activeCount = await _transfers.GetActiveTransferCountAsync(request.UserId, ct);
 

@@ -211,14 +211,14 @@ public class DownloadAllUrlEndpointTests : IAsyncLifetime
         Assert.Equal(2, await freshDb.Set<DownloadEvent>().CountAsync(e => e.TransferId == transferId)); // exactly the two successful rows
     }
 
-    // ---- T-003-10 (AC-003-5): the app's singleton context TRACKS the transfer (post-finalize state) - zip cap flip must detach, not delete ----
+    // ---- T-003-10 (AC-003-5) / CHORE-dbcontext-lifetime: a transfer seeded and tracked in a separate context - the cap flip still gives 410 and the app stays healthy ----
 
     [Fact]
     public async Task CapReached_TrackedInAppContext_Returns410_AndContextStaysHealthy()
     {
         await using var factory = new TestFactory();
         using var client = factory.CreateClient();
-        var appDb = factory.Services.GetRequiredService<WaDbContext>();
+        await using var appDb = await factory.Services.GetRequiredService<IDbContextFactory<WaDbContext>>().CreateDbContextAsync();
 
         var a = await SeedTrackedInAppContextAsync(appDb, maxDownloads: 1);
         await UploadZipBlobAsync(a.TransferId, [1, 2, 3]);
@@ -234,9 +234,7 @@ public class DownloadAllUrlEndpointTests : IAsyncLifetime
             Assert.Equal(410, doc.RootElement.GetProperty("status").GetInt32());
         }
 
-        Assert.DoesNotContain(appDb.ChangeTracker.Entries(), e => e.State == EntityState.Deleted);
-
-        // Follow-up write through the same context (another transfer's mint -> SaveChanges) stays healthy.
+        // Follow-up write (another transfer's mint -> SaveChanges) stays healthy.
         var bLink = wa.domain.ValueObjects.LinkId.Mint().Value;
         var bId = await SeedTransferAsync(status: 1, linkId: bLink, maxDownloads: 5);
         await SeedFileItemsAsync(bId, [(Guid.NewGuid(), "b.txt", 10L)]);
@@ -415,7 +413,7 @@ public class DownloadAllUrlEndpointTests : IAsyncLifetime
         await _db.SaveChangesAsync();
     }
 
-    /// <summary>T-003-10: seed Transfer + BlobRef + FileItem through the APP's singleton context in ONE SaveChanges, so all three stay tracked Unchanged (the post-finalize state).</summary>
+    /// <summary>T-003-10: seed Transfer + BlobRef + FileItem through a context from the app's factory in ONE SaveChanges, so all three stay tracked Unchanged in that context.</summary>
     private static async Task<(Guid TransferId, string LinkId)> SeedTrackedInAppContextAsync(WaDbContext appDb, int maxDownloads)
     {
         var transferId = Guid.NewGuid();
@@ -469,7 +467,7 @@ public class DownloadAllUrlEndpointTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// A fresh context for reading AFTER the app has mutated rows via its own DI singleton DbContext.
+    /// A fresh context for reading AFTER the app has mutated rows via its own per-call DbContext.
     /// The seed context holds tracked entities with stale in-memory values (DownloadsCount=0, etc.); the app's
     /// ExecuteUpdateAsync / SaveChangesAsync hit SQL directly through a different instance. A fresh context has no
     /// identity-map entries, so its queries read the real DB rows — the only way to see the app's writes.

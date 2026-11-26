@@ -1,7 +1,7 @@
 namespace wa.application.UseCases.Transfers;
 
 /// <summary>
-/// US-023-01 (F-PRF-003): read port for the download analytics view. Implemented by a thin singleton adapter over WaDbContext.
+/// US-023-01 (F-PRF-003): read port for the download analytics view. Implemented by a thin singleton adapter that opens a fresh WaDbContext per call.
 /// All aggregation happens in SQL (EC-023-4); no raw DownloadEvent rows cross this port.
 /// </summary>
 public interface ITransferAnalyticsStore
@@ -13,7 +13,7 @@ public interface ITransferAnalyticsStore
     /// <returns>The transfer facts, or <see langword="null"/> when it is not an existing transfer of this owner.</returns>
     Task<AnalyticsTransfer?> GetOwnedTransferAsync(Guid ownerId, Guid transferId, CancellationToken ct);
 
-    /// <summary>Grouped counts of the transfer's DownloadEvents with CreatedAtUtc &gt;= sinceUtc (sequential queries on the singleton context).</summary>
+    /// <summary>Grouped counts of the transfer's DownloadEvents with CreatedAtUtc &gt;= sinceUtc (sequential queries on one per-call context).</summary>
     /// <param name="transferId">Id of the transfer whose download events are aggregated.</param>
     /// <param name="sinceUtc">Only download events at or after this instant are counted.</param>
     /// <param name="ct">Token that cancels the operation.</param>

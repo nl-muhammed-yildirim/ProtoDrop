@@ -33,6 +33,8 @@ public class DeleteTransferPurgesAnalyticsTests : IAsyncLifetime
 
     private WaDbContext NewDb() => new(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(_connString).Options);
 
+    private AppDbContextFactory NewFactory() => new(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(_connString).Options);
+
     private async Task<Guid> SeedOwnerAsync()
     {
         var planId = await _db.Set<Plan>().Select(p => p.Id).FirstAsync();
@@ -119,7 +121,7 @@ public class DeleteTransferPurgesAnalyticsTests : IAsyncLifetime
         var other = await SeedTransferWithEventsAsync(owner, events: 2);
         Assert.Equal(3, await EventCountAsync(target));
 
-        var result = await new TransferStore(_db).MarkDeletedAsync(target, owner, DateTime.UtcNow, CancellationToken.None);
+        var result = await new TransferStore(NewFactory()).MarkDeletedAsync(target, owner, DateTime.UtcNow, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal((byte)4, await StatusAsync(target));
@@ -135,7 +137,7 @@ public class DeleteTransferPurgesAnalyticsTests : IAsyncLifetime
         var stranger = await SeedOwnerAsync();
         var target = await SeedTransferWithEventsAsync(owner, events: 2);
 
-        var result = await new TransferStore(_db).MarkDeletedAsync(target, stranger, DateTime.UtcNow, CancellationToken.None);
+        var result = await new TransferStore(NewFactory()).MarkDeletedAsync(target, stranger, DateTime.UtcNow, CancellationToken.None);
 
         Assert.Null(result);
         Assert.Equal(2, await EventCountAsync(target));
@@ -150,7 +152,7 @@ public class DeleteTransferPurgesAnalyticsTests : IAsyncLifetime
         var other = await SeedTransferWithEventsAsync(owner, events: 2);
         Assert.Equal(3, await EventCountAsync(target));
 
-        var result = await new AdminTransferStore(_db).AdminMarkDeletedAsync(target, DateTime.UtcNow, CancellationToken.None);
+        var result = await new AdminTransferStore(NewFactory()).AdminMarkDeletedAsync(target, DateTime.UtcNow, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal((byte)4, await StatusAsync(target));

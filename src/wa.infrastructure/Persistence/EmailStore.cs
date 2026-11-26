@@ -7,22 +7,23 @@ namespace wa.infrastructure.Persistence;
 
 /// <summary>
 /// T-006-01: thin adapter over WaDbContext implementing IEmailStore.
-/// Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext).
+/// Registered as a singleton; opens a fresh WaDbContext per call (CHORE-dbcontext-lifetime).
 /// </summary>
-/// <param name="db">Database context that backs the store.</param>
-public sealed class EmailStore(WaDbContext db) : IEmailStore
+/// <param name="factory">Factory that creates a short-lived database context per call.</param>
+public sealed class EmailStore(IDbContextFactory<WaDbContext> factory) : IEmailStore
 {
-    private readonly WaDbContext _db = db;
+    private readonly IDbContextFactory<WaDbContext> _factory = factory;
 
     /// <inheritdoc />
     public async Task<EmailTransferContext?> GetTransferWithFilesAsync(Guid transferId, CancellationToken ct)
     {
-        var transfer = await _db.Set<Transfer>().FirstOrDefaultAsync(t => t.Id == transferId, ct);
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        var transfer = await db.Set<Transfer>().FirstOrDefaultAsync(t => t.Id == transferId, ct);
         if (transfer is null)
             return null;
 
         // Query FileItems separately (no navigation property on Transfer).
-        var files = await _db.Set<FileItem>()
+        var files = await db.Set<FileItem>()
             .Where(f => f.TransferId == transferId)
             .OrderBy(f => f.SortOrder)
             .Select(f => new FileEntry(f.OriginalName, f.SizeBytes))
@@ -43,7 +44,8 @@ public sealed class EmailStore(WaDbContext db) : IEmailStore
     /// <inheritdoc />
     public async Task<IReadOnlyList<EmailRecipient>> GetRecipientsAsync(Guid transferId, CancellationToken ct)
     {
-        var recipients = await _db.Set<EmailRecipient>()
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        var recipients = await db.Set<EmailRecipient>()
             .Where(r => r.TransferId == transferId)
             .ToListAsync(ct);
         return recipients;
@@ -55,10 +57,11 @@ public sealed class EmailStore(WaDbContext db) : IEmailStore
         string? senderEmail,
         CancellationToken ct)
     {
+        await using var db = await _factory.CreateDbContextAsync(ct);
         if (addresses.Count == 0)
             return new HashSet<string>();
 
-        var suppressed = await _db.Set<EmailSuppression>()
+        var suppressed = await db.Set<EmailSuppression>()
             .Where(s => addresses.Contains(s.Address) &&
                 (s.SenderEmail == senderEmail || s.SenderEmail == null))
             .Select(s => s.Address)
@@ -73,11 +76,12 @@ public sealed class EmailStore(WaDbContext db) : IEmailStore
         DateTime notifiedAtUtc,
         CancellationToken ct)
     {
+        await using var db = await _factory.CreateDbContextAsync(ct);
         if (recipientIds.Count == 0)
             return;
 
         // ExecuteUpdate with WHERE NotifiedAtUtc IS NULL (idempotent — replay won't double-set).
-        await _db.Set<EmailRecipient>()
+        await db.Set<EmailRecipient>()
             .Where(r => recipientIds.Contains(r.Id) && r.NotifiedAtUtc == null)
             .ExecuteUpdateAsync(s => s.SetProperty(r => r.NotifiedAtUtc, notifiedAtUtc), ct);
     }
