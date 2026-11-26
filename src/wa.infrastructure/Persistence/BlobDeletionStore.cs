@@ -8,20 +8,21 @@ namespace wa.infrastructure.Persistence;
 /// <summary>
 /// T-005-03: thin adapter over WaDbContext implementing IBlobDeletionStore — the f-delete-blobs job's DB surface (TA-6.5).
 /// </summary>
-/// <param name="db">Database context that backs the store.</param>
+/// <param name="factory">Factory that creates a short-lived database context per call.</param>
 /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
-public sealed class BlobDeletionStore(WaDbContext db, TimeProvider timeProvider) : IBlobDeletionStore
+public sealed class BlobDeletionStore(IDbContextFactory<WaDbContext> factory, TimeProvider timeProvider) : IBlobDeletionStore
 {
-    private readonly WaDbContext _db = db;
+    private readonly IDbContextFactory<WaDbContext> _factory = factory;
     private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <inheritdoc />
     public async Task<bool> TryClaimAsync(DateTime runWindowStartUtc, DateTime lockUntilUtc, CancellationToken ct)
     {
+        await using var db = await _factory.CreateDbContextAsync(ct);
         try
         {
-            // Raw SQL INSERT — bypasses the EF change tracker (singleton DbContext shared across invocations).
-            await _db.Database.ExecuteSqlRawAsync(
+            // Raw SQL INSERT — bypasses the EF change tracker so the duplicate-PK race is caught by SqlException.
+            await db.Database.ExecuteSqlRawAsync(
                 "INSERT INTO [JobRun] ([JobKey], [RunAtUtc], [LockUntilUtc]) VALUES ({0}, {1}, {2})",
                 ["delete-blobs", runWindowStartUtc, lockUntilUtc], ct);
             return true;
@@ -36,7 +37,8 @@ public sealed class BlobDeletionStore(WaDbContext db, TimeProvider timeProvider)
     /// <inheritdoc />
     public async Task<IReadOnlyList<BlobDeletionBatchRow>> GetNextBatchAsync(DateTime cutoffUtc, int batchSize, CancellationToken ct)
     {
-        return await _db.Set<BlobRef>()
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        return await db.Set<BlobRef>()
             .AsNoTracking()
             .Where(b => b.RefCount == 0 && b.PhysicallyDeletedAtUtc < cutoffUtc)
             .OrderBy(b => b.PhysicallyDeletedAtUtc)
@@ -48,19 +50,21 @@ public sealed class BlobDeletionStore(WaDbContext db, TimeProvider timeProvider)
     /// <inheritdoc />
     public async Task DeleteRowAsync(Guid blobRefId, CancellationToken ct)
     {
-        var blob = await _db.Set<BlobRef>().FirstAsync(b => b.Id == blobRefId, ct);
-        _db.Set<BlobRef>().Remove(blob);
-        await _db.SaveChangesAsync(ct);
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        var blob = await db.Set<BlobRef>().FirstAsync(b => b.Id == blobRefId, ct);
+        db.Set<BlobRef>().Remove(blob);
+        await db.SaveChangesAsync(ct);
     }
 
     /// <inheritdoc />
     public async Task CompleteClaimAsync(DateTime runWindowStartUtc, CancellationToken ct)
     {
-        var jobRun = _db.Set<JobRun>().Find("delete-blobs", runWindowStartUtc);
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        var jobRun = db.Set<JobRun>().Find("delete-blobs", runWindowStartUtc);
         if (jobRun is not null)
         {
             jobRun.FinishedAtUtc = _timeProvider.GetUtcNow().UtcDateTime;
-            await _db.SaveChangesAsync(ct);
+            await db.SaveChangesAsync(ct);
         }
     }
 }

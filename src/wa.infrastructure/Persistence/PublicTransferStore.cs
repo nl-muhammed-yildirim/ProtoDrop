@@ -6,30 +6,30 @@ namespace wa.infrastructure.Persistence;
 
 /// <summary>
 /// T-014: thin adapter over WaDbContext implementing IPublicTransferStore — the only DB surface the recipient-page handler needs.
-/// Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext).
+/// Registered as a singleton; opens a fresh WaDbContext per call (CHORE-dbcontext-lifetime).
 /// </summary>
-/// <param name="db">Database context that backs the store.</param>
+/// <param name="factory">Factory that creates a short-lived database context per call.</param>
 /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
-public sealed class PublicTransferStore(WaDbContext db, TimeProvider timeProvider) : IPublicTransferStore
+public sealed class PublicTransferStore(IDbContextFactory<WaDbContext> factory, TimeProvider timeProvider) : IPublicTransferStore
 {
-    private readonly WaDbContext _db = db;
+    private readonly IDbContextFactory<WaDbContext> _factory = factory;
     private readonly TimeProvider _timeProvider = timeProvider;
 
     /// <inheritdoc />
     /// <remarks>
-    /// AsNoTracking is load-bearing, not style: RecordSingleFileDownloadAsync's cap flip writes via raw SQL (the guard lives in
-    /// the UPDATE itself), which bypasses the change tracker. On the singleton context a tracked read then returns the seed-era
-    /// values for that row even after the entity was detached — endpoint 4 would answer Active instead of DownloadLimit and lose
-    /// FR-003-9's byte identity (CapReached_410_BodyByteIdenticalToEndpoint4). No handler mutates or saves this entity, so an
+    /// AsNoTracking: this is a read-only query — the cap flip in RecordSingleFileDownloadAsync writes via raw SQL (the guard lives in
+    /// the UPDATE itself) and every call opens its own context, so no tracked copy can return stale values for that row
+    /// (FR-003-9 byte identity, CapReached_410_BodyByteIdenticalToEndpoint4). No handler mutates or saves this entity, so an
     /// untracked read is safe for all three callers (GetPublicTransfer/GetFileDownloadUrl/UnlockTransfer — status checks + email only).
     /// </remarks>
     public async Task<(Transfer?, IReadOnlyList<PublicFileItem>)> GetByLinkIdAsync(string linkId, CancellationToken ct)
     {
-        var transfer = await _db.Set<Transfer>().AsNoTracking().FirstOrDefaultAsync(t => t.LinkId == linkId, ct);
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        var transfer = await db.Set<Transfer>().AsNoTracking().FirstOrDefaultAsync(t => t.LinkId == linkId, ct);
         if (transfer is null) return (null, []);
 
         // FileItem has no navigation from Transfer — separate query, projected to plain rows (no EF entities in use cases; golden rule 8).
-        var files = await _db.Set<FileItem>()
+        var files = await db.Set<FileItem>()
             .Where(f => f.TransferId == transfer.Id)
             .OrderBy(f => f.SortOrder)
             .Select(f => new PublicFileItem(f.Id, f.OriginalName, f.SizeBytes))
@@ -52,8 +52,9 @@ public sealed class PublicTransferStore(WaDbContext db, TimeProvider timeProvide
         string? userAgentFamily,
         CancellationToken ct)
     {
+        await using var db = await _factory.CreateDbContextAsync(ct);
         // TA-7.2 step 4: the guard runs in the UPDATE itself — rowsAffected==1 iff the download is within cap at execution time.
-        var rowsAffected = await _db.Set<Transfer>()
+        var rowsAffected = await db.Set<Transfer>()
             .Where(t => t.Id == transferId && (t.MaxDownloads < 0 || t.DownloadsCount < t.MaxDownloads))
             .ExecuteUpdateAsync(setter => setter.SetProperty(t => t.DownloadsCount, t => t.DownloadsCount + 1), ct);
 
@@ -61,19 +62,19 @@ public sealed class PublicTransferStore(WaDbContext db, TimeProvider timeProvide
         {
             // US-005-03 technical note literal: idempotent flip — Status=3 + ExpiredAtUtc set when it flips (grace clock starts),
             // WHERE Id=@id AND Status IN (1,5) so concurrent racers all write the same value.
-            _ = await _db.Database.ExecuteSqlRawAsync(
+            _ = await db.Database.ExecuteSqlRawAsync(
                 "UPDATE [Transfer] SET [Status]=3, [ExpiredAtUtc]=COALESCE([ExpiredAtUtc], GETUTCDATE()) WHERE [Id] = {0} AND [Status] IN (1, 5)",
                 [transferId], ct);
 
             // The raw-SQL UPDATE bypasses the change tracker: detach any tracked copy so later SaveChanges can't resurrect the old
             // Status/DownloadsCount (GetByLinkIdAsync reads untracked). T-003-10: a real detach — Local.Remove marks the row Deleted.
-            _db.DetachTransfer(transferId);
+            db.DetachTransfer(transferId);
 
             return new SingleFileDownloadResult(SingleFileDownloadOutcome.CapReached);
         }
 
         // Within cap: the DownloadEvent row (TA-3.2; IpHash/UaHash already PII-transformed upstream — TA-9.4/10.5).
-        _db.Set<DownloadEvent>().Add(new DownloadEvent
+        db.Set<DownloadEvent>().Add(new DownloadEvent
         {
             TransferId = transferId,
             FileId = fileId,
@@ -82,7 +83,7 @@ public sealed class PublicTransferStore(WaDbContext db, TimeProvider timeProvide
             UserAgentFamily = userAgentFamily,
             CreatedAtUtc = _timeProvider.GetUtcNow().UtcDateTime
         });
-        await _db.SaveChangesAsync(ct);
+        await db.SaveChangesAsync(ct);
         return new SingleFileDownloadResult(SingleFileDownloadOutcome.Recorded);
     }
 
@@ -101,8 +102,9 @@ public sealed class PublicTransferStore(WaDbContext db, TimeProvider timeProvide
         string? userAgentFamily,
         CancellationToken ct)
     {
+        await using var db = await _factory.CreateDbContextAsync(ct);
         // TA-7.2 step 4: the guard runs in the UPDATE itself — rowsAffected==1 iff the download is within cap at execution time.
-        var rowsAffected = await _db.Set<Transfer>()
+        var rowsAffected = await db.Set<Transfer>()
             .Where(t => t.Id == transferId && (t.MaxDownloads < 0 || t.DownloadsCount < t.MaxDownloads))
             .ExecuteUpdateAsync(setter => setter.SetProperty(t => t.DownloadsCount, t => t.DownloadsCount + 1), ct);
 
@@ -110,20 +112,20 @@ public sealed class PublicTransferStore(WaDbContext db, TimeProvider timeProvide
         {
             // US-005-03 technical note literal: idempotent flip — Status=3 + ExpiredAtUtc set when it flips (grace clock starts),
             // WHERE Id=@id AND Status IN (1,5) so concurrent racers all write the same value.
-            _ = await _db.Database.ExecuteSqlRawAsync(
+            _ = await db.Database.ExecuteSqlRawAsync(
                 "UPDATE [Transfer] SET [Status]=3, [ExpiredAtUtc]=COALESCE([ExpiredAtUtc], GETUTCDATE()) WHERE [Id] = {0} AND [Status] IN (1, 5)",
                 [transferId], ct);
 
             // The raw-SQL UPDATE bypasses the change tracker: detach any tracked copy so later SaveChanges can't resurrect the old
             // Status/DownloadsCount (GetByLinkIdAsync reads untracked). T-003-10: a real detach — Local.Remove marks the row Deleted.
-            _db.DetachTransfer(transferId);
+            db.DetachTransfer(transferId);
 
             return new SingleFileDownloadResult(SingleFileDownloadOutcome.CapReached);
         }
 
         // Within cap: the DownloadEvent row (TA-3.2; IpHash/UaHash already PII-transformed upstream — TA-9.4/10.5).
         // FileId = null for download-all (TA-3.2: NULL = download-all).
-        _db.Set<DownloadEvent>().Add(new DownloadEvent
+        db.Set<DownloadEvent>().Add(new DownloadEvent
         {
             TransferId = transferId,
             FileId = null, // download-all
@@ -132,7 +134,7 @@ public sealed class PublicTransferStore(WaDbContext db, TimeProvider timeProvide
             UserAgentFamily = userAgentFamily,
             CreatedAtUtc = _timeProvider.GetUtcNow().UtcDateTime
         });
-        await _db.SaveChangesAsync(ct);
+        await db.SaveChangesAsync(ct);
         return new SingleFileDownloadResult(SingleFileDownloadOutcome.Recorded);
     }
 }

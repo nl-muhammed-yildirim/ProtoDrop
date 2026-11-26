@@ -7,12 +7,12 @@ namespace wa.infrastructure.Persistence;
 
 /// <summary>
 /// T-011-06 (TA-4.2#22 / FR-011-2): admin users list — single bounded query over WaDbContext.
-/// Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext).
+/// Registered as a singleton; opens a fresh WaDbContext per call (CHORE-dbcontext-lifetime).
 /// </summary>
-/// <param name="db">Database context that backs the store.</param>
-public sealed class AdminUserStore(WaDbContext db) : IAdminUserStore
+/// <param name="factory">Factory that creates a short-lived database context per call.</param>
+public sealed class AdminUserStore(IDbContextFactory<WaDbContext> factory) : IAdminUserStore
 {
-    private readonly WaDbContext _db = db;
+    private readonly IDbContextFactory<WaDbContext> _factory = factory;
 
     /// <inheritdoc />
     /// <remarks>
@@ -31,7 +31,8 @@ public sealed class AdminUserStore(WaDbContext db) : IAdminUserStore
         int limit,
         CancellationToken ct)
     {
-        var rows = await _db.Set<AppUser>()
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        var rows = await db.Set<AppUser>()
             .AsNoTracking()
             // T-011-06 (DECISION): q predicate — email substring on the normalized term.
             .Where(u => q == null || u.Email.Contains(q))
@@ -44,11 +45,11 @@ public sealed class AdminUserStore(WaDbContext db) : IAdminUserStore
                 u.Id,
                 u.Email,
                 // Plan name via scalar subquery (FirstOrDefault) — Plans are seeded and never deleted; null handled.
-                _db.Set<Plan>().Where(p => p.Id == u.PlanId).Select(p => p.Name).FirstOrDefault(),
+                db.Set<Plan>().Where(p => p.Id == u.PlanId).Select(p => p.Name).FirstOrDefault(),
                 // T-010-04 (US-010-03): storage used — 3-step expression inlined as a nested subquery (Status IN (1,3), per-ref counting).
-                _db.Set<BlobRef>()
-                    .Where(b => _db.Set<FileItem>()
-                        .Where(f => _db.Set<Transfer>()
+                db.Set<BlobRef>()
+                    .Where(b => db.Set<FileItem>()
+                        .Where(f => db.Set<Transfer>()
                             .Where(t => t.OwnerAppUserId == u.Id && (t.Status == 1 || t.Status == 3))
                             .Select(t => t.Id)
                             .Contains(f.TransferId))
@@ -57,7 +58,7 @@ public sealed class AdminUserStore(WaDbContext db) : IAdminUserStore
                         .Contains(b.Id))
                     .Sum(b => b.SizeBytes),
                 // Active transfer count — Status == 1 plus Scheduled (5), consistent with the owner's My Files "active" filter.
-                _db.Set<Transfer>().Count(t => t.OwnerAppUserId == u.Id && (t.Status == 1 || t.Status == TransferStatus.Scheduled)),
+                db.Set<Transfer>().Count(t => t.OwnerAppUserId == u.Id && (t.Status == 1 || t.Status == TransferStatus.Scheduled)),
                 u.CreatedAtUtc))
             .ToListAsync(ct);
 
@@ -77,7 +78,8 @@ public sealed class AdminUserStore(WaDbContext db) : IAdminUserStore
     /// </remarks>
     public async Task<bool> SetPlanIdAsync(Guid userId, Guid newPlanId, CancellationToken ct)
     {
-        var updatedUsers = await _db.Set<AppUser>()
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        var updatedUsers = await db.Set<AppUser>()
             .Where(u => u.Id == userId)
             .ExecuteUpdateAsync(s => s.SetProperty(u => u.PlanId, newPlanId), ct);
 

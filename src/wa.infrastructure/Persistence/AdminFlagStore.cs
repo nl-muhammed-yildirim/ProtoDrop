@@ -6,12 +6,12 @@ namespace wa.infrastructure.Persistence;
 
 /// <summary>
 /// T-011-08 (TA-4.2#23 / FR-011-2): admin flag write surface — single-key PK upsert over WaDbContext.
-/// Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext).
+/// Registered as a singleton; opens a fresh WaDbContext per call (CHORE-dbcontext-lifetime).
 /// </summary>
-/// <param name="db">Database context that backs the store.</param>
-public sealed class AdminFlagStore(WaDbContext db) : IAdminFlagStore
+/// <param name="factory">Factory that creates a short-lived database context per call.</param>
+public sealed class AdminFlagStore(IDbContextFactory<WaDbContext> factory) : IAdminFlagStore
 {
-    private readonly WaDbContext _db = db;
+    private readonly IDbContextFactory<WaDbContext> _factory = factory;
 
     /// <inheritdoc />
     /// <remarks>
@@ -21,8 +21,9 @@ public sealed class AdminFlagStore(WaDbContext db) : IAdminFlagStore
     /// </remarks>
     public async Task<FeatureFlag?> UpsertAsync(string key, string value, DateTime updatedAtUtc, CancellationToken ct)
     {
+        await using var db = await _factory.CreateDbContextAsync(ct);
         // 1. Read the old row (AsNoTracking — no change tracking on this write path).
-        var old = await _db.Set<FeatureFlag>()
+        var old = await db.Set<FeatureFlag>()
             .AsNoTracking()
             .FirstOrDefaultAsync(f => f.Key == key, ct);
 
@@ -30,7 +31,7 @@ public sealed class AdminFlagStore(WaDbContext db) : IAdminFlagStore
             return null; // unknown key → handler throws ForNotFound (404 NOT_FOUND at the endpoint)
 
         // 2. Single-row update via ExecuteUpdateAsync — mirrors AdminUserStore.SetPlanIdAsync's idiom (L77-84).
-        await _db.Set<FeatureFlag>()
+        await db.Set<FeatureFlag>()
             .Where(f => f.Key == key)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(f => f.Value, value)

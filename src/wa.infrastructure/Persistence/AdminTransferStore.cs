@@ -8,12 +8,12 @@ namespace wa.infrastructure.Persistence;
 /// <summary>
 /// T-011-05 (TA-4.2#21 / FR-011-4): admin force-delete — thin adapter over WaDbContext implementing IAdminTransferStore.
 /// Mirrors TransferStore.MarkDeletedAsync at src/wa.infrastructure/Persistence/TransferStore.cs:143 with the owner predicate
-/// removed (platform-scoped: Id=@id AND Status != 4). Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext).
+/// removed (platform-scoped: Id=@id AND Status != 4). Registered as a singleton; opens a fresh WaDbContext per call (CHORE-dbcontext-lifetime).
 /// </summary>
-/// <param name="db">Database context that backs the store.</param>
-public sealed class AdminTransferStore(WaDbContext db) : IAdminTransferStore
+/// <param name="factory">Factory that creates a short-lived database context per call.</param>
+public sealed class AdminTransferStore(IDbContextFactory<WaDbContext> factory) : IAdminTransferStore
 {
-    private readonly WaDbContext _db = db;
+    private readonly IDbContextFactory<WaDbContext> _factory = factory;
 
     /// <inheritdoc />
     /// <remarks>
@@ -22,10 +22,11 @@ public sealed class AdminTransferStore(WaDbContext db) : IAdminTransferStore
     /// </remarks>
     public async Task<MarkDeleteResult?> AdminMarkDeletedAsync(Guid id, DateTime deletedAtUtc, CancellationToken ct)
     {
-        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
 
         // 1. Load the row with platform-scoped predicate (Id=@id AND Status != 4 — NO owner predicate).
-        var t = await _db.Set<Transfer>()
+        var t = await db.Set<Transfer>()
             .FirstOrDefaultAsync(t => t.Id == id && t.Status != 4, ct);
         if (t is null) return null; // already-deleted / unknown → handler returns null → NOT_FOUND (tx disposed → rolled back)
 
@@ -34,7 +35,7 @@ public sealed class AdminTransferStore(WaDbContext db) : IAdminTransferStore
         t.DeletedAtUtc = deletedAtUtc;
 
         // 3. Decrement RefCount for each distinct BlobRefId referenced by this transfer's FileItems.
-        var blobIds = await _db.Set<FileItem>()
+        var blobIds = await db.Set<FileItem>()
             .AsNoTracking()
             .Where(f => f.TransferId == id)
             .Select(f => f.BlobRefId)
@@ -43,7 +44,7 @@ public sealed class AdminTransferStore(WaDbContext db) : IAdminTransferStore
 
         if (blobIds.Count > 0)
         {
-            var blobRefs = await _db.Set<BlobRef>()
+            var blobRefs = await db.Set<BlobRef>()
                 .Where(b => blobIds.Contains(b.Id))
                 .ToListAsync(ct);
 
@@ -61,10 +62,10 @@ public sealed class AdminTransferStore(WaDbContext db) : IAdminTransferStore
 
         }
 
-        await _db.SaveChangesAsync(ct);
+        await db.SaveChangesAsync(ct);
 
         // 4. US-023-04 (FR-023-6): analytics live exactly as long as the transfer — hard-delete its DownloadEvent rows in the same transaction.
-        await _db.Set<DownloadEvent>()
+        await db.Set<DownloadEvent>()
             .Where(e => e.TransferId == id)
             .ExecuteDeleteAsync(ct);
 

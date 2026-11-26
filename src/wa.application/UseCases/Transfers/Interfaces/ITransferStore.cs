@@ -4,7 +4,7 @@ namespace wa.application.UseCases.Transfers;
 
 /// <summary>
 /// T-001-10: minimal DB surface the finalize handler needs (avoids a circular project reference to wa.infrastructure).
-/// Implemented by <c>wa.infrastructure.Persistence.WaDbContext</c> via a thin adapter registered in Program.cs.
+/// Implemented by <c>wa.infrastructure.Persistence.WaDbContext</c> via a thin singleton adapter that opens a fresh WaDbContext per call.
 /// </summary>
 public interface ITransferStore
 {

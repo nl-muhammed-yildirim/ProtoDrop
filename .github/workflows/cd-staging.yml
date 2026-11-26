@@ -1,0 +1,173 @@
+# CD to staging (TA-12.1 "main → cd-staging.yml", production plan §1-2). Order matters (TA-12.2):
+# IaC → secrets → images → migrate (before API cutover) → workers → api/web → smoke → e2e.
+# Auth: GitHub OIDC → Azure (no long-lived secrets). One-time setup: infra/README.md.
+name: CD staging
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_e2e:
+        description: Run the Playwright @staging suite after deploy
+        type: boolean
+        default: true
+
+concurrency:
+  group: cd-staging
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  RG: wa-staging-rg
+  TAG: ${{ github.sha }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: staging
+    outputs:
+      public_url: ${{ steps.url.outputs.public_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: IaC phase 1 — platform (no apps)
+        id: platform
+        run: |
+          out=$(az deployment group create -g "$RG" -n "platform-$TAG" \
+            -f infra/bicep/main.bicep -p infra/bicep/main/staging.bicepparam \
+            -p deployApps=false \
+               deployerPrincipalId='${{ secrets.AZURE_DEPLOYER_OBJECT_ID }}' \
+               alertEmails='${{ vars.ALERT_EMAILS || '[]' }}' \
+            --query properties.outputs -o json)
+          echo "acr=$(jq -r .acrName.value <<<"$out")" >> "$GITHUB_OUTPUT"
+          echo "kv=$(jq -r .keyVaultName.value <<<"$out")" >> "$GITHUB_OUTPUT"
+
+      - name: Seed Key Vault secrets (idempotent)
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+        run: bash infra/scripts/seed-secrets.sh "${{ steps.platform.outputs.kv }}"
+
+      - name: Resolve public URL (Front Door host after the first run)
+        id: url
+        run: |
+          url='${{ vars.PUBLIC_URL }}'
+          if [[ -z "$url" ]]; then
+            host=$(az afd endpoint list -g "$RG" --profile-name wa-staging-fd --query "[0].hostName" -o tsv 2>/dev/null || true)
+            [[ -n "$host" ]] && url="https://$host"
+          fi
+          echo "public_url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Build + push images (ACR build, no local Docker)
+        run: |
+          acr='${{ steps.platform.outputs.acr }}'
+          az acr build -r "$acr" -t "wa-api:$TAG" -f src/wa.api/Dockerfile . --no-logs
+          az acr build -r "$acr" -t "wa-migrate:$TAG" -f src/wa.api/Dockerfile.migrate . --no-logs
+          # Same-origin API behind Front Door (/api/* → wa-api); the web build reads VITE_WA_API_BASE.
+          az acr build -r "$acr" -t "wa-web:$TAG" -f src/wa.web/Dockerfile \
+            --build-arg VITE_WA_API_BASE=/api/v1 . --no-logs
+
+      - name: Migrate before cutover (existing environment)
+        id: premigrate
+        run: |
+          job=wa-staging-migrate
+          if az containerapp job show -g "$RG" -n "$job" -o none 2>/dev/null; then
+            az containerapp job update -g "$RG" -n "$job" \
+              --image "${{ steps.platform.outputs.acr }}.azurecr.io/wa-migrate:$TAG" -o none
+            bash infra/scripts/run-job.sh "$RG" "$job"
+            echo "done=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "done=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Publish workers package
+        run: |
+          dotnet publish src/wa.workers -c Release -o out/workers
+          (cd out/workers && zip -qr ../workers.zip .)
+
+      - name: Deploy workers first (existing environment)
+        id: preworkers
+        run: |
+          fa=$(az functionapp list -g "$RG" --query "[0].name" -o tsv)
+          if [[ -n "$fa" ]]; then
+            az functionapp deploy -g "$RG" -n "$fa" --src-path out/workers.zip --type zip -o none
+            echo "done=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "done=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: IaC phase 2 — apps (api, web, migrate job, functions, Front Door, alerts)
+        id: apps
+        run: |
+          out=$(az deployment group create -g "$RG" -n "apps-$TAG" \
+            -f infra/bicep/main.bicep -p infra/bicep/main/staging.bicepparam \
+            -p deployApps=true imageTag="$TAG" \
+               publicUrl='${{ steps.url.outputs.public_url }}' \
+               adminEmails='${{ vars.ADMIN_EMAILS }}' \
+               deployerPrincipalId='${{ secrets.AZURE_DEPLOYER_OBJECT_ID }}' \
+               alertEmails='${{ vars.ALERT_EMAILS || '[]' }}' \
+            --query properties.outputs -o json)
+          echo "fd=$(jq -r .frontDoorHost.value <<<"$out")" >> "$GITHUB_OUTPUT"
+          echo "fa=$(jq -r .functionAppName.value <<<"$out")" >> "$GITHUB_OUTPUT"
+          echo "api=$(jq -r .apiFqdn.value <<<"$out")" >> "$GITHUB_OUTPUT"
+
+      - name: First run — migrate + workers after the apps exist
+        if: steps.premigrate.outputs.done != 'true' || steps.preworkers.outputs.done != 'true'
+        run: |
+          bash infra/scripts/run-job.sh "$RG" wa-staging-migrate
+          az functionapp deploy -g "$RG" -n "${{ steps.apps.outputs.fa }}" --src-path out/workers.zip --type zip -o none
+
+      - name: First run — re-deploy with the Front Door URL (CORS, Wa:Url:Public)
+        if: steps.url.outputs.public_url == '' && steps.apps.outputs.fd != ''
+        run: |
+          az deployment group create -g "$RG" -n "apps-url-$TAG" \
+            -f infra/bicep/main.bicep -p infra/bicep/main/staging.bicepparam \
+            -p deployApps=true imageTag="$TAG" publicUrl="https://${{ steps.apps.outputs.fd }}" \
+               adminEmails='${{ vars.ADMIN_EMAILS }}' \
+               deployerPrincipalId='${{ secrets.AZURE_DEPLOYER_OBJECT_ID }}' \
+               alertEmails='${{ vars.ALERT_EMAILS || '[]' }}' -o none
+
+      - name: Smoke — GET /health (DB + Service Bus)
+        run: |
+          host='${{ steps.apps.outputs.fd }}'
+          [[ -z "$host" ]] && host='${{ steps.apps.outputs.api }}'
+          for i in $(seq 1 30); do
+            if curl -fsS "https://$host/health"; then echo; exit 0; fi
+            sleep 10
+          done
+          echo "health never went green" >&2; exit 1
+
+  e2e:
+    needs: deploy
+    if: github.event_name == 'push' || inputs.run_e2e
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/wa.web/package-lock.json
+      - working-directory: src/wa.web
+        run: npm ci && npx playwright install --with-deps chromium
+      # T-028: specs tagged @staging run against the deployed URL (no local SQL/Azurite seeding).
+      - name: Playwright @staging
+        working-directory: src/wa.web
+        env:
+          E2E_BASE_URL: ${{ needs.deploy.outputs.public_url }}
+        run: npx playwright test --grep @staging --pass-with-no-tests

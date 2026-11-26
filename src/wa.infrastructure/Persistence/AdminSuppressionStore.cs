@@ -6,18 +6,19 @@ namespace wa.infrastructure.Persistence;
 
 /// <summary>
 /// T-011-09 (TA-4.2#24 / FR-011-2): admin suppressions adapter over WaDbContext (mirrors AdminFlagStore).
-/// Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext).
+/// Registered as a singleton; opens a fresh WaDbContext per call (CHORE-dbcontext-lifetime).
 /// </summary>
-/// <param name="db">Database context that backs the store.</param>
-public sealed class AdminSuppressionStore(WaDbContext db) : IAdminSuppressionStore
+/// <param name="factory">Factory that creates a short-lived database context per call.</param>
+public sealed class AdminSuppressionStore(IDbContextFactory<WaDbContext> factory) : IAdminSuppressionStore
 {
-    private readonly WaDbContext _db = db;
+    private readonly IDbContextFactory<WaDbContext> _factory = factory;
 
     /// <inheritdoc />
     /// <remarks>T-011-09 (TA-4.2#24): list all rows — no order contract (the handler orders).</remarks>
     public async Task<IReadOnlyList<EmailSuppression>> ListAsync(CancellationToken ct)
     {
-        return await _db.Set<EmailSuppression>()
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        return await db.Set<EmailSuppression>()
             .AsNoTracking()
             .ToListAsync(ct);
     }
@@ -29,12 +30,13 @@ public sealed class AdminSuppressionStore(WaDbContext db) : IAdminSuppressionSto
     /// </remarks>
     public async Task<EmailSuppression?> RemoveByIdAsync(Guid id, CancellationToken ct)
     {
-        var row = await _db.Set<EmailSuppression>().FirstOrDefaultAsync(s => s.Id == id, ct);
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        var row = await db.Set<EmailSuppression>().FirstOrDefaultAsync(s => s.Id == id, ct);
         if (row is null)
             return null; // unknown id → handler passes through → endpoint 404 NOT_FOUND
 
-        _db.Set<EmailSuppression>().Remove(row);
-        await _db.SaveChangesAsync(ct);
+        db.Set<EmailSuppression>().Remove(row);
+        await db.SaveChangesAsync(ct);
         return row; // the removed row — the endpoint audits { email } from it (FR-011-5)
     }
 }

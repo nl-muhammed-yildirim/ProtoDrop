@@ -9,25 +9,29 @@ namespace wa.infrastructure.Persistence;
 /// US-023-01 (F-PRF-003): thin adapter over WaDbContext for the analytics read path. Three GROUP BY queries, all
 /// WHERE TransferId = @id AND CreatedAtUtc >= @since (seek on IX_DownEvent_T), AsNoTracking; no raw rows leave SQL (EC-023-4).
 /// </summary>
-/// <param name="db">Database context that backs the store.</param>
-public sealed class TransferAnalyticsStore(WaDbContext db) : ITransferAnalyticsStore
+/// <param name="factory">Factory that creates a short-lived database context per call.</param>
+public sealed class TransferAnalyticsStore(IDbContextFactory<WaDbContext> factory) : ITransferAnalyticsStore
 {
-    private readonly WaDbContext _db = db;
+    private readonly IDbContextFactory<WaDbContext> _factory = factory;
 
     /// <inheritdoc />
-    public Task<AnalyticsTransfer?> GetOwnedTransferAsync(Guid ownerId, Guid transferId, CancellationToken ct) =>
-        _db.Set<Transfer>()
+    public async Task<AnalyticsTransfer?> GetOwnedTransferAsync(Guid ownerId, Guid transferId, CancellationToken ct)
+    {
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        return await db.Set<Transfer>()
             .AsNoTracking()
             .Where(t => t.Id == transferId && t.OwnerAppUserId == ownerId && t.DeletedAtUtc == null)
             .Select(t => new AnalyticsTransfer(t.Id, t.CreatedAtUtc, t.Status))
             .FirstOrDefaultAsync(ct);
+    }
 
     /// <inheritdoc />
     public async Task<AnalyticsAggregate> AggregateAsync(Guid transferId, DateTime sinceUtc, CancellationToken ct)
     {
-        var events = _db.Set<DownloadEvent>().AsNoTracking();
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        var events = db.Set<DownloadEvent>().AsNoTracking();
 
-        // Sequential: the singleton store shares one WaDbContext.
+        // Sequential keeps one DB round-trip at a time on this call's context (a DbContext is not thread-safe).
         var daily = await DailyQuery(events, transferId, sinceUtc).ToListAsync(ct);
         var countries = await Scope(events, transferId, sinceUtc)
             .GroupBy(e => e.Country)
@@ -38,7 +42,7 @@ public sealed class TransferAnalyticsStore(WaDbContext db) : ITransferAnalyticsS
             .Select(g => new KeyCount(g.Key, g.Count()))
             .ToListAsync(ct);
         var fileRows = await FileQuery(events, transferId, sinceUtc).ToListAsync(ct);
-        var files = await _db.Set<FileItem>()
+        var files = await db.Set<FileItem>()
             .AsNoTracking()
             .Where(f => f.TransferId == transferId)
             .OrderBy(f => f.SortOrder)

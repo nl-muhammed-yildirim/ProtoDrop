@@ -17,22 +17,22 @@ Status values: `open` → `confirmed` (you) / `default-accepted` (you said "proc
 | D-04 | Email `From` address | no-reply@protodrop.com | **no-reply@protodrop.com** | you | default-accepted |
 | D-05 | Plan names | Free / Pro / Business | **Free / Pro / Business** | you | default-accepted |
 | D-06 | Free tier limits | 5 GB / 7 d / 100 downloads / 5 GB storage / 20 active | per Feature Plan Appendix A | you | default-accepted |
-| D-07 | Pro/Business limits & prices | 20/50 GB & 100 GB tiers; $9 / $19 / $49 (TBD) | confirm before billing (F-BIL-001) | you | open |
+| D-07 | Pro/Business limits & prices | Pro 20 GB / $9 mo ($90 yr); Business 100 GB / $19 mo ($190 yr) | **Pro 20 GB per transfer at $9/mo, Business 100 GB at $19/mo** (2026-11-26). Seed today has Pro `maxTransferSize` 10 GB — migration follow-up | you | confirmed |
 | D-08 | Azure region (prod) | westeurope | **westeurope** (GDPR-friendly) | you | default-accepted |
-| D-09 | Cost ceiling | ~$1,800/mo at 10 TB/day (TA-16) | review at CG-1/CG-2 gates | you | open |
+| D-09 | Cost ceiling | ~$1,800/mo at 10 TB/day (TA-16) | **Target ~$1,800/mo; Azure budget alerts at 50/80/100 % in IaC; re-baseline at CG-2** (2026-11-26) | you | confirmed |
 | D-10 | Brand primary color | `#4185F4` (ProtoDrop brand blue) | **`#4185F4`** | you | default-accepted |
 | D-11 | CI provider | GitHub Actions | **GitHub Actions** | you | default-accepted |
 | D-12 | Stripe account | test mode until launch | you create (Preflight P-08) | you | open |
-| D-13 | Communication Hub resource | dev resource created with IaC; prod resource manual | you create (Preflight P-09) | you | open |
+| D-13 | Communication Hub resource | dev resource created with IaC; prod resource manual | you create (Preflight P-06) | you | open |
 | D-14 | Free-tier ads on/off | off at MVP launch (F-PRF-004 later) | off | you | default-accepted |
 | D-15 | Magic link as default auth UX | email+password primary, magic link secondary | as specced | you | default-accepted |
-| D-16 | i18n language set at launch | en, nl, fr, es, pt, it, de, tr | en+nl+de+tr at launch, rest follow | you | open |
+| D-16 | i18n language set at launch | en, nl, fr, es, pt, it, de, tr | **en+nl+de+tr reviewed at launch; fr/es/pt/it ship marked beta** (2026-11-26) | you | confirmed |
 | D-17 | GDPR legal texts (ToS/Privacy) | drafted by you | needed at launch (Preflight P-14) | you | open |
 | D-18 | Admin emails (seed) | dev: dev@example.com; prod: you | set in KV/config at deploy | you | open |
-| D-19 | Retention days for Pro/Business | 30 / 90 | confirm with D-07 | you | open |
+| D-19 | Retention days for Pro/Business | 30 / 90 | **30 / 90** (2026-11-26, matches the seed) | you | confirmed |
 | D-20 | Tracking pixel in emails | OFF by default | keep OFF (privacy) | you | default-accepted |
 | D-21 | Search backend for F-XCT-002 | SQL full-text `CONTAINS` first | **Literal substring match (option B)** for US-045-01 — case-insensitive `Contains` over FileItem.OriginalName / EmailRecipient.Address / Transfer.SenderName, no FTS, no schema change (see Part 3, 2026-11-21). Azure Search only if relevance/scale demands (ADR at that point, endpoint contract unchanged) | you | decided |
-| D-22 | Data export retention (F-XCT-004) | link 24 h / stored zip 7 days | **24 h link, 7-day blob lifecycle** — confirm before launch (privacy text D-17 must match) | you | open |
+| D-22 | Data export retention (F-XCT-004) | link 24 h / stored zip 7 days | **24 h link, 7-day blob lifecycle** — confirmed 2026-11-26 (privacy text D-17 must match) | you | confirmed |
 
 ## Part 2 — Frozen constants (code reads these, never literals)
 
@@ -40,7 +40,7 @@ These are the *current* values of the Limits Registry (TA-3.4 / Feature Plan App
 
 | Constant | Free | Pro | Business |
 |---|---|---|---|
-| `MAX_TRANSFER_SIZE` | 5368709120 (5 GB) | TBD (D-07) | 107374182400 (100 GB) |
+| `MAX_TRANSFER_SIZE` | 5368709120 (5 GB) | 21474836480 (20 GB, D-07; seed still 10 GB until the follow-up migration) | 107374182400 (100 GB) |
 | `MAX_SINGLE_FILE` | = `MAX_TRANSFER_SIZE` | same | same |
 | `MAX_ZIP_SIZE` | 4294967296 (4 GB) | 9223372036854775807 | 9223372036854775807 |
 | `RETENTION_DAYS` | 7 | 30 (D-19) | 90 (D-19) |
@@ -121,7 +121,7 @@ No new packages; key from `Wa:Blob:AccountKey` (Key Vault unwrap = prod deploy c
 | 2026-11-17 | T-012-06/07 log PII handling (TA-9.4) | Raw email/IP/file name/token removed from ILogger lines instead of hashed (TA-9.4 sanctions SHA-256 only for file names, HMAC only for IPs; no email transform invented). Gap tasks T-012-06 (user decision) and T-012-07 (same class, found in review). Paths logged as route template (`LogRoute`), business log line = Code + Status, AspNetCoreRateLimit.* clamped to Warning | Rate-limited requests no longer appear in logs (trade-off accepted). LogEmailSender (dev-only `Wa:Email:Sender=log`) still logs full addresses/bodies — open for the user |
 | 2026-11-17 | T-014-05 account-locale storage (AC-014-3) | **Client-only (user decision):** no schema change, no AppUser column. ProfilePage "Language" select writes `protoDrop.accountLocale` in localStorage, which `resolveInitialLanguage()` already reads ahead of the browser | Trade-off accepted: per-browser, not cross-device; server/email locale unaffected. A server-side AppUser.Locale column (TA-3.2 + migration) stays a possible later F-TRF-008 item |
 | 2026-11-18 | F-BIL-002 billing.email_requested event type (US-019-04, plan D-3) | **Option A, user decision:** add TA-5.3 type `billing.email_requested` so billing emails flow through f-email (FR-019-7 retry/DLQ); one generic type for every billing_* kind | Option B (direct send from f-expire) would bypass retry/DLQ and create a second sending path. Precedent T-008-04 (`auth.magic_link_requested`). TA-5.3 row added in the F-BIL-002 close-out commit | user + AI (US-019-04 architect) |
-| 2026-11-18 | BILLING_UNAVAILABLE ProblemCode (US-019-01, AC-019-5) | Added as 503 member of the closed list (19 members) | AC-019-5 names the code. **Open: the TA-18 ADR line for it is not yet written** — orchestrator follow-up before merge to main | AI (US-019-01 architect) |
+| 2026-11-18 | BILLING_UNAVAILABLE ProblemCode (US-019-01, AC-019-5) | Added as 503 member of the closed list (19 members) | AC-019-5 names the code. ADR line written 2026-11-26 as TA-17 **ADR-019** | AI (US-019-01 architect) |
 | 2026-11-18 | Stripe transport for F-BIL-002 (US-019-01, plan O-1) | BCL `HttpClient` adapter behind `IStripeCheckoutGateway` / `IStripeSubscriptionSource`; no Stripe.net package added | TA-17 rule (new package → ADR). TA-1 names Stripe.net 14.x; revisit if the hand-rolled client grows | AI (US-019-01 architect) |
 | 2026-11-18 | Stripe webhook timestamp tolerance 300 s (US-019-03) | Private const in `StripeWebhookSignature` | Stripe's default tolerance; not in the Limits Registry. Confirm or move to Part 2 | AI (US-019-03 coder) |
 | 2026-11-18 | Grace period 14 d (US-019-05) | Code constant `BillingGrace.Duration`, not a Limits Registry entry (registry GRACE_DAYS = transfer deletion) | FR-019-6 says 14 d for all plans. Moving it to the registry would be a DECISION (AGENT.md §7) | AI (US-019-05 architect) |
@@ -136,7 +136,7 @@ No new packages; key from `Wa:Blob:AccountKey` (Key Vault unwrap = prod deploy c
 | 2026-11-19 | F-PRF-001 email org name source | **Option A:** org name resolved at dispatch, not stamped at send; no Transfer column | User chose A | user |
 | 2026-11-19 | F-PRF-001 domain guard `FeaturesProviderAllowList` | Extended with `GetPublicTransferQuery.cs`, `SenderBranding.cs`, `SendNotificationEmails.cs`, `WorkerServices.cs` for sender-plan gating; no viewer PlanContext | Approved by user | user |
 | 2026-11-19 | F-PRF-001 CORS for logo endpoint | `PUT` added to preflight allow-methods for `/auth/me/logo`; origins, headers and credentials unchanged | Accepted by reviewer | AI (reviewer) |
-| 2026-11-19 | F-PRF-001 `ORG_NAME_MAX_LENGTH` placement | Domain constant next to the column (schema width, like `DisplayNameMaxLength`), not in the Limits Registry | Orchestrator decision, **pending user confirmation** | AI (orchestrator) |
+| 2026-11-19 | F-PRF-001 `ORG_NAME_MAX_LENGTH` placement | Domain constant next to the column (schema width, like `DisplayNameMaxLength`), not in the Limits Registry | Orchestrator decision, **confirmed by user 2026-11-26** | AI (orchestrator) |
 | 2026-11-19 | F-PRF-001 org-name write gate (review fix) | Server Pro gate: `PATCH /auth/me` `orgName` requires branding; clearing (null/blank) allowed on every plan | Review fix so a Free account cannot set an org name by calling the API directly | AI (review fix) |
 | 2026-11-18 | F-BIL-003 US-020-03 plan-screen read endpoint (AI, orchestrator) | Add `GET /api/v1/billing/plan` (`GetPlanUsageQuery`, cookie-gated) for usage + limits; `/auth/me` unchanged. Active count = `Status IN (1,3)` (story said `Status=1`, fixed to match enforcement) | Architect DECISION-1 option A: keeps the `/me` key set pinned and adds queries only on the plan screen. Open product question: Pro's Upgrade goes to the Billing Portal, but US-019-02 says hide Upgrade when subscribed | AI (orchestrator) |
 | 2026-11-20 | F-PRF-004 Free ads + ad telemetry | Free FeaturesJson ads:true via migration AddFreeAdsEnabled (feature.ads stays false); ad_impression/ad_error added to TA-10.2 (props slotId, reason) | US-024-01 architect decisions D1/D2 | you |
@@ -144,3 +144,6 @@ No new packages; key from `Wa:Blob:AccountKey` (Key Vault unwrap = prod deploy c
 | 2026-11-25 | CHORE-code-style-2 login with no password hash (CS8604, LoginHandler.cs:58) | A null `PasswordHash` (magic-link-only account) is treated as a failed verify: `login_failed` + `LoginWrongPasswordException.ForWrongPassword()`, same as an unknown email; plus one LoginHandlerTests case. Fixes the 500 INTERNAL and the account-existence leak (T-008-02 no-leak) | Architect DECISION, user choice A (2026-11-25) | you |
 | 2026-11-25 | CHORE-code-style-2 CORS `Vary: Origin` (CA1806, CorsAllowListMiddleware.cs:40) | `Headers.Vary.Append("Origin")` was a discarded LINQ call (no header sent); replace with a real response-header append so echoed-origin responses carry `Vary: Origin` (TA-4.1.6), plus a middleware test | Architect DECISION, user choice A (2026-11-25) | you |
 | 2026-11-25 | CHORE-code-style-2 quality gates (decided alone, AGENT.md §7 layout/tooling) | `AnalysisLevel` pinned `10.0-recommended` (src only; `latest` differs between SDK 10 and 11); CA rules off with reasons in `src/.editorconfig`; TWAE in src+tests with NU1901–1904 kept as warnings; `[LoggerMessage]` adds `EventId`/`EventName` to structured logs (additive) | Architect plan §2 | AI (orchestrator) |
+| 2026-11-26 | Pre-prod readiness answers (audit `docs/reviews/PREPROD-readiness-audit.md`) | D-07 Pro 20 GB/$9, Business 100 GB/$19; D-09, D-16, D-19, D-22 confirmed as recommended; `ORG_NAME_MAX_LENGTH` placement confirmed; subscribed users see **Manage billing** (portal) instead of Upgrade (US-019-02 wins) | Owner answers to the audit questions | you |
+| 2026-11-26 | ADR — Key Vault + managed identity (audit N-3 / S-3) | **Approved:** `Azure.Identity` + Key Vault references / managed identity for SQL, Blob, Service Bus and secrets; Bicep sets the app settings. **Not approved (stay open):** App Insights/OpenTelemetry sink package, Static Web Apps hosting (web stays an nginx container), splitting `Wa:Jwt:Secret` into a separate PII HMAC key | Owner answer 2026-11-26; package version pinned in the ADR row when it lands | you |
+| 2026-11-26 | Deploy config surfaces (CHORE-deploy-hardening + chore/infra-cd) | New env vars, decided by the orchestrator under the owner's "fix them all" (2026-11-26): `VITE_WA_API_BASE` (web build), `WA_API_ORIGIN` / `WA_BLOB_ORIGIN` (nginx CSP), `AZURE_FUNCTIONS_ENVIRONMENT` on workers; listed in TA-13.1. CSP + security headers emitted by nginx and the API; `Wa:Email:Sender=log` refused outside Development/Local and addresses masked (closes the 2026-11-17 open LogEmailSender item once the PR merges). Ads (D-14 off) would need a CSP widening — separate security decision | Required for any deployed environment; defaults keep local behaviour unchanged | AI (orchestrator) |

@@ -42,10 +42,10 @@ public static class WorkerServices
         services.AddSingleton(TimeProvider.System); // CHORE-code-style-2: the one clock — handlers/stores take TimeProvider instead of reading DateTime.UtcNow
         var dbConnection = configuration[DbKey] ?? "";
 
-        // DbContext for the zip function
-        services.AddSingleton(new DbContextOptionsBuilder<WaDbContext>()
-            .UseSqlServer(dbConnection).Options);
-        services.AddSingleton(sp => new WaDbContext(sp.GetRequiredService<DbContextOptions<WaDbContext>>()));
+        // DbContext factory — every store and SbEventPublisher open a fresh context per call (CHORE-dbcontext-lifetime).
+        services.AddSingleton<IDbContextFactory<WaDbContext>>(new AppDbContextFactory(
+            new DbContextOptionsBuilder<WaDbContext>()
+                .UseSqlServer(dbConnection).Options));
 
         // Blob store
         var blobAccountUrl = Require(configuration, BlobAccountUrlKey);
@@ -58,27 +58,22 @@ public static class WorkerServices
 
         // Limits provider
         var limitsTtl = TimeSpan.FromSeconds(30);
-        services.AddSingleton<IPlansStore>(sp => new PlansStore(sp.GetRequiredService<WaDbContext>()));
-        services.AddSingleton<IFlagsStore>(sp => new FlagsStore(sp.GetRequiredService<WaDbContext>()));
+        services.AddSingleton<IPlansStore>(sp => new PlansStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
+        services.AddSingleton<IFlagsStore>(sp => new FlagsStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
         services.AddSingleton(sp => new PlansCache(sp.GetRequiredService<IPlansStore>(), limitsTtl, sp.GetRequiredService<TimeProvider>().GetUtcNow));
         services.AddSingleton(sp => new FlagsCache(sp.GetRequiredService<IFlagsStore>(), limitsTtl, sp.GetRequiredService<TimeProvider>().GetUtcNow));
         services.AddSingleton<ILimitsProvider>(sp => new LimitsProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
         services.AddSingleton<IFlagResolver>(sp => (IFlagResolver)sp.GetRequiredService<ILimitsProvider>()); // LimitsProvider implements both (API precedent Program.cs L113)
         services.AddSingleton<IFeaturesProvider>(sp => new FeaturesProvider(sp.GetRequiredService<PlansCache>(), sp.GetRequiredService<FlagsCache>()));
-        services.AddSingleton<ISenderBrandingStore>(sp => new SenderBrandingStore(sp.GetRequiredService<WaDbContext>()));
+        services.AddSingleton<ISenderBrandingStore>(sp => new SenderBrandingStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
 
         // Zip file source
-        services.AddSingleton<IZipFileSource>(sp => new ZipFileSource(sp.GetRequiredService<WaDbContext>()));
+        services.AddSingleton<IZipFileSource>(sp => new ZipFileSource(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
 
         // Telemetry reporter
         var hmacKey = System.Text.Encoding.UTF8.GetBytes(configuration[JwtSecretKey] ?? "");
         services.AddSingleton<wa.application.Telemetry.WaTelemetryReporter>(sp => new wa.application.Telemetry.WaTelemetryReporter(
             sp.GetRequiredService<ILogger<wa.application.Telemetry.WaTelemetryReporter>>(), hmacKey));
-
-        // DbContext factory (for SbEventPublisher outbox writes)
-        services.AddSingleton<IDbContextFactory<WaDbContext>>(new AppDbContextFactory(
-            new DbContextOptionsBuilder<WaDbContext>()
-                .UseSqlServer(dbConnection).Options));
 
         // Event publisher: SB in prod, in-memory fallback for local dev (TA-0.2 rule 7).
         var sbConnString = configuration[ServiceBusKey];
@@ -91,7 +86,7 @@ public static class WorkerServices
             services.AddSingleton<IEventPublisher>(new InMemoryEventPublisher());
 
         // T-005-01: f-expire job
-        services.AddSingleton<IExpiryStore>(sp => new ExpiryStore(sp.GetRequiredService<WaDbContext>(), sp.GetRequiredService<TimeProvider>()));
+        services.AddSingleton<IExpiryStore>(sp => new ExpiryStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>(), sp.GetRequiredService<TimeProvider>()));
         services.AddSingleton<ExpireTransfersHandler>(sp => new ExpireTransfersHandler(
             sp.GetRequiredService<IExpiryStore>(),
             sp.GetRequiredService<IEventPublisher>(),
@@ -124,7 +119,7 @@ public static class WorkerServices
             sp.GetRequiredService<ILogger<EndBillingGraceHandler>>()));
 
         // T-005-02: f-delete-transfers job
-        services.AddSingleton<IExpiryDeletionStore>(sp => new ExpiryDeletionStore(sp.GetRequiredService<WaDbContext>(), sp.GetRequiredService<TimeProvider>()));
+        services.AddSingleton<IExpiryDeletionStore>(sp => new ExpiryDeletionStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>(), sp.GetRequiredService<TimeProvider>()));
         services.AddSingleton<DeleteExpiredTransfersHandler>(sp => new DeleteExpiredTransfersHandler(
             sp.GetRequiredService<IExpiryDeletionStore>(),
             sp.GetRequiredService<IEventPublisher>(),
@@ -133,7 +128,7 @@ public static class WorkerServices
             sp.GetRequiredService<ILogger<DeleteExpiredTransfersHandler>>()));
 
         // T-005-03: f-delete-blobs job
-        services.AddSingleton<IBlobDeletionStore>(sp => new BlobDeletionStore(sp.GetRequiredService<WaDbContext>(), sp.GetRequiredService<TimeProvider>()));
+        services.AddSingleton<IBlobDeletionStore>(sp => new BlobDeletionStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>(), sp.GetRequiredService<TimeProvider>()));
         services.AddSingleton<DeleteOrphanBlobsHandler>(sp => new DeleteOrphanBlobsHandler(
             sp.GetRequiredService<IBlobDeletionStore>(),
             sp.GetRequiredService<IBlobStore>(),
@@ -156,7 +151,7 @@ public static class WorkerServices
 
         // T-006-01: f-email consumer
         services.AddSingleton<EventDeduplicator>(sp => new EventDeduplicator(sp.GetRequiredService<TimeProvider>().GetUtcNow));
-        services.AddSingleton<IEmailStore>(sp => new EmailStore(sp.GetRequiredService<WaDbContext>()));
+        services.AddSingleton<IEmailStore>(sp => new EmailStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
         // F-XCT-003 (FR-046-3): send-time owner-notification gate — every owner email handler calls MaySendAsync before sending.
         services.AddSingleton<IEmailNotificationsStore>(sp => new EmailNotificationsStore(sp.GetRequiredService<IDbContextFactory<WaDbContext>>()));
         services.AddSingleton<OwnerNotificationGate>(sp => new OwnerNotificationGate(

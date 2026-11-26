@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -51,6 +52,21 @@ public class WorkerServicesTests
         using var sp = Build(InMemory(BaseSettings()));
 
         Assert.IsType<InMemoryEventPublisher>(sp.GetRequiredService<IEventPublisher>());
+    }
+
+    [Fact]
+    public void DbStores_ResolveOverFactory_NoSharedContext() // CHORE-dbcontext-lifetime: no singleton WaDbContext in the workers host
+    {
+        using var sp = Build(InMemory(BaseSettings()));
+
+        Assert.Null(sp.GetService<wa.infrastructure.Persistence.WaDbContext>());
+        Assert.NotNull(sp.GetService<IDbContextFactory<wa.infrastructure.Persistence.WaDbContext>>());
+        Assert.NotNull(sp.GetService<wa.application.UseCases.Transfers.IZipFileSource>());
+        Assert.NotNull(sp.GetService<wa.application.UseCases.Transfers.IExpiryStore>());
+        Assert.NotNull(sp.GetService<wa.application.UseCases.Transfers.IExpiryDeletionStore>());
+        Assert.NotNull(sp.GetService<wa.application.UseCases.Transfers.IBlobDeletionStore>());
+        Assert.NotNull(sp.GetService<wa.application.UseCases.Transfers.IEmailStore>());
+        Assert.NotNull(sp.GetService<IPlansStore>());
     }
 
     [Fact]

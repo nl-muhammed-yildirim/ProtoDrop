@@ -75,8 +75,7 @@ public class GdprSweepIntegrationTests : IAsyncLifetime
 
     private async Task DeleteAsync(Guid userId)
     {
-        await using var ctx = new WaDbContext(_options);
-        Assert.True(await new AppUserStore(ctx).SoftDeleteWithReHomeAsync(userId, DateTime.UtcNow, CancellationToken.None));
+        Assert.True(await new AppUserStore(new AppDbContextFactory(_options)).SoftDeleteWithReHomeAsync(userId, DateTime.UtcNow, CancellationToken.None));
     }
 
     private async Task<Erasure> MarkerAsync(Guid userId)

@@ -56,10 +56,10 @@ public class ScheduledSendTimerIntegrationTests : IAsyncLifetime
     private ActivateScheduledTransfersHandler BuildTimer() =>
         new(new ScheduledSendStore(new WaDbContextFactory(_options)), _publisher, NullLogger<ActivateScheduledTransfersHandler>.Instance, TimeProvider.System);
 
-    /// <summary>f-email handler on a fresh context per call (EmailStore reads tracked rows; a long-lived context would return stale status).</summary>
+    /// <summary>f-email handler composed like the worker host: every store opens a fresh context per call.</summary>
     private async Task DeliverToEmailAsync(EventEnvelope envelope)
     {
-        await using var workerDb = new WaDbContext(_options);
+        var workerDb = new AppDbContextFactory(_options);
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Wa:Url:Public"] = "http://localhost:5173",
@@ -182,7 +182,7 @@ public class ScheduledSendTimerIntegrationTests : IAsyncLifetime
         var original = CreatedEnvelope(id, "SCHED02A", due);
 
         var telemetry = new WaTelemetryReporter(NullLogger<WaTelemetryReporter>.Instance, new byte[32]);
-        var expired = await new ExpireTransfersHandler(new ExpiryStore(new WaDbContext(_options), TimeProvider.System), _publisher, telemetry,
+        var expired = await new ExpireTransfersHandler(new ExpiryStore(new AppDbContextFactory(_options), TimeProvider.System), _publisher, telemetry,
             NullLogger<ExpireTransfersHandler>.Instance).RunAsync(T0, CancellationToken.None);
         Assert.Equal(1, expired);
         Assert.Equal(TransferStatus.Expired, await StatusAsync(id));
@@ -238,7 +238,7 @@ public class ScheduledSendTimerIntegrationTests : IAsyncLifetime
     {
         var id = await SeedAsync("SCHED06A", TransferStatus.Scheduled, T0.AddHours(1), T0.AddDays(7), maxDownloads: 1, downloads: 1);
 
-        var result = await new PublicTransferStore(new WaDbContext(_options), TimeProvider.System)
+        var result = await new PublicTransferStore(new AppDbContextFactory(_options), TimeProvider.System)
             .RecordSingleFileDownloadAsync(id, Guid.NewGuid(), null, null, null, CancellationToken.None);
 
         Assert.Equal(SingleFileDownloadOutcome.CapReached, result.Outcome);

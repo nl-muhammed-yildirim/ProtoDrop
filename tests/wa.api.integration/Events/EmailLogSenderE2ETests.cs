@@ -243,7 +243,7 @@ public class EmailLogSenderE2ETests : IAsyncLifetime
         return Assert.Single(matches);
     }
 
-    /// <summary>Worker side, composed like src/wa.workers/Program.cs: own DbContext, real renderer, sender from the log switch.</summary>
+    /// <summary>Worker side, composed like src/wa.workers/Program.cs: per-call DbContext, real renderer, sender from the log switch.</summary>
     private async Task RunWorkerAsync(EventEnvelope envelope)
     {
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
@@ -255,7 +255,7 @@ public class EmailLogSenderE2ETests : IAsyncLifetime
             ["DOTNET_ENVIRONMENT"] = "Development" // CHORE-deploy-hardening: the log sender is refused outside Local/Development
         }).Build();
 
-        await using var workerDb = NewDb();
+        var workerDb = new AppDbContextFactory(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(_connString).Options); // fresh context per store call
         var telemetry = new WaTelemetryReporter(_loggerFactory.CreateLogger<WaTelemetryReporter>(), Encoding.UTF8.GetBytes(TestSecret));
         var handler = new SendNotificationEmailsHandler(
             new EmailStore(workerDb),

@@ -4,7 +4,7 @@ using wa.domain;
 namespace wa.infrastructure.Persistence;
 
 /// <summary>
-/// T-003-10: after a raw-SQL UPDATE on a Transfer row, drop any stale tracked copy from the singleton context.
+/// T-003-10: after a raw-SQL UPDATE on a Transfer row, drop any stale tracked copy from the call's context (a no-op on a fresh context, still guards within one call).
 /// NEVER Local.Remove — on a tracked entity it marks it Deleted (-> "association severed" / DELETE on the next SaveChanges).
 /// </summary>
 internal static class TransferTrackerExtensions

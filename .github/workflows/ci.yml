@@ -134,6 +134,15 @@ jobs:
       - name: Build wa-api image
         run: docker build -f src/wa.api/Dockerfile . -t "wa-api:ci-${GITHUB_SHA}"
 
+  # AGENT.md §4 (CHORE-infra-cd): Bicep compiles (main + every env param file). Runners ship the az CLI.
+  iac:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: az bicep install
+      - run: az bicep build --file infra/bicep/main.bicep --stdout > /dev/null
+      - run: for p in infra/bicep/main/*.bicepparam; do az bicep build-params --file "$p" --stdout > /dev/null; done
+
   # CHORE-deploy-hardening: the SPA image builds, nginx renders the CSP template and every path carries the headers.
   docker-web:
     runs-on: ubuntu-latest

@@ -98,8 +98,7 @@ public class DataExportJobIntegrationTests : IAsyncLifetime
     /// <summary>The real delete path both DELETE /auth/me and admin force-delete use (soft delete + Erasure marker).</summary>
     private async Task DeleteUserAsync(Guid id)
     {
-        await using var ctx = new WaDbContext(_options);
-        Assert.True(await new AppUserStore(ctx).SoftDeleteWithReHomeAsync(id, DateTime.UtcNow, CancellationToken.None));
+        Assert.True(await new AppUserStore(new AppDbContextFactory(_options)).SoftDeleteWithReHomeAsync(id, DateTime.UtcNow, CancellationToken.None));
     }
 
     private async Task<bool> RowExistsAsync(Guid id)

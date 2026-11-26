@@ -7,20 +7,26 @@ namespace wa.infrastructure.Persistence;
 
 /// <summary>
 /// T-001-10: thin adapter over WaDbContext implementing ITransferStore — the only DB surface the finalize handler needs.
-/// Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext).
+/// Registered as a singleton; opens a fresh WaDbContext per call (CHORE-dbcontext-lifetime).
 /// </summary>
-/// <param name="db">Database context that backs the store.</param>
-public sealed class TransferStore(WaDbContext db) : ITransferStore
+/// <param name="factory">Factory that creates a short-lived database context per call.</param>
+public sealed class TransferStore(IDbContextFactory<WaDbContext> factory) : ITransferStore
 {
-    private readonly WaDbContext _db = db;
+    private readonly IDbContextFactory<WaDbContext> _factory = factory;
 
     /// <inheritdoc />
-    public Task<IdempotencyKey?> FindByIdempotencyKeyAsync(string key, CancellationToken ct) =>
-        _db.Set<IdempotencyKey>().FirstOrDefaultAsync(k => k.Key == key, ct);
+    public async Task<IdempotencyKey?> FindByIdempotencyKeyAsync(string key, CancellationToken ct)
+    {
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        return await db.Set<IdempotencyKey>().FirstOrDefaultAsync(k => k.Key == key, ct);
+    }
 
     /// <inheritdoc />
-    public Task<bool> TransferExistsByLinkIdAsync(string linkId, CancellationToken ct) =>
-        _db.Set<Transfer>().AnyAsync(t => t.LinkId == linkId, ct);
+    public async Task<bool> TransferExistsByLinkIdAsync(string linkId, CancellationToken ct)
+    {
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        return await db.Set<Transfer>().AnyAsync(t => t.LinkId == linkId, ct);
+    }
 
     /// <inheritdoc />
     /// <remarks>
@@ -30,28 +36,32 @@ public sealed class TransferStore(WaDbContext db) : ITransferStore
     /// </remarks>
     public async Task<long> GetActiveStorageBytesAsync(Guid ownerId, CancellationToken ct)
     {
+        await using var db = await _factory.CreateDbContextAsync(ct);
         // (a) active transfer ids for this owner — Status IN (1,3,5): a Scheduled transfer is live and holds its blobs (US-022-01, D-5).
-        var activeIds = _db.Set<Transfer>()
+        var activeIds = db.Set<Transfer>()
             .Where(t => t.OwnerAppUserId == ownerId && (t.Status == 1 || t.Status == 3 || t.Status == TransferStatus.Scheduled))
             .Select(t => t.Id);
 
         // (b) distinct blob ids those transfers' FileItems reference.
-        var blobIds = _db.Set<FileItem>()
+        var blobIds = db.Set<FileItem>()
             .Where(f => activeIds.Contains(f.TransferId))
             .Select(f => f.BlobRefId)
             .Distinct();
 
         // (c) sum each physical blob once.
-        return await _db.Set<BlobRef>()
+        return await db.Set<BlobRef>()
             .Where(b => blobIds.Contains(b.Id))
             .SumAsync(b => b.SizeBytes, ct);
     }
 
     /// <inheritdoc />
-    public async Task<int> GetActiveTransferCountAsync(Guid ownerId, CancellationToken ct) =>
-        await _db.Set<Transfer>()
+    public async Task<int> GetActiveTransferCountAsync(Guid ownerId, CancellationToken ct)
+    {
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        return await db.Set<Transfer>()
             .Where(t => t.OwnerAppUserId == ownerId && (t.Status == 1 || t.Status == 3 || t.Status == TransferStatus.Scheduled))
             .CountAsync(ct);
+    }
 
     /// <inheritdoc />
     /// <remarks>
@@ -62,7 +72,8 @@ public sealed class TransferStore(WaDbContext db) : ITransferStore
     /// </remarks>
     public async Task<(List<MyTransferRow> Items, string? NextCursor)> ListByOwnerAsync(Guid ownerId, DateTime? afterUtc, Guid? afterIdExcluded, int limit, IReadOnlyCollection<byte>? statuses, CancellationToken ct)
     {
-        var rows = await _db.Set<Transfer>()
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        var rows = await db.Set<Transfer>()
             .Where(t => t.OwnerAppUserId == ownerId && t.DeletedAtUtc == null)
             // T-009-02 (US-009-02): status predicate only when a byte set is given — null = all.
             .Where(t => statuses == null || statuses.Contains(t.Status))
@@ -74,7 +85,7 @@ public sealed class TransferStore(WaDbContext db) : ITransferStore
             {
                 Id = t.Id,
                 CreatedAtUtc = t.CreatedAtUtc,
-                Name = _db.Set<FileItem>()
+                Name = db.Set<FileItem>()
                     .Where(f => f.TransferId == t.Id)
                     .OrderBy(f => f.SortOrder)
                     .ThenBy(f => f.Id)
@@ -86,7 +97,7 @@ public sealed class TransferStore(WaDbContext db) : ITransferStore
                 ExpiresAtUtc = t.ExpiresAtUtc,
                 DownloadsCount = t.DownloadsCount,
                 MaxDownloads = t.MaxDownloads,
-                RecipientCount = _db.Set<EmailRecipient>().Count(r => r.TransferId == t.Id),
+                RecipientCount = db.Set<EmailRecipient>().Count(r => r.TransferId == t.Id),
                 // T-009-06: linkId — Copy/View build {origin}/t/{linkId} client-side (no per-row round-trip).
                 LinkId = t.LinkId
             })
@@ -113,12 +124,13 @@ public sealed class TransferStore(WaDbContext db) : ITransferStore
     /// </remarks>
     public async Task<GetMyTransferResult?> GetByOwnerAsync(Guid ownerId, Guid id, CancellationToken ct)
     {
-        var t = await _db.Set<Transfer>()
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        var t = await db.Set<Transfer>()
             .AsNoTracking()
             .FirstOrDefaultAsync(t => t.Id == id && t.OwnerAppUserId == ownerId && t.DeletedAtUtc == null, ct);
         if (t is null) return null;
 
-        var files = await _db.Set<FileItem>()
+        var files = await db.Set<FileItem>()
             .AsNoTracking()
             .Where(f => f.TransferId == id)
             .OrderBy(f => f.SortOrder)
@@ -129,7 +141,7 @@ public sealed class TransferStore(WaDbContext db) : ITransferStore
         // Row Name = first file's OriginalName by SortOrder/Id or "Transfer" — mirrors ListByOwnerAsync's row shape (FR-009-1).
         var name = files.FirstOrDefault()?.Name ?? "Transfer";
 
-        var recipients = await _db.Set<EmailRecipient>()
+        var recipients = await db.Set<EmailRecipient>()
             .AsNoTracking()
             .Where(r => r.TransferId == id)
             .OrderBy(r => r.Id)
@@ -148,10 +160,11 @@ public sealed class TransferStore(WaDbContext db) : ITransferStore
     /// </remarks>
     public async Task<MarkDeleteResult?> MarkDeletedAsync(Guid id, Guid ownerId, DateTime deletedAtUtc, CancellationToken ct)
     {
-        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
 
         // 1. Load the row with owner-scoped predicate (Id=@id AND OwnerAppUserId=@ownerId AND Status != 4).
-        var t = await _db.Set<Transfer>()
+        var t = await db.Set<Transfer>()
             .FirstOrDefaultAsync(t => t.Id == id && t.OwnerAppUserId == ownerId && t.Status != 4, ct);
         if (t is null) return null; // foreign owner / guest / already-deleted / unknown → handler returns null → NOT_FOUND (tx disposed → rolled back)
 
@@ -160,7 +173,7 @@ public sealed class TransferStore(WaDbContext db) : ITransferStore
         t.DeletedAtUtc = deletedAtUtc;
 
         // 3. Decrement RefCount for each distinct BlobRefId referenced by this transfer's FileItems.
-        var blobIds = await _db.Set<FileItem>()
+        var blobIds = await db.Set<FileItem>()
             .AsNoTracking()
             .Where(f => f.TransferId == id)
             .Select(f => f.BlobRefId)
@@ -169,7 +182,7 @@ public sealed class TransferStore(WaDbContext db) : ITransferStore
 
         if (blobIds.Count > 0)
         {
-            var blobRefs = await _db.Set<BlobRef>()
+            var blobRefs = await db.Set<BlobRef>()
                 .Where(b => blobIds.Contains(b.Id))
                 .ToListAsync(ct);
 
@@ -187,10 +200,10 @@ public sealed class TransferStore(WaDbContext db) : ITransferStore
 
         }
 
-        await _db.SaveChangesAsync(ct);
+        await db.SaveChangesAsync(ct);
 
         // 4. US-023-04 (FR-023-6): analytics live exactly as long as the transfer — hard-delete its DownloadEvent rows in the same transaction.
-        await _db.Set<DownloadEvent>()
+        await db.Set<DownloadEvent>()
             .Where(e => e.TransferId == id)
             .ExecuteDeleteAsync(ct);
 
@@ -202,19 +215,16 @@ public sealed class TransferStore(WaDbContext db) : ITransferStore
     /// <inheritdoc />
     public async Task SaveFinalizeAsync(Transfer transfer, IReadOnlyList<BlobRef> blobRefs, IReadOnlyList<FileItem> fileItems, IdempotencyKey idempotencyKey, CancellationToken ct)
     {
-        await using var tx = await _db.Database.BeginTransactionAsync(ct);
-        _db.Set<Transfer>().Add(transfer);
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        db.Set<Transfer>().Add(transfer);
         foreach (var br in blobRefs)
-            _db.Set<BlobRef>().Add(br);
+            db.Set<BlobRef>().Add(br);
         foreach (var fi in fileItems)
-            _db.Set<FileItem>().Add(fi);
+            db.Set<FileItem>().Add(fi);
 
-        // Singleton context (adapter-owned): the handler's own FindByIdempotencyKeyAsync may already
-        // have tracked a row for this key (e.g. an expired key pre-seeded by T-002-04). Reuse that
-        // instance instead of Add — a second tracked instance with the same PK ('Key') throws an EF
-        // identity conflict, and a blind INSERT would hit PK_Idem at the DB level.
-        var existing = _db.Set<IdempotencyKey>().Local.FirstOrDefault(k => k.Key == idempotencyKey.Key)
-            ?? await _db.Set<IdempotencyKey>().FirstOrDefaultAsync(k => k.Key == idempotencyKey.Key, ct);
+        // An expired key row may already exist (pre-seeded by T-002-04): update it instead of a blind INSERT (PK_Idem).
+        var existing = await db.Set<IdempotencyKey>().FirstOrDefaultAsync(k => k.Key == idempotencyKey.Key, ct);
         if (existing is not null)
         {
             existing.ResultJson = idempotencyKey.ResultJson;
@@ -224,10 +234,10 @@ public sealed class TransferStore(WaDbContext db) : ITransferStore
         }
         else
         {
-            _db.Set<IdempotencyKey>().Add(idempotencyKey);
+            db.Set<IdempotencyKey>().Add(idempotencyKey);
         }
 
-        await _db.SaveChangesAsync(ct);
+        await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
     }
 }
