@@ -87,4 +87,15 @@ public class TelemetryEventsTests
     public void IpAddress_DiffersForDifferentIps() => Assert.NotEqual(
         PiiTransforms.IpAddress("10.0.0.1", new byte[] { 1 }),
         PiiTransforms.IpAddress("192.168.0.1", new byte[] { 1 })); // value-sensitivity: keyed hash is per-IP, not constant
+
+    [Fact]
+    public void FileName_IsAFullHash_NotATruncation()
+    {
+        // US-048-01 / AC-048-1: the file name is hashed, never truncated or partially kept.
+        var hash = PiiTransforms.FileName("2026-salary-proposal-final_v3.pdf");
+
+        Assert.Matches("^[0-9a-f]{64}$", hash);
+        Assert.DoesNotContain("salary", hash);
+        Assert.NotEqual(hash, PiiTransforms.FileName("2026-salary-proposal-final_v4.pdf")); // one-character edit changes the whole digest
+    }
 }

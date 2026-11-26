@@ -33,6 +33,12 @@
  *                            template checks (email literal, {placeholder} identifiers); the declaration must be `private static partial void Name(ILogger ..`
  *                            (anything else lets call sites escape the scan and is a finding); every parameter other than the logger / the exception is
  *                            checked by name; and every in-file call `Name(logger, ..)` gets the argument checks above on the arguments after the logger.
+ *   R8  event payload      — T-069 (F-XCT-005, US-048-01, AC-048-1/2): every TA-5.3 event payload (`Payload = new { .. }`, or `Payload = <id>` where
+ *                            `<id> = new { .. }` is bound earlier in the same file) is checked key by key. A key naming a file name / IP / user agent
+ *                            (words `ip`, `ua`, or `file`+`name`) must carry exactly ONE slot-wrapped call (PiiTransforms.FileName / IpAddress /
+ *                            UserAgent, FileNameSlot, IpSlot). A key in EVENT_PII_KEYS (the TA-5.3 members that carry an address by contract) may carry
+ *                            any value. Any other key, and its value identifiers, must not name PII (same naming rule as R7). An email literal anywhere
+ *                            is a finding, and so is a payload whose shape the scan cannot see (`Payload = Build(x)`).
  *
  * Allowlists are CLOSED sets: adding a telemetry property means editing one list below — that diff is the PR-visible review point (EC-012-3).
  *
@@ -42,7 +48,7 @@
  * Limitation: a paren/quote-aware text scan, not a Roslyn/TS parser. Server: a reporter method taken as a delegate / method group
  * (`var f = reporter.X; f(..)`) or invoked via reflection escapes R1/R2/R4 (R6 + the reflection pin in WaTelemetryReporterTests mitigate).
  * Client: re-exporting (`export { trackClientEvent as x }`), passing the function as a value (`wrap(trackClientEvent)`), or calling it via
- * a destructured / namespace alias other than the two shapes R6 flags escapes R5. T-069 owns the [Pii] attribute and event-DTO convention tests.
+ * a destructured / namespace alias other than the two shapes R6 flags escapes R5. R8 is T-069's event-payload scan (the [Pii] attribute and erasure-list convention tests are C#, in tests/wa.application.unit/Privacy).
  * R7 also flags `.Path`/`.PathBase`/`.QueryString`/`.Message` member arguments (T-012-07: raw request path / exception message in a neutral slot).
  * R7 is a text scan too: a PII value laundered through a neutrally named local (`var x = user.Email; _logger.LogX("{X}", x)`) escapes it.
  * [LoggerMessage] limits: the attribute must use the named `Message = "<literal>"` argument (positional / const messages are findings), and the
@@ -69,6 +75,10 @@ const CLIENT_PROPS = new Set(['fileId', 'retries', 'reason', 'bytes', 'durationM
 const STRING_SLOT_METHODS = new Set(['TransferPageViewed'])
 /** The slot transforms themselves — their argument IS the raw value being hashed. */
 const SLOT_METHODS = new Set(['FileNameSlot', 'IpSlot'])
+/** R8: the only payload keys (TA-5.3) allowed to carry a raw address; widening this set is a reviewed, PII-shaped change (docs/AGENT.md section 7). */
+const EVENT_PII_KEYS = new Set(['emails', 'senderEmail', 'email', 'to', 'actor'])
+/** R8: the `Payload =` initializer of EventEnvelope (not `==`). */
+const PAYLOAD_RE = /\bPayload\s*=(?!=)/g
 const PII_WORDS = new Set(['email', 'mail', 'address', 'name', 'ip', 'password', 'passwd', 'secret', 'sas', 'sig', 'signature'])
 /**
  * Public instance method names of WaTelemetryReporter, parsed from its source (so new methods are covered automatically).
@@ -97,7 +107,7 @@ const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/
 /** R7: ILogger call on any receiver (does not match reporter `LogEvent(` — the level group is followed directly by `(`). */
 const LOG_CALL_RE = /\.\s*Log(?:Trace|Debug|Information|Warning|Error|Critical)?\s*\(/g
 const LOG_PII_WORDS = new Set(['email', 'mail', 'address', 'ip', 'password', 'passwd', 'secret', 'sas', 'sig', 'signature'])
-const NAME_QUALIFIERS = new Set(['file', 'sender', 'display', 'user', 'recipient', 'owner'])
+const NAME_QUALIFIERS = new Set(['file', 'sender', 'display', 'user', 'recipient', 'owner', 'original'])
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Lexing helpers
@@ -239,6 +249,19 @@ function extractCall(code, open) {
   return null
 }
 
+/** `code[open] === '{'` → { start, end } of the brace body (exclusive of the braces), or null if unbalanced. `code` is masked. */
+function extractBraces(code, open) {
+  let depth = 0
+  for (let i = open; i < code.length; i++) {
+    if (code[i] === '{') depth++
+    else if (code[i] === '}') {
+      depth--
+      if (depth === 0) return { start: open + 1, end: i }
+    }
+  }
+  return null
+}
+
 /** Splits code[start,end) at top-level commas (depth over () [] {}). Returns [{ s, e }] (blank segments dropped). */
 function splitTopLevel(code, start, end) {
   const parts = []
@@ -279,7 +302,7 @@ function stripSanctioned(code) {
 /** Removes slot-wrapped calls (with any receiver prefix) from masked code. */
 function stripSlots(code) {
   let s = code
-  const slot = /(?:[A-Za-z_]\w*\s*\??\.\s*)*(?:PiiTransforms\s*\.\s*(?:FileName|IpAddress)|\bFileNameSlot|\bIpSlot)\s*\(/
+  const slot = /(?:[A-Za-z_]\w*\s*\??\.\s*)*(?:PiiTransforms\s*\.\s*(?:FileName|IpAddress|UserAgent)|\bFileNameSlot|\bIpSlot)\s*\(/
   for (;;) {
     const m = slot.exec(s)
     if (!m) break
@@ -338,6 +361,73 @@ function isLogPiiIdentifier(id) {
   const words = identifierWords(id)
   if (words.some((w) => LOG_PII_WORDS.has(w))) return true
   return words.includes('name') && words.some((w) => NAME_QUALIFIERS.has(w))
+}
+
+/** Members of an anonymous object body: `key = expr`, a projection `a.b.Key` (key = last member) or a bare identifier. */
+function csAnonMembers(code, start, end) {
+  const out = []
+  for (const seg of splitTopLevel(code, start, end)) {
+    const text = code.slice(seg.s, seg.e)
+    const kv = /^\s*([A-Za-z_]\w*)\s*=(?!=)/.exec(text)
+    if (kv) {
+      out.push({ key: kv[1], s: seg.s + kv[0].length, e: seg.e })
+      continue
+    }
+    const last = /([A-Za-z_]\w*)\s*$/.exec(text)
+    out.push({ key: last ? last[1] : '', s: seg.s, e: seg.e })
+  }
+  return out
+}
+
+/** R8 — TA-5.3 event payload shapes (`Payload = ..`) over one C# file. Pure: text in, findings out. */
+function scanPayloads(file, text) {
+  const { nc, code } = mask(text, 'cs')
+  const findings = []
+  let payloads = 0
+  for (const m of code.matchAll(PAYLOAD_RE)) {
+    const line = lineOf(text, m.index)
+    const after = m.index + m[0].length
+    let open = -1
+    const direct = /^\s*new\s*\{/.exec(code.slice(after))
+    if (direct) open = after + direct[0].length - 1
+    else {
+      const id = /^\s*([A-Za-z_]\w*)\s*(?=[,;})]|$)/.exec(code.slice(after))
+      if (id) {
+        const bind = new RegExp(`\\b${id[1]}\\s*=\\s*new\\s*\\{`, 'g')
+        let last = null
+        for (const b of code.slice(0, m.index).matchAll(bind)) last = b
+        if (last) open = last.index + last[0].length - 1
+      }
+    }
+    const body = open >= 0 ? extractBraces(code, open) : null
+    if (!body) {
+      findings.push(finding(file, line, 'R8', 'event payload shape is hidden (not `new { .. }` or a local bound to `new { .. }` in this file) — the guard cannot check its keys (TA-9.4)'))
+      continue
+    }
+    payloads++
+    for (const mem of csAnonMembers(code, body.start, body.end)) {
+      const valueCode = code.slice(mem.s, mem.e)
+      const valueText = nc.slice(mem.s, mem.e)
+      const mline = lineOf(text, mem.s)
+      const words = identifierWords(mem.key)
+      if (EMAIL_RE.test(valueText)) findings.push(finding(file, mline, 'R8', `payload key '${mem.key}' carries a raw email literal (TA-9.4)`))
+      if (words.includes('ip') || words.includes('ua') || (words.includes('file') && words.includes('name'))) {
+        const stripped = stripSlots(valueCode)
+        if (stripped === valueCode || stripped.trim() !== '') {
+          findings.push(finding(file, mline, 'R8', `payload key '${mem.key}' names a file name / IP / user agent — its value must be exactly one slot-wrapped call (PiiTransforms.* / FileNameSlot / IpSlot) (AC-048-1)`))
+        }
+        continue
+      }
+      if (EVENT_PII_KEYS.has(mem.key)) continue
+      const ids = new Set()
+      if (isLogPiiIdentifier(mem.key)) ids.add(mem.key)
+      for (const im of stripSlots(valueCode).matchAll(/[A-Za-z_][A-Za-z0-9_]*/g)) if (isLogPiiIdentifier(im[0])) ids.add(im[0])
+      if (ids.size > 0) {
+        findings.push(finding(file, mline, 'R8', `payload key '${mem.key}' names PII (${[...ids].join(', ')}) outside EVENT_PII_KEYS — hash it via PiiTransforms.* or use a TA-5.3 key (AC-048-2)`))
+      }
+    }
+  }
+  return { findings, payloads }
 }
 
 /** R7 argument checks shared by `.LogX(..)` calls and [LoggerMessage] call sites. argText = comments-blanked text, argCode = strings blanked too. */
@@ -587,7 +677,7 @@ function* walk(dir) {
 
 function scanTree() {
   const findings = []
-  const counts = { csFiles: 0, tsFiles: 0, serverCalls: 0, clientCalls: 0, templates: 0, logCalls: 0, loggerMessages: 0, loggerMessageCalls: 0 }
+  const counts = { csFiles: 0, tsFiles: 0, serverCalls: 0, clientCalls: 0, templates: 0, logCalls: 0, loggerMessages: 0, loggerMessageCalls: 0, payloads: 0 }
   for (const full of walk(SRC)) {
     const r = rel(full)
     const isCs = full.endsWith('.cs')
@@ -603,6 +693,11 @@ function scanTree() {
       findings.push(...lm.findings)
       counts.loggerMessages += lm.messages
       counts.loggerMessageCalls += lm.calls
+      if (r !== REPORTER_CS) {
+        const pl = scanPayloads(r, text)
+        findings.push(...pl.findings)
+        counts.payloads += pl.payloads
+      }
       if (r === REPORTER_CS) {
         const res = scanReporter(r, text)
         findings.push(...res.findings)
@@ -627,15 +722,15 @@ function scanTree() {
 function runScan() {
   console.log('Telemetry PII guard (T-012-05 / T-012-06, EC-012-3 / AC-012-3):')
   const { findings, counts } = scanTree()
-  console.log(`  scanned ${counts.csFiles} C# files, ${counts.tsFiles} web files: ${counts.serverCalls} server helper calls, ${counts.templates} reporter templates, ${counts.clientCalls} client trackClientEvent calls, ${counts.logCalls} logger calls, ${counts.loggerMessages} [LoggerMessage] methods, ${counts.loggerMessageCalls} [LoggerMessage] call sites`)
+  console.log(`  scanned ${counts.csFiles} C# files, ${counts.tsFiles} web files: ${counts.serverCalls} server helper calls, ${counts.templates} reporter templates, ${counts.clientCalls} client trackClientEvent calls, ${counts.logCalls} logger calls, ${counts.loggerMessages} [LoggerMessage] methods, ${counts.loggerMessageCalls} [LoggerMessage] call sites, ${counts.payloads} event payloads`)
   findings.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line)
   for (const f of findings) console.error(`  ${f.file}:${f.line}  ${f.rule}  ${f.message}`)
   console.log('  rule  findings')
-  for (const rule of ['R0', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7']) {
+  for (const rule of ['R0', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8']) {
     const n = findings.filter((f) => f.rule === rule).length
     if (rule !== 'R0' || n > 0) console.log(`  ${rule}    ${n}`)
   }
-  if (counts.serverCalls === 0 || counts.templates === 0 || counts.clientCalls === 0 || counts.logCalls === 0 || counts.loggerMessages === 0) {
+  if (counts.serverCalls === 0 || counts.templates === 0 || counts.clientCalls === 0 || counts.logCalls === 0 || counts.loggerMessages === 0 || counts.payloads === 0) {
     console.error('\nFAIL — scan found no call sites on a surface (path or pattern drift): the guard would pass vacuously.')
     process.exit(1)
   }
@@ -651,7 +746,7 @@ function runScan() {
 // ---------------------------------------------------------------------------------------------------------------------
 
 function runSelfTest() {
-  const scan = { cs: (c) => scanCs('selftest.cs', c).findings, reporter: (c) => scanReporter('selftest.cs', c).findings, ts: (c) => scanTs('selftest.ts', c).findings, log: (c) => scanLog('selftest.cs', c).findings, logmsg: (c) => scanLoggerMessage('selftest.cs', c).findings }
+  const scan = { cs: (c) => scanCs('selftest.cs', c).findings, reporter: (c) => scanReporter('selftest.cs', c).findings, ts: (c) => scanTs('selftest.ts', c).findings, log: (c) => scanLog('selftest.cs', c).findings, logmsg: (c) => scanLoggerMessage('selftest.cs', c).findings, payload: (c) => scanPayloads('selftest.cs', c).findings }
   const seeded = [
     ['S1', 'cs', 'R1', '_telemetry.TransferPageViewed(PiiTransforms.FileName("dev@example.com"));'],
     ['S2', 'cs', 'R2', '_telemetry.StorageBytesActive(user.Email.Length);'],
@@ -685,6 +780,12 @@ function runSelfTest() {
     ['S30', 'logmsg', 'R7', '[LoggerMessage(Level = LogLevel.Warning, Message = "failed {Id}")]\npublic static partial void LogFailed(ILogger logger, Guid id);'],
     ['S31', 'logmsg', 'R7', '[LoggerMessage(Level = LogLevel.Error, Message = "Unhandled on {Route}")]\nprivate static partial void LogFailed(ILogger logger, Exception exception, string route);\nvoid M() { LogFailed(_logger, ex, context.Request.Path); }'],
     ['S32', 'logmsg', 'R7', '[LoggerMessage(Level = LogLevel.Warning, Message = "sent " + "{RecipientEmail}")]\nprivate static partial void LogSent(ILogger logger, string id);'],
+    ['S33', 'payload', 'R8', 'Payload = new { transferId = t.Id, fileName = file.OriginalName }'],
+    ['S34', 'payload', 'R8', 'Payload = new { transferId = t.Id, recipient = recipient.Address }'],
+    ['S35', 'payload', 'R8', 'Payload = new { ipHash = request.ClientIp }'],
+    ['S36', 'payload', 'R8', 'Payload = BuildPayload(x)'],
+    ['S37', 'payload', 'R8', 'Payload = new { to = "dev@example.com" }'],
+    ['S38', 'log', 'R7', '_logger.LogInformation("sent {Email:Pii}", email);'],
   ]
   const clean = [
     ['C1', 'ts', "if (x) {\n  trackClientEvent('upload_failed', { fileId: id, retries: fileAttempts.get(id)?.retries, ...(isBlobUnavailable ? { reason: 'blob_unavailable' } : {}) })\n}"],
@@ -702,6 +803,11 @@ function runSelfTest() {
     ['C14', 'log', '_logger.LogError(ex, "Unhandled exception on {Route}", LogRoute.Of(context));'],
     ['C15', 'logmsg', '[LoggerMessage(Level = LogLevel.Information, Message = "transfer {TransferId} expired")]\nprivate static partial void LogExpired(ILogger logger, Guid transferId);\nvoid M() { LogExpired(_logger, transfer.Id); }'],
     ['C16', 'logmsg', '[LoggerMessage(Level = LogLevel.Error, Message = "Unhandled exception on {Route} — mapped to 500 INTERNAL")]\nprivate static partial void LogUnhandled(ILogger logger, Exception exception, string route);\nvoid M() { LogUnhandled(_logger, unhandled, LogRoute.Of(context)); }'],
+    ['C17', 'payload', 'Payload = new { transferId = context.TransferId, to = recipient.Address, attempt = attempt, locale }'],
+    ['C18', 'payload', 'var payload = new { transferId = transfer.Id, emails = addresses, senderEmail = transfer.SenderEmail };\nvar e = new EventEnvelope { Payload = payload };'],
+    ['C19', 'payload', 'Payload = new { to = email, attempt = maxDeliveryCount, reason = ex.GetType().Name, kind, step }'],
+    ['C20', 'payload', 'Payload = new { transferId = t.Id, fileName = PiiTransforms.FileName(file.OriginalName) }'],
+    ['C21', 'payload', 'Payload = new { actor = actorEmail, action, entityType, entityId, details }'],
     ['C5', 'cs', '_telemetry.UploadCompleted(\n    totalBytes,\n    stopwatch.ElapsedMilliseconds,\n    totalRetries);'],
   ]
   let caught = 0
