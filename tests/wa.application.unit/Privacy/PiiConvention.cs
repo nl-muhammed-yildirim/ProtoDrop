@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using wa.domain.Privacy;
 using wa.infrastructure.Persistence;
 
@@ -38,18 +39,41 @@ internal static partial class PiiConvention
         return violations;
     }
 
-    /// <summary>Every mapped <see cref="string"/> property of the real EF model, as CLR properties.</summary>
-    internal static IReadOnlyList<PropertyInfo> ModelStringColumns()
+    /// <summary>The real EF model (built on the InMemory provider; the model itself is provider-independent for the mapped CLR shape).</summary>
+    internal static IModel Model()
     {
         var options = new DbContextOptionsBuilder<WaDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         using var db = new WaDbContext(options);
-        return db.Model.GetEntityTypes()
+        return db.Model;
+    }
+
+    /// <summary>Every mapped <see cref="string"/> property of the real EF model, as CLR properties.</summary>
+    internal static IReadOnlyList<PropertyInfo> ModelStringColumns() =>
+        Model().GetEntityTypes()
             .SelectMany(e => e.GetProperties())
             .Where(p => p.ClrType == typeof(string) && p.PropertyInfo is not null)
             .Select(p => p.PropertyInfo!)
             .DistinctBy(p => (p.DeclaringType, p.Name))
             .ToList();
+
+    /// <summary>Bidirectional check of the closed list: a [Pii] property missing from it, and an entry with no [Pii] property behind it.</summary>
+    internal static IReadOnlyList<string> ClosedListViolations(IEnumerable<PropertyInfo> props, IReadOnlyCollection<ErasureColumn> list)
+    {
+        var violations = new List<string>();
+        var listed = list.Select(c => (c.Entity, c.Property)).ToHashSet();
+        foreach (var p in props.Where(p => p.GetCustomAttribute<PiiAttribute>() is not null))
+        {
+            if (!listed.Contains((p.DeclaringType!, p.Name)))
+                violations.Add($"{p.DeclaringType!.Name}.{p.Name}: [Pii] column missing from ErasureScope.AllColumns (US-048-03)");
+        }
+        foreach (var c in list)
+        {
+            var prop = c.Entity.GetProperty(c.Property);
+            if (prop?.GetCustomAttribute<PiiAttribute>() is null)
+                violations.Add($"{c.Entity.Name}.{c.Property}: ErasureScope entry has no [Pii] property behind it (US-048-03)");
+        }
+        return violations;
     }
 }
