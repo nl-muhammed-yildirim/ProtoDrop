@@ -27,7 +27,7 @@ public sealed class ForgotPasswordHandler(
     TimeProvider timeProvider) : IRequestHandler<ForgotPasswordCommand, ForgotPasswordResult>
 {
     /// <summary>Purpose code for forgot-password tokens (TA-3.2: AuthToken.Purpose; 2=forgot-password).</summary>
-    private const byte PurposeForgotPassword = 2;
+    private const byte PurposeResetToken = 2;
 
     private readonly IAppUserStore _users = users;
     private readonly IAuthTokenStore _tokens = tokens;
@@ -59,7 +59,7 @@ public sealed class ForgotPasswordHandler(
             Id = Guid.NewGuid(),
             Email = email,
             TokenHash = tokenHashHex,
-            Purpose = PurposeForgotPassword,
+            Purpose = PurposeResetToken,
             ExpiresAtUtc = nowUtc.AddSeconds(RequestMagicLinkHandler.TtlSeconds), // frozen 600 s — same assembly constant
             RedeemedAtUtc = null, // unused until redeem (single-use)
             CreatedAtUtc = nowUtc
@@ -73,7 +73,7 @@ public sealed class ForgotPasswordHandler(
             email = email,
             token = rawToken, // base64 — f-email worker renders it into the CTA URL (?ml={token})
             expiresAtUtc = authToken.ExpiresAtUtc,
-            purpose = PurposeForgotPassword
+            purpose = PurposeResetToken
         };
 
         var envelope = new EventEnvelope

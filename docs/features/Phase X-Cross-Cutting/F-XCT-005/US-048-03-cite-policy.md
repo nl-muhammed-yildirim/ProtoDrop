@@ -50,7 +50,7 @@ Then the convention test checks it against the closed list and the erasure casca
 ## Technical notes
 
 - `ErasureScope.AllColumns` (in `wa.domain`) is the single source the cascade and the convention test both read — the sync proof is one array, not two documents.
-- Quotable sentence for the privacy policy (D-17): "Raw personal data lives in exactly seven places in our database (the closed list in F-XCT-005, FR-048-2); in our analytics it is hashed or HMAC'd; and when you delete your account, every one of those places is erased — telemetry included."
+- Quotable sentence for the privacy policy (D-17), **to be finalised once the erasure-scrub decision is made**: "Raw personal data lives in exactly 15 places in our database (the closed list in F-XCT-005, FR-048-2); in our analytics it is hashed or HMAC'd." The old second half ("when you delete your account, every one of them is erased") is **not true today**: 10 of the 15 columns are retained (Open-Decisions Part 3, 2026-11-26).
 
 ## Links
 

@@ -1,3 +1,5 @@
+using wa.domain.Privacy;
+
 namespace wa.domain;
 
 /// <summary>A file transfer. TA-3.2: dbo.Transfer.</summary>
@@ -20,8 +22,10 @@ public class Transfer
     /// <summary>Password hash (VARCHAR(256)); plain password never persisted.</summary>
     public string? PasswordHash { get; set; }
     /// <summary>Sender name shown to recipients; PII (TA-9.4).</summary>
+    [Pii]
     public string SenderName { get; set; } = null!;
     /// <summary>Sender email used for reply and unsubscribe handling; null for anonymous senders; PII (TA-9.4).</summary>
+    [Pii]
     public string? SenderEmail { get; set; }
     /// <summary>Optional message from the sender shown on the download page.</summary>
     public string? Note { get; set; }
