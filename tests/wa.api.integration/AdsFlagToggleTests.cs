@@ -67,6 +67,7 @@ public class AdsFlagToggleTests : IAsyncLifetime
             Email = AdminEmail.ToLowerInvariant(),
             DisplayName = "Ads Flag Test",
             PlanId = planId,
+            EmailConfirmed = true, // the admin role needs a confirmed email (CHORE-staging-blockers)
             CreatedAtUtc = DateTime.UtcNow
         });
         await _db.SaveChangesAsync();

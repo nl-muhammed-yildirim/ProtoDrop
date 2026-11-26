@@ -143,6 +143,7 @@ public class SetUserPlanCommandTests
         public Task UpdateProfileAsync(Guid userId, string? displayName, string? theme, CancellationToken ct) =>
             Task.CompletedTask;
 
+        public Task ConfirmEmailAndClearPasswordAsync(Guid userId, CancellationToken ct) => Task.CompletedTask;
         public Task<bool> SoftDeleteWithReHomeAsync(Guid userId, DateTime deletedAtUtc, CancellationToken ct) =>
             Task.FromResult(true);
     }

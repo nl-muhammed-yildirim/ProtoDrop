@@ -297,6 +297,7 @@ public class OrgLogoTests
         public Task<AppUser?> FindByEmailAsync(string lowercasedEmail, CancellationToken ct) => Task.FromResult<AppUser?>(null);
         public Task CreateAsync(AppUser user, CancellationToken ct) => Task.CompletedTask;
         public Task UpdateProfileAsync(Guid userId, string? displayName, string? theme, CancellationToken ct) => Task.CompletedTask;
+        public Task ConfirmEmailAndClearPasswordAsync(Guid userId, CancellationToken ct) => Task.CompletedTask;
         public Task<bool> SoftDeleteWithReHomeAsync(Guid userId, DateTime deletedAtUtc, CancellationToken ct) => Task.FromResult(false);
     }
 

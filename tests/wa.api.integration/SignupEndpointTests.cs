@@ -148,6 +148,61 @@ public class SignupEndpointTests : IAsyncLifetime
         Assert.Equal("WRONG_PASSWORD", doc.RootElement.GetProperty("code").GetString());
     }
 
+    // ---- CHORE-staging-blockers: magic-link redeem on a pre-registered account confirms it and wipes the unverified password; deleted accounts are refused ----
+
+    private async Task<string> SeedMagicLinkAsync(string email)
+    {
+        var raw = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(raw))).ToLowerInvariant();
+        _db.Set<AuthToken>().Add(new AuthToken
+        {
+            Id = Guid.NewGuid(),
+            Email = email,
+            TokenHash = hash,
+            Purpose = 1,
+            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10),
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        await _db.SaveChangesAsync();
+        return raw;
+    }
+
+    [Fact]
+    public async Task Redeem_PreRegisteredUnconfirmedAccount_ConfirmsEmail_AndWipesPassword()
+    {
+        const string Email = "prereg@example.com";
+        using (var signup = await _client.PostAsJsonAsync("/api/v1/auth/signup", new { email = Email, password = "attacker-pass-1" }))
+            Assert.Equal(HttpStatusCode.OK, signup.StatusCode);
+
+        var raw = await SeedMagicLinkAsync(Email);
+        using var redeem = await _client.PostAsJsonAsync("/api/v1/auth/magic-link/redeem", new { token = raw });
+        Assert.Equal(HttpStatusCode.OK, redeem.StatusCode);
+
+        var row = await _db.Set<AppUser>().AsNoTracking().SingleAsync(u => u.Email == Email);
+        Assert.True(row.EmailConfirmed);
+        Assert.Null(row.PasswordHash);
+
+        using var login = await _client.PostAsJsonAsync("/api/v1/auth/login", new { email = Email, password = "attacker-pass-1" });
+        Assert.Equal(HttpStatusCode.Unauthorized, login.StatusCode); // the pre-registered password no longer works
+    }
+
+    [Fact]
+    public async Task Redeem_SoftDeletedAccount_Returns410_LINK_EXPIRED()
+    {
+        const string Email = "deletedredeem@example.com";
+        using (var signup = await _client.PostAsJsonAsync("/api/v1/auth/signup", new { email = Email, password = "password123" }))
+            Assert.Equal(HttpStatusCode.OK, signup.StatusCode);
+        await _db.Set<AppUser>().Where(u => u.Email == Email)
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.DeletedAtUtc, (DateTime?)new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)));
+
+        var raw = await SeedMagicLinkAsync(Email);
+        using var redeem = await _client.PostAsJsonAsync("/api/v1/auth/magic-link/redeem", new { token = raw });
+
+        Assert.Equal(HttpStatusCode.Gone, redeem.StatusCode);
+        using var doc = JsonDocument.Parse(await redeem.Content.ReadAsByteArrayAsync());
+        Assert.Equal("LINK_EXPIRED", doc.RootElement.GetProperty("code").GetString());
+    }
+
     // ---- VALIDATION Problem+JSON via the existing pipeline (TA-4.1.3 closed list) ----
 
     [Fact]

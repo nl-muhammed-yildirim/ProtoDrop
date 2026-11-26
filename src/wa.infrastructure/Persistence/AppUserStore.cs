@@ -55,6 +55,15 @@ public sealed class AppUserStore(IDbContextFactory<WaDbContext> factory) : IAppU
     }
 
     /// <inheritdoc />
+    public async Task ConfirmEmailAndClearPasswordAsync(Guid userId, CancellationToken ct)
+    {
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        await db.Set<AppUser>()
+            .Where(u => u.Id == userId && u.DeletedAtUtc == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.EmailConfirmed, true).SetProperty(u => u.PasswordHash, (string?)null), ct);
+    }
+
+    /// <inheritdoc />
     /// <remarks>T-008-06 / FR-008-8: soft-delete + transfer re-home in ONE transaction (mirrors ExpiryDeletionStore's idiom); US-047-02 adds the pending Erasure marker to the same transaction.</remarks>
     public async Task<bool> SoftDeleteWithReHomeAsync(Guid userId, DateTime deletedAtUtc, CancellationToken ct)
     {

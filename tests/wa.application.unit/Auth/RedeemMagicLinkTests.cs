@@ -91,6 +91,64 @@ public class RedeemMagicLinkTests
         Assert.NotNull(tokenRow.RedeemedAtUtc);
     }
 
+    // ---- CHORE-staging-blockers: redeem confirms an unconfirmed account and discards its unverified password ----
+
+    [Fact]
+    public async Task Redeem_ExistingUnconfirmedAccount_ConfirmsEmail_AndWipesUnverifiedPassword()
+    {
+        var user = SeedRealAppUser(Guid.NewGuid(), _plans.Plan.Id);
+        user.PasswordHash = "attacker-chosen-hash";
+        _users.ExistingUser = user;
+        SeedLiveToken("real@example.com");
+
+        var result = await _handler.Handle(new RedeemMagicLinkCommand(_tokens.Raw!), CancellationToken.None);
+
+        Assert.NotEmpty(result.SessionToken);
+        Assert.Equal([user.Id], _users.ConfirmedAndWiped);
+    }
+
+    [Fact]
+    public async Task Redeem_ExistingConfirmedAccount_KeepsItsPassword()
+    {
+        var user = SeedRealAppUser(Guid.NewGuid(), _plans.Plan.Id);
+        user.EmailConfirmed = true;
+        user.PasswordHash = "owner-hash";
+        _users.ExistingUser = user;
+        SeedLiveToken("real@example.com");
+
+        await _handler.Handle(new RedeemMagicLinkCommand(_tokens.Raw!), CancellationToken.None);
+
+        Assert.Empty(_users.ConfirmedAndWiped);
+        Assert.Equal("owner-hash", user.PasswordHash);
+    }
+
+    [Fact]
+    public async Task Redeem_NewAccount_IsCreatedConfirmedWithoutPassword()
+    {
+        SeedLiveToken("fresh@example.com");
+
+        await _handler.Handle(new RedeemMagicLinkCommand(_tokens.Raw!), CancellationToken.None);
+
+        Assert.NotNull(_users.Created);
+        Assert.True(_users.Created!.EmailConfirmed);
+        Assert.Null(_users.Created.PasswordHash);
+    }
+
+    [Fact]
+    public async Task Redeem_SoftDeletedAccount_ThrowsLinkExpired_NoSession_NoLoginSuccess()
+    {
+        var user = SeedRealAppUser(Guid.NewGuid(), _plans.Plan.Id);
+        user.DeletedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        _users.ExistingUser = user;
+        SeedLiveToken("real@example.com");
+
+        await Assert.ThrowsAsync<LinkExpiredException>(async () =>
+            await _handler.Handle(new RedeemMagicLinkCommand(_tokens.Raw!), CancellationToken.None));
+
+        Assert.DoesNotContain(_telemetryLogger.Entries, e => e.RenderedText == TelemetryEvents.LoginSuccess);
+        Assert.Empty(_users.ConfirmedAndWiped);
+    }
+
     // ---- AC-008-2: magic link clicked twice → second click invalid (token single-use) ----
 
     [Fact]
@@ -228,6 +286,14 @@ public class RedeemMagicLinkTests
         // T-008-06 (D-1): compile fix only — the RedeemMagicLink handler doesn't call these new members.
         public Task<AppUser?> GetByIdAsync(Guid userId, CancellationToken ct) => Task.FromResult(ExistingUser?.Id == userId ? ExistingUser : null);
         public Task UpdateProfileAsync(Guid userId, string? displayName, string? theme, CancellationToken ct) => Task.CompletedTask;
+        public List<Guid> ConfirmedAndWiped { get; } = [];
+
+        public Task ConfirmEmailAndClearPasswordAsync(Guid userId, CancellationToken ct)
+        {
+            ConfirmedAndWiped.Add(userId);
+            return Task.CompletedTask;
+        }
+
         public Task<bool> SoftDeleteWithReHomeAsync(Guid userId, DateTime deletedAtUtc, CancellationToken ct) => Task.FromResult(true);
     }
 

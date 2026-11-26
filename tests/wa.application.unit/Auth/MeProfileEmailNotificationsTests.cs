@@ -104,6 +104,7 @@ public class MeProfileEmailNotificationsTests
             if (displayName is not null) User!.DisplayName = displayName;
             return Task.CompletedTask;
         }
+        public Task ConfirmEmailAndClearPasswordAsync(Guid userId, CancellationToken ct) => Task.CompletedTask;
         public Task<bool> SoftDeleteWithReHomeAsync(Guid userId, DateTime deletedAtUtc, CancellationToken ct) => Task.FromResult(false);
     }
 

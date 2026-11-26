@@ -40,4 +40,12 @@ public interface IAppUserStore
     /// <param name="ct">Token that cancels the operation.</param>
     /// <returns><see langword="true"/> when the user was deleted; <see langword="false"/> when the user id is unknown.</returns>
     Task<bool> SoftDeleteWithReHomeAsync(Guid userId, DateTime deletedAtUtc, CancellationToken ct);
+
+    /// <summary>
+    /// CHORE-staging-blockers: a magic-link redeem proves ownership of the email, so mark it confirmed and discard the password set while it was unverified
+    /// (an attacker may have pre-registered the address). A soft-deleted or unknown id is left alone.
+    /// </summary>
+    /// <param name="userId">Id of the user whose email was just proven.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    Task ConfirmEmailAndClearPasswordAsync(Guid userId, CancellationToken ct);
 }

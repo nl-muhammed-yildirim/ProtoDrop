@@ -42,7 +42,7 @@ internal sealed class AdminGate
     /// <summary>Resolves the session user's admin role or throws the closed-set 401 / 403 Problem.</summary>
     /// <remarks>
     /// T-011-01 gate helper for the admin endpoints. Session read gives 401 UNAUTHENTICATED; an unknown email, an email not in
-    /// <c>Wa:AdminEmails</c>, or an Operator on a SuperAdmin-only route gives FORBIDDEN. Returns the role (US-047-03 email reveal).
+    /// <c>Wa:AdminEmails</c>, an account whose email is not confirmed, or an Operator on a SuperAdmin-only route gives FORBIDDEN. Returns the role (US-047-03 email reveal).
     /// No audit row for a rejected gate: the suppression DELETE emits <c>TelemetryEvents.AdminAction</c> only AFTER the gate passes (T-006-03).
     /// </remarks>
     /// <param name="ctx">The current HTTP context (carries the session user id).</param>
@@ -57,7 +57,7 @@ internal sealed class AdminGate
             throw new BusinessException(ProblemCodes.Unauthenticated, ProblemCodes.TitleOf(ProblemCodes.Unauthenticated));
 
         var user = await users.GetByIdAsync(userId, ct);
-        var role = user?.Email is { } email ? AdminRolePolicy.Resolve(email.ToLowerInvariant(), AdminEmails, OperatorEmails) : null;
+        var role = user?.Email is { } email ? AdminRolePolicy.Resolve(email.ToLowerInvariant(), user.EmailConfirmed, AdminEmails, OperatorEmails) : null;
         if (role is null || (superadminOnly && role != AdminRole.SuperAdmin))
             throw new BusinessException(ProblemCodes.Forbidden, ProblemCodes.TitleOf(ProblemCodes.Forbidden));
         return role.Value;

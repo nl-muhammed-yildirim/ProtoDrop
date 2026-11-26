@@ -17,6 +17,7 @@ public class ExportMyDataHandlerTests
         public Task<AppUser?> FindByEmailAsync(string lowercasedEmail, CancellationToken ct) => throw new NotSupportedException();
         public Task CreateAsync(AppUser u, CancellationToken ct) => throw new NotSupportedException();
         public Task UpdateProfileAsync(Guid userId, string? displayName, string? theme, CancellationToken ct) => throw new NotSupportedException();
+        public Task ConfirmEmailAndClearPasswordAsync(Guid userId, CancellationToken ct) => Task.CompletedTask;
         public Task<bool> SoftDeleteWithReHomeAsync(Guid userId, DateTime deletedAtUtc, CancellationToken ct) => throw new NotSupportedException();
     }
 

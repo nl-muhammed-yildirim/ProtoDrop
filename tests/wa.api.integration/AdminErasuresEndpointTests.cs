@@ -76,7 +76,7 @@ public class AdminErasuresEndpointTests : IAsyncLifetime
     private async Task<Guid> AddUserAsync(string email, Guid planId)
     {
         var id = Guid.NewGuid();
-        _db.Set<AppUser>().Add(new AppUser { Id = id, Email = email, DisplayName = "U", PlanId = planId, CreatedAtUtc = DateTime.UtcNow });
+        _db.Set<AppUser>().Add(new AppUser { Id = id, Email = email, DisplayName = "U", PlanId = planId, EmailConfirmed = true, CreatedAtUtc = DateTime.UtcNow }); // confirmed: the admin role needs a confirmed email (CHORE-staging-blockers)
         await _db.SaveChangesAsync();
         return id;
     }
