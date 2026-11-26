@@ -64,7 +64,8 @@ services:
       context: .
       dockerfile: src/wa.web/Dockerfile
     ports: ["5173:5173"]
-    # SPA hardcodes http://localhost:8080/api/v1 -> browser hits the host-published API port. Serves :5173.
+    # SPA API base = VITE_WA_API_BASE (build arg), default http://localhost:8080/api/v1 -> the host-published API port. Serves :5173.
+    # nginx CSP vars WA_API_ORIGIN / WA_BLOB_ORIGIN default to the local API and Azurite origins (Dockerfile ENV).
 
   wa.workers:
     build:
@@ -79,5 +80,7 @@ services:
       "Wa:Jwt:Secret": "1f3a9c0e2d4b6f8a0c1e3d5b7f9a2c4e6d8b0f1a3c5e7d9b1f3a5c7e9d1b3f5a"
       # Email is log-only in dev (no real SMTP) — read links from the workers console/Serilog.
       "Wa:Email:Sender": "log"
+      # CHORE-deploy-hardening: Sender=log is refused at startup outside Development/Local.
+      AZURE_FUNCTIONS_ENVIRONMENT: "Development"
       "Wa:Zip:SignKey": "local-zip-signing-key-m0-dev-only"
     depends_on: [wa.api]

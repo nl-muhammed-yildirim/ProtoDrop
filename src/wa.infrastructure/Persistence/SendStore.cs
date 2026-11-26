@@ -7,34 +7,38 @@ namespace wa.infrastructure.Persistence;
 
 /// <summary>
 /// T-002-04: thin adapter over WaDbContext implementing ISendStore — the only DB surface the send handler needs.
-/// Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext).
+/// Registered as a singleton; opens a fresh WaDbContext per call (CHORE-dbcontext-lifetime).
 /// </summary>
-/// <param name="db">Database context that backs the store.</param>
+/// <param name="factory">Factory that creates a short-lived database context per call.</param>
 /// <param name="blobs">Blob store used to check that re-sent files still physically exist.</param>
-public sealed class SendStore(WaDbContext db, IBlobStore blobs) : ISendStore
+public sealed class SendStore(IDbContextFactory<WaDbContext> factory, IBlobStore blobs) : ISendStore
 {
-    private readonly WaDbContext _db = db;
+    private readonly IDbContextFactory<WaDbContext> _factory = factory;
     private readonly IBlobStore _blobs = blobs;   // T-010-02: the gate primitive — physical-presence checks via ExistsAsync.
 
     /// <inheritdoc />
-    public Task<Transfer?> FindByIdAsync(Guid id, CancellationToken ct) =>
-        _db.Set<Transfer>().FirstOrDefaultAsync(t => t.Id == id, ct);
+    public async Task<Transfer?> FindByIdAsync(Guid id, CancellationToken ct)
+    {
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        return await db.Set<Transfer>().FirstOrDefaultAsync(t => t.Id == id, ct);
+    }
 
     /// <inheritdoc />
     public async Task SaveSendAsync(Transfer transfer, IReadOnlyList<EmailRecipient> recipients, CancellationToken ct)
     {
-        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
 
         // T-010-02 (EC-010-2): re-send drafts only — a normal draft's blobs cannot be "gone" via this lifecycle, so the
         // gate is scoped to SourcedFrom rows. Runs BEFORE any write: a throw rolls the transaction back → no orphan rows.
         if (transfer.SourcedFrom is not null)
         {
-            var blobIds = await _db.Set<FileItem>()
+            var blobIds = await db.Set<FileItem>()
                 .Where(f => f.TransferId == transfer.Id)
                 .Select(f => f.BlobRefId)
                 .Distinct()
                 .ToListAsync(ct);
-            await AssertBlobsPhysicallyPresentAsync(blobIds, ct); // T-010-02: the shared FILES_GONE gate
+            await AssertBlobsPhysicallyPresentAsync(db, blobIds, ct); // T-010-02: the shared FILES_GONE gate
         }
 
         // T-010-01 (AC-010-1): a re-send draft carries SourcedFrom = original.Id — set SupersededBy on the original row
@@ -42,42 +46,48 @@ public sealed class SendStore(WaDbContext db, IBlobStore blobs) : ISendStore
         // EC-010-2's FILES_GONE gate is T-010-02's scope (it inserts its predicate before this write).
         if (transfer.SourcedFrom is not null)
         {
-            _ = await _db.Database.ExecuteSqlRawAsync(
+            _ = await db.Database.ExecuteSqlRawAsync(
                 "UPDATE [Transfer] SET [SupersededBy] = {0} WHERE [Id] = {1}",
                 [transfer.Id, transfer.SourcedFrom.Value], ct);
 
             // The raw-SQL UPDATE bypasses the change tracker: the original was loaded (tracked) by the earlier resend command, so detach it
             // so a later SaveChanges can't resurrect the old SupersededBy. T-003-10: TransferTrackerExtensions.DetachTransfer, never Local.Remove.
-            _db.DetachTransfer(transfer.SourcedFrom.Value);
+            db.DetachTransfer(transfer.SourcedFrom.Value);
         }
 
         // T-010-01: re-send drafts materialized snapshot recipient rows at creation — the send's submitted set replaces them,
         // keeping exactly one row per address. Normal drafts have none, so behavior is unchanged for them.
-        var preExisting = await _db.Set<EmailRecipient>().Where(r => r.TransferId == transfer.Id).ToListAsync(ct);
-        _db.Set<EmailRecipient>().RemoveRange(preExisting);
+        var preExisting = await db.Set<EmailRecipient>().Where(r => r.TransferId == transfer.Id).ToListAsync(ct);
+        db.Set<EmailRecipient>().RemoveRange(preExisting);
 
-        _db.Set<Transfer>().Update(transfer);
+        db.Set<Transfer>().Update(transfer);
         foreach (var r in recipients)
-            _db.Set<EmailRecipient>().Add(r);
-        await _db.SaveChangesAsync(ct);
+            db.Set<EmailRecipient>().Add(r);
+        await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<string>> GetRecipientAddressesAsync(Guid transferId, CancellationToken ct) =>
-        await _db.Set<EmailRecipient>()
+    public async Task<IReadOnlyList<string>> GetRecipientAddressesAsync(Guid transferId, CancellationToken ct)
+    {
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        return await db.Set<EmailRecipient>()
             .Where(r => r.TransferId == transferId)
             .Select(r => r.Address)
             .ToListAsync(ct);
+    }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<FileItemRow>> ListFileItemsByTransferAsync(Guid transferId, CancellationToken ct) =>
-        await _db.Set<FileItem>()
+    public async Task<IReadOnlyList<FileItemRow>> ListFileItemsByTransferAsync(Guid transferId, CancellationToken ct)
+    {
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        return await db.Set<FileItem>()
             .AsNoTracking()
             .Where(f => f.TransferId == transferId)
             .OrderBy(f => f.SortOrder)
             .Select(f => new FileItemRow(f.Id, f.BlobRefId, f.OriginalName, f.SizeBytes, f.ContentType, f.SortOrder))
             .ToListAsync(ct);
+    }
 
     /// <inheritdoc />
     /// <remarks>
@@ -91,25 +101,26 @@ public sealed class SendStore(WaDbContext db, IBlobStore blobs) : ISendStore
     /// </exception>
     public async Task SaveResendAsync(Transfer draft, IReadOnlyList<FileItem> fileItems, IReadOnlyList<EmailRecipient> recipients, IReadOnlyList<BlobRef> sharedBlobRefs, CancellationToken ct)
     {
-        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
 
         // T-010-02 (AC-010-2): step 0 — the FILES_GONE gate inside this transaction, BEFORE any insert or RefCount bump.
-        // The handler passes Id-only BlobRef stubs, so the predicate reads its own rows from _db. A throw rolls this
+        // The handler passes Id-only BlobRef stubs, so the predicate reads its own rows through the same context (db). A throw rolls this
         // transaction back → zero new rows, no RefCount change (no half-created draft remains).
         var distinctBlobIds = sharedBlobRefs.Select(b => b.Id).Distinct().ToList();
-        await AssertBlobsPhysicallyPresentAsync(distinctBlobIds, ct);
+        await AssertBlobsPhysicallyPresentAsync(db, distinctBlobIds, ct);
 
-        _db.Set<Transfer>().Add(draft);
+        db.Set<Transfer>().Add(draft);
         foreach (var f in fileItems)
-            _db.Set<FileItem>().Add(f);
+            db.Set<FileItem>().Add(f);
         foreach (var r in recipients)
-            _db.Set<EmailRecipient>().Add(r); // T-010-01: materialized snapshot rows — the editable pending state US-010-02 reads
-        await _db.SaveChangesAsync(ct);
+            db.Set<EmailRecipient>().Add(r); // T-010-01: materialized snapshot rows — the editable pending state US-010-02 reads
+        await db.SaveChangesAsync(ct);
 
         // The guard lives in the UPDATE's WHERE (Id must exist); a concurrent physical delete makes rowsAffected 0.
         foreach (var blobRef in sharedBlobRefs)
         {
-            var rowsAffected = await _db.Set<BlobRef>()
+            var rowsAffected = await db.Set<BlobRef>()
                 .Where(b => b.Id == blobRef.Id)
                 .ExecuteUpdateAsync(setter => setter.SetProperty(b => b.RefCount, b => b.RefCount + 1), ct);
 
@@ -129,12 +140,12 @@ public sealed class SendStore(WaDbContext db, IBlobStore blobs) : ISendStore
     /// a FilesGoneException throw rolls it back → zero new rows, no RefCount change (AC-010-2). An empty id collection
     /// returns early (a SourcedFrom draft with no file rows must not fire the gate).
     /// </summary>
-    private async Task AssertBlobsPhysicallyPresentAsync(List<Guid> blobRefIds, CancellationToken ct)
+    private async Task AssertBlobsPhysicallyPresentAsync(WaDbContext db, List<Guid> blobRefIds, CancellationToken ct)
     {
         if (blobRefIds.Count == 0)
             return;
 
-        var rows = await _db.Set<BlobRef>()
+        var rows = await db.Set<BlobRef>()
             .AsNoTracking()
             .Where(b => blobRefIds.Contains(b.Id))
             .ToListAsync(ct);

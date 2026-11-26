@@ -113,7 +113,7 @@ public class EmailBrandingIntegrationTests : IAsyncLifetime
             ["Wa:Email:FromAddress"] = FromAddress
         }).Build();
 
-        await using var workerDb = new WaDbContext(_options);
+        var workerDb = new AppDbContextFactory(_options); // fresh context per store call
         var telemetry = new WaTelemetryReporter(NullLogger<WaTelemetryReporter>.Instance, Encoding.UTF8.GetBytes("test-key"));
         var sender = new CapturingEmailSender();
         var handler = new SendNotificationEmailsHandler(

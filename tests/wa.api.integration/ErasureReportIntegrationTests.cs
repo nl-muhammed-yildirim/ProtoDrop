@@ -62,8 +62,7 @@ public class ErasureReportIntegrationTests : IAsyncLifetime
 
     private async Task DeleteAsync(Guid userId, DateTime? at = null, bool expectFirst = true)
     {
-        await using var ctx = new WaDbContext(_options);
-        var ok = await new AppUserStore(ctx).SoftDeleteWithReHomeAsync(userId, at ?? DateTime.UtcNow, CancellationToken.None);
+        var ok = await new AppUserStore(new AppDbContextFactory(_options)).SoftDeleteWithReHomeAsync(userId, at ?? DateTime.UtcNow, CancellationToken.None);
         if (expectFirst) Assert.True(ok);
     }
 

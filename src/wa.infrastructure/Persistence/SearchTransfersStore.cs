@@ -7,12 +7,12 @@ namespace wa.infrastructure.Persistence;
 
 /// <summary>
 /// T-011-04 (TA-4.2#21 / FR-011-3): platform-wide admin transfer search — single bounded query over WaDbContext.
-/// Registered as a singleton in Program.cs (same lifetime as the adapter-owned WaDbContext).
+/// Registered as a singleton; opens a fresh WaDbContext per call (CHORE-dbcontext-lifetime).
 /// </summary>
-/// <param name="db">Database context that backs the store.</param>
-public sealed class SearchTransfersStore(WaDbContext db) : ISearchTransfersStore
+/// <param name="factory">Factory that creates a short-lived database context per call.</param>
+public sealed class SearchTransfersStore(IDbContextFactory<WaDbContext> factory) : ISearchTransfersStore
 {
-    private readonly WaDbContext _db = db;
+    private readonly IDbContextFactory<WaDbContext> _factory = factory;
 
     /// <inheritdoc />
     /// <remarks>
@@ -35,13 +35,14 @@ public sealed class SearchTransfersStore(WaDbContext db) : ISearchTransfersStore
         int limit,
         CancellationToken ct)
     {
-        var rows = await _db.Set<Transfer>()
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        var rows = await db.Set<Transfer>()
             .AsNoTracking()
             // T-011-04 + US-045-01 (FR-045-4): LinkId exact OR recipient substring; with feature.search on also file name / sender substring (literal, CI collation).
             .Where(t => q == null || t.LinkId == q
-                || _db.Set<EmailRecipient>().Any(r => r.TransferId == t.Id && r.Address.Contains(q))
+                || db.Set<EmailRecipient>().Any(r => r.TransferId == t.Id && r.Address.Contains(q))
                 || (matchFilesAndSender && (t.SenderName.Contains(q)
-                    || _db.Set<FileItem>().Any(f => f.TransferId == t.Id && f.OriginalName.Contains(q)))))
+                    || db.Set<FileItem>().Any(f => f.TransferId == t.Id && f.OriginalName.Contains(q)))))
             // T-011-04: status predicate only when a byte set is given — null = all statuses including deleted (DECISION).
             .Where(t => statuses == null || statuses.Contains(t.Status))
             // T-011-04: size range — inclusive bounds, null = no bound.
@@ -58,7 +59,7 @@ public sealed class SearchTransfersStore(WaDbContext db) : ISearchTransfersStore
             .Select(t => new AdminTransferRow(
                 t.Id,
                 t.LinkId,
-                _db.Set<AppUser>().Where(u => u.Id == t.OwnerAppUserId).Select(u => u.Email).FirstOrDefault(),
+                db.Set<AppUser>().Where(u => u.Id == t.OwnerAppUserId).Select(u => u.Email).FirstOrDefault(),
                 t.Status,
                 t.FileCount,
                 t.TotalBytes,

@@ -56,6 +56,8 @@ npm run lint && npm run test:run && npm run build   # T-017-03: `npm run lint` =
 node ../../scripts/check-theme-tokens.mjs   # T-015-03 (FR-015-2): token-diff parity — all 14 tokens in :root/dark/light, dark ≠ light per token; CI job theme-check runs the same script from repo root.
 node ../../scripts/check-contrast.mjs       # T-016-06 (FR-016-4): WCAG contrast from tokens.css, both themes; gated core pairs ≥ 4.5:1; CI job contrast-check runs the same script from repo root.
 node ../../scripts/check-telemetry-pii.mjs && node ../../scripts/check-telemetry-pii.mjs selftest   # T-012-05 (EC-012-3): no raw email / unhashed PII / unknown property reaches a telemetry call (server reporter on any receiver + client trackClientEvent); R7 (T-012-06/07) also covers ILogger `.Log<Level>(` calls, incl. `.Path/.PathBase/.QueryString/.Message` member args, and (CHORE-code-style-2) `[LoggerMessage]` templates, parameter names and call sites; R8 (T-069) checks domain-event `Payload = new { … }` members: raw addresses only under the 5 TA-5.3 keys, file name/IP/user agent must be hashed. CI job pii-check runs both from repo root.
+cd ../..
+az bicep build --file infra/bicep/main.bicep --stdout > /dev/null   # CHORE-infra-cd: IaC compiles (needs az CLI; CI job iac also builds every infra/bicep/main/*.bicepparam). Skip locally when az is not installed — CI is the gate.
 ```
 
 Plus, per task: the task's own **exit check** in `Milestone-Backlog.md`.

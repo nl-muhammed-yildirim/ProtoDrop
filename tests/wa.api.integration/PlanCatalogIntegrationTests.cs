@@ -56,7 +56,7 @@ public class PlanCatalogIntegrationTests : IAsyncLifetime
         _db.Set<Plan>().Add(plan);
         await _db.SaveChangesAsync();
 
-        await using var readDb = new WaDbContext(_options);
+        var readDb = new AppDbContextFactory(_options);
         var provider = new LimitsProvider(
             new PlansCache(new PlansStore(readDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow),
             new FlagsCache(new FlagsStore(readDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow));
@@ -76,7 +76,7 @@ public class PlanCatalogIntegrationTests : IAsyncLifetime
 
         var now = DateTimeOffset.UtcNow;
         var ttl = TimeSpan.FromSeconds(30);
-        await using var readDb = new WaDbContext(_options);
+        var readDb = new AppDbContextFactory(_options);
         var provider = new LimitsProvider(
             new PlansCache(new PlansStore(readDb), ttl, () => now),
             new FlagsCache(new FlagsStore(readDb), ttl, () => now));
@@ -130,7 +130,7 @@ public class PlanCatalogIntegrationTests : IAsyncLifetime
             await writeDb.SaveChangesAsync();
         }
 
-        await using var readDb = new WaDbContext(_options);
+        var readDb = new AppDbContextFactory(_options);
         var cache = new PlansCache(new PlansStore(readDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow);
         var plan = await cache.GetAsync("pro", CancellationToken.None);
 
@@ -185,9 +185,9 @@ public class PlanCatalogIntegrationTests : IAsyncLifetime
     private static readonly Guid ProId = Guid.Parse("11111111-0000-4000-8000-000000000002");
     private static readonly Guid BusinessId = Guid.Parse("11111111-0000-4000-8000-000000000003");
 
-    private FeaturesProvider NewFeaturesProvider(WaDbContext readDb) => new(
-        new PlansCache(new PlansStore(readDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow),
-        new FlagsCache(new FlagsStore(readDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow));
+    private FeaturesProvider NewFeaturesProvider() => new(
+        new PlansCache(new PlansStore(new AppDbContextFactory(_options)), TimeSpan.Zero, () => DateTimeOffset.UtcNow),
+        new FlagsCache(new FlagsStore(new AppDbContextFactory(_options)), TimeSpan.Zero, () => DateTimeOffset.UtcNow));
 
     private async Task SetGate(string key, string value)
     {
@@ -219,8 +219,7 @@ public class PlanCatalogIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task SeededGates_Off_EveryPlanResolvesAllFeaturesOff()
     {
-        await using var readDb = new WaDbContext(_options);
-        var provider = NewFeaturesProvider(readDb);
+        var provider = NewFeaturesProvider();
 
         foreach (var id in new[] { FreeId, ProId, BusinessId })
         {
@@ -236,8 +235,7 @@ public class PlanCatalogIntegrationTests : IAsyncLifetime
         var free = await _db.Set<Plan>().AsNoTracking().SingleAsync(p => p.Id == FreeId);
         var pro = await _db.Set<Plan>().AsNoTracking().SingleAsync(p => p.Id == ProId);
 
-        await using var readDb = new WaDbContext(_options);
-        var provider = NewFeaturesProvider(readDb);
+        var provider = NewFeaturesProvider();
 
         AssertSame(JsonSerializer.Deserialize<PlanFeatures>(pro.FeaturesJson)!, await provider.Resolve(pro.Code, CancellationToken.None));
         AssertSame(new PlanFeatures { Ads = true }, await provider.Resolve(free.Code, CancellationToken.None)); // Free seed carries ads:true (AddFreeAdsEnabled)

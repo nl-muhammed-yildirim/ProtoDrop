@@ -7,7 +7,7 @@ namespace wa.infrastructure.Persistence;
 
 /// <summary>
 /// US-047-01: API-side adapter for <see cref="IDataExportStore"/>. A fresh WaDbContext per call, so a failed INSERT
-/// (unique violation) never stays tracked on a shared context (BillingSequenceStore precedent).
+/// (unique violation) never stays tracked in a long-lived context (BillingSequenceStore precedent).
 /// </summary>
 public sealed class DataExportStore : IDataExportStore
 {
