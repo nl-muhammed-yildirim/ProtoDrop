@@ -898,7 +898,7 @@ describe('RecipientPage (T-003-05 — password gate UI)', () => {
 })
 
 describe('RecipientPage (T-003-06 — per-file download wiring)', () => {
-  const SAS_URL = 'https://azurite.example.com/transfers/fake-sas?sig=abc'
+  const SAS_URL = 'http://127.0.0.1:10000/transfers/fake-sas?sig=abc'
 
   // Dispatching stub: endpoint 4 → active body; endpoint 6 → minted { url, expiresAt } (TA-4.2#6 wire shape).
   function stubDownloadFetch(status = 200): void {
@@ -961,6 +961,40 @@ describe('RecipientPage (T-003-06 — per-file download wiring)', () => {
       expect(assignedHref as unknown as string).toContain('spr=https%2Chttp') // the plain-HTTP leg's protocol line.
       // The store still shows active with the same files (no terminal state).
       expect(useRecipientStore.getState().status).toBe('active')
+      host.remove()
+    } finally {
+      Object.defineProperty(window, 'location', { configurable: true, value: realLocation })
+    }
+  })
+
+  it('production SAS (real Azure Blob) navigates verbatim — no re-sign, no re-address (CHORE-staging-blockers)', async () => {
+    const PROD_URL = 'https://acct.blob.core.windows.net/transfers/t/f?sv=2024&sp=r&sig=abc'
+    const realLocation = window.location as unknown
+    const currentPathname: string | undefined = (realLocation as Location).pathname
+    const fakeLocation: Record<string, unknown> = {}
+    let assignedHref: string | null = null
+    Object.defineProperty(fakeLocation, 'href', {
+      configurable: true,
+      get: () => '',
+      set: (v: string) => { assignedHref = v },
+    })
+    Object.defineProperty(fakeLocation, 'pathname', { configurable: true, get: () => currentPathname })
+    Object.defineProperty(window, 'location', { configurable: true, get: () => fakeLocation })
+    try {
+      vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/download-url')) {
+          return new Response(JSON.stringify({ url: PROD_URL, expiresAt: '2030-01-01T00:30:00Z' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+        }
+        return new Response(JSON.stringify(activeBody()), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      })
+      const host = await renderApp(isActive)
+      const btn = host.querySelector('.rp-download') as HTMLButtonElement
+      await act(async () => {
+        btn.click()
+        for (let i = 0; i < 400 && assignedHref === null; i++) { await tick() }
+      })
+      expect(assignedHref as unknown as string).toBe(PROD_URL)
       host.remove()
     } finally {
       Object.defineProperty(window, 'location', { configurable: true, value: realLocation })
@@ -1270,7 +1304,7 @@ describe('RecipientPage (T-003-07 — growth loop)', () => {
 })
 
 describe('RecipientPage (T-003-08 — mobile sticky bar, store-driven DOM)', () => {
-  const SAS_URL = 'https://azurite.example.com/transfers/fake-sas?sig=abc'
+  const SAS_URL = 'http://127.0.0.1:10000/transfers/fake-sas?sig=abc'
 
   beforeEach(() => {
     window.history.pushState('', '', `/t/${LINK_ID}`)

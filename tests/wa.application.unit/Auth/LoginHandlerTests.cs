@@ -113,6 +113,22 @@ public class LoginHandlerTests
         Assert.Empty(_users.Created);
     }
 
+    // ---- CHORE-staging-blockers: a soft-deleted account is never signed in, even with the right password ----
+
+    [Fact]
+    public async Task Login_SoftDeletedAccount_ThrowsWrongPassword_EmitsLoginFailed()
+    {
+        var user = SeedRealAppUser(Guid.NewGuid());
+        user.DeletedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        _users.ExistingUser = user;
+
+        await Assert.ThrowsAsync<LoginWrongPasswordException>(async () =>
+            await _handler.Handle(new LoginCommand("real@example.com", "password123"), CancellationToken.None));
+
+        Assert.Single(_telemetryLogger.Entries, e => e.RenderedText == TelemetryEvents.LoginFailed);
+        Assert.DoesNotContain(_telemetryLogger.Entries, e => e.RenderedText == TelemetryEvents.LoginSuccess);
+    }
+
     // ---- EC-008-4 (no-leak): unknown email → same exception as wrong password, NOT "user not found" ----
 
     [Fact]

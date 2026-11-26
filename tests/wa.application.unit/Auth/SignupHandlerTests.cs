@@ -94,17 +94,7 @@ public class SignupHandlerTests
     {
         // EC-008-4: sign-up is sign-in — known email (any case) signs into existing row; no duplicate insert.
         var existingId = Guid.NewGuid();
-        _store.ExistingUser = new AppUser
-        {
-            Id = existingId,
-            Email = "existing@proto.drop",
-            DisplayName = "Existing",
-            Theme = "system",
-            PasswordHash = "stored-hash",
-            PlanId = _freePlan.Id,
-            EmailConfirmed = false,
-            CreatedAtUtc = DateTime.UtcNow
-        };
+        SeedExisting(existingId, new PasswordHasher<string>().HashPassword(existingId.ToString("n"), "password123"));
 
         var result = await _handler.Handle(new SignupCommand("Existing@PROTO.drop", "password123"), CancellationToken.None);
 
@@ -115,6 +105,86 @@ public class SignupHandlerTests
 
         // US-008-01: login_success emitted on both branches.
         Assert.Contains(_telemetryLogger.Entries, e => e.RenderedText == TelemetryEvents.LoginSuccess);
+    }
+
+    private void SeedExisting(Guid id, string? passwordHash, DateTime? deletedAtUtc = null) =>
+        _store.ExistingUser = new AppUser
+        {
+            Id = id,
+            Email = "existing@proto.drop",
+            DisplayName = "Existing",
+            Theme = "system",
+            PasswordHash = passwordHash,
+            PlanId = _freePlan.Id,
+            EmailConfirmed = false,
+            CreatedAtUtc = DateTime.UtcNow,
+            DeletedAtUtc = deletedAtUtc
+        };
+
+    private async Task AssertRejectedAsync(string password)
+    {
+        await Assert.ThrowsAsync<LoginWrongPasswordException>(async () =>
+            await _handler.Handle(new SignupCommand("existing@proto.drop", password), CancellationToken.None));
+
+        Assert.Single(_telemetryLogger.Entries, e => e.RenderedText == TelemetryEvents.LoginFailed);
+        Assert.DoesNotContain(_telemetryLogger.Entries, e => e.RenderedText == TelemetryEvents.LoginSuccess);
+        Assert.Empty(_store.Created);
+    }
+
+    // ---- EC-008-4 + AC-008-1 (security half): a known email signs in only with the correct password ----
+
+    [Fact]
+    public async Task Signup_KnownEmail_CorrectPassword_ReturnsToken_EmitsLoginSuccessOnly()
+    {
+        var id = Guid.NewGuid();
+        SeedExisting(id, new PasswordHasher<string>().HashPassword(id.ToString("n"), "password123"));
+
+        var result = await _handler.Handle(new SignupCommand("existing@proto.drop", "password123"), CancellationToken.None);
+
+        Assert.NotEmpty(result.SessionToken);
+        Assert.Equal(id, result.UserId);
+        Assert.DoesNotContain(_telemetryLogger.Entries, e => e.RenderedText == TelemetryEvents.UserCreated);
+        Assert.Single(_telemetryLogger.Entries, e => e.RenderedText == TelemetryEvents.LoginSuccess);
+        Assert.Empty(_store.Created);
+    }
+
+    [Fact]
+    public async Task Signup_KnownEmail_WrongPassword_ThrowsWrongPassword_NoToken_EmitsLoginFailed()
+    {
+        var id = Guid.NewGuid();
+        SeedExisting(id, new PasswordHasher<string>().HashPassword(id.ToString("n"), "password123"));
+
+        await AssertRejectedAsync("different-pass-1");
+    }
+
+    [Fact]
+    public async Task Signup_KnownEmail_MagicLinkOnlyAccount_ThrowsWrongPassword()
+    {
+        SeedExisting(Guid.NewGuid(), passwordHash: null);
+
+        await AssertRejectedAsync("password123");
+    }
+
+    [Fact]
+    public async Task Signup_KnownEmail_SoftDeleted_ThrowsWrongPassword_EvenWithCorrectPassword()
+    {
+        var id = Guid.NewGuid();
+        SeedExisting(id, new PasswordHasher<string>().HashPassword(id.ToString("n"), "password123"),
+            new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+
+        await AssertRejectedAsync("password123");
+    }
+
+    [Fact]
+    public async Task Signup_KnownEmail_ReturnsUsersOwnPlanCode()
+    {
+        var id = Guid.NewGuid();
+        SeedExisting(id, new PasswordHasher<string>().HashPassword(id.ToString("n"), "password123"));
+
+        var result = await _handler.Handle(new SignupCommand("existing@proto.drop", "password123"), CancellationToken.None);
+
+        Assert.Equal(_freePlan.Code, result.PlanCode);
+        Assert.Equal(0, _plans.GetAsyncCalls); // the plan comes from the user's PlanId, not the default-plan lookup
     }
 
     [Fact]
@@ -165,8 +235,13 @@ public class SignupHandlerTests
         // FR-004: "Free by default" is a seeded row — test stub mirrors the seed (TA-3.4).
         public Plan Plan { get; } = new() { Id = Guid.NewGuid(), Code = "free", Name = "Free" };
 
-        public Task<Plan> GetAsync(string planCode, CancellationToken cancellationToken) =>
-            planCode == "free" ? Task.FromResult(Plan) : throw new PlanUnknownException(planCode);
+        public int GetAsyncCalls { get; private set; }
+
+        public Task<Plan> GetAsync(string planCode, CancellationToken cancellationToken)
+        {
+            GetAsyncCalls++;
+            return planCode == "free" ? Task.FromResult(Plan) : throw new PlanUnknownException(planCode);
+        }
 
         // T-008-02: by-Id read (returns null or the row; never throws) — new IPlansStore member from the plan.
         public Task<Plan?> GetByIdAsync(Guid planId, CancellationToken cancellationToken) =>
