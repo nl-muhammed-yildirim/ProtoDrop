@@ -35,7 +35,7 @@
  *                            checked by name; and every in-file call `Name(logger, ..)` gets the argument checks above on the arguments after the logger.
  *   R8  event payload      — T-069 (F-XCT-005, US-048-01, AC-048-1/2): every TA-5.3 event payload (`Payload = new { .. }`, or `Payload = <id>` where
  *                            `<id> = new { .. }` is bound earlier in the same file) is checked key by key. A key naming a file name / IP / user agent
- *                            (words `ip`, `ua`, or `file`+`name`) must carry exactly ONE slot-wrapped call (PiiTransforms.FileName / IpAddress /
+ *                            (words `ip`, `ua`, `user`+`agent`, or `file`+`name`) must carry exactly ONE slot-wrapped call (PiiTransforms.FileName / IpAddress /
  *                            UserAgent, FileNameSlot, IpSlot). A key in EVENT_PII_KEYS (the TA-5.3 members that carry an address by contract) may carry
  *                            any value. Any other key, and its value identifiers, must not name PII (same naming rule as R7). An email literal anywhere
  *                            is a finding, and so is a payload whose shape the scan cannot see (`Payload = Build(x)`).
@@ -49,6 +49,8 @@
  * (`var f = reporter.X; f(..)`) or invoked via reflection escapes R1/R2/R4 (R6 + the reflection pin in WaTelemetryReporterTests mitigate).
  * Client: re-exporting (`export { trackClientEvent as x }`), passing the function as a value (`wrap(trackClientEvent)`), or calling it via
  * a destructured / namespace alias other than the two shapes R6 flags escapes R5. R8 is T-069's event-payload scan (the [Pii] attribute and erasure-list convention tests are C#, in tests/wa.application.unit/Privacy).
+ * R8 known escapes: an opaque member value (e.g. AuditWriter `details`, which carries `new { email = .. }` built in AdminEndpoints.cs) is not looked into, and an
+ * identifier payload resolves to the LAST same-name `new { .. }` bound before the match in the file, so a same-name local re-bound in another method can be mis-resolved.
  * R7 also flags `.Path`/`.PathBase`/`.QueryString`/`.Message` member arguments (T-012-07: raw request path / exception message in a neutral slot).
  * R7 is a text scan too: a PII value laundered through a neutrally named local (`var x = user.Email; _logger.LogX("{X}", x)`) escapes it.
  * [LoggerMessage] limits: the attribute must use the named `Message = "<literal>"` argument (positional / const messages are findings), and the
@@ -107,7 +109,7 @@ const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/
 /** R7: ILogger call on any receiver (does not match reporter `LogEvent(` — the level group is followed directly by `(`). */
 const LOG_CALL_RE = /\.\s*Log(?:Trace|Debug|Information|Warning|Error|Critical)?\s*\(/g
 const LOG_PII_WORDS = new Set(['email', 'mail', 'address', 'ip', 'password', 'passwd', 'secret', 'sas', 'sig', 'signature'])
-const NAME_QUALIFIERS = new Set(['file', 'sender', 'display', 'user', 'recipient', 'owner', 'original'])
+const NAME_QUALIFIERS = new Set(['file', 'sender', 'display', 'user', 'recipient', 'owner', 'original', 'org'])
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Lexing helpers
@@ -411,7 +413,7 @@ function scanPayloads(file, text) {
       const mline = lineOf(text, mem.s)
       const words = identifierWords(mem.key)
       if (EMAIL_RE.test(valueText)) findings.push(finding(file, mline, 'R8', `payload key '${mem.key}' carries a raw email literal (TA-9.4)`))
-      if (words.includes('ip') || words.includes('ua') || (words.includes('file') && words.includes('name'))) {
+      if (words.includes('ip') || words.includes('ua') || (words.includes('user') && words.includes('agent')) || (words.includes('file') && words.includes('name'))) {
         const stripped = stripSlots(valueCode)
         if (stripped === valueCode || stripped.trim() !== '') {
           findings.push(finding(file, mline, 'R8', `payload key '${mem.key}' names a file name / IP / user agent — its value must be exactly one slot-wrapped call (PiiTransforms.* / FileNameSlot / IpSlot) (AC-048-1)`))
@@ -785,6 +787,8 @@ function runSelfTest() {
     ['S35', 'payload', 'R8', 'Payload = new { ipHash = request.ClientIp }'],
     ['S36', 'payload', 'R8', 'Payload = BuildPayload(x)'],
     ['S37', 'payload', 'R8', 'Payload = new { to = "dev@example.com" }'],
+    ['S40', 'payload', 'R8', 'Payload = new { orgName = user.OrgName }'],
+    ['S41', 'payload', 'R8', 'Payload = new { userAgent = ctx.Request.Headers.UserAgent }'],
     ['S38', 'log', 'R7', '_logger.LogInformation("sent {Email:Pii}", email);'],
   ]
   const clean = [
@@ -808,6 +812,7 @@ function runSelfTest() {
     ['C19', 'payload', 'Payload = new { to = email, attempt = maxDeliveryCount, reason = ex.GetType().Name, kind, step }'],
     ['C20', 'payload', 'Payload = new { transferId = t.Id, fileName = PiiTransforms.FileName(file.OriginalName) }'],
     ['C21', 'payload', 'Payload = new { actor = actorEmail, action, entityType, entityId, details }'],
+    ['C23', 'payload', 'Payload = new { userAgent = PiiTransforms.UserAgent(ctx.Request.Headers.UserAgent) }'],
     ['C5', 'cs', '_telemetry.UploadCompleted(\n    totalBytes,\n    stopwatch.ElapsedMilliseconds,\n    totalRetries);'],
   ]
   let caught = 0

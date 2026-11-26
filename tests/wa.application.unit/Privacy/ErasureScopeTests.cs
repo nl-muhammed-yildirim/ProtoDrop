@@ -74,5 +74,5 @@ public class ErasureScopeTests
     }
 
     [Fact]
-    public void ClosedList_HasFourteenColumns() => Assert.Equal(14, ErasureScope.AllColumns.Count);
+    public void ClosedList_HasFifteenColumns() => Assert.Equal(15, ErasureScope.AllColumns.Count);
 }
