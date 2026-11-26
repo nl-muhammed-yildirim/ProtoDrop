@@ -49,7 +49,7 @@ public sealed class PlanContextAccessor(IUserPlanStore users, ILimitsProvider li
             ? await users.GetPlanCodeAsync(id, cancellationToken) ?? ILimitsProvider.GuestPlanCode
             : ILimitsProvider.GuestPlanCode;
 
-        // Sequential on purpose: both providers share singleton caches / DbContext.
+        // Sequential on purpose: keeps one DB round-trip at a time per request.
         var resolvedLimits = await limits.Resolve(code, cancellationToken);
         var resolvedFeatures = await features.Resolve(code, cancellationToken);
         return new PlanContext(code, resolvedLimits, resolvedFeatures);

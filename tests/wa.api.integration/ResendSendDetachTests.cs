@@ -79,7 +79,7 @@ public class ResendSendDetachTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ResendThenSend_201_OriginalKeptWithSupersededBy_ContextStaysHealthy()
+    public async Task ResendThenSend_201_OriginalKeptWithSupersededBy_Succeeds()
     {
         var ownerId = await SeedOwnerAsync();
         var origId = await SeedActiveOriginalWithBlobAsync(ownerId);

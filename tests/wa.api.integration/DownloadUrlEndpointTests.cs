@@ -221,16 +221,16 @@ public class DownloadUrlEndpointTests : IAsyncLifetime
         Assert.Equal(2, await freshDb.Set<DownloadEvent>().CountAsync(e => e.TransferId == transferId)); // exactly the two successful rows
     }
 
-    // ---- T-003-10 (AC-003-5) / CHORE-dbcontext-lifetime: a transfer seeded and tracked in a separate context - the cap flip still gives 410 and the app stays healthy ----
+    // ---- T-003-10 (AC-003-5) / CHORE-dbcontext-lifetime: at the cap the mint answers 410 (status flips to 3, row kept) and a follow-up mint for another transfer still succeeds ----
 
     [Fact]
-    public async Task CapReached_TrackedInAppContext_Returns410_AndContextStaysHealthy()
+    public async Task CapReached_Returns410_FollowUpMintOk()
     {
         await using var factory = new TestFactory();
         using var client = factory.CreateClient();
         await using var appDb = await factory.Services.GetRequiredService<IDbContextFactory<WaDbContext>>().CreateDbContextAsync();
 
-        var a = await SeedTrackedInAppContextAsync(appDb, maxDownloads: 1);
+        var a = await SeedAtCapAsync(appDb, maxDownloads: 1);
 
         using (var ok = await client.GetAsync($"/api/v1/public/transfers/{a.LinkId}/files/{a.FileId:n}/download-url"))
             Assert.Equal(HttpStatusCode.OK, ok.StatusCode); // 0 -> 1
@@ -504,8 +504,8 @@ public class DownloadUrlEndpointTests : IAsyncLifetime
         await _db.SaveChangesAsync();
     }
 
-    /// <summary>T-003-10: seed Transfer + BlobRef + FileItem through a context from the app's factory in ONE SaveChanges, so all three stay tracked Unchanged in that context.</summary>
-    private static async Task<(Guid TransferId, string LinkId, Guid FileId)> SeedTrackedInAppContextAsync(WaDbContext appDb, int maxDownloads)
+    /// <summary>T-003-10: seed Transfer + BlobRef + FileItem through a context from the app's factory in ONE SaveChanges (a transfer with max downloads set, to be driven to its cap).</summary>
+    private static async Task<(Guid TransferId, string LinkId, Guid FileId)> SeedAtCapAsync(WaDbContext appDb, int maxDownloads)
     {
         var transferId = Guid.NewGuid();
         var fileId = Guid.NewGuid();
