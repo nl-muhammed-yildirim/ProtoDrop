@@ -1,3 +1,4 @@
+import { API_BASE } from '../../core/config/apiBase'
 import { create } from 'zustand'
 import { getTraceParent } from '../../core/traceparent'
 import { trackClientEvent } from '../../core/telemetry/clientTelemetry'
@@ -26,13 +27,13 @@ export interface RecipientFile { fileId: string; name: string; sizeBytes: number
 export type RecipientStatus = 'loading' | 'active' | 'error' | 'expired' | 'downloadLimit'
 
 // T-003-02 (TA-4.2#4): endpoint 4 — fixed-port style like LinkScreen/StagingList; page views mint no SAS, no auth, no cookie.
-const PUBLIC_TRANSFER_ENDPOINT = 'http://localhost:8080/api/v1/public/transfers/{linkId}'
+const PUBLIC_TRANSFER_ENDPOINT = `${API_BASE}/public/transfers/{linkId}`
 // T-003-05 (TA-4.2#5): endpoint 5 — the only client-side consumer of the unlock token; no auth, no cookie, no SAS.
-const UNLOCK_ENDPOINT = 'http://localhost:8080/api/v1/public/transfers/{linkId}/unlock'
+const UNLOCK_ENDPOINT = `${API_BASE}/public/transfers/{linkId}/unlock`
 // T-003-06 (TA-4.2#6): endpoint 6 — mint a 30-minute read SAS; the browser streams the blob directly against storage.
-const DOWNLOAD_URL_ENDPOINT = 'http://localhost:8080/api/v1/public/transfers/{linkId}/files/{fileId}/download-url'
+const DOWNLOAD_URL_ENDPOINT = `${API_BASE}/public/transfers/{linkId}/files/{fileId}/download-url`
 // T-004-03 (TA-4.2#7): endpoint 7 — zip download URL; 200 {url} | 202 {pollAfterSec}.
-const DOWNLOAD_ALL_URL_ENDPOINT = 'http://localhost:8080/api/v1/public/transfers/{linkId}/download-all-url'
+const DOWNLOAD_ALL_URL_ENDPOINT = `${API_BASE}/public/transfers/{linkId}/download-all-url`
 const LOAD_TIMEOUT_MS = 30_000
 // T-004-03 (FR-004-6): fallback poll interval when a 202 omits pollAfterSec (the server sends the same 2 s) - UX timing, not a plan limit.
 const DEFAULT_POLL_AFTER_SEC = 2

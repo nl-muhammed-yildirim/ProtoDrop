@@ -753,14 +753,14 @@ namespace wa.infrastructure.Persistence.Migrations
                             Key = "limits.pro.maxSingleFile",
                             Description = "Plan limits override (TA-3.4); values per Open-Decisions Part 2",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Value = "10737418240"
+                            Value = "21474836480"
                         },
                         new
                         {
                             Key = "limits.pro.maxTransferSize",
                             Description = "Plan limits override (TA-3.4); values per Open-Decisions Part 2",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Value = "10737418240"
+                            Value = "21474836480"
                         },
                         new
                         {
@@ -939,7 +939,7 @@ namespace wa.infrastructure.Persistence.Migrations
                             Id = new Guid("11111111-0000-4000-8000-000000000002"),
                             Code = "pro",
                             FeaturesJson = "{\"ads\":false,\"scheduling\":true,\"analytics\":true,\"branding\":true,\"sso_scim\":false}",
-                            LimitsJson = "{\"maxTransferSize\":10737418240,\"maxSingleFile\":10737418240,\"maxZipSize\":9223372036854775807,\"retentionDays\":30,\"graceDays\":3,\"maxDownloads\":1000,\"maxEmails\":100,\"storageQuota\":107374182400,\"activeTransfersMax\":200,\"maxLogoSize\":1048576}",
+                            LimitsJson = "{\"maxTransferSize\":21474836480,\"maxSingleFile\":21474836480,\"maxZipSize\":9223372036854775807,\"retentionDays\":30,\"graceDays\":3,\"maxDownloads\":1000,\"maxEmails\":100,\"storageQuota\":107374182400,\"activeTransfersMax\":200,\"maxLogoSize\":1048576}",
                             Name = "Pro",
                             PriceJson = "{\"currency\":\"USD\",\"monthly\":{\"amount\":900,\"stripePriceId\":null},\"annual\":{\"amount\":9000,\"stripePriceId\":null},\"perSeatMonthly\":null}",
                             SortOrder = 2

@@ -20,6 +20,7 @@ var app = builder.Build();
 // T-011-01 (TA-9.2 / FR-011-1): the admin / operator email sets are read once, right after Build() — see AdminGate.
 var adminGate = AdminGate.FromConfiguration(builder.Configuration);
 
+app.UseMiddleware<SecurityHeadersMiddleware>(); // TA-9.5: first, so preflight 204s and limiter 429s also carry the headers
 // TA-4.1.6 (T-056-03): allow-list CORS only — configured origins via Wa:Cors:AllowedOrigins, no wildcard, preflight cached 1 h.
 app.UseMiddleware<CorsAllowListMiddleware>();
 app.UseMiddleware<CorrelationMiddleware>(); // FR-056-1: runs before everything else — correlationId present in every log line incl. UseSerilogRequestLogging's per-request INF line

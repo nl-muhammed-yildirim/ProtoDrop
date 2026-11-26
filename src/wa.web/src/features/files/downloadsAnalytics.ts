@@ -1,3 +1,4 @@
+import { API_BASE } from '../../core/config/apiBase'
 import { getTraceParent } from '../../core/traceparent'
 import i18n from '../../core/i18n/init'
 
@@ -6,7 +7,6 @@ import i18n from '../../core/i18n/init'
  * no raw IP / UA ever reaches the client. Server stays the authority; every failure here fails closed.
  */
 
-const API_BASE = 'http://localhost:8080/api/v1'
 const PLAN_URL = `${API_BASE}/billing/plan`
 
 export interface DailyPoint { date: string; count: number }

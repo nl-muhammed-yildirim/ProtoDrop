@@ -1,3 +1,4 @@
+import { API_BASE } from '../../core/config/apiBase'
 import { useEffect, useState } from 'react'
 
 import { formatBytes } from '../../core/upload/formatBytes'
@@ -6,8 +7,7 @@ import type { OverviewDto } from './overviewData'
 import { formatLastDelivery, formatUpdatedAt, statusLabel, statusTone } from './overviewData'
 import { getTraceParent } from '../../core/traceparent'
 
-// T-011-03 (FR-011-2): fixed local port, no proxy, no env vars yet (AuthPage + FilesPage precedent).
-const API_BASE = 'http://localhost:8080/api/v1'
+// T-011-03 (FR-011-2): fixed local port, no proxy, base from VITE_WA_API_BASE (CHORE-deploy-hardening) (AuthPage + FilesPage precedent).
 
 type LoadState =
   | { kind: 'loading' }

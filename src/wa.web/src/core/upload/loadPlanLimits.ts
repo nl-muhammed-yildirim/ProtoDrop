@@ -1,8 +1,9 @@
+import { API_BASE } from '../config/apiBase'
 import { getTraceParent } from '../traceparent'
 import { setPlanLimits } from './planLimits'
 
 // Fixed-port absolute base, same precedent as PlanPage BILLING_BASE.
-const PLAN_URL = 'http://localhost:8080/api/v1/billing/plan'
+const PLAN_URL = `${API_BASE}/billing/plan`
 
 /**
  * Loads the signed-in user's per-upload caps from GET /billing/plan (PlanContext.Limits) into planLimits.

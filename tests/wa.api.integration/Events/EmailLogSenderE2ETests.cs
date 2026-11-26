@@ -22,6 +22,7 @@ using wa.application.Ports;
 using wa.application.Telemetry;
 using wa.application.UseCases.Transfers;
 using wa.domain;
+using wa.domain.Privacy;
 using wa.infrastructure.Email;
 using wa.infrastructure.Events;
 using wa.infrastructure.Persistence;
@@ -120,8 +121,9 @@ public class EmailLogSenderE2ETests : IAsyncLifetime
 
         // FR-006-3: sender's own address skipped → exactly 2 mails.
         Assert.Equal(2, mails.Count);
-        Assert.Equivalent(new[] { "ann@example.com", "ben@example.com" }, mails.Select(m => m.To));
-        Assert.DoesNotContain(mails, m => m.To == "alice@example.com");
+        // CHORE-deploy-hardening (TA-9.4): the log sender masks addresses; ann and alice mask alike, so the sender-skip is
+        // proven by Count == 2 above plus the DB assertion on alice's NotifiedAtUtc below (FR-006-3).
+        Assert.Equivalent(new[] { "a****@example.com", "b****@example.com" }, mails.Select(m => m.To));
 
         await using var db = NewDb();
         var transfer = await db.Set<Transfer>().AsNoTracking().FirstAsync(t => t.Id == transferId);
@@ -152,7 +154,7 @@ public class EmailLogSenderE2ETests : IAsyncLifetime
         var dir = Path.Combine(AppContext.BaseDirectory, "artifacts", "T-006-05");
         Directory.CreateDirectory(dir);
         var path = Path.Combine(dir, "transfer-email-en.html");
-        await File.WriteAllTextAsync(path, mails.First(m => m.To == "ann@example.com").Html);
+        await File.WriteAllTextAsync(path, mails.First(m => m.To == EmailMask.Mask("ann@example.com")).Html);
         _output.WriteLine($"Rendered email artifact: {path}");
     }
 
@@ -168,7 +170,7 @@ public class EmailLogSenderE2ETests : IAsyncLifetime
         await RunWorkerAsync(TransferCreatedEnvelope(t1));
         var first = _capture.Mails().Skip(before).ToList();
         var benMail = Assert.Single(first);
-        Assert.Equal("ben@example.com", benMail.To);
+        Assert.Equal(EmailMask.Mask("ben@example.com"), benMail.To);
 
         var match = Regex.Match(benMail.Html, "href=\"(?<url>[^\"]*/unsubscribe/(?<token>[^\"]+))\"");
         Assert.True(match.Success, "rendered email has no unsubscribe link");
@@ -190,7 +192,7 @@ public class EmailLogSenderE2ETests : IAsyncLifetime
         before = _capture.Mails().Count;
         await RunWorkerAsync(TransferCreatedEnvelope(t2));
         var second = _capture.Mails().Skip(before).ToList();
-        Assert.Equal("ann@example.com", Assert.Single(second).To);
+        Assert.Equal(EmailMask.Mask("ann@example.com"), Assert.Single(second).To);
 
         await using (var db = NewDb())
         {
@@ -205,7 +207,7 @@ public class EmailLogSenderE2ETests : IAsyncLifetime
         before = _capture.Mails().Count;
         await RunWorkerAsync(TransferCreatedEnvelope(t3));
         var third = _capture.Mails().Skip(before).ToList();
-        Assert.Equal("ben@example.com", Assert.Single(third).To);
+        Assert.Equal(EmailMask.Mask("ben@example.com"), Assert.Single(third).To);
     }
 
     // ---- Helpers ----
@@ -249,7 +251,8 @@ public class EmailLogSenderE2ETests : IAsyncLifetime
             ["Wa:Url:Public"] = PublicOrigin,
             ["Wa:Jwt:Secret"] = TestSecret,
             ["Wa:Email:FromAddress"] = FromAddress,
-            ["Wa:Email:Sender"] = "log"
+            ["Wa:Email:Sender"] = "log",
+            ["DOTNET_ENVIRONMENT"] = "Development" // CHORE-deploy-hardening: the log sender is refused outside Local/Development
         }).Build();
 
         await using var workerDb = NewDb();

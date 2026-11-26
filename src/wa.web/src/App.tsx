@@ -1,3 +1,4 @@
+import { API_BASE } from './core/config/apiBase'
 import { useEffect, useState } from 'react'
 
 import TopBar from './core/TopBar'
@@ -93,7 +94,7 @@ export default function App() {
     // T-008-07: POST /auth/logout clears the server-side wa.session cookie (T-008-06, TA-4.2#13).
     // Fire-and-forget with a local fallback — even if the network fails we still clear the client session
     // so the TopBar returns to "Sign in" (exit check c); the stale server-side cookie will 401 on next GET /auth/me.
-    fetch('http://localhost:8080/api/v1/auth/logout', { method: 'POST', credentials: 'include', headers: { traceparent: getTraceParent() } }).catch(() => {})
+    fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include', headers: { traceparent: getTraceParent() } }).catch(() => {})
     clearSession()
     setSession(null)
     goHome()

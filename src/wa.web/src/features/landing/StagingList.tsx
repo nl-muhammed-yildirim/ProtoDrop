@@ -1,3 +1,4 @@
+import { API_BASE } from '../../core/config/apiBase'
 import { useEffect, useRef, useState } from 'react'
 
 import i18n from '../../core/i18n/init'
@@ -29,10 +30,10 @@ import { useFinalize } from './finalizeState'
  * /api/v1/transfers/draft in row order and hands the minted draft to the engine's start().
  */
 
- // T-001-09 (Send wiring): the API is cross-origin at a fixed local port — no proxy, no env vars yet (ADR row).
- const DRAFT_ENDPOINT = 'http://localhost:8080/api/v1/transfers/draft'
+ // T-001-09 (Send wiring): the API is cross-origin at a fixed local port — no proxy, base from VITE_WA_API_BASE (CHORE-deploy-hardening) (ADR row).
+ const DRAFT_ENDPOINT = `${API_BASE}/transfers/draft`
  // T-001-10 (TA-4.2#2): finalize — server-side blob copy staging→transfers + mint linkId; {draftId} filled per send().
- const FINALIZE_ENDPOINT = 'http://localhost:8080/api/v1/transfers/draft/{draftId}/finalize'
+ const FINALIZE_ENDPOINT = `${API_BASE}/transfers/draft/{draftId}/finalize`
  const AZURITE_ACCOUNT_KEY_B64 = 'Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=='
  const AZURITE_ACCOUNT_NAME = 'devstoreaccount1'
 

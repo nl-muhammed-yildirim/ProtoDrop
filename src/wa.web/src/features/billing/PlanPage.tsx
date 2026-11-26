@@ -1,3 +1,4 @@
+import { API_BASE } from '../../core/config/apiBase'
 import { useEffect, useState } from 'react'
 
 import i18n from '../../core/i18n/init'
@@ -7,7 +8,7 @@ import { hasManageBilling, meterState, planNameKey, upgradeAction } from './plan
 import type { PlanUsageDto } from './planUsage'
 
 // Fixed-port absolute base, same precedent as ProfilePage ME_BASE (TA-4.2 billing routes).
-const BILLING_BASE = 'http://localhost:8080/api/v1/billing'
+const BILLING_BASE = `${API_BASE}/billing`
 
 type Interval = 'monthly' | 'annual'
 

@@ -1,3 +1,4 @@
+import { API_BASE } from '../../core/config/apiBase'
 import { useState } from 'react'
 
 import type { StoredProfile } from '../../core/auth/session'
@@ -16,7 +17,7 @@ import OrgLogoSection from './OrgLogoSection'
 import OrgNameSection from './OrgNameSection'
 
 // T-008-06 wire (TA-4.2#12–13), verified against src/wa.api/Program.cs — GET/PATCH /auth/me + logout:
-export const ME_BASE = 'http://localhost:8080/api/v1/auth/me'   // fixed-port absolute, AuthPage API_BASE precedent; shared with DangerZone (T-008-09 D-1)
+export const ME_BASE = `${API_BASE}/auth/me`   // fixed-port absolute, AuthPage API_BASE precedent; shared with DangerZone (T-008-09 D-1)
 
 interface ProfilePageProps {
   profile: StoredProfile                     // App owns the session; this is a prop (UnsubscribePage pattern)

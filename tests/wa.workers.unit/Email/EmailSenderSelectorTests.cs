@@ -15,13 +15,51 @@ public class EmailSenderSelectorTests
         var provider = new CapturingProvider();
         using var factory = new LoggerFactory([provider]);
 
-        var sender = EmailSenderSelector.Create(Config(("Wa:Email:Sender", "log")), factory);
+        var sender = EmailSenderSelector.Create(Config(("Wa:Email:Sender", "log"), ("DOTNET_ENVIRONMENT", "Development")), factory);
 
         Assert.IsType<LogEmailSender>(sender);
         await sender.SendAsync(
             new EmailMessage("to@x.com", "Subject", "<p>Hi</p>", "Hi", "no-reply@protodrop.com", null),
             CancellationToken.None);
-        Assert.Contains(provider.Messages, m => m.StartsWith("EMAIL SENT") && m.Contains("To: to@x.com"));
+        Assert.Contains(provider.Messages, m => m.StartsWith("EMAIL SENT") && m.Contains("To: t****@x.com"));
+        Assert.DoesNotContain(provider.Messages, m => m.Contains("to@x.com")); // TA-9.4: the raw address never reaches the log
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("Production")]
+    [InlineData("Staging")]
+    public void Create_Log_OutsideDevelopment_Throws(string? environment)
+    {
+        using var factory = new LoggerFactory();
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            EmailSenderSelector.Create(Config(("Wa:Email:Sender", "log"), ("DOTNET_ENVIRONMENT", environment)), factory));
+
+        Assert.Contains("Wa:Email:Sender", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("AZURE_FUNCTIONS_ENVIRONMENT", "Development")]
+    [InlineData("AZURE_FUNCTIONS_ENVIRONMENT", "Local")]
+    [InlineData("DOTNET_ENVIRONMENT", "Development")]
+    [InlineData("DOTNET_ENVIRONMENT", "Local")]
+    [InlineData("ASPNETCORE_ENVIRONMENT", "Development")]
+    [InlineData("ASPNETCORE_ENVIRONMENT", "Local")]
+    public void Create_Log_AllowedEnvironment_ReturnsLogSender(string key, string environment)
+    {
+        using var factory = new LoggerFactory();
+
+        var sender = EmailSenderSelector.Create(Config(("Wa:Email:Sender", "log"), (key, environment)), factory);
+
+        Assert.IsType<LogEmailSender>(sender);
+    }
+
+    [Fact]
+    public void EnsureSenderAllowed_NonLogSender_InProduction_DoesNotThrow()
+    {
+        EmailSenderSelector.EnsureSenderAllowed(
+            Config(("Wa:Email:Sender", "acs"), ("DOTNET_ENVIRONMENT", "Production")));
     }
 
     [Fact]

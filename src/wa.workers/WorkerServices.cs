@@ -170,6 +170,8 @@ public static class WorkerServices
         // IEmailSender selection (TA-0.2 rule 7): log if Wa:Email:Sender=="log" else CommunicationHubEmailSender.
         // Keys are read via IConfiguration (Wa__... on Linux hosts); a missing Wa:CommunicationHub:Connection
         // throws on first resolution (T-006-06 D-3), never a silent fallback to log.
+        // CHORE-deploy-hardening: log is refused outside Local/Development at composition (fail fast — the host will not start).
+        EmailSenderSelector.EnsureSenderAllowed(configuration);
         services.AddSingleton<IEmailSender>(sp => EmailSenderSelector.Create(
             sp.GetRequiredService<IConfiguration>(),
             sp.GetRequiredService<ILoggerFactory>()));
