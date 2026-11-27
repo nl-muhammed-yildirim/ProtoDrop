@@ -20,6 +20,8 @@ using wa.application.Events;
 using wa.application.Limits;
 using wa.application.Ports;
 using wa.application.Telemetry;
+using wa.application.UseCases.Billing;
+using wa.application.UseCases.EmailSettings;
 using wa.application.UseCases.Transfers;
 using wa.domain;
 using wa.domain.Privacy;
@@ -210,6 +212,53 @@ public class EmailLogSenderE2ETests : IAsyncLifetime
         Assert.Equal(EmailMask.Mask("ben@example.com"), Assert.Single(third).To);
     }
 
+    // ---- Fact C: US-046-02 / AC-046-3 / FR-046-4 ----
+
+    [Fact]
+    public async Task OwnerSettingOff_RecipientsAndBillingStillSent_OnlyOwnerPathSuppressed()
+    {
+        const string owner = "alice@example.com";
+        Guid ownerId = Guid.NewGuid();
+        await using (var db = NewDb())
+        {
+            var planId = await db.Set<Plan>().Where(p => p.Code == Plan.DefaultCode).Select(p => p.Id).FirstAsync();
+            db.Set<AppUser>().Add(new AppUser { Id = ownerId, Email = owner, DisplayName = "Alice Example", PlanId = planId, Theme = "system", CreatedAtUtc = DateTime.UtcNow, EmailNotificationsEnabled = false });
+            db.Set<EmailSuppression>().Add(new EmailSuppression { Id = Guid.NewGuid(), Address = "muted@example.com", SenderEmail = owner, CreatedAtUtc = DateTime.UtcNow });
+            (await db.Set<FeatureFlag>().FirstAsync(f => f.Key == FeatureGates.EmailSettings)).Value = "true";
+            await db.SaveChangesAsync();
+        }
+
+        var transferId = await SetupDraftTransferAsync(("owner.txt", 512));
+        await SendAsync(transferId, new[] { "r@example.com", "muted@example.com", owner }, owner);
+        await using (var db = NewDb()) // attach the owner after the guest send: the worker reads the row at send time
+            await db.Set<Transfer>().Where(t => t.Id == transferId).ExecuteUpdateAsync(s => s.SetProperty(t => t.OwnerAppUserId, (Guid?)ownerId));
+
+        // The fixture's owner really is "off": the real gate over the real store + flag registry suppresses owner mail.
+        var workerDb = new AppDbContextFactory(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(_connString).Options);
+        var flags = new LimitsProvider(
+            new PlansCache(new PlansStore(workerDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow),
+            new FlagsCache(new FlagsStore(workerDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow));
+        var gate = new OwnerNotificationGate(new EmailNotificationsStore(workerDb), flags, _loggerFactory.CreateLogger<OwnerNotificationGate>());
+        Assert.False(await gate.MaySendAsync(ownerId, CancellationToken.None));
+
+        var before = _capture.Mails().Count;
+        await RunWorkerAsync(TransferCreatedEnvelope(transferId));
+        var recipientMails = _capture.Mails().Skip(before).ToList();
+        Assert.Equal("r@example.com", Assert.Single(recipientMails).To); // recipient unaffected; muted stays muted; owner never mailed
+
+        before = _capture.Mails().Count;
+        await RunBillingWorkerAsync(ownerId, owner);
+        var billing = Assert.Single(_capture.Mails().Skip(before).ToList()); // AC-046-3: billing exempt
+        Assert.Equal(owner, billing.To);
+        Assert.Equal("Your ProtoDrop payment didn't go through", billing.Subject);
+
+        await using (var db = NewDb()) // independent rows: neither mechanism touched the other
+        {
+            Assert.False(await db.Set<AppUser>().AsNoTracking().Where(u => u.Id == ownerId).Select(u => u.EmailNotificationsEnabled).SingleAsync());
+            Assert.Equal("muted@example.com", (await db.Set<EmailSuppression>().AsNoTracking().SingleAsync()).Address);
+        }
+    }
+
     // ---- Helpers ----
 
     private WaDbContext NewDb() =>
@@ -246,14 +295,7 @@ public class EmailLogSenderE2ETests : IAsyncLifetime
     /// <summary>Worker side, composed like src/wa.workers/Program.cs: per-call DbContext, real renderer, sender from the log switch.</summary>
     private async Task RunWorkerAsync(EventEnvelope envelope)
     {
-        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["Wa:Url:Public"] = PublicOrigin,
-            ["Wa:Jwt:Secret"] = TestSecret,
-            ["Wa:Email:FromAddress"] = FromAddress,
-            ["Wa:Email:Sender"] = "log",
-            ["DOTNET_ENVIRONMENT"] = "Development" // CHORE-deploy-hardening: the log sender is refused outside Local/Development
-        }).Build();
+        var config = WorkerConfig();
 
         var workerDb = new AppDbContextFactory(new DbContextOptionsBuilder<WaDbContext>().UseSqlServer(_connString).Options); // fresh context per store call
         var telemetry = new WaTelemetryReporter(_loggerFactory.CreateLogger<WaTelemetryReporter>(), Encoding.UTF8.GetBytes(TestSecret));
@@ -270,6 +312,41 @@ public class EmailLogSenderE2ETests : IAsyncLifetime
             new FeaturesProvider(
                 new PlansCache(new PlansStore(workerDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow),
                 new FlagsCache(new FlagsStore(workerDb), TimeSpan.Zero, () => DateTimeOffset.UtcNow)), TimeProvider.System);
+        await handler.HandleAsync(envelope, 1, 5, CancellationToken.None);
+    }
+
+    private static IConfiguration WorkerConfig() => new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+    {
+        ["Wa:Url:Public"] = PublicOrigin,
+        ["Wa:Jwt:Secret"] = TestSecret,
+        ["Wa:Email:FromAddress"] = FromAddress,
+        ["Wa:Email:Sender"] = "log",
+        ["DOTNET_ENVIRONMENT"] = "Development" // CHORE-deploy-hardening: the log sender is refused outside Local/Development
+    }).Build();
+
+    /// <summary>US-046-02: the billing arm of f-email, composed like WorkerServices (templates from the linked Emails/templates).</summary>
+    private async Task RunBillingWorkerAsync(Guid userId, string email)
+    {
+        var config = WorkerConfig();
+        var telemetry = new WaTelemetryReporter(_loggerFactory.CreateLogger<WaTelemetryReporter>(), Encoding.UTF8.GetBytes(TestSecret));
+        var handler = new SendBillingEmailHandler(
+            EmailSenderSelector.Create(config, _loggerFactory),
+            new InMemoryEventPublisher(),
+            config,
+            telemetry,
+            _loggerFactory.CreateLogger<SendBillingEmailHandler>(),
+            Path.Combine(AppContext.BaseDirectory, "Emails", "templates"),
+            TimeProvider.System);
+        var envelope = new EventEnvelope
+        {
+            EventId = Guid.NewGuid(),
+            Type = EventType.BillingEmailRequested,
+            Version = 1,
+            OccurredAtUtc = DateTime.UtcNow,
+            CorrelationId = Guid.NewGuid(),
+            PartitionKey = userId.ToString("n"),
+            Payload = new { userId, email, subscriptionId = Guid.NewGuid(), kind = BillingEmailSchedule.Kind, step = 1 }
+        };
         await handler.HandleAsync(envelope, 1, 5, CancellationToken.None);
     }
 
