@@ -117,7 +117,7 @@ public sealed partial class GetDownloadAllUrlHandler(
 
             var signKey = _config["Wa:Zip:SignKey"] ?? string.Empty;
             using var httpClient = new HttpClient();
-            using var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl.TrimEnd('/')}/zip/{transferId.ToString("n")}");
+            using var request = new HttpRequestMessage(HttpMethod.Post, ZipHandOff.BuildTriggerUrl(baseUrl, transferId));
             request.Headers.Add("x-zip-sign", signKey);
             // T-012-01: forward the ambient W3C traceparent so f-zip's logs share this request's correlationId (TA-10.1).
             request.Headers.Add("traceparent", CorrelationContext.CurrentRequest?.ToHeader() ?? W3CTraceParser.New().ToHeader());
