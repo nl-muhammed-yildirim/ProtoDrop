@@ -51,7 +51,10 @@ jobs:
       - run: dotnet test tests/wa.workers.unit
 
   # AGENT.md §4: dotnet test tests/wa.api.integration (Testcontainers; runners have Docker — EC-051-2).
+  # Runs only on PRs into main (user rule 2026-11-27): the ~50 min suite is the release gate,
+  # not a gate for feature PRs into develop. On develop PRs the job shows as skipped.
   integration:
+    if: github.base_ref == 'main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

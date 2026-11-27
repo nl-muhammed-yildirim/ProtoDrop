@@ -49,7 +49,7 @@ Run **all** of these before marking a task done:
 dotnet test tests/wa.domain.unit
 dotnet test tests/wa.application.unit
 dotnet test tests/wa.workers.unit       # Azure Functions (f-zip, f-email) unit tests — added to the gate 2026-11-17 (Phase 0 gap sweep)
-dotnet test tests/wa.api.integration     # Testcontainers: Docker must be running
+dotnet test tests/wa.api.integration     # Testcontainers: Docker must be running. CI job integration runs only on PRs into main (2026-11-27); on develop PRs it is skipped, so run it locally.
 dotnet format src/wa.slnx --verify-no-changes   # CHORE-code-style-2: must leave the tree unchanged (CI job lint-dotnet)
 cd src/wa.web
 npm run lint && npm run test:run && npm run build   # T-017-03: `npm run lint` = eslint + scripts/check-tap-targets.mjs (44 px / 16 px floor at ≤640 px on P0 surfaces); `npm run test` is watch mode
