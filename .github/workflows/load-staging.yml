@@ -14,9 +14,9 @@ on:
         type: string
         default: gh-hosted
       recipients_per_send:
-        description: email-burst only — recipients per send (must equal limits.<plan>.maxEmails)
+        description: email-burst only — recipients per send; must equal the load user's plan maxEmails (no default, read it from the admin Flags screen)
         type: string
-        default: "20"
+        required: false
 
 permissions:
   contents: read

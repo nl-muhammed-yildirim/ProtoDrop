@@ -58,7 +58,7 @@ node ../../scripts/check-contrast.mjs       # T-016-06 (FR-016-4): WCAG contrast
 node ../../scripts/check-telemetry-pii.mjs && node ../../scripts/check-telemetry-pii.mjs selftest   # T-012-05 (EC-012-3): no raw email / unhashed PII / unknown property reaches a telemetry call (server reporter on any receiver + client trackClientEvent); R7 (T-012-06/07) also covers ILogger `.Log<Level>(` calls, incl. `.Path/.PathBase/.QueryString/.Message` member args, and (CHORE-code-style-2) `[LoggerMessage]` templates, parameter names and call sites; R8 (T-069) checks domain-event `Payload = new { … }` members: raw addresses only under the 5 TA-5.3 keys, file name/IP/user agent must be hashed. CI job pii-check runs both from repo root.
 cd ../..
 az bicep build --file infra/bicep/main.bicep --stdout > /dev/null   # CHORE-infra-cd: IaC compiles (needs az CLI; CI job iac also builds every infra/bicep/main/*.bicepparam). Skip locally when az is not installed — CI is the gate.
-k6 inspect tests/load/api-latency.js > /dev/null   # T-029: every tests/load/*.js parses (CI job k6-inspect). Skip locally when k6 is not installed.
+for f in tests/load/*.js; do k6 inspect "$f" > /dev/null; done   # T-029: every tests/load/*.js parses (CI job k6-inspect). Skip locally when k6 is not installed.
 ```
 
 Plus, per task: the task's own **exit check** in `Milestone-Backlog.md`.
