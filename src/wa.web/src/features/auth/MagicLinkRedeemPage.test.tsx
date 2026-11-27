@@ -126,4 +126,50 @@ describe('MagicLinkRedeemPage', () => {
     expect(onSignedIn).toHaveBeenCalledTimes(1)
     cleanup()
   })
+
+  it('replaces (not pushes) the history entry and never replays a consumed success on Back', async () => {
+    window.history.replaceState(null, '', '/auth?ml=tok-back')
+    const replaceSpy = vi.spyOn(window.history, 'replaceState')
+    const pushSpy = vi.spyOn(window.history, 'pushState')
+    const calls = stubFetch(() => new Response(JSON.stringify(dto), { status: 200 }))
+    const onSignedIn = vi.fn()
+    const first = await mount('tok-back', onSignedIn)
+
+    expect(onSignedIn).toHaveBeenCalledTimes(1)
+    expect(replaceSpy).toHaveBeenCalledWith(null, '', '/')
+    expect(pushSpy).not.toHaveBeenCalled()
+    expect(window.location.pathname + window.location.search).toBe('/')
+    first.cleanup()
+
+    // Back-navigation re-mounts the page for the same token: the server (single-use) now answers 410.
+    clearSession()
+    calls.length = 0
+    stubFetch(() => problem(410, 'LINK_EXPIRED', 'This link has expired'))
+    const second = await mount('tok-back', onSignedIn)
+
+    expect(onSignedIn).toHaveBeenCalledTimes(1)   // no replayed sign-in
+    expect(readSession()).toBeNull()               // no stale session restored
+    expect(second.host.querySelector('[role="alert"]')?.textContent).toBe('This link has expired')
+    second.cleanup()
+    replaceSpy.mockRestore()
+    pushSpy.mockRestore()
+  })
+
+  it('drops ?ml= from the address bar on failure and allows a retry after a network error', async () => {
+    window.history.replaceState(null, '', '/auth?ml=tok-retry')
+    stubFetch(() => { throw new TypeError('network down') })
+    const first = await mount('tok-retry', vi.fn())
+
+    expect(first.host.querySelector('[role="alert"]')).not.toBeNull()
+    expect(window.location.pathname + window.location.search).toBe('/auth')
+    first.cleanup()
+
+    const calls = stubFetch(() => new Response(JSON.stringify(dto), { status: 200 }))
+    const onSignedIn = vi.fn()
+    const second = await mount('tok-retry', onSignedIn)
+
+    expect(calls).toHaveLength(1)   // failed outcome was not cached
+    expect(onSignedIn).toHaveBeenCalledWith(dto)
+    second.cleanup()
+  })
 })

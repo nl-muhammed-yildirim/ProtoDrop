@@ -63,10 +63,16 @@ export function MagicLinkRedeemPage({ token, onSignedIn }: MagicLinkRedeemPagePr
     let active = true
     void redeemOnce(token).then((r) => {
       if (!active) return
+      // Outcome consumed: never replay it (a re-mount for the same token must not re-sign-in).
+      inflight.delete(token)
       if (r.ok) {
         writeSession(r.profile)
+        // Replace (not push) the /auth?ml=<token> entry so Back can't land on the consumed link.
+        window.history.replaceState(null, '', '/')
         onSignedIn(r.profile)
       } else {
+        // Drop the token from the address bar; App's `search` state only refreshes on popstate, so this error UI stays mounted.
+        window.history.replaceState(null, '', '/auth')
         setError(r.message)
       }
     })

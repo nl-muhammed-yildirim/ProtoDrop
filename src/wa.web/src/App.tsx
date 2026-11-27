@@ -101,6 +101,13 @@ export default function App() {
   // goHome only touches window + popstate (no state), so the empty dep list is correct.
   const handleSignedIn = useCallback((p: StoredProfile) => { setSession(p); goHome() }, [])
 
+  // Emailed-link redeem: MagicLinkRedeemPage has already REPLACED the /auth?ml=<token> entry with '/' (no push, so Back
+  // never re-lands on the consumed link); only the session + the popstate refresh are left to do here.
+  const handleRedeemed = useCallback((p: StoredProfile) => {
+    setSession(p)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }, [])
+
   const handleSignOut = () => {
     // T-008-07: POST /auth/logout clears the server-side wa.session cookie (T-008-06, TA-4.2#13).
     // Fire-and-forget with a local fallback — even if the network fails we still clear the client session
@@ -149,7 +156,7 @@ export default function App() {
             <UnsubscribePage token={unsubscribeToken} />
           ) : magicLinkToken !== null ? (
             // CHORE-magic-link-redeem (FR-008-1, EC-008-3): emailed /auth?ml= link — redeems regardless of current session.
-            <MagicLinkRedeemPage token={magicLinkToken} onSignedIn={handleSignedIn} />
+            <MagicLinkRedeemPage token={magicLinkToken} onSignedIn={handleRedeemed} />
           ) : session && matchProfilePath(pathname) ? (
             <ProfilePage profile={session} onSignedIn={setSession} onThemeChange={handleThemeChange} onDeleteAccount={handleDeleteAccount} />
           ) : session && matchPlanPath(pathname) ? (
