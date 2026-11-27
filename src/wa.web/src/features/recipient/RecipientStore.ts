@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { getTraceParent } from '../../core/traceparent'
 import { trackClientEvent } from '../../core/telemetry/clientTelemetry'
+import { AZURITE_LOOPBACK_ORIGIN, toBrowserBlobUrl } from '../../core/blob/azuriteSas'
 
 /**
  * T-003-02 (TA-4.2#4): Zustand store for the recipient page at /t/{linkId} — holds endpoint 4's payload
@@ -39,55 +40,6 @@ const DEFAULT_POLL_AFTER_SEC = 2
 // T-004-03 (US-004-01 alt flow): give up after 3 minutes of 202s, measured from the first 202 - UX timing, not a plan limit.
 const ZIP_PREPARE_TIMEOUT_MS = 180_000
 const ERROR_MESSAGE = 'Something went wrong'
-
-// T-003-08-fix (T-055-05/TA-14.3, StagingList precedent): the local Azurite account is IP-hosted — the minted URL's
-// authority drops the /devstoreaccount1 path segment (raw GET 404s), and its spr=https signature rejects plain HTTP
-// (AuthorizationProtocolMismatch). Recipient downloads re-address + protocol-re-sign in product code, exactly like
-// StagingList's uploads and the e2e seed helper. TA-8.2: features are self-contained — same constants live there too.
-const AZURITE_BLOB_ORIGIN = 'http://127.0.0.1:10000'
-const AZURITE_ACCOUNT_NAME = 'devstoreaccount1'
-const AZURITE_ACCOUNT_KEY_B64 = 'Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=='
-
-const toBase64 = (buf: ArrayBuffer) => btoa(String.fromCharCode(...new Uint8Array(buf)))
-
-/**
- * T-003-08-fix (T-055-05/TA-14.3 convention, StagingList precedent for uploads): re-addresses a minted recipient read
- * SAS to the canonical /blob/devstoreaccount1{path} name and re-signs over the blob-SAS string-to-sign with only the
- * protocol line changed to "https,http" — Azurite reads the first path segment as the account and rejects plain-HTTP
- * GETs against a spr=https signature. The minted value is otherwise untouched (same sv/st/se/sp/sr/rscd), including the
- * RFC 5987 rscd override which IS signed into the string-to-sign (T-003-06, element 13 of the 16-line form).
- */
-const browserDownloadUrl = async (mintedUrl: string): Promise<string> => {
-  const minted = new URL(mintedUrl)
-  const q = minted.searchParams
-  // The minted query carries these (TA-3.6 matrix) — the fallbacks are the minter's literal defaults.
-  const sv = q.get('sv') ?? '2024'
-  const st = q.get('st') ?? ''
-  const se = q.get('se') ?? ''
-  const sp = q.get('sp') ?? 'r'
-  const sr = q.get('sr') ?? 'b'
-  const rscd = q.get('rscd') ?? ''
-
-  const key = await crypto.subtle.importKey(
-    'raw',
-    Uint8Array.from(atob(AZURITE_ACCOUNT_KEY_B64), (c) => c.charCodeAt(0)),
-    { name: 'HMAC', hash: 'SHA-256' },
-    true,
-    ['sign'],
-  )
-
-  // Blob-SAS canonical string-to-sign (16 lines): sp, st, se, canonical resource, identifier, iprange, protocol,
-  // sv, sr, snapshot, encryption scope, cache-control, content-disposition (the signed rscd override), encoding,
-  // language, content-type — same layout as BlobSasMinter/DownloadUrlEndpointTests.StreamUrl.
-  const lines = [
-    sp, st, se, `/blob/${AZURITE_ACCOUNT_NAME}${minted.pathname}`, '', '', 'https,http', sv, sr, '', '', '', rscd, '', '', '',
-  ]
-  const sig = toBase64(
-    await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(lines.join('\n'))),
-  )
-
-  return `${AZURITE_BLOB_ORIGIN}/${AZURITE_ACCOUNT_NAME}${minted.pathname}?sv=${sv}&spr=https%2Chttp&st=${encodeURIComponent(st)}&se=${encodeURIComponent(se)}&sr=b&sp=${sp}&rscd=${encodeURIComponent(rscd)}&sig=${encodeURIComponent(sig)}`
-}
 
 // T-003-05 (AC-003-2): the unlock token is tab-isolated in sessionStorage by design (not a cookie — a second tab,
 // or a cleared store, re-prompts: EC-003-2 documented trade-off). Empty string is treated as absent so a stray
@@ -421,8 +373,8 @@ export const useRecipientStore = create<RecipientState & RecipientActions>((set,
         }
         const body = (await res.json()) as { url: string }
         if (downloadAllController !== controller) return
-        // Same Azurite re-sign + same-tab navigation as per-file (AC-017-2 / EC-017-4 - a navigation, not a popup).
-        const href = await browserDownloadUrl(body.url)
+        // Same Azurite-only re-sign (a production SAS navigates verbatim) + same-tab navigation as per-file (AC-017-2 / EC-017-4 - a navigation, not a popup).
+        const href = await toBrowserBlobUrl(body.url, AZURITE_LOOPBACK_ORIGIN)
         if (downloadAllController !== controller) return
         window.location.href = href
         const { files, downloadsLeft } = get()
@@ -477,9 +429,9 @@ export const useRecipientStore = create<RecipientState & RecipientActions>((set,
         const body = (await res.json()) as { url: string; expiresAt: string | null }
         // T-016 (TA-4.2#6): the browser streams the blob directly against storage — no fetch-blob (up to ~5 GB of memory),
         // no download attribute (cross-origin navigation ignores it); Content-Disposition attachment does the naming.
-        // T-003-08-fix (T-055-05/TA-14.3, StagingList precedent): re-address + protocol-re-sign for local Azurite before
-        // navigating — the raw minted URL 404s against an IP-hosted account and spr=https rejects the plain-HTTP leg.
-        window.location.href = await browserDownloadUrl(body.url)
+        // T-003-08-fix (T-055-05/TA-14.3, StagingList precedent): re-sign only for local Azurite before navigating
+        // (the raw minted URL 404s against an IP-hosted account); a production SAS navigates verbatim.
+        window.location.href = await toBrowserBlobUrl(body.url, AZURITE_LOOPBACK_ORIGIN)
         // T-012-02 (TA-10.2): download_completed — bytes from RecipientFile state, durationMs client-measured.
         const fileForTelemetry = get().files.find((f) => f.fileId === fileId)
         trackClientEvent('download_completed', {

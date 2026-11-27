@@ -1,3 +1,5 @@
+using wa.domain.Privacy;
+
 namespace wa.domain;
 
 /// <summary>An application user. TA-3.2: dbo.AppUser.</summary>
@@ -6,10 +8,12 @@ public class AppUser
     /// <summary>Primary key of the user.</summary>
     public Guid Id { get; set; }
     /// <summary>Sign-in email, stored lowercased; PII (TA-9.4).</summary>
+    [Pii]
     public string Email { get; set; } = null!;
     /// <summary>True once the user has redeemed a magic link for this address.</summary>
     public bool EmailConfirmed { get; set; }
     /// <summary>Name shown to recipients as the sender; PII (TA-9.4).</summary>
+    [Pii]
     public string DisplayName { get; set; } = null!;
     /// <summary>PBKDF2 hash (ASP.NET Identity PasswordHasher); null for magic-link-only accounts.</summary>
     public string? PasswordHash { get; set; }
@@ -22,6 +26,7 @@ public class AppUser
     /// <summary>Soft-delete marker (TA-3.1): UTC instant the account was deleted, null while active.</summary>
     public DateTime? DeletedAtUtc { get; set; }
     /// <summary>F-PRF-001 FR-021-1: organization shown beside the sender name; at most 60 chars. PII (TA-9.4).</summary>
+    [Pii]
     public string? OrgName { get; set; }
     /// <summary>F-PRF-001 FR-021-1: ORG_NAME_MAX_LENGTH — the NVARCHAR width of <see cref="OrgName"/>.</summary>
     public const int OrgNameMaxLength = 60;

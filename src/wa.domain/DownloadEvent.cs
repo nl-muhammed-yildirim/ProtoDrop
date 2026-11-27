@@ -1,3 +1,5 @@
+using wa.domain.Privacy;
+
 namespace wa.domain;
 
 /// <summary>A download analytics event. TA-3.2: dbo.DownloadEvent.</summary>
@@ -10,6 +12,7 @@ public class DownloadEvent
     /// <summary>NULL = download-all.</summary>
     public Guid? FileId { get; set; }
     /// <summary>HMAC of the client IP — the raw IP is never stored (PII-safe); null when unavailable.</summary>
+    [NotPii("HMAC-SHA256 of the IP keyed by Wa:Jwt:Secret (TA-9.4) - never the raw IP")]
     public string? IpHash { get; set; }
     /// <summary>Two-letter ISO country code of the downloader; nullable and not populated by the current code (analytics shows "??" when null).</summary>
     public string? Country { get; set; }

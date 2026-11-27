@@ -20,7 +20,7 @@ internal static class AuthEndpoints
     /// <returns>The same <paramref name="endpoints"/>, so calls can be chained.</returns>
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder endpoints, AdminGate adminGate)
     {
-        // T-008-01 (TA-4.2#8 / FR-008-3): sign-up is sign-in — unknown email → create; known email (any case) → existing row.
+        // T-008-01 (TA-4.2#8 / FR-008-3): sign-up is sign-in — unknown email → create; known email (any case) → password-verified sign-in (wrong password → 401 WRONG_PASSWORD).
         endpoints.MapPost("/api/v1/auth/signup", async (SignupCommand cmd, ISender sender, CancellationToken ct) =>
         {
             try
@@ -41,6 +41,11 @@ internal static class AuthEndpoints
                 // T-056 pipeline maps BusinessException → Problem+JSON; no new code — reuse VALIDATION (TA-4.1.3).
                 // Preserve the exception chain: the inner keeps its stack trace (Serilog), wire shape still comes from Code + the pipeline.
                 throw new BusinessException(ProblemCodes.Validation, ex.Message, ex);
+            }
+            catch (LoginWrongPasswordException ex)
+            {
+                // CHORE-staging-blockers: known email + wrong/absent password or deleted account → 401 WRONG_PASSWORD, same as login (no new code).
+                throw new BusinessException(ProblemCodes.WrongPassword, ex.Message, ex);
             }
         });
 

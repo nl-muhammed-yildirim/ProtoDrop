@@ -109,6 +109,45 @@ public class SignupEndpointTests : IAsyncLifetime
         Assert.Equal(1, count);
     }
 
+    // ---- CHORE-staging-blockers: a known email signs in only with the correct password ----
+
+    [Fact]
+    public async Task Signup_ExistingEmail_WrongPassword_Returns401_WRONG_PASSWORD_NoSessionToken()
+    {
+        const string Email = "takeover@example.com";
+
+        using (var first = await _client.PostAsJsonAsync("/api/v1/auth/signup", new { email = Email, password = "password123" }))
+            Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+
+        using var second = await _client.PostAsJsonAsync("/api/v1/auth/signup", new { email = Email, password = "different-pass-1" });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, second.StatusCode);
+        using var doc = JsonDocument.Parse(await second.Content.ReadAsByteArrayAsync());
+        Assert.Equal("WRONG_PASSWORD", doc.RootElement.GetProperty("code").GetString());
+        Assert.Equal(401, doc.RootElement.GetProperty("status").GetInt32());
+        Assert.False(doc.RootElement.TryGetProperty("sessionToken", out _));
+        Assert.Equal(1, await _db.Set<AppUser>().CountAsync(u => u.Email == Email));
+    }
+
+    [Fact]
+    public async Task Signup_SoftDeletedAccount_Returns401_WRONG_PASSWORD()
+    {
+        const string Email = "deleted@example.com";
+        const string Password = "password123";
+
+        using (var first = await _client.PostAsJsonAsync("/api/v1/auth/signup", new { email = Email, password = Password }))
+            Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+
+        await _db.Set<AppUser>().Where(u => u.Email == Email)
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.DeletedAtUtc, (DateTime?)new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)));
+
+        using var second = await _client.PostAsJsonAsync("/api/v1/auth/signup", new { email = Email, password = Password });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, second.StatusCode);
+        using var doc = JsonDocument.Parse(await second.Content.ReadAsByteArrayAsync());
+        Assert.Equal("WRONG_PASSWORD", doc.RootElement.GetProperty("code").GetString());
+    }
+
     // ---- VALIDATION Problem+JSON via the existing pipeline (TA-4.1.3 closed list) ----
 
     [Fact]

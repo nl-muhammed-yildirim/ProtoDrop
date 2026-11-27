@@ -1,3 +1,5 @@
+using wa.domain.Privacy;
+
 namespace wa.domain;
 
 /// <summary>A billing plan (free/pro/business). TA-3.2: dbo.Plan.</summary>
@@ -11,6 +13,7 @@ public class Plan
     /// <summary>Stable machine code of the plan (for example the default plan code); never contains a dot because it is a segment of the limits flag key.</summary>
     public string Code { get; set; } = null!;
     /// <summary>Display name of the plan.</summary>
+    [NotPii("product plan display name, not a person")]
     public string Name { get; set; } = null!;
     /// <summary>LimitsRecord JSON (TA-3.4).</summary>
     public string LimitsJson { get; set; } = null!;

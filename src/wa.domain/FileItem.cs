@@ -1,3 +1,5 @@
+using wa.domain.Privacy;
+
 namespace wa.domain;
 
 /// <summary>A file belonging to a transfer. TA-3.2: dbo.FileItem.</summary>
@@ -10,6 +12,7 @@ public class FileItem
     /// <summary>The ref-counted blob holding the bytes; several files can share one blob.</summary>
     public Guid BlobRefId { get; set; }
     /// <summary>File name as uploaded by the sender; PII, so telemetry only sees its hash (TA-9.4).</summary>
+    [Pii]
     public string OriginalName { get; set; } = null!;
     /// <summary>File size in bytes.</summary>
     public long SizeBytes { get; set; }

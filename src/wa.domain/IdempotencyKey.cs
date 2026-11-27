@@ -1,3 +1,5 @@
+using wa.domain.Privacy;
+
 namespace wa.domain;
 
 /// <summary>Client idempotency key (TA-4.1.5). TA-3.2: dbo.IdempotencyKey.</summary>
@@ -5,7 +7,8 @@ public class IdempotencyKey
 {
     /// <summary>The client-supplied unique opaque string — primary key (VARCHAR(128)).</summary>
     public string Key { get; set; } = null!;
-    /// <summary>Serialized response body stored for replay on a repeated request; null while the first request is still running.</summary>
+    /// <summary>Serialized response body stored for replay on a repeated request (carries raw file names, so it is PII, TA-9.4); null while the first request is still running.</summary>
+    [Pii]
     public string? ResultJson { get; set; }
     /// <summary>The transfer the first request created, if any.</summary>
     public Guid? TransferId { get; set; }
