@@ -1,6 +1,6 @@
 # US-046-02 — Trust that recipients are unaffected
 
-**Feature:** F-XCT-003 — Email Settings (Notification Preferences) | **Status:** pending
+**Feature:** F-XCT-003 — Email Settings (Notification Preferences) | **Status:** done (2026-11-27, PR #719; T-067 slice 2)
 
 ---
 

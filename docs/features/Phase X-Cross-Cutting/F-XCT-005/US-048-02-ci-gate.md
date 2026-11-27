@@ -1,6 +1,6 @@
 # US-048-02 — Catch a PII leak before release
 
-**Feature:** F-XCT-005 — PII Policy (emails, sender names, telemetry) | **Status:** pending
+**Feature:** F-XCT-005 — PII Policy (emails, sender names, telemetry) | **Status:** done (2026-11-27, PR #714; T-069)
 
 ---
 
