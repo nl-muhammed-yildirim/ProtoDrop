@@ -142,3 +142,11 @@ jobs:
       - run: az bicep install
       - run: az bicep build --file infra/bicep/main.bicep --stdout > /dev/null
       - run: for p in infra/bicep/main/*.bicepparam; do az bicep build-params --file "$p" --stdout > /dev/null; done
+
+  # T-029: k6 scripts parse and their options/thresholds are valid (no load is generated).
+  k6-inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: grafana/setup-k6-action@v1
+      - run: for f in tests/load/*.js; do echo "== $f"; k6 inspect "$f" > /dev/null; done

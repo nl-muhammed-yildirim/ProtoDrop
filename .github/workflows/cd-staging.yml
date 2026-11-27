@@ -170,4 +170,15 @@ jobs:
         working-directory: src/wa.web
         env:
           E2E_BASE_URL: ${{ needs.deploy.outputs.public_url }}
-        run: npx playwright test --grep @staging --pass-with-no-tests
+          # The admin account must be in vars.ADMIN_EMAILS AND confirmed once by magic link (tests/load/README.md);
+          # until then expiry-flag.spec.ts skips with a reason.
+          E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+          E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+        run: npx playwright test -g @staging
+      # Report only: test-results/ and e2e/.auth/ can hold session cookies and must never be uploaded.
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-staging
+          path: src/wa.web/playwright-report/
+          retention-days: 7
