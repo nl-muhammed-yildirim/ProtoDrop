@@ -4,7 +4,7 @@ import { loadPlanLimits } from './loadPlanLimits'
 import { checkLimits, getPlanLimits, resetPlanLimits } from './planLimits'
 
 const SIX_GIB = 6 * 1024 ** 3
-const PRO = 10737418240
+const PRO = 21474836480
 const FREE = 5368709120
 
 beforeEach(() => resetPlanLimits())

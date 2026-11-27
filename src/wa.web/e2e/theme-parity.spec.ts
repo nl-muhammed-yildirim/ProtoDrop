@@ -8,7 +8,7 @@ import { expect, test } from '@playwright/test'
  * - AC-015-1: account theme=dark in the session mirror ('protoDrop.session', same shape session.ts writes) seeded via addInitScript before navigation → data-theme="dark" on first frame — no light flash.
  * - AC-015-3: system mode + emulateMedia switch light→dark mid-session → data-theme flips to "dark" WITHOUT a page reload (exercises T-015-02's useSystemTheme matchMedia listener in a real browser).
  *
- * First-frame proof: addInitScript patches Element.prototype.setAttribute at document-start (before <html> even exists) and records the FIRST data-theme value ever set on <html>. The inline bootstrap in index.html is the sole writer before paint (FR-015-3), so a recorded "dark" can only come from it.
+ * First-frame proof: addInitScript patches Element.prototype.setAttribute at document-start (before <html> even exists) and records the FIRST data-theme value ever set on <html>. The external bootstrap public/theme-init.js (a synchronous script in index.html head) is the sole writer before paint (FR-015-3), so a recorded "dark" can only come from it.
  */
 
 /** Seeds localStorage with the full StoredProfile shape session.ts writes (core/auth/session.ts) BEFORE navigation. */
@@ -27,7 +27,7 @@ function recordFirstFrameTheme(page: import('@playwright/test').Page) {
     const w = window as unknown as Record<string, string | null>
     w.themeParityFirstSet = null
     // documentElement is still null at this point (document-start), so observe via the prototype:
-    // every setAttribute('data-theme', …) on <html> funnels through here — including the inline bootstrap's.
+    // every setAttribute('data-theme', …) on <html> funnels through here — including the external bootstrap's (public/theme-init.js).
     const proto = Element.prototype as unknown as { setAttribute(name: string, value: string): void }
     // Keep original UNBOUND and call it with the real receiver (this) — binding to the prototype would make this=Element.prototype, which is not a valid DOM node → "Illegal invocation".
     const original = proto.setAttribute

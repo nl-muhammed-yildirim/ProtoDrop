@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 
+import { API_BASE } from '../../core/config/apiBase'
 import type { AuditRecentRowDto, FlagRowDto } from './adminData'
 import { formatCreatedAt } from './adminData'
 import { getTraceParent } from '../../core/traceparent'
@@ -8,8 +9,7 @@ interface AdminFlagsPageProps {
   role: 'SuperAdmin' | 'Operator'   // T-011-10 precedent — AdminShell narrows /auth/me's role and passes it down.
 }
 
-// T-011-03 (FR-011-2): fixed local port, no proxy, no env vars yet (AdminShell + FilesPage precedent).
-const API_BASE = 'http://localhost:8080/api/v1'
+// T-011-03 (FR-011-2): fixed local port, no proxy, base from VITE_WA_API_BASE (CHORE-deploy-hardening) (AdminShell + FilesPage precedent).
 
 // US-044-01 (AC-044-3 / EC-044-1): inline copy for a 400 FLAG_INVALID.
 const INVALID_COPY = 'Invalid value (400 FLAG_INVALID) — the previous value stays live.'

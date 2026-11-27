@@ -68,6 +68,7 @@ public class UnsubscribeEndpointTests : IAsyncLifetime
             Email = AdminEmail.ToLowerInvariant(),
             DisplayName = "Gate Test",
             PlanId = planId,
+            EmailConfirmed = true, // the admin role needs a confirmed email (CHORE-staging-blockers)
             CreatedAtUtc = DateTime.UtcNow
         });
         await _db.SaveChangesAsync();

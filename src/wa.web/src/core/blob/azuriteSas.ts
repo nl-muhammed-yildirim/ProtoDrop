@@ -20,8 +20,8 @@ const AZURITE_HOSTNAMES = new Set(['127.0.0.1', 'localhost', 'host.docker.intern
 const toBase64 = (buf: ArrayBuffer) => btoa(String.fromCharCode(...new Uint8Array(buf)))
 
 /**
- * True when the URL points at the local Azurite emulator: a loopback/docker host on the Azurite blob port (10000), or a
- * path that starts with the `/devstoreaccount1/` account segment. An unparsable URL is not Azurite (the caller uses it verbatim).
+ * True when the URL points at the local Azurite emulator: a loopback/docker host on the Azurite blob port (10000) or with the
+ * `/devstoreaccount1/` account path segment, or any host on port 10000 with that segment (local Azurite behind another name). The account segment alone never qualifies. An unparsable URL is not Azurite (the caller uses it verbatim).
  */
 export function isAzuriteBlobUrl(url: string): boolean {
   let parsed: URL
@@ -30,8 +30,11 @@ export function isAzuriteBlobUrl(url: string): boolean {
   } catch {
     return false
   }
-  if (parsed.pathname.startsWith(`/${AZURITE_ACCOUNT_NAME}/`)) return true
-  return AZURITE_HOSTNAMES.has(parsed.hostname) && parsed.port === AZURITE_BLOB_PORT
+  // The account path segment alone is not enough: a real Azure container may be named `devstoreaccount1`. Require an Azurite host too.
+  if (AZURITE_HOSTNAMES.has(parsed.hostname)) {
+    return parsed.port === AZURITE_BLOB_PORT || parsed.pathname.startsWith(`/${AZURITE_ACCOUNT_NAME}/`)
+  }
+  return parsed.port === AZURITE_BLOB_PORT && parsed.pathname.startsWith(`/${AZURITE_ACCOUNT_NAME}/`)
 }
 
 /**

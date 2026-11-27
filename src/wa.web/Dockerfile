@@ -8,12 +8,17 @@ COPY src/wa.web/package.json src/wa.web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
 COPY src/wa.web/ .
+# CHORE-deploy-hardening: API base is inlined by Vite at build time (staging passes /api/v1).
+ARG VITE_WA_API_BASE=http://localhost:8080/api/v1
+ENV VITE_WA_API_BASE=$VITE_WA_API_BASE
 # tsc -b && vite build (package.json "build" script)
 RUN npm run build
 
 # Serve stage — nginx with SPA fallback on port 5173
 FROM nginx:alpine AS final
-COPY src/wa.web/nginx.conf /etc/nginx/conf.d/default.conf
+# CHORE-deploy-hardening (TA-9.5): envsubst template; the stock entrypoint renders it to conf.d/default.conf at start.
+COPY src/wa.web/nginx.conf /etc/nginx/templates/default.conf.template
+ENV WA_API_ORIGIN="http://localhost:8080" WA_BLOB_ORIGIN="http://127.0.0.1:10000 http://localhost:10000"
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 5173
 CMD ["nginx", "-g", "daemon off;"]

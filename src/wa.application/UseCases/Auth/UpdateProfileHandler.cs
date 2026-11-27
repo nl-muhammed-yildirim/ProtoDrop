@@ -99,6 +99,6 @@ public sealed class UpdateProfileHandler(
         if (plan is null)
             throw MeProfileException.ForNotFound();
 
-        return new GetProfileResult(user.Id, user.Email, user.DisplayName, user.Theme, plan.Code, user.OrgName, AppUser.EmailNotificationsOn(user.EmailNotificationsEnabled));
+        return new GetProfileResult(user.Id, user.Email, user.DisplayName, user.Theme, plan.Code, user.OrgName, AppUser.EmailNotificationsOn(user.EmailNotificationsEnabled), user.EmailConfirmed);
     }
 }

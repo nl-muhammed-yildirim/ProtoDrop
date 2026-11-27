@@ -99,7 +99,7 @@ docker compose -f docker-compose.local.yml up -d
 | `Wa:Url:Public` | `http://localhost:5173` |
 | `Wa:Url:Api` | `http://localhost:8080` |
 | `Wa:Cors:AllowedOrigins` | `http://localhost:5173` |
-| `Wa:AdminEmails` | `dev@example.com` — local admin login password `ProtoDropDev!2026` (local DB only; re-create after a DB reset via `POST /api/v1/auth/signup`) |
+| `Wa:AdminEmails` | `dev@example.com` — local admin login password `ProtoDropDev!2026` (local DB only; re-create after a DB reset via `POST /api/v1/auth/signup`). **Since 2026-11-26 the admin role also needs a confirmed email**: after signup, redeem a magic link for `dev@example.com` (the workers log it with `Wa:Email:Sender=log`), or locally run `UPDATE AppUser SET EmailConfirmed = 1 WHERE Email = 'dev@example.com'`. Redeeming a link on an unconfirmed account clears its password, so set the password by signing up again before redeeming, or use magic-link sign-in from then on |
 | `Wa:Zip:SignKey` | any 32+ chars |
 
 ### 5.3 Run

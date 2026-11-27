@@ -15,10 +15,12 @@ public static class AdminRolePolicy
 
     /// <summary>EC-011-3: the role is a pure function of the two config lists — same email, list membership change → role flips or nulls (never token claims).</summary>
     /// <param name="lowercasedEmail">The signed-in user's email, already lowercased.</param>
+    /// <param name="emailConfirmed">Whether the account's email is confirmed (magic link redeemed). An unconfirmed account never gets a role: anyone can sign up with an admin email before its owner does (CHORE-staging-blockers).</param>
     /// <param name="adminEmails">Configured emails that get the SuperAdmin role.</param>
     /// <param name="operatorEmails">Configured emails that get the read-only Operator role; checked first.</param>
-    /// <returns>The role, or <see langword="null"/> when the email is on neither list (not an admin).</returns>
-    public static AdminRole? Resolve(string lowercasedEmail, IReadOnlySet<string> adminEmails, IReadOnlySet<string> operatorEmails) =>
+    /// <returns>The role, or <see langword="null"/> when the email is unconfirmed or on neither list (not an admin).</returns>
+    public static AdminRole? Resolve(string lowercasedEmail, bool emailConfirmed, IReadOnlySet<string> adminEmails, IReadOnlySet<string> operatorEmails) =>
+        !emailConfirmed ? null :
         operatorEmails.Contains(lowercasedEmail) ? AdminRole.Operator :
         adminEmails.Contains(lowercasedEmail) ? AdminRole.SuperAdmin : null;
 

@@ -17,6 +17,8 @@ namespace wa.api.integration;
 /// </summary>
 public class SignupEndpointTests : IAsyncLifetime
 {
+    private const string AdminEmail = "admin-victim@example.com";
+
     private AzuriteContainer _azurite = null!;
     private MsSqlContainer _sql = null!;
     private WaDbContext _db = null!;
@@ -35,6 +37,7 @@ public class SignupEndpointTests : IAsyncLifetime
         Environment.SetEnvironmentVariable("Wa__Blob__AccountUrl", accountUrl.ToString());
         Environment.SetEnvironmentVariable("Wa__Blob__AccountKey", AzuriteBuilder.AccountKey);
         Environment.SetEnvironmentVariable("Wa__Jwt__Secret", "test-jwt-secret");
+        Environment.SetEnvironmentVariable("Wa__AdminEmails", AdminEmail); // the admin-hijack facts below sign up with a configured admin address
 
         // Fresh SQL + migrations: seeds the free plan row (TA-3.4) and creates dbo.AppUser (T-052).
         _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
@@ -146,6 +149,115 @@ public class SignupEndpointTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Unauthorized, second.StatusCode);
         using var doc = JsonDocument.Parse(await second.Content.ReadAsByteArrayAsync());
         Assert.Equal("WRONG_PASSWORD", doc.RootElement.GetProperty("code").GetString());
+    }
+
+    // ---- CHORE-staging-blockers: magic-link redeem on a pre-registered account confirms it and wipes the unverified password; deleted accounts are refused ----
+
+    private async Task<string> SeedMagicLinkAsync(string email)
+    {
+        var raw = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(raw))).ToLowerInvariant();
+        _db.Set<AuthToken>().Add(new AuthToken
+        {
+            Id = Guid.NewGuid(),
+            Email = email,
+            TokenHash = hash,
+            Purpose = 1,
+            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10),
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        await _db.SaveChangesAsync();
+        return raw;
+    }
+
+    [Fact]
+    public async Task Redeem_PreRegisteredUnconfirmedAccount_ConfirmsEmail_AndWipesPassword()
+    {
+        const string Email = "prereg@example.com";
+        using (var signup = await _client.PostAsJsonAsync("/api/v1/auth/signup", new { email = Email, password = "attacker-pass-1" }))
+            Assert.Equal(HttpStatusCode.OK, signup.StatusCode);
+
+        var raw = await SeedMagicLinkAsync(Email);
+        using var redeem = await _client.PostAsJsonAsync("/api/v1/auth/magic-link/redeem", new { token = raw });
+        Assert.Equal(HttpStatusCode.OK, redeem.StatusCode);
+
+        var row = await _db.Set<AppUser>().AsNoTracking().SingleAsync(u => u.Email == Email);
+        Assert.True(row.EmailConfirmed);
+        Assert.Null(row.PasswordHash);
+
+        using var login = await _client.PostAsJsonAsync("/api/v1/auth/login", new { email = Email, password = "attacker-pass-1" });
+        Assert.Equal(HttpStatusCode.Unauthorized, login.StatusCode); // the pre-registered password no longer works
+    }
+
+    [Fact]
+    public async Task Redeem_SoftDeletedAccount_Returns410_LINK_EXPIRED()
+    {
+        const string Email = "deletedredeem@example.com";
+        using (var signup = await _client.PostAsJsonAsync("/api/v1/auth/signup", new { email = Email, password = "password123" }))
+            Assert.Equal(HttpStatusCode.OK, signup.StatusCode);
+        await _db.Set<AppUser>().Where(u => u.Email == Email)
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.DeletedAtUtc, (DateTime?)new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)));
+
+        var raw = await SeedMagicLinkAsync(Email);
+        using var redeem = await _client.PostAsJsonAsync("/api/v1/auth/magic-link/redeem", new { token = raw });
+
+        Assert.Equal(HttpStatusCode.Gone, redeem.StatusCode);
+        using var doc = JsonDocument.Parse(await redeem.Content.ReadAsByteArrayAsync());
+        Assert.Equal("LINK_EXPIRED", doc.RootElement.GetProperty("code").GetString());
+    }
+
+    // ---- CHORE-staging-blockers r2: a session minted at a pre-registration dies when the owner confirms; the owner's new session works ----
+
+    private async Task<HttpResponseMessage> GetWithSessionAsync(string url, string sessionToken)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Add("Cookie", $"wa.session={sessionToken}");
+        return await _client.SendAsync(request);
+    }
+
+    [Fact]
+    public async Task PreRegistrationSession_DiesAfterOwnerRedeems_OwnerSessionWorks_AdminEndpointRefused()
+    {
+        // The attacker pre-registers the admin address with their own password and keeps the session token from the signup response.
+        string attackerToken;
+        using (var signup = await _client.PostAsJsonAsync("/api/v1/auth/signup", new { email = AdminEmail, password = "attacker-pass-1" }))
+        {
+            Assert.Equal(HttpStatusCode.OK, signup.StatusCode);
+            using var doc = JsonDocument.Parse(await signup.Content.ReadAsByteArrayAsync());
+            attackerToken = doc.RootElement.GetProperty("sessionToken").GetString()!;
+        }
+
+        // Before the owner acts the attacker's session is a normal, unconfirmed session: it works as a user but never carries the admin role.
+        using (var me = await GetWithSessionAsync("/api/v1/auth/me", attackerToken))
+        {
+            Assert.Equal(HttpStatusCode.OK, me.StatusCode);
+            using var doc = JsonDocument.Parse(await me.Content.ReadAsByteArrayAsync());
+            Assert.False(doc.RootElement.TryGetProperty("role", out _)); // unconfirmed Wa:AdminEmails address: no role in /auth/me
+        }
+
+        // The owner proves the address through a magic link.
+        var raw = await SeedMagicLinkAsync(AdminEmail);
+        string ownerToken;
+        using (var redeem = await _client.PostAsJsonAsync("/api/v1/auth/magic-link/redeem", new { token = raw }))
+        {
+            Assert.Equal(HttpStatusCode.OK, redeem.StatusCode);
+            using var doc = JsonDocument.Parse(await redeem.Content.ReadAsByteArrayAsync());
+            ownerToken = doc.RootElement.GetProperty("sessionToken").GetString()!;
+        }
+
+        // The attacker's replayed token is now a guest session everywhere: /auth/me and the admin gate both see no user.
+        using (var me = await GetWithSessionAsync("/api/v1/auth/me", attackerToken))
+            Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
+        using (var admin = await GetWithSessionAsync("/api/v1/admin/overview", attackerToken))
+            Assert.Equal(HttpStatusCode.Unauthorized, admin.StatusCode); // revoked token = no session user, so the gate answers UNAUTHENTICATED (never an admin 200)
+
+        // The owner's fresh session works and, with a confirmed email on Wa:AdminEmails, carries the role.
+        using (var me = await GetWithSessionAsync("/api/v1/auth/me", ownerToken))
+        {
+            Assert.Equal(HttpStatusCode.OK, me.StatusCode);
+            using var doc = JsonDocument.Parse(await me.Content.ReadAsByteArrayAsync());
+            Assert.Equal("superadmin", doc.RootElement.GetProperty("role").GetString());
+        }
     }
 
     // ---- VALIDATION Problem+JSON via the existing pipeline (TA-4.1.3 closed list) ----

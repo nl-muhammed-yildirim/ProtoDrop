@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 
+import { API_BASE } from '../config/apiBase'
 import { getTraceParent } from '../traceparent'
 
 /**
@@ -10,7 +11,7 @@ import { getTraceParent } from '../traceparent'
  */
 
 // Fixed-port absolute base, same precedent as loadPlanLimits / PlanPage BILLING_BASE.
-const FEATURES_URL = 'http://localhost:8080/api/v1/features'
+const FEATURES_URL = `${API_BASE}/features`
 
 export const FEATURE_GATE_KEYS = [
   'feature.search',

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { API_BASE } from '../../core/config/apiBase'
 import { formatBytes } from '../../core/upload/formatBytes'
 import { statusLabel, statusTone } from './overviewData'
 import type { AdminTransferRowDto, SearchParams } from './transfersData'
@@ -10,8 +11,7 @@ interface AdminTransfersPageProps {
   role: 'SuperAdmin' | 'Operator'   // T-011-10 precedent — AdminShell narrows /auth/me's role and passes it down.
 }
 
-// T-011-03 (FR-011-2): fixed local port, no proxy, no env vars yet (AdminShell + FilesPage precedent).
-const API_BASE = 'http://localhost:8080/api/v1'
+// T-011-03 (FR-011-2): fixed local port, no proxy, base from VITE_WA_API_BASE (CHORE-deploy-hardening) (AdminShell + FilesPage precedent).
 
 // FR-011-3 status vocabulary (TA-4.2#21) — the wire words, verbatim; absent → all.
 const STATUS_OPTIONS = ['all', 'draft', 'active', 'expired', 'download_limit', 'deleted'] as const
