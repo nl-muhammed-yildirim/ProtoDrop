@@ -1,6 +1,6 @@
 # US-048-03 — Cite the PII list (DPO)
 
-**Feature:** F-XCT-005 — PII Policy (emails, sender names, telemetry) | **Status:** pending
+**Feature:** F-XCT-005 — PII Policy (emails, sender names, telemetry) | **Status:** done (2026-11-27, PR #714; T-069 — erasure-scrub of the 10 retained columns is an open owner decision, see docs/reviews/PREPROD-readiness-status.md)
 
 ---
 
