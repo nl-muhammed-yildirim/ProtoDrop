@@ -9,6 +9,7 @@ using wa.application.UseCases.Sample;
 using wa.application.UseCases.Transfers;
 using wa.domain.Errors; // T-056-02: /health catch writes through ProblemWriter (closed code list)
 using wa.infrastructure.Blob;
+using wa.infrastructure.Email;
 using wa.infrastructure.Events;
 using wa.infrastructure.Persistence;
 using wa.api.Middleware;
@@ -37,15 +38,7 @@ public static class ApiServices
         services.AddSingleton<wa.infrastructure.Persistence.AppDbContextFactory>();
         // SbEventPublisher (T-054-03) resolves the interface — register under both types.
         services.AddSingleton<IDbContextFactory<WaDbContext>, wa.infrastructure.Persistence.AppDbContextFactory>();
-        // T-054-05 (TA-0.2 rule 7): no "is this the fake?" branch in production code — DI picks the adapter on the connection string.
-        var sbConnString = configuration["Wa:ServiceBus:ConnectionString"];
-        if (string.IsNullOrEmpty(sbConnString))
-            services.AddSingleton<wa.application.Ports.IEventPublisher, InMemoryEventPublisher>();
-        else
-            services.AddSingleton<wa.application.Ports.IEventPublisher>(sp => new SbEventPublisher(
-                sp.GetRequiredService<IConfiguration>(),
-                sp.GetRequiredService<ILogger<SbEventPublisher>>(),
-                sp.GetRequiredService<IDbContextFactory<WaDbContext>>(), sp.GetRequiredService<TimeProvider>()));
+        services.AddEventPublisher(configuration);
         // T-055-02 (TA-3.5 topology, §5.2 config): blob store + one-time container bootstrap. GR#7 — no "is this the fake?" branch; the adapter is picked by its §5.2 config values only.
         var blobAccountUrl = configuration["Wa:Blob:AccountUrl"];
         var blobAccountKey = configuration["Wa:Blob:AccountKey"];
@@ -174,6 +167,52 @@ public static class ApiServices
         // US-019-07 (EC-019-4): webhook re-fetch of the subscription — same adapter, same key.
         services.AddSingleton<wa.application.UseCases.Billing.IStripeSubscriptionSource>(sp => sp.GetRequiredService<wa.infrastructure.Billing.StripeCheckoutGateway>());
 
+        return services;
+    }
+
+    /// <summary>
+    /// Registers the <see cref="IEventPublisher"/> adapter (TA-0.2 rule 7 — DI picks it from configuration, no "is this the fake?" branch).
+    /// Precedence: a Service Bus connection string selects <see cref="SbEventPublisher"/> (T-054-05); otherwise a blank
+    /// <c>Wa:EmailFunction:BaseUrl</c> selects <see cref="InMemoryEventPublisher"/>; otherwise (CHORE-local-email) the local-only
+    /// <see cref="HttpHandOffEventPublisher"/>, which is refused outside Local/Development.
+    /// </summary>
+    /// <param name="services">The service collection to register the publisher in.</param>
+    /// <param name="configuration">The live configuration; reads the Service Bus, hand-off base URL, hand-off sign key and environment keys.</param>
+    /// <returns>The same <paramref name="services"/>, so calls can be chained.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when the hand-off base URL is set outside Local/Development, or when it is set without the sign key (names keys and environment only, never a value).</exception>
+    public static IServiceCollection AddEventPublisher(this IServiceCollection services, IConfiguration configuration)
+    {
+        var sbConnString = configuration["Wa:ServiceBus:ConnectionString"];
+        if (!string.IsNullOrEmpty(sbConnString))
+        {
+            services.AddSingleton<wa.application.Ports.IEventPublisher>(sp => new SbEventPublisher(
+                sp.GetRequiredService<IConfiguration>(),
+                sp.GetRequiredService<ILogger<SbEventPublisher>>(),
+                sp.GetRequiredService<IDbContextFactory<WaDbContext>>(), sp.GetRequiredService<TimeProvider>()));
+            return services;
+        }
+
+        var handOffBaseUrl = configuration[EmailHandOff.BaseUrlKey];
+        if (string.IsNullOrWhiteSpace(handOffBaseUrl))
+        {
+            services.AddSingleton<wa.application.Ports.IEventPublisher, InMemoryEventPublisher>();
+            return services;
+        }
+
+        if (!EmailSenderSelector.IsLocalOrDevelopment(configuration))
+        {
+            var environment = EmailSenderSelector.ResolveEnvironment(configuration);
+            throw new InvalidOperationException(
+                $"{EmailHandOff.BaseUrlKey} is allowed only when the host environment is Local or Development; current: '{environment ?? "(unset = Production)"}'.");
+        }
+
+        var handOffSignKey = configuration[EmailHandOff.SignKeyKey];
+        if (string.IsNullOrWhiteSpace(handOffSignKey))
+            throw new InvalidOperationException($"{EmailHandOff.SignKeyKey} is required when {EmailHandOff.BaseUrlKey} is set.");
+
+        var baseUri = new Uri(handOffBaseUrl.TrimEnd('/') + "/");
+        services.AddSingleton<wa.application.Ports.IEventPublisher>(sp => new HttpHandOffEventPublisher(
+            new HttpClient(), baseUri, handOffSignKey, sp.GetRequiredService<ILogger<HttpHandOffEventPublisher>>()));
         return services;
     }
 }

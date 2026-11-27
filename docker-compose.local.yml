@@ -10,6 +10,10 @@ services:
     image: mcr.microsoft.com/azure-storage/azurite:latest
     command: ["azurite-blob", "--blobHost", "0.0.0.0"]
     ports: ["10000:10000"]
+  # CHORE-local-email: SMTP catcher. Workers send to mailpit:1025; read the mails at http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit:latest
+    ports: ["1025:1025", "8025:8025"]
 
   # One-shot: apply EF migrations (6 + seeds) before the API starts, using wa.api's config so it
   # reads the same connection string as the running app. Idempotent — safe to re-run on every start.
@@ -57,6 +61,10 @@ services:
       # Bridge containers can't see each other's localhost; reach workers via the host-published port.
       Wa__ZipFunction__BaseUrl: "http://host.docker.internal:8081"
       Wa__Zip__SignKey: "local-zip-signing-key-m0-dev-only"
+      # CHORE-local-email: with no Service Bus, the API posts every event (signed with x-email-sign) to the workers' f-email-handoff
+      # trigger, which sends the mail to Mailpit. Local/Development only; the same key must be set on wa.workers.
+      Wa__EmailFunction__BaseUrl: "http://host.docker.internal:8081"
+      Wa__Email__HandOffSignKey: "local-email-handoff-key-dev-only"
     depends_on: [migrate, cors-init]
 
   wa.web:
@@ -78,9 +86,12 @@ services:
       "Wa:Blob:AccountUrl": "http://host.docker.internal:10000/devstoreaccount1"
       "Wa:Blob:AccountKey": "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
       "Wa:Jwt:Secret": "1f3a9c0e2d4b6f8a0c1e3d5b7f9a2c4e6d8b0f1a3c5e7d9b1f3a5c7e9d1b3f5a"
-      # Email is log-only in dev (no real SMTP) — read links from the workers console/Serilog.
-      "Wa:Email:Sender": "log"
-      # CHORE-deploy-hardening: Sender=log is refused at startup outside Development/Local.
+      # CHORE-local-email: mail goes to Mailpit, inbox http://localhost:8025; set the sender to log to print mails to the console instead.
+      "Wa:Email:Sender": "smtp"
+      "Wa:Email:Smtp:Host": "mailpit"
+      "Wa:Email:Smtp:Port": "1025"
+      "Wa:Email:HandOffSignKey": "local-email-handoff-key-dev-only"
+      # CHORE-deploy-hardening: Sender=log/smtp and the email hand-off are refused outside Development/Local.
       AZURE_FUNCTIONS_ENVIRONMENT: "Development"
       "Wa:Zip:SignKey": "local-zip-signing-key-m0-dev-only"
-    depends_on: [wa.api]
+    depends_on: [wa.api, mailpit]

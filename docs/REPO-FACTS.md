@@ -70,7 +70,7 @@ Typography/shape: `--fs-display 40px`, `--fs-h1 28px`, `--fs-body 16px`, `--fs-s
   `IAuthTokenStore` — `FindByHashAsync(sha256Hex)`, `CreateAsync(AuthToken)`, `MarkRedeemedAsync` (first redeem wins).
 - **Magic-link token:** stored as SHA-256 hex (64 chars), single-use via `RedeemedAtUtc`.
 - **`/auth/me` profile fields (F-XCT-003 US-046-01):** `PATCH` body is additive — `emailNotifications` (bool?, absent = unchanged; 404 FEATURE_DISABLED when `feature.emailSettings` off); `GET` returns the effective value via `AppUser.EmailNotificationsOn(bool?) => stored ?? true`. Column: `AppUser.EmailNotificationsEnabled BIT NULL` (no default constraint).
-- **f-email audience (F-XCT-003 US-046-02):** handlers = `SendNotificationEmailsHandler` (recipient), `SendMagicLinkEmailHandler` + `SendForgotPasswordEmailHandler` (auth), `SendBillingEmailHandler` (billing); none takes `OwnerNotificationGate` (it has no production caller yet). Closed lists pinned in `tests/wa.workers.unit/Email/EmailAudienceClassificationTests.cs` (handlers, EmailFunction ctor, template folders, EventType). Window: one in-flight message (EC-046-1).
+- **f-email audience (F-XCT-003 US-046-02):** handlers = `SendNotificationEmailsHandler` (recipient), `SendMagicLinkEmailHandler` + `SendForgotPasswordEmailHandler` (auth), `SendBillingEmailHandler` (billing); none takes `OwnerNotificationGate` (it has no production caller yet). Closed lists pinned in `tests/wa.workers.unit/Email/EmailAudienceClassificationTests.cs` (handlers, EmailEnvelopeDispatcher ctor (CHORE-local-email: shared by the SB trigger `EmailFunction` and the HTTP trigger `f-email-handoff`), template folders, EventType). Window: one in-flight message (EC-046-1).
 
 ## 4. Storage keys & client constants
 
