@@ -91,9 +91,9 @@ public sealed partial class SendMagicLinkEmailHandler : IEmailEventHandler
         else
             expiresAtUtc = _timeProvider.GetUtcNow().UtcDateTime.AddMinutes(10); // fallback
 
-        // 2. Build CTA URL: {publicOrigin}/auth?ml={rawToken}
+        // 2. Build CTA URL: {publicOrigin}/auth?ml={Uri.EscapeDataString(rawToken)} (base64 + / = must survive the query string)
         var publicOrigin = _config["Wa:Url:Public"] ?? "http://localhost:5173";
-        var ctaUrl = $"{publicOrigin}/auth?ml={rawToken}";
+        var ctaUrl = $"{publicOrigin}/auth?ml={Uri.EscapeDataString(rawToken)}";
 
         // 3. Compute remaining minutes for the expiry note.
         var minutesRemaining = (int)Math.Ceiling((expiresAtUtc - _timeProvider.GetUtcNow().UtcDateTime).TotalMinutes);
