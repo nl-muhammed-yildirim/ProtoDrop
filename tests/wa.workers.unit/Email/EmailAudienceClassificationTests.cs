@@ -38,7 +38,7 @@ public class EmailAudienceClassificationTests
         ["billing-grace-ended"] = Billing,
     };
 
-    // Tripwire: EmailFunction.Run's switch is private — this table forces a decision per new EventType member.
+    // Tripwire: EmailEnvelopeDispatcher.DispatchAsync's switch is private — this table forces a decision per new EventType member.
     private static readonly Dictionary<EventType, string> EventTypes = new()
     {
         [EventType.TransferCreated] = Recipient,
@@ -94,9 +94,9 @@ public class EmailAudienceClassificationTests
     }
 
     [Fact]
-    public void EmailFunction_DispatchesExactlyTheClassifiedHandlers()
+    public void EmailEnvelopeDispatcher_DispatchesExactlyTheClassifiedHandlers()
     {
-        var wired = typeof(EmailFunction).GetConstructors().Single().GetParameters()
+        var wired = typeof(EmailEnvelopeDispatcher).GetConstructors().Single().GetParameters()
             .Select(p => p.ParameterType)
             .Where(t => !typeof(ILogger).IsAssignableFrom(t))
             .OrderBy(t => t.FullName);

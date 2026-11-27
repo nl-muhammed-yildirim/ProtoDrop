@@ -97,6 +97,28 @@ public class WorkerServicesTests
     }
 
     [Fact]
+    public void EmailEnvelopeDispatcher_Resolves() // CHORE-local-email: both email triggers share one composed dispatcher
+    {
+        var settings = BaseSettings();
+        settings["Wa:Email:Sender"] = "log";
+        settings["DOTNET_ENVIRONMENT"] = "Development";
+        using var sp = Build(InMemory(settings));
+
+        Assert.IsType<EmailEnvelopeDispatcher>(sp.GetRequiredService<IEmailEnvelopeDispatcher>());
+    }
+
+    [Fact]
+    public void SmtpSender_InProduction_FailsAtComposition() // CHORE-local-email: smtp is local-only, like log
+    {
+        var settings = BaseSettings();
+        settings["Wa:Email:Sender"] = "smtp";
+
+        var ex = Assert.Throws<InvalidOperationException>(() => Build(InMemory(settings)));
+
+        Assert.Contains("Wa:Email:Sender", ex.Message);
+    }
+
+    [Fact]
     public void LogSender_InProduction_FailsAtComposition() // CHORE-deploy-hardening: fail fast, not on first send
     {
         var settings = BaseSettings();

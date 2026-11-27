@@ -97,6 +97,83 @@ public class EmailSenderSelectorTests
         Assert.Contains("Wa:CommunicationHub:Connection", ex.Message);
     }
 
+    // ---- CHORE-local-email: Wa:Email:Sender=smtp (Mailpit), Local/Development only ----
+
+    [Theory]
+    [InlineData("AZURE_FUNCTIONS_ENVIRONMENT", "Development")]
+    [InlineData("AZURE_FUNCTIONS_ENVIRONMENT", "Local")]
+    [InlineData("DOTNET_ENVIRONMENT", "Development")]
+    [InlineData("DOTNET_ENVIRONMENT", "Local")]
+    [InlineData("ASPNETCORE_ENVIRONMENT", "Development")]
+    [InlineData("ASPNETCORE_ENVIRONMENT", "Local")]
+    public void Create_Smtp_Development_ReturnsSmtpEmailSender(string key, string environment)
+    {
+        using var factory = new LoggerFactory();
+
+        var sender = EmailSenderSelector.Create(SmtpConfig((key, environment)), factory);
+
+        Assert.IsType<SmtpEmailSender>(sender);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("Production")]
+    [InlineData("Staging")]
+    public void Create_Smtp_OutsideDevelopment_Throws(string? environment)
+    {
+        using var factory = new LoggerFactory();
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            EmailSenderSelector.Create(SmtpConfig(("DOTNET_ENVIRONMENT", environment)), factory));
+
+        Assert.Contains("Wa:Email:Sender", ex.Message);
+    }
+
+    [Fact]
+    public void EnsureSenderAllowed_Smtp_InProduction_Throws()
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            EmailSenderSelector.EnsureSenderAllowed(SmtpConfig(("DOTNET_ENVIRONMENT", "Production"))));
+
+        Assert.Contains("Wa:Email:Sender", ex.Message);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Create_Smtp_MissingHost_ThrowsNamingKey(string? host)
+    {
+        using var factory = new LoggerFactory();
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            EmailSenderSelector.Create(
+                Config(("Wa:Email:Sender", "smtp"), ("Wa:Email:Smtp:Host", host), ("Wa:Email:Smtp:Port", "1025"), ("DOTNET_ENVIRONMENT", "Development")),
+                factory));
+
+        Assert.Contains("Wa:Email:Smtp:Host", ex.Message);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("abc")]
+    [InlineData("0")]
+    [InlineData("70000")]
+    public void Create_Smtp_BadPort_ThrowsNamingKey(string? port)
+    {
+        using var factory = new LoggerFactory();
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            EmailSenderSelector.Create(
+                Config(("Wa:Email:Sender", "smtp"), ("Wa:Email:Smtp:Host", "mailpit"), ("Wa:Email:Smtp:Port", port), ("DOTNET_ENVIRONMENT", "Development")),
+                factory));
+
+        Assert.Contains("Wa:Email:Smtp:Port", ex.Message);
+    }
+
+    private static IConfiguration SmtpConfig(params (string Key, string? Value)[] extra) =>
+        Config([("Wa:Email:Sender", "smtp"), ("Wa:Email:Smtp:Host", "mailpit"), ("Wa:Email:Smtp:Port", "1025"), .. extra]);
+
     private const string FakeConnection =
         "endpoint=https://fake.communication.azure.com/;accesskey=ZmFrZS1hY2Nlc3Mta2V5";
 

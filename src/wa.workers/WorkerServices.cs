@@ -162,10 +162,10 @@ public static class WorkerServices
             sp.GetRequiredService<ILogger<StubbleTemplateRenderer>>(),
             sp.GetRequiredService<wa.application.Telemetry.WaTelemetryReporter>())); // T-014-04: fallback telemetry event
 
-        // IEmailSender selection (TA-0.2 rule 7): log if Wa:Email:Sender=="log" else CommunicationHubEmailSender.
+        // IEmailSender selection (TA-0.2 rule 7): log if Wa:Email:Sender=="log", plain SMTP (Mailpit) if "smtp", else CommunicationHubEmailSender.
         // Keys are read via IConfiguration (Wa__... on Linux hosts); a missing Wa:CommunicationHub:Connection
         // throws on first resolution (T-006-06 D-3), never a silent fallback to log.
-        // CHORE-deploy-hardening: log is refused outside Local/Development at composition (fail fast — the host will not start).
+        // CHORE-deploy-hardening: log and smtp are refused outside Local/Development at composition (fail fast — the host will not start).
         EmailSenderSelector.EnsureSenderAllowed(configuration);
         services.AddSingleton<IEmailSender>(sp => EmailSenderSelector.Create(
             sp.GetRequiredService<IConfiguration>(),
@@ -207,6 +207,12 @@ public static class WorkerServices
             sp.GetRequiredService<wa.application.Telemetry.WaTelemetryReporter>(),
             sp.GetRequiredService<ILogger<SendBillingEmailHandler>>(),
             Path.Combine(AppContext.BaseDirectory, "Emails", "templates"), sp.GetRequiredService<TimeProvider>()));
+
+        // CHORE-local-email: both email triggers (f-email Service Bus, f-email-handoff HTTP) share this one dispatch path.
+        services.AddSingleton<IEmailEnvelopeDispatcher>(sp => new EmailEnvelopeDispatcher(
+            sp.GetRequiredService<SendNotificationEmailsHandler>(), sp.GetRequiredService<SendMagicLinkEmailHandler>(),
+            sp.GetRequiredService<SendForgotPasswordEmailHandler>(), sp.GetRequiredService<SendBillingEmailHandler>(),
+            sp.GetRequiredService<ILogger<EmailEnvelopeDispatcher>>()));
 
         return services;
     }

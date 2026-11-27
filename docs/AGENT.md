@@ -80,6 +80,9 @@ services:
     image: mcr.microsoft.com/azure-storage:latest
     command: ["azurite-blob", "--blobHost", "0.0.0.0"]
     ports: ["10000:10000"]
+  mailpit:                       # CHORE-local-email: SMTP catcher; inbox at http://localhost:8025
+    image: axllent/mailpit:latest
+    ports: ["1025:1025", "8025:8025"]
 ```
 
 ```powershell
@@ -95,12 +98,15 @@ docker compose -f docker-compose.local.yml up -d
 | `Wa:Blob:AccountUrl` | `http://127.0.0.1:10000/devstoreaccount1` |
 | `Wa:Blob:AccountKey` | `Eby8vdM02xNOcqTqK…> (Azurite dev key) |
 | `Wa:ServiceBus:ConnectionString` | *(optional locally; use in-memory publisher fake if unset)* |
-| `Wa:CommunicationHub:Connection` | *(optional locally when `Wa:Email:Sender=log`; required otherwise — the workers throw on first email if it is missing, T-006-06)* |
+| `Wa:CommunicationHub:Connection` | *(optional locally when `Wa:Email:Sender` is `log` or `smtp`; required otherwise — the workers throw on first email if it is missing, T-006-06)* |
+| `Wa:Email:Sender` | `smtp` → plain SMTP to Mailpit via `Wa:Email:Smtp:Host` / `Wa:Email:Smtp:Port` (compose default: `mailpit` / `1025`); `log` → the workers print mails to their console; both are refused outside Local/Development (CHORE-local-email) |
+| `Wa:EmailFunction:BaseUrl` | *(optional, Local/Development only)* when set and no Service Bus string is set, the API POSTs every event to the workers' `f-email-handoff` trigger (compose: `http://host.docker.internal:8081`); refused outside Local/Development |
+| `Wa:Email:HandOffSignKey` | any 32+ chars — signs the hand-off body (HMAC, header `x-email-sign`); same value on API and workers |
 | `Wa:Jwt:Secret` | 64 hex chars (any fixed dev value) |
 | `Wa:Url:Public` | `http://localhost:5173` |
 | `Wa:Url:Api` | `http://localhost:8080` |
 | `Wa:Cors:AllowedOrigins` | `http://localhost:5173` |
-| `Wa:AdminEmails` | `dev@example.com` — local admin login password `ProtoDropDev!2026` (local DB only; re-create after a DB reset via `POST /api/v1/auth/signup`). **Since 2026-11-26 the admin role also needs a confirmed email**: after signup, redeem a magic link for `dev@example.com` (the workers log it with `Wa:Email:Sender=log`), or locally run `UPDATE AppUser SET EmailConfirmed = 1 WHERE Email = 'dev@example.com'`. Redeeming a link on an unconfirmed account clears its password, so set the password by signing up again before redeeming, or use magic-link sign-in from then on |
+| `Wa:AdminEmails` | `dev@example.com` — local admin login password `ProtoDropDev!2026` (local DB only; re-create after a DB reset via `POST /api/v1/auth/signup`). **Since 2026-11-26 the admin role also needs a confirmed email**: after signup, redeem a magic link for `dev@example.com` (open it in the Mailpit inbox http://localhost:8025; with `Wa:Email:Sender=log` the workers print it to their console instead), or locally run `UPDATE AppUser SET EmailConfirmed = 1 WHERE Email = 'dev@example.com'`. Redeeming a link on an unconfirmed account clears its password, so set the password by signing up again before redeeming, or use magic-link sign-in from then on |
 | `Wa:Zip:SignKey` | any 32+ chars |
 
 ### 5.3 Run
