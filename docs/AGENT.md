@@ -97,7 +97,7 @@ docker compose -f docker-compose.local.yml up -d
 | `ConnectionStrings__WaDb` | `Server=localhost,1433;User Id=sa;Password=YourStrong!Passw0rd;Database=wa;TrustServerCertificate=True` |
 | `Wa:Blob:AccountUrl` | `http://127.0.0.1:10000/devstoreaccount1` |
 | `Wa:Blob:AccountKey` | `Eby8vdM02xNOcqTqK…> (Azurite dev key) |
-| `Wa:ServiceBus:ConnectionString` | *(optional locally; use in-memory publisher fake if unset)* |
+| `Wa:ServiceBus:ConnectionString` | *(optional locally; unset → in-memory publisher fake, or the HTTP email hand-off to the workers when `Wa:EmailFunction:BaseUrl` is set — CHORE-local-email)* |
 | `Wa:CommunicationHub:Connection` | *(optional locally when `Wa:Email:Sender` is `log` or `smtp`; required otherwise — the workers throw on first email if it is missing, T-006-06)* |
 | `Wa:Email:Sender` | `smtp` → plain SMTP to Mailpit via `Wa:Email:Smtp:Host` / `Wa:Email:Smtp:Port` (compose default: `mailpit` / `1025`); `log` → the workers print mails to their console; both are refused outside Local/Development (CHORE-local-email) |
 | `Wa:EmailFunction:BaseUrl` | *(optional, Local/Development only)* when set and no Service Bus string is set, the API POSTs every event to the workers' `f-email-handoff` trigger (compose: `http://host.docker.internal:8081`); refused outside Local/Development |

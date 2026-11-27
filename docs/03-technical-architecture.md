@@ -624,6 +624,7 @@ Single-row claim in `JobRun`: `INSERT (JobKey, RunAtUtc=trunc(now,15m), LockUnti
 | Function | Trigger | Concurrency | Timeout |
 |---|---|---|---|
 | `f-email` | SB `core/email` | 10 | 5 min |
+| `f-email-handoff` | HTTP POST `api/events/email` — Local/Development only (CHORE-local-email: API hand-off when no Service Bus; 404 elsewhere; `x-email-sign` HMAC) | 4 (host http) | host default |
 | `f-expire` | timer `0 */15 * * * *` | 1 | 10 min |
 | `f-delete-transfers` | timer `0 */15 * * * *` | 1 | 10 min |
 | `f-delete-blobs` | timer `0 0 * * * *` (hourly) | 1 | 30 min |
@@ -945,7 +946,11 @@ tag v* → cd-prod.yml: same as staging + manual approval + canary (20% → 100%
 | `Wa:AdminEmails` | ✓ | `ops@example.com` (role needs a confirmed email: first sign-in by magic link) |
 | `Wa:Zip:SignKey` | ✓ (KV) | |
 | `Wa:Flags:TtlSeconds` | – | `30` |
-| `AZURE_FUNCTIONS_ENVIRONMENT` (wa-workers) | – | `Development` only where `Wa:Email:Sender=log`; unset = Production (log sender refused at startup) |
+| `AZURE_FUNCTIONS_ENVIRONMENT` (wa-workers) | – | `Development` only where `Wa:Email:Sender=log`/`smtp`; unset = Production (log/smtp senders refused at startup) |
+| `Wa:Email:Sender` (wa-workers) | – | unset/other = Communication Hub; `log` or `smtp` (Local/Development only) |
+| `Wa:Email:Smtp:Host` / `Wa:Email:Smtp:Port` (wa-workers) | when `Wa:Email:Sender=smtp` | `mailpit` / `1025` (local compose) |
+| `Wa:EmailFunction:BaseUrl` (wa-api) | – (Local/Development only; startup throws elsewhere) | `http://host.docker.internal:8081` — HTTP email hand-off when `Wa:ServiceBus:ConnectionString` is unset (CHORE-local-email) |
+| `Wa:Email:HandOffSignKey` (wa-api + wa-workers) | with `Wa:EmailFunction:BaseUrl` | any dev-only string; HMAC-SHA256 of the body in `x-email-sign` |
 
 **wa-web (CHORE-deploy-hardening, 2026-11-26):**
 
