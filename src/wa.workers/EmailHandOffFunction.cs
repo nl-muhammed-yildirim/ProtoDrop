@@ -2,7 +2,6 @@ using System.Text;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using wa.domain.Errors;
 using wa.infrastructure.Email;
 using wa.infrastructure.Events;
@@ -16,12 +15,10 @@ namespace wa.workers;
 /// </summary>
 /// <param name="dispatcher">Shared dispatch of an event envelope to its email handler.</param>
 /// <param name="config">Configuration source for the signing key and the host environment.</param>
-/// <param name="logger">Logger for dispatch failures (never logs addresses).</param>
-public partial class EmailHandOffFunction(IEmailEnvelopeDispatcher dispatcher, IConfiguration config, ILogger<EmailHandOffFunction> logger)
+public class EmailHandOffFunction(IEmailEnvelopeDispatcher dispatcher, IConfiguration config)
 {
     private readonly IEmailEnvelopeDispatcher _dispatcher = dispatcher;
     private readonly IConfiguration _config = config;
-    private readonly ILogger<EmailHandOffFunction> _logger = logger;
 
     /// <summary>HTTP entry point <c>POST events/email</c>: verifies the <c>x-email-sign</c> HMAC over the exact body, then dispatches the envelope as the final delivery attempt (HTTP has no broker retry).</summary>
     /// <param name="context">Function invocation context; supplies the cancellation token.</param>
@@ -49,15 +46,12 @@ public partial class EmailHandOffFunction(IEmailEnvelopeDispatcher dispatcher, I
         {
             await _dispatcher.DispatchAsync(Encoding.UTF8.GetString(body), EmailEnvelopeDispatcher.MaxDeliveryCount, context.CancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            LogHandOffDispatchFailed(_logger, ex);
+            // The dispatcher already logged the failure with the event id and attempt before rethrowing.
             return JobAuth.CreateProblem(req, 500, ProblemCodes.Internal, "Email dispatch failed.");
         }
 
         return JobAuth.CreateSuccess(req, new { dispatched = true });
     }
-
-    [LoggerMessage(Level = LogLevel.Error, Message = "f-email-handoff dispatch failed")]
-    private static partial void LogHandOffDispatchFailed(ILogger logger, Exception exception);
 }

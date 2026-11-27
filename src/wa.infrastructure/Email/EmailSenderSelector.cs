@@ -38,12 +38,18 @@ public static class EmailSenderSelector
     public static readonly IReadOnlyList<string> EnvironmentKeys =
         ["AZURE_FUNCTIONS_ENVIRONMENT", "DOTNET_ENVIRONMENT", "ASPNETCORE_ENVIRONMENT"];
 
+    /// <summary>Resolves the host environment name from the first non-blank <see cref="EnvironmentKeys"/> entry.</summary>
+    /// <param name="configuration">Configuration source; reads the environment keys.</param>
+    /// <returns>The first non-blank environment value, or <see langword="null"/> when none is set (which counts as Production).</returns>
+    public static string? ResolveEnvironment(IConfiguration configuration) =>
+        EnvironmentKeys.Select(k => configuration[k]).FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+
     /// <summary>Tells whether the host environment is Local or Development. An unset environment counts as Production.</summary>
     /// <param name="configuration">Configuration source; reads the environment keys.</param>
     /// <returns><see langword="true"/> when the first non-blank environment key is Local or Development (case-insensitive).</returns>
     public static bool IsLocalOrDevelopment(IConfiguration configuration)
     {
-        var environment = EnvironmentKeys.Select(k => configuration[k]).FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+        var environment = ResolveEnvironment(configuration);
         return string.Equals(environment, "Development", StringComparison.OrdinalIgnoreCase)
             || string.Equals(environment, "Local", StringComparison.OrdinalIgnoreCase);
     }
@@ -64,7 +70,7 @@ public static class EmailSenderSelector
         if (IsLocalOrDevelopment(configuration))
             return;
 
-        var environment = EnvironmentKeys.Select(k => configuration[k]).FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+        var environment = ResolveEnvironment(configuration);
         throw new InvalidOperationException(
             $"{SenderKey}={sender} is allowed only when the host environment is Local or Development "
             + $"(AZURE_FUNCTIONS_ENVIRONMENT / DOTNET_ENVIRONMENT / ASPNETCORE_ENVIRONMENT); current: '{environment ?? "(unset = Production)"}'.");

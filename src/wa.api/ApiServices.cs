@@ -201,7 +201,7 @@ public static class ApiServices
 
         if (!EmailSenderSelector.IsLocalOrDevelopment(configuration))
         {
-            var environment = EmailSenderSelector.EnvironmentKeys.Select(k => configuration[k]).FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+            var environment = EmailSenderSelector.ResolveEnvironment(configuration);
             throw new InvalidOperationException(
                 $"{EmailHandOff.BaseUrlKey} is allowed only when the host environment is Local or Development; current: '{environment ?? "(unset = Production)"}'.");
         }

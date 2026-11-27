@@ -32,7 +32,7 @@ public class EmailTriggersTests
         Config(("AZURE_FUNCTIONS_ENVIRONMENT", "Development"), ("Wa:Email:HandOffSignKey", key));
 
     private static EmailHandOffFunction Build(RecordingDispatcher dispatcher, IConfiguration config) =>
-        new(dispatcher, config, NullLogger<EmailHandOffFunction>.Instance);
+        new(dispatcher, config);
 
     private static string Sign(string body) => EmailHandOff.Sign(Encoding.UTF8.GetBytes(body), Key);
 
@@ -136,7 +136,7 @@ public class EmailTriggersTests
         {
             EventId = Guid.NewGuid(),
             Type = EventType.EmailSent,
-            OccurredAtUtc = DateTime.UtcNow,
+            OccurredAtUtc = new DateTime(2026, 11, 27, 10, 0, 0, DateTimeKind.Utc),
             CorrelationId = Guid.NewGuid(),
             PartitionKey = "p",
             Payload = new { }

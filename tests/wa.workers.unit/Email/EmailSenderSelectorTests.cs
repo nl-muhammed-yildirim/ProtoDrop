@@ -25,6 +25,14 @@ public class EmailSenderSelectorTests
         Assert.DoesNotContain(provider.Messages, m => m.Contains("to@x.com")); // TA-9.4: the raw address never reaches the log
     }
 
+    [Fact]
+    public void ResolveEnvironment_FirstNonBlankKeyWins_NullWhenUnset()
+    {
+        Assert.Null(EmailSenderSelector.ResolveEnvironment(Config()));
+        Assert.Equal("Local", EmailSenderSelector.ResolveEnvironment(
+            Config(("AZURE_FUNCTIONS_ENVIRONMENT", " "), ("DOTNET_ENVIRONMENT", "Local"), ("ASPNETCORE_ENVIRONMENT", "Production"))));
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("Production")]
