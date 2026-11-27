@@ -1,6 +1,5 @@
 using System.Net.Mail;
 using MediatR;
-using Microsoft.AspNetCore.Identity;
 using wa.application.Ports;
 using wa.application.Telemetry;
 using wa.domain;
@@ -12,6 +11,7 @@ namespace wa.application.UseCases.Auth;
 /// T-008-02 (TA-4.2#9 / FR-008-1): the only business logic behind POST /api/v1/auth/login.
 /// Normalize email (same form as SignupHandler.NormalizeEmail — EC-008-1); no row OR failed hash verify → one single
 /// use-case exception mapped to WRONG_PASSWORD at the endpoint — never "user not found" (EC: don't leak which emails exist).
+/// A soft-deleted account fails the same way (CHORE-staging-blockers).
 /// </summary>
 /// <param name="users">Store used to look up the account by email.</param>
 /// <param name="plans">Store used to resolve the plan code of the account.</param>
@@ -44,12 +44,9 @@ public sealed class LoginHandler(
             throw LoginWrongPasswordException.ForWrongPassword(); // no row → same shape as wrong password (no-leak)
         }
 
-        // TA-9.1: PBKDF2-SHA256 via ASP.NET Identity PasswordHasher<string>, keyed by userId.ToString("n") — same keying as signup.
-        var hasher = new PasswordHasher<string>();
-        // A magic-link-only account has no PasswordHash: nothing to verify, so it is a failed verify (same shape as no row — no 500, no leak).
-        if (user.PasswordHash is null
-            || hasher.VerifyHashedPassword(user.Id.ToString("n"), user.PasswordHash, request.Password) is not
-            (PasswordVerificationResult.Success or PasswordVerificationResult.SuccessRehashNeeded))
+        // TA-9.1: shared PBKDF2-SHA256 check (PasswordSignIn). A magic-link-only account (no hash) or a soft-deleted account is a failed verify
+        // (same shape as no row — no 500, no leak).
+        if (!PasswordSignIn.Accepts(user, request.Password))
         {
             _telemetry.LogEvent(TelemetryEvents.LoginFailed); // AC-008-1 / task §4: login_failed on the wrong-password path
             throw LoginWrongPasswordException.ForWrongPassword(); // failed verify → same shape as no row (no-leak)

@@ -1,3 +1,5 @@
+using wa.domain.Privacy;
+
 namespace wa.domain;
 
 /// <summary>An outbox row holding a published domain event (T-006b). TA-3.2: dbo.DomainEvents — new migration per golden rule 4.</summary>
@@ -10,12 +12,14 @@ public class DomainEvent
     public string EventType { get; set; } = null!;
 
     /// <summary>The exact TA-5.2 serialized envelope (single source of truth for re-publish).</summary>
+    [Pii]
     public string EnvelopeJson { get; set; } = null!;
 
     /// <summary>Correlation id of the request that raised the event, so consumers can continue the same trace (TA-10.1).</summary>
     public Guid CorrelationId { get; set; }
 
-    /// <summary>Optional Service Bus partition/session key that keeps related events ordered (for example the transfer id).</summary>
+    /// <summary>Optional Service Bus partition/session key that keeps related events ordered (for example the transfer id, or the email for auth/billing events per TA-5.2, which makes it PII).</summary>
+    [Pii]
     public string? PartitionKey { get; set; }
 
     /// <summary>UTC instant the domain fact happened (the envelope time, not the publish time).</summary>
