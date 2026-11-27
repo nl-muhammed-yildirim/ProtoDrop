@@ -670,6 +670,7 @@ Single-row claim in `JobRun`: `INSERT (JobKey, RunAtUtc=trunc(now,15m), LockUnti
 4. Success → mark `EmailRecipient.NotifiedAtUtc`, emit `email.sent`.
 5. Failure → retry with backoff per SB MaxDeliveryCount; last attempt emits `email.failed` (alert).
 6. Unsubscribe: link `/unsubscribe/{token}` (token = HMAC(suppressionId)) → insert `EmailSuppression`, redirect to `/` with success toast.
+7. Owner email setting (F-XCT-003, FR-046-3/4): only owner-notification emails consult `AppUser.EmailNotificationsEnabled`, through `OwnerNotificationGate.MaySendAsync` at send time. Recipient (transfer created), auth (magic link / forgot password) and billing (billing email requested, every kind) handlers never take the gate — pinned by `tests/wa.workers.unit/Email/EmailAudienceClassificationTests.cs`. No owner-notification email exists yet; a new one must call the gate before sending. The column is read per message (no cache), so a toggle misses at most the one message already being processed — the one-in-flight-message window (EC-046-1).
 
 ### TA-6.8 Blob staging cleanup
 
