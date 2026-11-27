@@ -26,3 +26,6 @@ dist-ssr
 # Playwright (T-001-09): local-stack artifacts, never committed.
 test-results/
 playwright-report/
+
+# T-028: staging session state (cookies/tokens) — never committed or uploaded.
+e2e/.auth/
