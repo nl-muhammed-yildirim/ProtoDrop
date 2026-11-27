@@ -26,12 +26,12 @@ test.describe('expiry via admin flag override @staging', () => {
     // Raise-then-restore: the original value is read from the API (no literal limits) and PUT back in finally.
     const seeded = await withFlagOverride(adminToken, FLAG_KEY, '1', async () => {
       // The flag cache is per replica, so poll with fresh seeds (the limit is stamped at send) instead of one fixed sleep.
-      const deadline = Date.now() + (FLAGS_TTL_SECONDS + 30) * 1000
+      const deadline = Date.now() + (FLAGS_TTL_SECONDS + 60) * 1000
       for (let attempt = 0; ; attempt++) {
         const candidate = await seedTransfer({ files: [{ name: `e2e-${RUN_ID}-expiry-${attempt}.txt`, content: 'expiry e2e payload' }] })
         const pub = await publicGet(candidate.linkId)
         if (pub.status === 200 && pub.body.downloadsLeft === 1) return candidate
-        if (Date.now() > deadline) throw new Error(`flag override never took effect within ${FLAGS_TTL_SECONDS + 30}s (last downloadsLeft=${String(pub.body.downloadsLeft)})`)
+        if (Date.now() > deadline) throw new Error(`flag override never took effect within ${FLAGS_TTL_SECONDS + 60}s (last downloadsLeft=${String(pub.body.downloadsLeft)})`)
         await new Promise((resolve) => setTimeout(resolve, POLL_EVERY_MS))
       }
     })

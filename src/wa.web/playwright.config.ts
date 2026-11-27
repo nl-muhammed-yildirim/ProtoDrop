@@ -1,4 +1,4 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices, type ReporterDescription } from '@playwright/test';
 
 // T-001-09: the local stack (API :8080, Vite :5173, SQL + Azurite) is launched externally —
 // docker-compose.local.yml + supervised services — so no webServer key here.
@@ -29,6 +29,8 @@ const stagingProjects = [
   { name: 'staging', testMatch: /remote[\\/].*\.spec\.ts/, dependencies: ['staging-setup'], use: stagingUse, retries: 0 },
 ];
 
+const remoteReporter: ReporterDescription[] = [['html', { open: 'never' }], ['list']];
+
 export default defineConfig({
   testDir: './e2e',
   globalSetup: localHost ? './e2e/global-setup.ts' : undefined, // Azurite ships with CORS off; set the Vite-origin rule before any test.
@@ -40,5 +42,7 @@ export default defineConfig({
     baseURL: remoteBaseUrl ?? 'http://localhost:5173',
     trace: 'retain-on-failure',
   },
+  // Remote runs publish playwright-report/ (never test-results/ or e2e/.auth/, which hold cookies); local keeps the default reporter.
+  ...(remoteBaseUrl ? { reporter: remoteReporter } : {}),
   projects: remoteBaseUrl ? stagingProjects : [...localProjects, ...stagingProjects],
 });

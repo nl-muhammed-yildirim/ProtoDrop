@@ -44,12 +44,17 @@ async function authPost(ctx: APIRequestContext, route: string, data: unknown): P
   const send = (): Promise<APIResponse> => ctx.post(`${API}${route}`, { data })
   let res = await send()
   if (res.status() === 429) {
-    const retryAfter = Number(res.headers()['retry-after'])
-    const waitMs = Math.min(Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 30_000, MAX_RETRY_AFTER_MS)
-    await new Promise((resolve) => setTimeout(resolve, waitMs))
+    await retryPause(res)
     res = await send()
   }
   return res
+}
+
+/** Waits out a 429's Retry-After (capped; 30 s when absent). */
+async function retryPause(res: APIResponse): Promise<void> {
+  const retryAfter = Number(res.headers()['retry-after'])
+  const waitMs = Math.min(Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 30_000, MAX_RETRY_AFTER_MS)
+  await new Promise((resolve) => setTimeout(resolve, waitMs))
 }
 
 interface SessionBody { sessionToken: string; email: string; userId: string }
@@ -80,7 +85,11 @@ export async function tryLogin(email: string, password: string): Promise<LoginRe
 /** DELETE /auth/me with the session cookie. 401/404 are tolerated (already gone). */
 export async function deleteMe(token: string): Promise<void> {
   await withApi(async (ctx) => {
-    const res = await ctx.delete(`${API}/auth/me`, { headers: sessionHeaders(token) })
+    let res = await ctx.delete(`${API}/auth/me`, { headers: sessionHeaders(token) })
+    if (res.status() === 429) {
+      await retryPause(res)
+      res = await ctx.delete(`${API}/auth/me`, { headers: sessionHeaders(token) })
+    }
     if (!res.ok() && res.status() !== 401 && res.status() !== 404) throw await failure('delete account', res)
   })
 }
@@ -123,10 +132,31 @@ function browserBlobUrl(mintedUrl: string): string {
 }
 
 /**
+ * Seed limiter: Front Door's DraftPerIp rule (10/min) matches /api/v1/transfers/draft INCLUDING finalize, so one seed costs 2
+ * matching requests. At most SEEDS_PER_MINUTE seeds (8 matching requests) per rolling minute per run, across every spec — the
+ * expiry poll waits here instead of tripping the WAF. With E2E_API_URL set to the direct API origin Front Door is bypassed, but
+ * the same pace is kept (harmless, simpler).
+ */
+const SEEDS_PER_MINUTE = 4
+const seedTimes: number[] = []
+async function paceSeed(): Promise<void> {
+  for (;;) {
+    const now = Date.now()
+    while (seedTimes.length > 0 && now - seedTimes[0] >= 60_000) seedTimes.shift()
+    if (seedTimes.length < SEEDS_PER_MINUTE) {
+      seedTimes.push(now)
+      return
+    }
+    await new Promise((resolve) => setTimeout(resolve, 60_000 - (now - seedTimes[0]) + 50))
+  }
+}
+
+/**
  * draft -> single-shot blob PUT -> finalize (Idempotency-Key) -> send with no recipients (link-only). Returns an ACTIVE transfer.
- * About 4 API calls per seed — spaced by the specs to stay under the Front Door draft budget of 10/min.
+ * Paced by paceSeed so draft + finalize stay under the Front Door draft budget.
  */
 export async function seedTransfer(opts: SeedOptions): Promise<Seeded> {
+  await paceSeed()
   const headers = sessionHeaders(opts.sessionToken)
   const files = opts.files.map((f) => ({
     name: f.name,
@@ -188,15 +218,16 @@ export async function mintDownload(linkId: string, fileId: string): Promise<numb
 
 // ---- Admin flags (D8) ----
 
-/** Reads a flag's current value from GET /admin/flags (never hard-code a limit — golden rule 2). Throws when not an admin. */
-export async function getFlag(adminToken: string, key: string): Promise<string> {
+interface FlagRow { key: string; value: unknown; planDefault?: unknown; overridden?: boolean }
+
+/** Reads one flag row from GET /admin/flags (value, plan default, overridden marker; no literal limits). Throws when not an admin. */
+export async function getFlagRow(adminToken: string, key: string): Promise<{ value: string; planDefault: string; overridden: boolean }> {
   return withApi(async (ctx) => {
     const res = await ctx.get(`${API}/admin/flags`, { headers: sessionHeaders(adminToken) })
     if (!res.ok()) throw await failure('GET /admin/flags', res)
-    const rows = (await res.json()) as Array<{ key: string; value: unknown }>
-    const row = rows.find((r) => r.key === key)
+    const row = ((await res.json()) as FlagRow[]).find((r) => r.key === key)
     if (!row) throw new Error(`flag ${key} not found in GET /admin/flags`)
-    return String(row.value)
+    return { value: String(row.value), planDefault: String(row.planDefault ?? row.value), overridden: row.overridden === true }
   })
 }
 
@@ -211,23 +242,47 @@ export async function setFlag(adminToken: string, key: string, value: string): P
   })
 }
 
-/** Probes whether the token reaches the admin API (200). Setup uses it to learn whether the e2e admin actually holds the role. */
-export async function probeAdmin(token: string): Promise<{ ok: boolean; status: number }> {
+/**
+ * Proves the SuperAdmin role through GET /auth/me (`role: "superadmin"`): an Operator can READ flags but not PUT them, so a flags
+ * probe would pass for the wrong role. Returns the role, or null when absent / not signed in. Retries once on 429 (auth budget).
+ */
+export async function adminRole(token: string): Promise<string | null> {
   return withApi(async (ctx) => {
-    const res = await ctx.get(`${API}/admin/flags`, { headers: sessionHeaders(token) })
-    return { ok: res.ok(), status: res.status() }
+    let res = await ctx.get(`${API}/auth/me`, { headers: sessionHeaders(token) })
+    if (res.status() === 429) {
+      await retryPause(res)
+      res = await ctx.get(`${API}/auth/me`, { headers: sessionHeaders(token) })
+    }
+    if (!res.ok()) return null
+    return ((await res.json()) as { role?: string }).role ?? null
   })
 }
 
-/** Sets `key` to `value`, runs `fn`, and ALWAYS restores the original value (try/finally) — a crashed runner can still leave it set (R8). */
+/**
+ * Sets `key` to `value`, runs `fn`, and ALWAYS restores the flag to its PLAN DEFAULT (not the live-read value, which could itself be
+ * a leftover override of a crashed run). A row already overridden at `value` on entry is repaired first and logged. If both `fn`
+ * and the restore throw, the original error is rethrown with the restore failure appended.
+ */
 export async function withFlagOverride<T>(adminToken: string, key: string, value: string, fn: () => Promise<T>): Promise<T> {
-  const original = await getFlag(adminToken, key)
-  await setFlag(adminToken, key, value)
-  try {
-    return await fn()
-  } finally {
-    await setFlag(adminToken, key, original)
+  const before = await getFlagRow(adminToken, key)
+  if (before.overridden && before.value === value) {
+    console.warn(`[e2e] ${key} was already overridden at ${value} (leftover of an earlier run) — repairing to plan default ${before.planDefault}`)
+    await setFlag(adminToken, key, before.planDefault)
   }
+  await setFlag(adminToken, key, value)
+  let result: T
+  try {
+    result = await fn()
+  } catch (err) {
+    try {
+      await setFlag(adminToken, key, before.planDefault)
+    } catch (restoreErr) {
+      throw new Error(`${err instanceof Error ? err.message : String(err)} (flag restore ALSO failed: ${String(restoreErr)})`, { cause: err })
+    }
+    throw err
+  }
+  await setFlag(adminToken, key, before.planDefault)
+  return result
 }
 
 // ---- Session file (written by staging-setup, read by specs + teardown) ----
@@ -248,4 +303,13 @@ export function writeSession(s: E2eSession): void {
 
 export function readSession(): E2eSession {
   return JSON.parse(fs.readFileSync(SESSION_FILE, 'utf8')) as E2eSession
+}
+
+/** Teardown variant: a missing, unreadable or partial file yields null instead of throwing. */
+export function readSessionOrNull(): Partial<E2eSession> | null {
+  try {
+    return JSON.parse(fs.readFileSync(SESSION_FILE, 'utf8')) as Partial<E2eSession>
+  } catch {
+    return null
+  }
 }

@@ -1,4 +1,4 @@
-// T-029 (TA-14.1 load bullet 3, TA-15): 5 GB upload in < 10 minutes. One VU, one iteration: guest draft -> 8 MiB blocks (4 in
+// T-029 (TA-14.1 load bullet 3, TA-15): 5 GB upload in < 10 minutes. One VU, one iteration: draft as the load user -> 8 MiB blocks (4 in
 // flight) straight to Blob -> Put Block List -> finalize. The size is the plan's maxTransferSize (read from the API, no literal).
 import { Trend } from 'k6/metrics';
 import { check } from 'k6';
@@ -11,7 +11,7 @@ const uploadMbps = new Trend('upload_mbps'); // reported, not gated: a runner's 
 
 export const options = {
   scenarios: { upload: { executor: 'per-vu-iterations', vus: 1, iterations: 1, maxDuration: '40m' } },
-  thresholds: { upload_duration_ms: [`max<${TARGETS.uploadMaxMs}`] },
+  thresholds: { upload_duration_ms: [`max<${TARGETS.uploadMaxMs}`], 'http_req_failed{kind:blob}': ['rate<0.01'], checks: ['rate>0.99'] },
   setupTimeout: '2m',
 };
 
@@ -19,7 +19,7 @@ export const options = {
 export function setup() {
   const token = signupIfNeeded(required('LOAD_USER_EMAIL'), required('LOAD_USER_PASSWORD'));
   const limits = planLimits(token);
-  return { totalBytes: limits.maxTransferSize, maxSingleFile: limits.maxSingleFile };
+  return { token, totalBytes: limits.maxTransferSize, maxSingleFile: limits.maxSingleFile };
 }
 
 export default function (data) {
@@ -31,12 +31,12 @@ export default function (data) {
   const block = new ArrayBuffer(BLOCK_SIZE); // allocated ONCE, reused for every block of every file.
   const started = Date.now();
 
-  const draft = createDraft(files, null);
+  const draft = createDraft(files, data.token);
   draft.files.forEach((f, i) => {
     const ids = putBlocks(f.uploadUrl, files[i].sizeBytes, block);
     commitBlockList(f.uploadUrl, ids, files[i].contentType);
   });
-  const fin = finalize(draft.draftId, draft.files.map((f, i) => Object.assign({ fileId: f.fileId }, files[i])), null); // 600 s: server-side copy.
+  const fin = finalize(draft.draftId, draft.files.map((f, i) => Object.assign({ fileId: f.fileId }, files[i])), data.token); // 600 s: server-side copy.
 
   const elapsed = Date.now() - started;
   uploadDuration.add(elapsed);

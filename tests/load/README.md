@@ -81,3 +81,19 @@ This measures send to provider hand-off, not delivery to the inbox. True send to
 
 - The API is reachable directly (external ingress, no Front Door restriction). That is deliberate for load, and a separate infra-review item.
 - Do not run `api-latency.js` through Front Door: the WAF would throttle it and the thresholds would fail for the wrong reason.
+
+## Owner setup checklist (GitHub environment `staging`)
+
+Everything below is an owner step; the workflows only read these values.
+
+| Name | Kind | Value |
+|---|---|---|
+| `STAGING_API_URL` | variable | Full `https://` origin of the API Container App (the `apiFqdn` output of `cd-staging.yml`), no trailing slash. This is the `API_BASE_URL` of the k6 scripts (direct origin, bypasses Front Door). |
+| `PUBLIC_URL` | variable | Front Door origin (`https://...`), used as `PUBLIC_BASE_URL` and as `E2E_BASE_URL`. |
+| `ADMIN_EMAILS` | variable | Must include the e2e admin address (`Wa__AdminEmails`). |
+| `E2E_ADMIN_EMAIL`, `E2E_ADMIN_PASSWORD` | secrets | The e2e admin login; confirm the email once by magic link (see above). |
+| `LOAD_USER_EMAIL`, `LOAD_USER_PASSWORD` | secrets | A synthetic load account (for example `k6-load@example.com`); created on first use. |
+| `BURST_RECIPIENT_TEMPLATE` | secret | Must contain `{n}` and point at mailboxes you own, for example `me+burst{n}@yourdomain`. |
+| `RECIPIENTS_PER_SEND` | required input of `email-burst.js` | Must equal the plan's `limits.free.maxEmails` (Admin, Flags); it is not discovered at run time. |
+
+`summary.json` is built from a whitelist (`metrics`, `state`, `root_group`); `setup_data` (which carries the load user's session token) is never written. `burst-manifest.json` contains the run id and trace ids only.

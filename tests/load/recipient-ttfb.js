@@ -17,6 +17,9 @@ export const options = {
   thresholds: {
     'http_req_waiting{kind:page}': [`p(95)<${TARGETS.ttfbP95Ms}`],
     'http_req_waiting{kind:public_api}': [`p(95)<${TARGETS.ttfbP95Ms}`],
+    'http_req_failed{kind:page}': ['rate<0.01'],
+    'http_req_failed{kind:public_api}': ['rate<0.01'],
+    checks: ['rate>0.99'],
   },
   setupTimeout: '2m',
 };

@@ -43,7 +43,7 @@ export const TARGETS = {
   ttfbP95Ms: 500,
   /** TA-15: 5 GB upload in under 10 minutes on a 100 Mbps line. */
   uploadMaxMs: 600000,
-  /** TA-14.1 email burst: API accept latency of a send (the inbox leg is measured after the run, see README). */
+  /** LOCAL HEURISTIC, not a TA-15 target: API accept latency of a send (TA-15 only sets send -> inbox p95 < 60 s, evaluated post-run). */
   burstAcceptP95Ms: 1000,
   /** TA-15: send -> inbox p95 < 60 s — evaluated with the KQL in the README, k6 cannot see an inbox. */
   emailP95Sec: 60,
@@ -62,7 +62,9 @@ export function summaryHandler(name, extraFiles) {
         lines.push(`${res.ok ? 'ok     ' : 'FAILED '} ${metric} ${expr}`);
       }
     }
-    const out = { 'summary.json': JSON.stringify(data, null, 2), stdout: lines.join('\n') + '\n' };
+    // Whitelist ONLY: setup_data holds the load user's session token / the owner mailbox template and this file is uploaded as an artifact.
+    const safe = { metrics: data.metrics, state: data.state, root_group: data.root_group };
+    const out = { 'summary.json': JSON.stringify(safe, null, 2), stdout: lines.join('\n') + '\n' };
     if (extraFiles) Object.assign(out, extraFiles(data));
     return out;
   };

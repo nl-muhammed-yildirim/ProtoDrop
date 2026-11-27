@@ -20,7 +20,11 @@ export const options = {
   scenarios: {
     burst: { executor: 'per-vu-iterations', vus: SENDS, iterations: 1, maxDuration: '10m' },
   },
-  thresholds: { 'http_req_duration{kind:send}': [`p(95)<${TARGETS.burstAcceptP95Ms}`] },
+  thresholds: {
+    'http_req_duration{kind:send}': [`p(95)<${TARGETS.burstAcceptP95Ms}`],
+    'http_req_failed{kind:send}': ['rate<0.01'],
+    checks: ['rate>0.99'],
+  },
   setupTimeout: '15m',
 };
 
