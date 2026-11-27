@@ -14,6 +14,9 @@ const PREP_PACE_SECONDS = Number(env('PREP_PACE_SECONDS', '1')); // spaces the d
 // Resolved at init so the options can be sized: sends = ceil(TOTAL / perSend). perSend comes from RECIPIENTS_PER_SEND, or
 // (in setup) from the admin flag limits.free.maxEmails; at init only the env route is known, so it is required there.
 const PER_SEND_ENV = env('RECIPIENTS_PER_SEND', undefined);
+if (PER_SEND_ENV !== undefined && !/^[1-9][0-9]*$/.test(PER_SEND_ENV)) {
+  throw new Error(`RECIPIENTS_PER_SEND must be a positive integer (the plan limit limits.free.maxEmails), got "${PER_SEND_ENV}"`);
+}
 const SENDS = PER_SEND_ENV ? Math.ceil(TOTAL / Number(PER_SEND_ENV)) : 1;
 
 export const options = {

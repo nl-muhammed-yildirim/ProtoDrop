@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { mintDownload, publicGet, readSession, seedTransfer, withFlagOverride } from './api'
+import { FlagForbiddenError, mintDownload, publicGet, readSession, seedTransfer, withFlagOverride } from './api'
 import { FLAGS_TTL_SECONDS, RUN_ID, locale, requireRemote } from './env'
 
 const FLAG_KEY = 'limits.free.maxDownloads' // TA-13.2 seeded key.
@@ -24,7 +24,9 @@ test.describe('expiry via admin flag override @staging', () => {
     const en = locale('en')
 
     // Raise-then-restore: the original value is read from the API (no literal limits) and PUT back in finally.
-    const seeded = await withFlagOverride(adminToken, FLAG_KEY, '1', async () => {
+    let seeded: Awaited<ReturnType<typeof seedTransfer>> | undefined
+    try {
+    seeded = await withFlagOverride(adminToken, FLAG_KEY, '1', async () => {
       // The flag cache is per replica, so poll with fresh seeds (the limit is stamped at send) instead of one fixed sleep.
       const deadline = Date.now() + (FLAGS_TTL_SECONDS + 60) * 1000
       for (let attempt = 0; ; attempt++) {
@@ -35,6 +37,11 @@ test.describe('expiry via admin flag override @staging', () => {
         await new Promise((resolve) => setTimeout(resolve, POLL_EVERY_MS))
       }
     })
+    } catch (err) {
+      if (err instanceof FlagForbiddenError) test.skip(true, err.message)
+      throw err
+    }
+    if (!seeded) throw new Error('unreachable: flag override returned no transfer')
 
     // Live transfers never re-resolve limits (FR-018-4), so the restore above is safe; now spend the one download via the API.
     expect(await mintDownload(seeded.linkId, seeded.files[0].fileId)).toBe(200)

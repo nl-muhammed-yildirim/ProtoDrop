@@ -4,6 +4,7 @@ import path from 'node:path'
 
 import { expect, test } from '@playwright/test'
 
+import { noteUiDraft } from './api'
 import { BASE_URL, RUN_ID, locale, requireRemote } from './env'
 
 const en = locale('en')
@@ -25,6 +26,7 @@ test.describe('guest loop @staging', () => {
       await page.goto('/')
       await page.setInputFiles('input[type="file"]', file)
       await expect(page.locator('.sl-row')).toHaveCount(1)
+      await noteUiDraft() // the UI upload does draft + finalize through Front Door.
       await page.locator('.sl-send').click()
       await expect(page.locator('.ls-heading')).toHaveText(en['link.ready.linkReady'], { timeout: 120_000 })
 

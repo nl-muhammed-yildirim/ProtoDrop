@@ -3,7 +3,7 @@
 import { check } from 'k6';
 
 import { env, required, summaryHandler, TARGETS } from './lib/config.js';
-import { get, seedSmallTransfer, signupIfNeeded } from './lib/api.js';
+import { deleteTransfer, get, seedSmallTransfer, signupIfNeeded } from './lib/api.js';
 
 const RATE = Number(env('RATE', '20')); // requests/s per scenario
 const DURATION = env('DURATION', '5m');
@@ -34,6 +34,11 @@ export function setup() {
   const pub = seedSmallTransfer(`k6-public-${suffix}.txt`, null);
   const owned = seedSmallTransfer(`k6-owned-${suffix}.txt`, token);
   return { token, linkId: pub.linkId, ownedId: owned.id };
+}
+
+/** Removes the owned seed so repeated runs do not accumulate against the active-transfers limit. */
+export function teardown(data) {
+  deleteTransfer(data.ownedId, data.token);
 }
 
 export function publicRead(data) {

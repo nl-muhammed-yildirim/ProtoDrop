@@ -4,7 +4,7 @@ import path from 'node:path'
 
 import { request as pwRequest, type APIRequestContext, type APIResponse } from '@playwright/test'
 
-import { API_URL, AUTH_DIR } from './env'
+import { API_URL, AUTH_DIR, BASE_URL } from './env'
 
 /**
  * T-028 (D4-D6, D8): the one deep module for staging HTTP — auth with a 429 retry, public-API seeding (draft -> blob PUT ->
@@ -132,23 +132,46 @@ function browserBlobUrl(mintedUrl: string): string {
 }
 
 /**
- * Seed limiter: Front Door's DraftPerIp rule (10/min) matches /api/v1/transfers/draft INCLUDING finalize, so one seed costs 2
- * matching requests. At most SEEDS_PER_MINUTE seeds (8 matching requests) per rolling minute per run, across every spec — the
- * expiry poll waits here instead of tripping the WAF. With E2E_API_URL set to the direct API origin Front Door is bypassed, but
- * the same pace is kept (harmless, simpler).
+ * Draft-path limiter (second line of defence): Front Door's DraftPerIp rule (10/min) matches /api/v1/transfers/draft INCLUDING
+ * finalize. At most DRAFT_REQUESTS_PER_MINUTE such requests per rolling minute for traffic that goes THROUGH Front Door. The
+ * timestamps live in a gitignored file under e2e/.auth/, so a worker restart does not reset the window. An API seed counts only
+ * when the API origin is the Front Door origin; with E2E_API_URL pointing at the direct API origin (bypasses Front Door) API seeds
+ * are not counted — only UI-driven flows are (noteUiDraft).
  */
-const SEEDS_PER_MINUTE = 4
-const seedTimes: number[] = []
-async function paceSeed(): Promise<void> {
+const DRAFT_REQUESTS_PER_MINUTE = 8
+const DRAFT_TIMES_FILE = path.join(AUTH_DIR, 'draft-times.json')
+const API_VIA_FRONT_DOOR = new URL(API_URL).origin === new URL(BASE_URL).origin
+
+function readDraftTimes(now: number): number[] {
+  try {
+    const all = JSON.parse(fs.readFileSync(DRAFT_TIMES_FILE, 'utf8')) as number[]
+    return all.filter((t) => now - t < 60_000)
+  } catch {
+    return []
+  }
+}
+
+async function reserveDraftRequests(count: number): Promise<void> {
   for (;;) {
     const now = Date.now()
-    while (seedTimes.length > 0 && now - seedTimes[0] >= 60_000) seedTimes.shift()
-    if (seedTimes.length < SEEDS_PER_MINUTE) {
-      seedTimes.push(now)
+    const times = readDraftTimes(now)
+    if (times.length + count <= DRAFT_REQUESTS_PER_MINUTE) {
+      for (let i = 0; i < count; i++) times.push(now)
+      fs.mkdirSync(AUTH_DIR, { recursive: true })
+      fs.writeFileSync(DRAFT_TIMES_FILE, JSON.stringify(times), 'utf8')
       return
     }
-    await new Promise((resolve) => setTimeout(resolve, 60_000 - (now - seedTimes[0]) + 50))
+    await new Promise((resolve) => setTimeout(resolve, Math.max(60_000 - (now - times[0]), 250) + 50))
   }
+}
+
+/** Call BEFORE a UI action that makes a draft + finalize round trip through Front Door (guest upload, My Files Re-send). */
+export async function noteUiDraft(): Promise<void> {
+  await reserveDraftRequests(2)
+}
+
+async function paceSeed(): Promise<void> {
+  if (API_VIA_FRONT_DOOR) await reserveDraftRequests(2) // draft + finalize
 }
 
 /**
@@ -238,9 +261,13 @@ export async function setFlag(adminToken: string, key: string, value: string): P
       data: value,
       headers: { ...sessionHeaders(adminToken), 'Content-Type': 'application/json' },
     })
+    if (res.status() === 403) throw new FlagForbiddenError(`PUT /admin/flags/${key} -> 403 (role/gate drift: the admin session may write flags no more)`)
     if (!res.ok()) throw await failure(`PUT /admin/flags/${key}`, res)
   })
 }
+
+/** Thrown when the admin session may not PUT flags (403); the expiry spec turns it into a skip with this message. */
+export class FlagForbiddenError extends Error {}
 
 /**
  * Proves the SuperAdmin role through GET /auth/me (`role: "superadmin"`): an Operator can READ flags but not PUT them, so a flags
@@ -259,15 +286,17 @@ export async function adminRole(token: string): Promise<string | null> {
 }
 
 /**
- * Sets `key` to `value`, runs `fn`, and ALWAYS restores the flag to its PLAN DEFAULT (not the live-read value, which could itself be
- * a leftover override of a crashed run). A row already overridden at `value` on entry is repaired first and logged. If both `fn`
- * and the restore throw, the original error is rethrown with the restore failure appended.
+ * Sets `key` to `value`, runs `fn`, and ALWAYS restores the flag. The restore target is the value read on entry, unless the row was
+ * already overridden at `value` (leftover of a crashed run): then it is repaired to the PLAN DEFAULT first, logged, and restored there.
+ * If both `fn` and the restore throw, the original error is rethrown with the restore failure appended.
  */
 export async function withFlagOverride<T>(adminToken: string, key: string, value: string, fn: () => Promise<T>): Promise<T> {
   const before = await getFlagRow(adminToken, key)
-  if (before.overridden && before.value === value) {
+  const repaired = before.overridden && before.value === value
+  const restoreTo = repaired ? before.planDefault : before.value
+  if (repaired) {
     console.warn(`[e2e] ${key} was already overridden at ${value} (leftover of an earlier run) — repairing to plan default ${before.planDefault}`)
-    await setFlag(adminToken, key, before.planDefault)
+    await setFlag(adminToken, key, restoreTo)
   }
   await setFlag(adminToken, key, value)
   let result: T
@@ -275,13 +304,13 @@ export async function withFlagOverride<T>(adminToken: string, key: string, value
     result = await fn()
   } catch (err) {
     try {
-      await setFlag(adminToken, key, before.planDefault)
+      await setFlag(adminToken, key, restoreTo)
     } catch (restoreErr) {
       throw new Error(`${err instanceof Error ? err.message : String(err)} (flag restore ALSO failed: ${String(restoreErr)})`, { cause: err })
     }
     throw err
   }
-  await setFlag(adminToken, key, before.planDefault)
+  await setFlag(adminToken, key, restoreTo)
   return result
 }
 

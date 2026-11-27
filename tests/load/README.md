@@ -47,7 +47,7 @@ OSS k6 runs from one machine. Run the script twice with different `ZONE` labels 
 
 ### Upload 5 GB (TA-15)
 
-The size is the load user's `limits.maxTransferSize` from `GET /billing/plan`, split into files of at most `limits.maxSingleFile`. One 8 MiB buffer is reused for every block, so memory stays flat. A GitHub runner's uplink is typically faster than 100 Mbps, so the 10-minute gate is lenient there. Use `upload_mbps` to extrapolate, and run once from a real 100 Mbps line for the honest proof. Each run leaves a 5 GB guest draft that expires after 30 days.
+The upload is a **guest** draft + finalize (no session), so it is not charged against any storage quota. Guest drafts use the free plan's limits; `/billing/plan` needs a session, so `setup()` reads the sizes from the load user's `GET /billing/plan` after asserting its `planCode` is `free`. The size is `limits.maxTransferSize`, split into files of at most `limits.maxSingleFile`. One 8 MiB buffer is reused for every block, so memory stays flat. A GitHub runner's uplink is typically faster than 100 Mbps, so the 10-minute gate is lenient there. Use `upload_mbps` to extrapolate, and run once from a real 100 Mbps line for the honest proof. Each run leaves a 5 GB guest draft that expires after 30 days.
 
 ### Email burst: what k6 can and cannot prove
 

@@ -130,6 +130,16 @@ export function send(transferId, emails, token, traceparent, tags) {
   return http.post(url(`/transfers/${transferId}/send`), body, jsonParams(token, headers, tags));
 }
 
+/** DELETE /transfers/{id} (owner) — cleanup of seeds; failures are ignored. */
+export function deleteTransfer(id, token) {
+  return http.del(url(`/transfers/${id}`), null, jsonParams(token));
+}
+
+/** The caller's whole billing/plan response (planCode + limits). */
+export function planUsage(token) {
+  return mustOk(http.get(url('/billing/plan'), jsonParams(token)), 200, 'billing/plan').json();
+}
+
 /** GET with the kind tag the thresholds select on. */
 export function get(path, token, tags) {
   return http.get(url(path), jsonParams(token, undefined, tags));

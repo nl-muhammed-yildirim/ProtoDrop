@@ -4,7 +4,7 @@ import { Trend } from 'k6/metrics';
 import { check } from 'k6';
 
 import { TARGETS, required, summaryHandler } from './lib/config.js';
-import { BLOCK_SIZE, commitBlockList, createDraft, finalize, planLimits, putBlocks, signupIfNeeded } from './lib/api.js';
+import { BLOCK_SIZE, commitBlockList, createDraft, finalize, planUsage, putBlocks, signupIfNeeded } from './lib/api.js';
 
 const uploadDuration = new Trend('upload_duration_ms', true);
 const uploadMbps = new Trend('upload_mbps'); // reported, not gated: a runner's uplink is not a 100 Mbps line (README).
@@ -15,11 +15,17 @@ export const options = {
   setupTimeout: '2m',
 };
 
-/** Reads the free plan's limits with the load user's session (one login). */
+/**
+ * The upload is a GUEST draft + finalize (no token): an owned finalize would check active bytes + 5 GiB against the storage quota.
+ * Guest drafts always use the FREE plan's limits (CreateDraftHandler), and billing/plan needs a session, so the sizes are read from
+ * the load user's plan after asserting it IS the free plan (one login).
+ */
 export function setup() {
   const token = signupIfNeeded(required('LOAD_USER_EMAIL'), required('LOAD_USER_PASSWORD'));
-  const limits = planLimits(token);
-  return { token, totalBytes: limits.maxTransferSize, maxSingleFile: limits.maxSingleFile };
+  const plan = planUsage(token);
+  if (plan.planCode !== 'free') throw new Error(`load user is on plan "${plan.planCode}", not the guest default (free) — use a free-plan account`);
+  const limits = plan.limits;
+  return { totalBytes: limits.maxTransferSize, maxSingleFile: limits.maxSingleFile };
 }
 
 export default function (data) {
@@ -31,12 +37,12 @@ export default function (data) {
   const block = new ArrayBuffer(BLOCK_SIZE); // allocated ONCE, reused for every block of every file.
   const started = Date.now();
 
-  const draft = createDraft(files, data.token);
+  const draft = createDraft(files, null);
   draft.files.forEach((f, i) => {
     const ids = putBlocks(f.uploadUrl, files[i].sizeBytes, block);
     commitBlockList(f.uploadUrl, ids, files[i].contentType);
   });
-  const fin = finalize(draft.draftId, draft.files.map((f, i) => Object.assign({ fileId: f.fileId }, files[i])), data.token); // 600 s: server-side copy.
+  const fin = finalize(draft.draftId, draft.files.map((f, i) => Object.assign({ fileId: f.fileId }, files[i])), null); // 600 s: server-side copy.
 
   const elapsed = Date.now() - started;
   uploadDuration.add(elapsed);

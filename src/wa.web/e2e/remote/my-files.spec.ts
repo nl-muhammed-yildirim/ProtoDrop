@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { publicGet, readSession, seedTransfer } from './api'
+import { noteUiDraft, publicGet, readSession, seedTransfer } from './api'
 import { AUTH_DIR, RUN_ID, locale, requireRemote } from './env'
 
 const en = locale('en')
@@ -21,6 +21,7 @@ test.describe('my files CRUD @staging', () => {
     await expect(rows).toHaveCount(1)
 
     // U: Re-send -> the resend screen mints a new draft; link-only send; back on /files there are two rows.
+    await noteUiDraft() // Re-send mints a new draft (and finalizes) through Front Door.
     await rows.first().getByRole('button', { name: en['files.action.resend'] }).click()
     await expect(page.locator('.ls-send-btn')).toBeVisible({ timeout: 60_000 })
     await page.locator('.ls-send-btn').click()
