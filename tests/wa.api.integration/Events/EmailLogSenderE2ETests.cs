@@ -244,12 +244,12 @@ public class EmailLogSenderE2ETests : IAsyncLifetime
         var before = _capture.Mails().Count;
         await RunWorkerAsync(TransferCreatedEnvelope(transferId));
         var recipientMails = _capture.Mails().Skip(before).ToList();
-        Assert.Equal("r@example.com", Assert.Single(recipientMails).To); // recipient unaffected; muted stays muted; owner never mailed
+        Assert.Equal(EmailMask.Mask("r@example.com"), Assert.Single(recipientMails).To); // recipient unaffected; muted stays muted; owner never mailed
 
         before = _capture.Mails().Count;
         await RunBillingWorkerAsync(ownerId, owner);
         var billing = Assert.Single(_capture.Mails().Skip(before).ToList()); // AC-046-3: billing exempt
-        Assert.Equal(owner, billing.To);
+        Assert.Equal(EmailMask.Mask(owner), billing.To);
         Assert.Equal("Your ProtoDrop payment didn't go through", billing.Subject);
 
         await using (var db = NewDb()) // independent rows: neither mechanism touched the other
