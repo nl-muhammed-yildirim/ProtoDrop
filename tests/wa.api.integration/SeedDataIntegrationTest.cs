@@ -72,7 +72,7 @@ public class SeedDataIntegrationTest : IAsyncLifetime
         {
             Id = Guid.Parse("11111111-0000-4000-8000-000000000002"),
             Code = "pro", Name = "Pro", SortOrder = 2,
-            LimitsJson = "{\"maxTransferSize\":10737418240,\"maxSingleFile\":10737418240,\"maxZipSize\":9223372036854775807,\"retentionDays\":30,\"graceDays\":3,\"maxDownloads\":1000,\"maxEmails\":100,\"storageQuota\":107374182400,\"activeTransfersMax\":200,\"maxLogoSize\":1048576}",
+            LimitsJson = "{\"maxTransferSize\":21474836480,\"maxSingleFile\":21474836480,\"maxZipSize\":9223372036854775807,\"retentionDays\":30,\"graceDays\":3,\"maxDownloads\":1000,\"maxEmails\":100,\"storageQuota\":107374182400,\"activeTransfersMax\":200,\"maxLogoSize\":1048576}",
             FeaturesJson = "{\"ads\":false,\"scheduling\":true,\"analytics\":true,\"branding\":true,\"sso_scim\":false}",
             PriceJson = "{\"currency\":\"USD\",\"monthly\":{\"amount\":900,\"stripePriceId\":null},\"annual\":{\"amount\":9000,\"stripePriceId\":null},\"perSeatMonthly\":null}"
         },

@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 
+import { API_BASE } from '../../core/config/apiBase'
 import { formatBytes } from '../../core/upload/formatBytes'
 import type { ListTransfersResponse, MyTransferRowDto } from './formatting'
 import { getTraceParent } from '../../core/traceparent'
@@ -20,8 +21,7 @@ interface FilesPageProps {
   onNewTransfer: () => void   // App owns navigation to "/" (goHome precedent — T-008-07)
 }
 
-// T-009-05: fixed local port, no proxy, no env vars yet (AuthPage API_BASE line-14 precedent).
-const API_BASE = 'http://localhost:8080/api/v1'
+// T-009-05: fixed local port, no proxy, base from VITE_WA_API_BASE (CHORE-deploy-hardening) (AuthPage API_BASE line-14 precedent).
 
 /**
  * T-016-03 (EC-016-2): the delete-confirm dialog owns its own focus trap. The hook must be called by a

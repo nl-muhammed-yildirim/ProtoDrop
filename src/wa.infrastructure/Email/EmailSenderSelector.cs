@@ -21,14 +21,46 @@ public static class EmailSenderSelector
     /// <summary>From address used when <see cref="FromAddressKey"/> is not configured.</summary>
     public const string DefaultFromAddress = "no-reply@protodrop.com";
 
+    /// <summary>Value of <see cref="SenderKey"/> that selects the log-only sender.</summary>
+    public const string LogSender = "log";
+
+    /// <summary>
+    /// Configuration keys that name the host environment, first non-blank wins. Read from configuration (not
+    /// <c>IHostEnvironment</c>) because the isolated worker host does not reliably map AZURE_FUNCTIONS_ENVIRONMENT.
+    /// </summary>
+    public static readonly IReadOnlyList<string> EnvironmentKeys =
+        ["AZURE_FUNCTIONS_ENVIRONMENT", "DOTNET_ENVIRONMENT", "ASPNETCORE_ENVIRONMENT"];
+
+    /// <summary>
+    /// CHORE-deploy-hardening (TA-9.4): refuses the log-only sender outside Local/Development, because it writes
+    /// message bodies (magic links) to the logs. An unset environment counts as Production.
+    /// </summary>
+    /// <param name="configuration">Configuration source; reads the sender key and the environment keys.</param>
+    /// <exception cref="InvalidOperationException">Thrown when the sender is <c>log</c> and the environment is not Local or Development (names keys and environment, never a secret).</exception>
+    public static void EnsureSenderAllowed(IConfiguration configuration)
+    {
+        if (!string.Equals(configuration[SenderKey], LogSender, StringComparison.Ordinal))
+            return;
+
+        var environment = EnvironmentKeys.Select(k => configuration[k]).FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+        if (string.Equals(environment, "Development", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(environment, "Local", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        throw new InvalidOperationException(
+            $"{SenderKey}={LogSender} is allowed only when the host environment is Local or Development "
+            + $"(AZURE_FUNCTIONS_ENVIRONMENT / DOTNET_ENVIRONMENT / ASPNETCORE_ENVIRONMENT); current: '{environment ?? "(unset = Production)"}'.");
+    }
+
     /// <summary>Builds the email sender that the configuration selects.</summary>
     /// <param name="configuration">Configuration source; reads the sender, from-address and connection keys.</param>
     /// <param name="loggerFactory">Factory for the logger of the chosen sender.</param>
     /// <returns>The log-only sender when the sender key is <c>log</c>; otherwise a Communication Services sender.</returns>
-    /// <exception cref="InvalidOperationException">Thrown when a real sender is selected but the connection string is missing (the message names the key only).</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the log sender is selected outside Local/Development, or when a real sender is selected but the connection string is missing (messages name keys only).</exception>
     public static IEmailSender Create(IConfiguration configuration, ILoggerFactory loggerFactory)
     {
-        if (configuration[SenderKey] == "log")
+        EnsureSenderAllowed(configuration);
+        if (configuration[SenderKey] == LogSender)
             return new LogEmailSender(loggerFactory.CreateLogger<LogEmailSender>());
 
         var connection = configuration[ConnectionKey];

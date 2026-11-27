@@ -43,8 +43,8 @@ public sealed class PlanConfiguration : IEntityTypeConfiguration<Plan>
                 Code = "pro",
                 Name = "Pro",
                 SortOrder = 2,
-                // D-07 stand-in (ESCALATIONS.md E-004): maxTransferSize 10 GB until D-07 is answered.
-                LimitsJson = "{\"maxTransferSize\":10737418240,\"maxSingleFile\":10737418240,\"maxZipSize\":9223372036854775807,\"retentionDays\":30,\"graceDays\":3,\"maxDownloads\":1000,\"maxEmails\":100,\"storageQuota\":107374182400,\"activeTransfersMax\":200,\"maxLogoSize\":1048576}",
+                // D-07 confirmed 2026-11-26: Pro 20 GB (maxTransferSize / maxSingleFile).
+                LimitsJson = "{\"maxTransferSize\":21474836480,\"maxSingleFile\":21474836480,\"maxZipSize\":9223372036854775807,\"retentionDays\":30,\"graceDays\":3,\"maxDownloads\":1000,\"maxEmails\":100,\"storageQuota\":107374182400,\"activeTransfersMax\":200,\"maxLogoSize\":1048576}",
                 FeaturesJson = "{\"ads\":false,\"scheduling\":true,\"analytics\":true,\"branding\":true,\"sso_scim\":false}",
                 // D-07 placeholder — prices pending D-07; stripePriceId operator-set per runbook (D-12).
                 PriceJson = "{\"currency\":\"USD\",\"monthly\":{\"amount\":900,\"stripePriceId\":null},\"annual\":{\"amount\":9000,\"stripePriceId\":null},\"perSeatMonthly\":null}"

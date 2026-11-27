@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { API_BASE } from '../../core/config/apiBase'
 import i18n from '../../core/i18n/init'
 import { useAriaLive } from '../../core/ui/useAriaLive'
 import { ProgressThrottle } from '../../core/ui/ariaLiveThrottle'
@@ -30,10 +31,10 @@ import { toBrowserBlobUrl } from '../../core/blob/azuriteSas'
  * /api/v1/transfers/draft in row order and hands the minted draft to the engine's start().
  */
 
- // T-001-09 (Send wiring): the API is cross-origin at a fixed local port — no proxy, no env vars yet (ADR row).
- const DRAFT_ENDPOINT = 'http://localhost:8080/api/v1/transfers/draft'
+ // T-001-09 (Send wiring): base from VITE_WA_API_BASE (local default is cross-origin :8080; staging is same-origin /api/v1).
+ const DRAFT_ENDPOINT = `${API_BASE}/transfers/draft`
  // T-001-10 (TA-4.2#2): finalize — server-side blob copy staging→transfers + mint linkId; {draftId} filled per send().
- const FINALIZE_ENDPOINT = 'http://localhost:8080/api/v1/transfers/draft/{draftId}/finalize'
+ const FINALIZE_ENDPOINT = `${API_BASE}/transfers/draft/{draftId}/finalize`
 
  /**
   * T-001-10 (TA-4.2#2): finalize response wire shape — mirrors Program.cs L229 exactly (id in 'n'-form, status "Draft").

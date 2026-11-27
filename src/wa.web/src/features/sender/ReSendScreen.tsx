@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 
+import { API_BASE } from '../../core/config/apiBase'
 import LinkScreen from './LinkScreen'
 import { getTraceParent } from '../../core/traceparent'
 import i18n from '../../core/i18n/init'
@@ -26,7 +27,7 @@ type ResendTransferResult = {
 }
 
 // T-010-03 (FR-010-4): endpoint 16 — POST /api/v1/transfers/{id}/resend (same fixed-port style as existing endpoints).
-const RESEND_ENDPOINT = 'http://localhost:8080/api/v1/transfers/{id}/resend'
+const RESEND_ENDPOINT = `${API_BASE}/transfers/{id}/resend`
 
 type ReSendState =
   | { phase: 'loading' }

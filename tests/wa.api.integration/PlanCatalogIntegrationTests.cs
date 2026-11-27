@@ -87,7 +87,7 @@ public class PlanCatalogIntegrationTests : IAsyncLifetime
         await using (var writeDb = new WaDbContext(_options))
         {
             var flag = await writeDb.Set<FeatureFlag>().SingleAsync(f => f.Key == "limits." + pro.Code + ".maxTransferSize");
-            flag.Value = "21474836480"; // 20 GB — a test value, not a constant change.
+            flag.Value = "32212254720"; // 30 GB — a test value, not a constant change.
             flag.UpdatedAtUtc = DateTime.UtcNow;
             await writeDb.SaveChangesAsync();
         }
@@ -98,7 +98,7 @@ public class PlanCatalogIntegrationTests : IAsyncLifetime
 
         now += TimeSpan.FromSeconds(2);
         var after = await provider.Resolve(pro.Code, CancellationToken.None);
-        Assert.Equal(21_474_836_480L, after.MaxTransferSize);
+        Assert.Equal(32_212_254_720L, after.MaxTransferSize);
     }
 
     [Fact]

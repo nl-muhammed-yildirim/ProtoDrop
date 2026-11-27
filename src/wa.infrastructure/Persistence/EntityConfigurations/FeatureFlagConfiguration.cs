@@ -64,7 +64,7 @@ public sealed class FeatureFlagConfiguration : IEntityTypeConfiguration<FeatureF
             Limit("limits.free.scheduling", "false"),
             Limit("limits.free.ssoScim", "false"),
             Limit("limits.free.storageQuota", "5368709120"),
-            // D-07 stand-in (ESCALATIONS.md E-004): Pro maxTransferSize 10 GB until D-07 is answered.
+            // D-07 confirmed 2026-11-26: Pro 20 GB (maxTransferSize / maxSingleFile).
             Limit("limits.pro.activeTransfersMax", "200"),
             Limit("limits.pro.ads", "false"),
             Limit("limits.pro.analytics", "true"),
@@ -73,8 +73,8 @@ public sealed class FeatureFlagConfiguration : IEntityTypeConfiguration<FeatureF
             Limit("limits.pro.maxDownloads", "1000"),
             Limit("limits.pro.maxEmails", "100"),
             Limit("limits.pro.maxLogoSize", "1048576"),
-            Limit("limits.pro.maxSingleFile", "10737418240"),
-            Limit("limits.pro.maxTransferSize", "10737418240"),
+            Limit("limits.pro.maxSingleFile", "21474836480"),
+            Limit("limits.pro.maxTransferSize", "21474836480"),
             Limit("limits.pro.maxZipSize", "9223372036854775807"),
             Limit("limits.pro.retentionDays", "30"),
             Limit("limits.pro.scheduling", "true"),

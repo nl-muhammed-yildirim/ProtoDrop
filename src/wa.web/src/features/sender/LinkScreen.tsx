@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { API_BASE } from '../../core/config/apiBase'
 import { useUploadEngine } from '../../core/upload/UploadEngine'
 import { getTraceParent } from '../../core/traceparent'
 import { MAX_EMAILS, parseRecipients, validateAddress } from './recipients'
@@ -40,7 +41,7 @@ type SendResponse = {
 type SendPhase = 'form' | 'sent'
 
 // T-002-04 (TA-4.2#3): endpoint 3 — activate the Draft transfer; {id} filled per component (same fixed-port style as StagingList's DRAFT_ENDPOINT).
-const SEND_ENDPOINT = 'http://localhost:8080/api/v1/transfers/{id}/send'
+const SEND_ENDPOINT = `${API_BASE}/transfers/{id}/send`
 
 /**
  * T-002-03: Link screen — the hero card shown after finalize.
