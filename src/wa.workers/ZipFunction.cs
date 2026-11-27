@@ -43,15 +43,15 @@ public partial class ZipFunction(
     private readonly IConfiguration _config = config;
     private readonly ILogger<ZipFunction> _logger = logger;
 
-    /// <summary>HTTP entry point <c>POST zip/{transferId}</c>: builds the zip of a transfer, streaming it to blob storage, and answers with the outcome. Requires a valid <c>x-zip-sign</c> header; an existing zip is reused.</summary>
+    /// <summary>HTTP entry point <c>POST api/zip/{transferId}</c>: builds the zip of a transfer, streaming it to blob storage, and answers with the outcome. Requires a valid <c>x-zip-sign</c> header; an existing zip is reused.</summary>
     /// <param name="context">Function invocation context.</param>
     /// <param name="req">The HTTP request, which carries the <c>x-zip-sign</c> and optional <c>traceparent</c> headers.</param>
-    /// <param name="transferIdParam">Route value: id of the transfer to zip.</param>
+    /// <param name="transferId">Route value: id of the transfer to zip.</param>
     /// <returns>A JSON response describing the result, or a problem response for a bad signature, unknown transfer or exceeded zip limit.</returns>
     [Function("Zip")]
     public async Task<HttpResponseData> Run(
         FunctionContext context,
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "zip/{transferId}")] HttpRequestData req, string transferIdParam)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = ZipHandOff.Route)] HttpRequestData req, string transferId)
     {
         // T-012-01: read-or-generate W3C traceparent for log correlation (TA-10.1, FR-012-1).
         // MEL BeginScope stores the scope in an AsyncLocal — subsequent _logger.* calls carry it.
@@ -67,7 +67,7 @@ public partial class ZipFunction(
             return CreateProblemResponse(req, 401, ProblemCodes.Unauthenticated, "Invalid or missing signature.");
 
         // Parse transferId as Guid → 404 if malformed (bound from route template zip/{transferId})
-        if (!Guid.TryParse(transferIdParam, out var id))
+        if (!Guid.TryParse(transferId, out var id))
             return CreateProblemResponse(req, 404, ProblemCodes.NotFound, "Transfer not found.");
 
         // Load files by transfer Id
