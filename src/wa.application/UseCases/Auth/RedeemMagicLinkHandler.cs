@@ -10,6 +10,7 @@ namespace wa.application.UseCases.Auth;
 /// <summary>
 /// T-008-04 (FR-008-1 / FR-008-3): redeem a magic-link token — verify single-use + expiry, sign in, mint session token.
 /// Unknown email → create AppUser on redeem (sign-up is sign-in); user_created emitted BEFORE login_success.
+/// Existing unconfirmed account → confirmed and its unverified password wiped; soft-deleted account → LinkExpiredException.
 /// Expired/redeemed/unknown → LinkExpiredException (410 Gone at endpoint).
 /// </summary>
 /// <param name="tokens">Store that looks up and redeems the token row.</param>
@@ -82,6 +83,21 @@ public sealed class RedeemMagicLinkHandler(
         }
         else
         {
+            // CHORE-staging-blockers: a soft-deleted account is never signed in — same shape as an expired link (no-leak), like login/signup.
+            if (existingUser.DeletedAtUtc is not null)
+                throw LinkExpiredException.ForLinkExpired();
+
+            // CHORE-staging-blockers: redeeming proves ownership of the email. An account that was never confirmed may have been pre-registered
+            // by someone else with a password they chose, so confirm it and discard that unverified password (the owner sets a new one via forgot-password).
+            if (!existingUser.EmailConfirmed)
+            {
+                // One UPDATE: confirm + wipe the password + move the session epoch (kills sessions minted at the pre-registration). 0 rows = deleted in between, so no session.
+                if (!await _users.ConfirmEmailAndClearPasswordAsync(existingUser.Id, _timeProvider.GetUtcNow().UtcDateTime, cancellationToken))
+                    throw LinkExpiredException.ForLinkExpired();
+                existingUser.EmailConfirmed = true;
+                existingUser.PasswordHash = null;
+            }
+
             user = existingUser;
         }
 

@@ -255,6 +255,8 @@ public class MeProfileTests
             await Task.CompletedTask;
         }
 
+        public Task<bool> ConfirmEmailAndClearPasswordAsync(Guid userId, DateTime nowUtc, CancellationToken ct) => Task.FromResult(true);
+        public Task<DateTime?> GetSessionsValidAfterUtcAsync(Guid userId, CancellationToken ct) => Task.FromResult<DateTime?>(null);
         public Task<bool> SoftDeleteWithReHomeAsync(Guid userId, DateTime deletedAtUtc, CancellationToken ct)
         {
             SoftDeletes.Add((userId, deletedAtUtc)); // record the call (D-4 test 6/7 assertions)

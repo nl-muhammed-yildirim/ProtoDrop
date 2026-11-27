@@ -63,6 +63,7 @@ public class AdminOverviewEmailHealthTests : IAsyncLifetime
             Email = AdminEmail.ToLowerInvariant(),
             DisplayName = "Health Test",
             PlanId = planId,
+            EmailConfirmed = true, // the admin role needs a confirmed email (CHORE-staging-blockers)
             CreatedAtUtc = DateTime.UtcNow
         });
         await _db.SaveChangesAsync();
@@ -118,6 +119,20 @@ public class AdminOverviewEmailHealthTests : IAsyncLifetime
         Assert.True(root.TryGetProperty("emailFailedTotal", out _));
         Assert.True(root.TryGetProperty("lastSuccessfulDeliveryAge", out _));
         Assert.True(root.TryGetProperty("dlqCount", out _));
+    }
+
+    // ---- CHORE-staging-blockers: the admin role needs a confirmed email (pre-account hijack of an admin address) ----
+
+    [Fact]
+    public async Task AdminOverview_AdminEmailNotConfirmed_Returns403_Forbidden()
+    {
+        await _db.Set<AppUser>().Where(u => u.Id == _adminUserId).ExecuteUpdateAsync(s => s.SetProperty(u => u.EmailConfirmed, false));
+
+        using var response = await WithSessionCookieAsync(HttpMethod.Get, "/api/v1/admin/overview");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsByteArrayAsync());
+        Assert.Equal("FORBIDDEN", doc.RootElement.GetProperty("code").GetString());
     }
 
     // ---- TA-9.1 cookie idiom (same as UnsubscribeEndpointTests) ----

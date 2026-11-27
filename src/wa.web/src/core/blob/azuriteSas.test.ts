@@ -46,7 +46,9 @@ describe('isAzuriteBlobUrl', () => {
     'http://localhost:10000/staging/x',
     'http://host.docker.internal:10000/staging/x',
     'http://[::1]:10000/staging/x',
-    'http://example.test:9999/devstoreaccount1/x',
+    'http://127.0.0.1:9999/devstoreaccount1/x',
+    'http://localhost/devstoreaccount1/x',
+    'http://example.test:10000/devstoreaccount1/x',
   ])('is true for %s', (url) => {
     expect(isAzuriteBlobUrl(url)).toBe(true)
   })
@@ -56,6 +58,8 @@ describe('isAzuriteBlobUrl', () => {
     'https://azurite.example.com/transfers/x',
     'http://127.0.0.1:8080/x',
     'not a url',
+    'https://acct.blob.core.windows.net/devstoreaccount1/blob?sig=a',
+    'http://example.test:9999/devstoreaccount1/x',
   ])('is false for %s', (url) => {
     expect(isAzuriteBlobUrl(url)).toBe(false)
   })

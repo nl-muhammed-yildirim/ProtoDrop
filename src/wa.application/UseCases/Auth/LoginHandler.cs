@@ -40,6 +40,7 @@ public sealed class LoginHandler(
         AppUser? user = await _users.FindByEmailAsync(email, cancellationToken);
         if (user is null)
         {
+            PasswordSignIn.BurnVerifyCost(request.Password); // same PBKDF2 cost as a real verify — no timing signal for "unknown email"
             _telemetry.LogEvent(TelemetryEvents.LoginFailed); // AC-008-1 / task §4: login_failed on the wrong-password path
             throw LoginWrongPasswordException.ForWrongPassword(); // no row → same shape as wrong password (no-leak)
         }

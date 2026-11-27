@@ -55,7 +55,7 @@ public class AdminGateRoleTests
     private static Dictionary<string, object> BuildMeBody(AppUser? user, HashSet<string>? adminEmails = null, HashSet<string>? operatorEmails = null)
     {
         var roleField = user?.Email is { } email
-            ? AdminRolePolicy.RoleField(AdminRolePolicy.Resolve(email.ToLowerInvariant(), adminEmails ?? AdminEmails, operatorEmails ?? OperatorEmails))
+            ? AdminRolePolicy.RoleField(AdminRolePolicy.Resolve(email.ToLowerInvariant(), user.EmailConfirmed, adminEmails ?? AdminEmails, operatorEmails ?? OperatorEmails))
             : null;
 
         var meBody = new Dictionary<string, object>
@@ -83,6 +83,7 @@ public class AdminGateRoleTests
             DisplayName = "Ada Lovelace",
             Theme = "system",
             PlanId = Guid.NewGuid(),
+            EmailConfirmed = true,
             CreatedAtUtc = DateTime.UtcNow
         };
 
@@ -91,6 +92,8 @@ public class AdminGateRoleTests
         // T-008-06 D-1 contract: null when unknown OR soft-deleted — /auth/me maps that to 404 NOT_FOUND.
         public Task<AppUser?> GetByIdAsync(Guid userId, CancellationToken ct) => Task.FromResult(userId == UserByEmail?.Id ? UserByEmail : null);
         public Task UpdateProfileAsync(Guid userId, string? displayName, string? theme, CancellationToken ct) => Task.CompletedTask;
+        public Task<bool> ConfirmEmailAndClearPasswordAsync(Guid userId, DateTime nowUtc, CancellationToken ct) => Task.FromResult(true);
+        public Task<DateTime?> GetSessionsValidAfterUtcAsync(Guid userId, CancellationToken ct) => Task.FromResult<DateTime?>(null);
         public Task<bool> SoftDeleteWithReHomeAsync(Guid userId, DateTime deletedAtUtc, CancellationToken ct) => Task.FromResult(true);
     }
 }
