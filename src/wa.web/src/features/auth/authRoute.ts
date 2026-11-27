@@ -9,3 +9,17 @@ export const ACCOUNT_PATH_RE = /^\/account(\/.*)?$/
 export function matchAccountPath(pathname: string): boolean {
   return ACCOUNT_PATH_RE.test(pathname)
 }
+
+/** CHORE-magic-link-redeem (FR-008-1, EC-008-3): emailed link path — {origin}/auth?ml={token}. */
+export const MAGIC_LINK_PATH = '/auth'
+
+/**
+ * Returns the redeem token for `/auth?ml=<token>`, else null. `URLSearchParams` decodes `%2B`; a legacy
+ * unencoded `+` arrives as a space, which base64 never contains — map it back so pre-deploy links still work.
+ */
+export function matchMagicLinkRedeem(pathname: string, search: string): string | null {
+  if (pathname !== MAGIC_LINK_PATH) return null
+  const raw = new URLSearchParams(search).get('ml')
+  if (!raw) return null
+  return raw.replace(/ /g, '+')
+}

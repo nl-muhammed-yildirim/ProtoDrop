@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { API_BASE } from './core/config/apiBase'
 import TopBar from './core/TopBar'
@@ -15,7 +15,8 @@ import DropZone from './features/landing/DropZone'
 import StagingList from './features/landing/StagingList'
 import { useFinalize } from './features/landing/finalizeState'
 import AuthPage from './features/auth/AuthPage'
-import { matchAccountPath } from './features/auth/authRoute'
+import MagicLinkRedeemPage from './features/auth/MagicLinkRedeemPage'
+import { matchAccountPath, matchMagicLinkRedeem } from './features/auth/authRoute'
 import ProfilePage from './features/profile/ProfilePage'
 import { matchProfilePath, PROFILE_PATH } from './features/profile/profileRoute'
 import PlanPage from './features/billing/PlanPage'
@@ -42,6 +43,8 @@ import ErrorScreen from './features/errors/ErrorScreen'
  */
 export default function App() {
   const [pathname, setPathname] = useState(() => (typeof window === 'undefined' ? '/' : window.location.pathname))
+  // CHORE-magic-link-redeem: query string for the emailed /auth?ml= link; same SSR-safe init + popstate refresh as pathname.
+  const [search, setSearch] = useState(() => (typeof window === 'undefined' ? '' : window.location.search))
   // T-008-03: lazy-init from localStorage; the typeof-window guard inside readSession keeps SSR null.
   const [session, setSession] = useState<StoredProfile | null>(() => readSession())
 
@@ -53,7 +56,10 @@ export default function App() {
   const [, setLimitsVersion] = useState(0)
 
   useEffect(() => {
-    const onPop = () => setPathname(window.location.pathname)
+    const onPop = () => {
+      setPathname(window.location.pathname)
+      setSearch(window.location.search)
+    }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
   }, [])
@@ -68,6 +74,7 @@ export default function App() {
 
   const linkId = matchLinkPath(pathname)
   const unsubscribeToken = matchUnsubscribePath(pathname)
+  const magicLinkToken = matchMagicLinkRedeem(pathname, search)
   // T-010-03 (FR-010-4): re-send route — /resend/{originalTransferId}; requires a signed-in user (T-010-01 owner scope).
   const resendTransferId = matchResendPath(pathname)
   // T-011-10 (FR-011-2): admin console — /admin/{screen}; role gating happens inside AdminShell via /auth/me.
@@ -89,6 +96,17 @@ export default function App() {
     window.history.pushState('', '', '/')
     window.dispatchEvent(new PopStateEvent('popstate')) // existing popstate listener updates pathname.
   }
+
+  // One sign-in callback for password login (AuthPage) and the emailed-link redeem page; stable identity so the redeem effect never re-runs.
+  // goHome only touches window + popstate (no state), so the empty dep list is correct.
+  const handleSignedIn = useCallback((p: StoredProfile) => { setSession(p); goHome() }, [])
+
+  // Emailed-link redeem: MagicLinkRedeemPage has already REPLACED the /auth?ml=<token> entry with '/' (no push, so Back
+  // never re-lands on the consumed link); only the session + the popstate refresh are left to do here.
+  const handleRedeemed = useCallback((p: StoredProfile) => {
+    setSession(p)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }, [])
 
   const handleSignOut = () => {
     // T-008-07: POST /auth/logout clears the server-side wa.session cookie (T-008-06, TA-4.2#13).
@@ -136,6 +154,9 @@ export default function App() {
         <main>
           {unsubscribeToken !== null ? (
             <UnsubscribePage token={unsubscribeToken} />
+          ) : magicLinkToken !== null ? (
+            // CHORE-magic-link-redeem (FR-008-1, EC-008-3): emailed /auth?ml= link — redeems regardless of current session.
+            <MagicLinkRedeemPage token={magicLinkToken} onSignedIn={handleRedeemed} />
           ) : session && matchProfilePath(pathname) ? (
             <ProfilePage profile={session} onSignedIn={setSession} onThemeChange={handleThemeChange} onDeleteAccount={handleDeleteAccount} />
           ) : session && matchPlanPath(pathname) ? (
@@ -151,7 +172,7 @@ export default function App() {
           ) : matchAccountPath(pathname) ? (
             // Signed-out guest keeps the sign-in card; /account/profile with no session falls
             // through here too (it still matches ACCOUNT_PATH_RE — order above is what wins).
-            <AuthPage onSignedIn={(p) => { setSession(p); goHome() }} />
+            <AuthPage onSignedIn={handleSignedIn} />
           ) : linkId !== null ? (
             <RecipientPage linkId={linkId} />
           ) : pathname === '/' ? (
