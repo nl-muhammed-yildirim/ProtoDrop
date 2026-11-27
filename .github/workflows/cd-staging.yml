@@ -31,6 +31,9 @@ jobs:
     environment: staging
     outputs:
       public_url: ${{ steps.url.outputs.public_url }}
+      # Direct API Container App origin (bypasses Front Door): e2e seeding uses it so the WAF
+      # draft rule (10/min per IP, TA-9.5) only sees the UI-driven flows.
+      api_url: ${{ steps.apiurl.outputs.api_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -141,6 +144,10 @@ jobs:
                deployerPrincipalId='${{ secrets.AZURE_DEPLOYER_OBJECT_ID }}' \
                alertEmails='${{ vars.ALERT_EMAILS || '[]' }}' -o none
 
+      - name: Direct API origin for e2e seeding
+        id: apiurl
+        run: echo "api_url=https://${{ steps.apps.outputs.api }}" >> "$GITHUB_OUTPUT"
+
       - name: Smoke — GET /health (DB + Service Bus)
         run: |
           host='${{ steps.apps.outputs.fd }}'
@@ -170,6 +177,7 @@ jobs:
         working-directory: src/wa.web
         env:
           E2E_BASE_URL: ${{ needs.deploy.outputs.public_url }}
+          E2E_API_URL: ${{ needs.deploy.outputs.api_url }}
           # The admin account must be in vars.ADMIN_EMAILS AND confirmed once by magic link (tests/load/README.md);
           # until then expiry-flag.spec.ts skips with a reason.
           E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
