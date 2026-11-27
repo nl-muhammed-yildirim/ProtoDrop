@@ -7,7 +7,7 @@ namespace wa.api.Middleware;
 /// Valid → sets user id in HttpContext.Items['wa.session.userId'] for endpoints 13–15; refreshes cookie when lifetime &lt; 15 days (rolling).
 /// Missing/invalid/expired → guest (item null). No response writes except Set-Cookie refresh.
 /// </summary>
-public sealed class SessionMiddleware
+public sealed partial class SessionMiddleware
 {
     /// <summary>Key under which the middleware stores the session user id (a nullable <see cref="Guid"/>) in <c>HttpContext.Items</c>; absent or null for guests.</summary>
     public const string SessionUserIdKey = "wa.session.userId";
@@ -16,14 +16,17 @@ public sealed class SessionMiddleware
     private readonly RequestDelegate _next;
     private readonly ISessionTokenMinter _tokens; // production = SessionTokenService (minter + reader in one class so format can't drift)
     private readonly TimeProvider _timeProvider;
+    private readonly ILogger<SessionMiddleware> _logger;
 
     /// <summary>Initializes a new instance of the <see cref="SessionMiddleware"/> class.</summary>
     /// <param name="next">Next middleware in the pipeline.</param>
     /// <param name="tokens">Reads session cookies and decides when a cookie needs renewal.</param>
     /// <param name="timeProvider">Clock source; <see cref="TimeProvider.System"/> in production.</param>
+    /// <param name="logger">Logger used when the session epoch cannot be read.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="tokens"/> or <paramref name="timeProvider"/> is null.</exception>
-    public SessionMiddleware(RequestDelegate next, ISessionTokenMinter tokens, TimeProvider timeProvider)
+    public SessionMiddleware(RequestDelegate next, ISessionTokenMinter tokens, TimeProvider timeProvider, ILogger<SessionMiddleware> logger)
     {
+        _logger = logger;
         _next = next;
         _tokens = tokens ?? throw new ArgumentNullException(nameof(tokens));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
@@ -45,7 +48,24 @@ public sealed class SessionMiddleware
         if (_tokens.Parse(sessionCookie) is { } parsed)
         {
             var (userId, expUtc, issuedAtUtc) = parsed;
-            var validAfter = await users.GetSessionsValidAfterUtcAsync(userId, context.RequestAborted);
+            DateTime? validAfter;
+            try
+            {
+                validAfter = await users.GetSessionsValidAfterUtcAsync(userId, context.RequestAborted);
+            }
+            catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+            {
+                return; // the client went away: end the request quietly (nothing to answer)
+            }
+            catch (Exception ex)
+            {
+                // This middleware runs before GlobalErrorMiddleware, so an unhandled throw would be a bare 500. Fail CLOSED: without the epoch the token
+                // cannot be trusted, so the request continues as a guest (no session user, no renewal) and the endpoint answers in Problem+JSON as usual.
+                LogEpochReadFailed(_logger, ex);
+                await _next(context);
+                return;
+            }
+
             if (!SessionRevocation.IsRevoked(issuedAtUtc, validAfter))
             {
                 context.Items[SessionUserIdKey] = userId;
@@ -61,6 +81,9 @@ public sealed class SessionMiddleware
 
         await _next(context);
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Session epoch read failed; treating the request as a guest session")]
+    private static partial void LogEpochReadFailed(ILogger logger, Exception exception);
 
     private static void SetSessionCookie(HttpContext context, string token) =>
         context.Response.Cookies.Append(CookieName, token, new CookieOptions

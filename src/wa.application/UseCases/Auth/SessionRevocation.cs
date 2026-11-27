@@ -15,6 +15,9 @@ public static class SessionRevocation
     /// <returns><see langword="true"/> when the token must be treated as a guest session; <see langword="false"/> when it is accepted.</returns>
     public static bool IsRevoked(DateTime issuedAtUtc, DateTime? sessionsValidAfterUtc)
     {
+        // The epoch is stamped by the instance that handled the owner's redeem, the token's iat by the instance that minted it, each from its own clock,
+        // so a small cross-instance skew is possible. It is not practically exploitable: only a token minted within that skew window BEFORE the owner's redeem
+        // could survive, and the attacker cannot time the owner's redeem (it is triggered by a link only the owner receives).
         if (sessionsValidAfterUtc is not { } epoch)
             return false;
 
