@@ -657,7 +657,7 @@ Single-row claim in `JobRun`: `INSERT (JobKey, RunAtUtc=trunc(now,15m), LockUnti
 
 ### TA-6.6 `f-zip` (spec — F-TRF-004)
 
-1. `POST /zip/{transferId}` (Front Door `x-forwarded-for` + shared secret header `x-zip-sign`).
+1. `POST /api/zip/{transferId}` — Functions host default `api` route prefix; route + URL builder shared via `ZipHandOff` (CHORE-zip-route-prefix, 2026-11-27) (Front Door `x-forwarded-for` + shared secret header `x-zip-sign`).
 2. If `transfers/{id}/all.zip` exists → return its URL.
 3. Else: stream files (ordered by `SortOrder`) through a `System.IO.Archive.ZipArchive` in **stream mode** into a new blob (`maxBufferSize=4MB`, `leaveOpen=true`), entry names = `OriginalName` with `_1`/`_2` de-dup.
 4. On success: emit `zip.generated`; on failure: delete partial, 500 + `zip_failed` telemetry.
