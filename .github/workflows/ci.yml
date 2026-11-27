@@ -164,3 +164,11 @@ jobs:
             done
             grep -qi "https://example.blob.core.windows.net" <<<"$h" || { echo "WA_BLOB_ORIGIN not rendered on $path" >&2; docker logs web; exit 1; }
           done
+
+  # T-029: k6 scripts parse and their options/thresholds are valid (no load is generated).
+  k6-inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: grafana/setup-k6-action@v1
+      - run: for f in tests/load/*.js; do echo "== $f"; k6 inspect "$f" > /dev/null; done

@@ -1,0 +1,52 @@
+# T-029 (TA-14.1 Load, TA-15 targets): manual k6 runs against staging. Thresholds live in the scripts;
+# a breached threshold fails the run. Docs + owner prerequisites: tests/load/README.md.
+name: Load staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      script:
+        description: k6 script under tests/load
+        type: choice
+        options: [api-latency, recipient-ttfb, upload-5gb, email-burst]
+      zone:
+        description: Zone label for this run (TTFB from 2 zones = two runs, D in tests/load/README.md)
+        type: string
+        default: gh-hosted
+      recipients_per_send:
+        description: email-burst only — recipients per send; must equal the load user's plan maxEmails (no default, read it from the admin Flags screen)
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  k6:
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: grafana/setup-k6-action@v1
+      - name: k6 run ${{ inputs.script }}
+        env:
+          API_BASE_URL: ${{ vars.STAGING_API_URL }}
+          PUBLIC_BASE_URL: ${{ vars.PUBLIC_URL }}
+          LOAD_USER_EMAIL: ${{ secrets.LOAD_USER_EMAIL }}
+          LOAD_USER_PASSWORD: ${{ secrets.LOAD_USER_PASSWORD }}
+          ZONE: ${{ inputs.zone }}
+          BURST_RECIPIENT_TEMPLATE: ${{ secrets.BURST_RECIPIENT_TEMPLATE }}
+          RECIPIENTS_PER_SEND: ${{ inputs.recipients_per_send }}
+          BURST_RUN_ID: ${{ github.run_id }}
+          E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+          E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+        run: k6 run "tests/load/${{ inputs.script }}.js"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-${{ inputs.script }}-${{ inputs.zone }}
+          path: |
+            summary.json
+            burst-manifest.json
+          if-no-files-found: ignore
