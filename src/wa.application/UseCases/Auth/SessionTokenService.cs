@@ -29,13 +29,13 @@ public sealed class SessionTokenService : ISessionTokenMinter
     {
         var now = _clock();
         var expSeconds = (now + TimeSpan.FromDays(LifetimeDays)).ToUnixTimeSeconds();
-        return Sign(userId, expSeconds);
+        return Sign(userId, expSeconds, now.ToUnixTimeMilliseconds());
     }
 
     /// <summary>Decodes a session token, verifies its HMAC-SHA256 signature in constant time and checks its expiry.</summary>
     /// <param name="token">Raw cookie value; may be null or empty.</param>
-    /// <returns>The user id and UTC expiry, or <see langword="null"/> when the token is missing, malformed, tampered with or expired.</returns>
-    public (Guid UserId, DateTime ExpUtc)? Parse(string? token)
+    /// <returns>The user id, UTC expiry and UTC issue time (explicit <c>iat</c> in milliseconds; a legacy three-segment token derives it as expiry minus <see cref="LifetimeDays"/>), or <see langword="null"/> when the token is missing, malformed, tampered with or expired.</returns>
+    public (Guid UserId, DateTime ExpUtc, DateTime IssuedAtUtc)? Parse(string? token)
     {
         if (string.IsNullOrEmpty(token))
             return null;
@@ -44,15 +44,17 @@ public sealed class SessionTokenService : ISessionTokenMinter
         {
             var str = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(token));
             var parts = str.Split('|');
-            if (parts.Length != 3)
+            // Current format: userId|exp|iatMs|sig. Legacy (still accepted): userId|exp|sig, issue time derived from exp.
+            if (parts.Length is not (3 or 4))
                 return null;
             var userIdPart = parts[0];
             var expPart = parts[1];
-            var sig = parts[2];
+            var iatPart = parts.Length == 4 ? parts[2] : null;
+            var sig = parts[^1];
 
             // TA-9.1: HMAC-SHA256 over the first two segments, fixed-time compare (the exact logic T-008-02 lifts out of Program.cs).
             using var hmac = new HMACSHA256(_key);
-            var expectedSig = Convert.ToBase64String(hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes($"{userIdPart}|{expPart}")));
+            var expectedSig = Convert.ToBase64String(hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(iatPart is null ? $"{userIdPart}|{expPart}" : $"{userIdPart}|{expPart}|{iatPart}")));
             if (!CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(sig), System.Text.Encoding.UTF8.GetBytes(expectedSig)))
                 return null; // tampered signature → guest (AC-008-1 cookie round-trip)
 
@@ -63,7 +65,15 @@ public sealed class SessionTokenService : ISessionTokenMinter
             if (_clock().UtcDateTime > expUtc)
                 return null; // expired → guest (AC-008-1 cookie round-trip)
 
-            return (uid, expUtc);
+            var issuedAtUtc = expUtc - TimeSpan.FromDays(LifetimeDays);
+            if (iatPart is not null)
+            {
+                if (!long.TryParse(iatPart, out var iatMs))
+                    return null;
+                issuedAtUtc = DateTimeOffset.FromUnixTimeMilliseconds(iatMs).UtcDateTime;
+            }
+
+            return (uid, expUtc, issuedAtUtc);
         }
         catch
         {
@@ -78,9 +88,9 @@ public sealed class SessionTokenService : ISessionTokenMinter
     public bool NeedsRenewal(DateTime expUtc, DateTime nowUtc) =>
         expUtc - nowUtc <= TimeSpan.FromDays(RenewRemainingDays);
 
-    private string Sign(Guid userId, long expSeconds)
+    private string Sign(Guid userId, long expSeconds, long issuedAtMs)
     {
-        var unsigned = $"{userId:N}|{expSeconds}";
+        var unsigned = $"{userId:N}|{expSeconds}|{issuedAtMs}";
         using var hmac = new HMACSHA256(_key);
         var sig = Convert.ToBase64String(hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(unsigned)));
         return Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{unsigned}|{sig}"));

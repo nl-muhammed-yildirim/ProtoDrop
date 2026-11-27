@@ -64,6 +64,7 @@ public class AdminFlagsEndpointTests : IAsyncLifetime
             Email = AdminEmail.ToLowerInvariant(),
             DisplayName = "Flags Test",
             PlanId = planId,
+            EmailConfirmed = true, // the admin role needs a confirmed email (CHORE-staging-blockers)
             CreatedAtUtc = DateTime.UtcNow
         });
         await _db.SaveChangesAsync();

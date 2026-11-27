@@ -90,9 +90,21 @@ public class WorkerServicesTests
     {
         var settings = BaseSettings();
         settings["Wa:Email:Sender"] = "log";
+        settings["DOTNET_ENVIRONMENT"] = "Development"; // CHORE-deploy-hardening: log sender is allowed in dev only
         using var sp = Build(InMemory(settings));
 
         Assert.NotNull(sp.GetRequiredService<wa.application.UseCases.Transfers.SendNotificationEmailsHandler>());
+    }
+
+    [Fact]
+    public void LogSender_InProduction_FailsAtComposition() // CHORE-deploy-hardening: fail fast, not on first send
+    {
+        var settings = BaseSettings();
+        settings["Wa:Email:Sender"] = "log";
+
+        var ex = Assert.Throws<InvalidOperationException>(() => Build(InMemory(settings)));
+
+        Assert.Contains("Wa:Email:Sender", ex.Message);
     }
 
     [Fact]

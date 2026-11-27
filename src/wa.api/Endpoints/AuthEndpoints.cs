@@ -171,7 +171,7 @@ internal static class AuthEndpoints
             {
                 var result = await sender.Send(new GetProfileCommand(userId), ct);
                 // T-011-01 (TA-9.2 / UI-Reference §5.6): additive role field — "superadmin" or "operator"; ABSENT for non-admin so the UI renders disabled buttons with tooltip, not hidden elements.
-                var roleField = AdminRolePolicy.RoleField(AdminRolePolicy.Resolve(result.Email.ToLowerInvariant(), adminGate.AdminEmails, adminGate.OperatorEmails));
+                var roleField = AdminRolePolicy.RoleField(AdminRolePolicy.Resolve(result.Email.ToLowerInvariant(), result.EmailConfirmed, adminGate.AdminEmails, adminGate.OperatorEmails));
                 // TA-4.2a exact key set (signup/login verbatim order). Dictionary preserves insertion order — the additive 'role' key is present ONLY when non-null, so a non-admin's body carries no role key at all (not "role":null).
                 var meBody = new Dictionary<string, object>
                 {

@@ -21,8 +21,8 @@ describe('planLimits module', () => {
   })
 
   it('setPlanLimits swaps in a real per-user source without literals elsewhere', () => {
-    setPlanLimits({ maxTransferSize: 10737418240, maxSingleFile: 10737418240 }) // Pro seed.
-    expect(getPlanLimits().maxTransferSize).toBe(10737418240)
+    setPlanLimits({ maxTransferSize: 21474836480, maxSingleFile: 21474836480 }) // Pro seed.
+    expect(getPlanLimits().maxTransferSize).toBe(21474836480)
   })
 })
 

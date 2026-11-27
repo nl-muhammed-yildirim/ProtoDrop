@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { API_BASE } from '../../core/config/apiBase'
 import type { StoredProfile } from '../../core/auth/session'
 import { writeSession } from '../../core/auth/session'
 import { getTraceParent } from '../../core/traceparent'
@@ -12,8 +13,7 @@ interface AuthPageProps {
 type Tab = 'sign-in' | 'sign-up'
 type Phase = 'form' | 'link-sent'
 
-// T-008-03: fixed local port, no proxy, no env vars yet (StagingList DRAFT_ENDPOINT precedent).
-const API_BASE = 'http://localhost:8080/api/v1'
+// T-008-03: fixed local port, no proxy, base from VITE_WA_API_BASE (CHORE-deploy-hardening) (StagingList DRAFT_ENDPOINT precedent).
 
 /**
  * T-008-03 (UI-Reference §5.5): auth screen at /account. Single card with copy-only Sign in / Sign up tabs

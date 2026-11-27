@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { API_BASE } from '../../core/config/apiBase'
 import { formatBytes } from '../../core/upload/formatBytes'
 import type { AdminUserRowDto, SearchParams } from './usersData'
 import { PLANS, buildSearchQuery, formatCreatedAt, parseSearchResponse, planIdForName } from './usersData'
@@ -9,8 +10,7 @@ interface AdminUsersPageProps {
   role: 'SuperAdmin' | 'Operator'   // T-011-10 precedent — AdminShell narrows /auth/me's role and passes it down.
 }
 
-// T-011-03 (FR-011-2): fixed local port, no proxy, no env vars yet (AdminShell + FilesPage precedent).
-const API_BASE = 'http://localhost:8080/api/v1'
+// T-011-03 (FR-011-2): fixed local port, no proxy, base from VITE_WA_API_BASE (CHORE-deploy-hardening) (AdminShell + FilesPage precedent).
 
 /**
  * T-011-12 (FR-011-2): admin Users screen at /admin/users — endpoint 22.

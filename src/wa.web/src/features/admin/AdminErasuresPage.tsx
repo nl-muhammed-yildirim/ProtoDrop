@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { API_BASE } from '../../core/config/apiBase'
 import i18n from '../../core/i18n/init'
 import { getTraceParent } from '../../core/traceparent'
 import type { ErasureRowDto } from './erasuresData'
 import { buildErasuresQuery, isLagging, parseErasuresResponse, toCsv } from './erasuresData'
 import { formatCreatedAt } from './usersData'
 
-// Fixed local port, no proxy, no env vars (AdminUsersPage precedent).
-const API_BASE = 'http://localhost:8080/api/v1'
+// Fixed local port, no proxy, base from VITE_WA_API_BASE (CHORE-deploy-hardening) (AdminUsersPage precedent).
 
 /**
  * US-047-03 (FR-047-6, UI-Reference §5.6): read-only Admin → Erasures screen — GET /admin/erasures.

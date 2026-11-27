@@ -186,6 +186,8 @@ public class AdminForceDeleteUserCommandTests
         public Task UpdateProfileAsync(Guid userId, string? displayName, string? theme, CancellationToken ct) =>
             Task.CompletedTask;
 
+        public Task<bool> ConfirmEmailAndClearPasswordAsync(Guid userId, DateTime nowUtc, CancellationToken ct) => Task.FromResult(true);
+        public Task<DateTime?> GetSessionsValidAfterUtcAsync(Guid userId, CancellationToken ct) => Task.FromResult<DateTime?>(null);
         public Task<bool> SoftDeleteWithReHomeAsync(Guid userId, DateTime deletedAtUtc, CancellationToken ct)
         {
             SoftDeleteCallCount++;

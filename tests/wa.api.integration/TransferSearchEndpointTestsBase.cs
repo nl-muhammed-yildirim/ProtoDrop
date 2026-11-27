@@ -71,6 +71,7 @@ public abstract class TransferSearchEndpointTestsBase(bool gateOn) : IAsyncLifet
             Email = AdminEmail.ToLowerInvariant(),
             DisplayName = "Search Test",
             PlanId = planId,
+            EmailConfirmed = true, // the admin role needs a confirmed email (CHORE-staging-blockers)
             CreatedAtUtc = DateTime.UtcNow
         });
         await Db.SaveChangesAsync();

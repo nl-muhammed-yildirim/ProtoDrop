@@ -9,6 +9,13 @@ namespace wa.application.UseCases.Auth;
 /// </summary>
 internal static class PasswordSignIn
 {
+    private static readonly string DummyHash = new PasswordHasher<string>().HashPassword("dummy", "dummy-password-for-timing");
+
+    /// <summary>Runs a PBKDF2 verify against a fixed dummy hash so the unknown-email path costs the same as a real verification; the result is discarded.</summary>
+    /// <param name="password">Plain-text password from the request.</param>
+    internal static void BurnVerifyCost(string password) =>
+        _ = new PasswordHasher<string>().VerifyHashedPassword("dummy", DummyHash, password);
+
     /// <summary>
     /// Decides whether the given password signs the account in: PBKDF2-SHA256 via <see cref="PasswordHasher{TUser}"/>, keyed by <c>userId.ToString("n")</c>.
     /// A soft-deleted account and a magic-link-only account (no hash) are never accepted.

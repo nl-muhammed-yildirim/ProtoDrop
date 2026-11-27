@@ -59,24 +59,32 @@ public class AdminRolePolicyTests
         var admin = new HashSet<string> { "ada@example.com" };
         var operatorList = new HashSet<string>();
 
-        Assert.Equal(AdminRole.SuperAdmin, AdminRolePolicy.Resolve("ada@example.com", admin, operatorList)); // absent/empty Wa:OperatorEmails → SuperAdmin (task file DECISION line)
+        Assert.Equal(AdminRole.SuperAdmin, AdminRolePolicy.Resolve("ada@example.com", true, admin, operatorList)); // absent/empty Wa:OperatorEmails → SuperAdmin (task file DECISION line)
 
         operatorList.Add("ada@example.com");
-        Assert.Equal(AdminRole.Operator, AdminRolePolicy.Resolve("ada@example.com", admin, operatorList)); // same email, list changed → role FLIPS to Operator
+        Assert.Equal(AdminRole.Operator, AdminRolePolicy.Resolve("ada@example.com", true, admin, operatorList)); // same email, list changed → role FLIPS to Operator
 
         var emptyAdmin = new HashSet<string>();
-        Assert.Equal(AdminRole.Operator, AdminRolePolicy.Resolve("ada@example.com", emptyAdmin, operatorList)); // removed from Wa:AdminEmails but still in Wa:OperatorEmails → stays Operator (EC-011-3: role is a pure function of the two lists)
+        Assert.Equal(AdminRole.Operator, AdminRolePolicy.Resolve("ada@example.com", true, emptyAdmin, operatorList)); // removed from Wa:AdminEmails but still in Wa:OperatorEmails → stays Operator (EC-011-3: role is a pure function of the two lists)
 
-        Assert.Null(AdminRolePolicy.Resolve("ada@example.com", new HashSet<string>(), new HashSet<string>())); // in NEITHER list → null (non-admin) — gate rejects with FORBIDDEN
+        Assert.Null(AdminRolePolicy.Resolve("ada@example.com", true, new HashSet<string>(), new HashSet<string>())); // in NEITHER list → null (non-admin) — gate rejects with FORBIDDEN
 
-        Assert.Equal(AdminRole.Operator, AdminRolePolicy.Resolve("grace@example.com", admin, new HashSet<string> { "grace@example.com" })); // Operator-only email (not in Wa:AdminEmails) still resolves
+        Assert.Equal(AdminRole.Operator, AdminRolePolicy.Resolve("grace@example.com", true, admin, new HashSet<string> { "grace@example.com" })); // Operator-only email (not in Wa:AdminEmails) still resolves
+    }
+
+    [Fact]
+    public void Resolve_UnconfirmedEmail_NeverGetsARole()
+    {
+        var admin = new HashSet<string> { "ada@example.com" };
+        Assert.Null(AdminRolePolicy.Resolve("ada@example.com", false, admin, new HashSet<string>())); // pre-account hijack: anyone can sign up with an admin email first
+        Assert.Null(AdminRolePolicy.Resolve("ada@example.com", false, new HashSet<string>(), admin)); // operators too
     }
 
     [Fact]
     public void Resolve_CaseInsensitive_BothLists()
     {
         var admin = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "ada@example.com" };
-        Assert.Equal(AdminRole.SuperAdmin, AdminRolePolicy.Resolve("ADA@EXAMPLE.COM", admin, new HashSet<string>())); // AppUser.Email stored lowercased; config may not be — compare case-insensitively
+        Assert.Equal(AdminRole.SuperAdmin, AdminRolePolicy.Resolve("ADA@EXAMPLE.COM", true, admin, new HashSet<string>())); // AppUser.Email stored lowercased; config may not be — compare case-insensitively
     }
 
     // ---- UI-Reference §5.6: additive /auth/me role field values (endpoint 13) ----

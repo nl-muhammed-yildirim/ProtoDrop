@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 
+import { API_BASE } from '../../core/config/apiBase'
 import AdminErasuresPage from './AdminErasuresPage'
 import AdminFlagsPage from './AdminFlagsPage'
 import AdminOverviewPage from './AdminOverviewPage'
@@ -14,8 +15,7 @@ interface AdminShellProps {
   screen: AdminScreen
 }
 
-// T-011-03 (FR-011-2): fixed local port, no proxy, no env vars yet (AuthPage + FilesPage precedent).
-const API_BASE = 'http://localhost:8080/api/v1'
+// T-011-03 (FR-011-2): fixed local port, no proxy, base from VITE_WA_API_BASE (CHORE-deploy-hardening) (AuthPage + FilesPage precedent).
 
 type RoleState =
   | { kind: 'loading' }
