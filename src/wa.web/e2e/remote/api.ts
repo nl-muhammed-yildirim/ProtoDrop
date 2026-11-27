@@ -306,11 +306,16 @@ export async function withFlagOverride<T>(adminToken: string, key: string, value
     try {
       await setFlag(adminToken, key, restoreTo)
     } catch (restoreErr) {
-      throw new Error(`${err instanceof Error ? err.message : String(err)} (flag restore ALSO failed: ${String(restoreErr)})`, { cause: err })
+      throw new Error(`${err instanceof Error ? err.message : String(err)} (flag restore ALSO failed — ${key} left at ${value}; restore it in Admin → Flags: ${String(restoreErr)})`, { cause: err })
     }
     throw err
   }
-  await setFlag(adminToken, key, restoreTo)
+  try {
+    await setFlag(adminToken, key, restoreTo)
+  } catch (restoreErr) {
+    // Never a FlagForbiddenError here: a failed restore must FAIL the run (the override already changed staging state).
+    throw new Error(`flag restore failed — ${key} left at ${value}; restore it in Admin → Flags (${String(restoreErr)})`, { cause: restoreErr })
+  }
   return result
 }
 
