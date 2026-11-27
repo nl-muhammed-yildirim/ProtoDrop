@@ -21,6 +21,11 @@ public class AppUser
     public DateTime CreatedAtUtc { get; set; }
     /// <summary>Soft-delete marker (TA-3.1): UTC instant the account was deleted, null while active.</summary>
     public DateTime? DeletedAtUtc { get; set; }
+    /// <summary>
+    /// TA-9.1 session epoch: session tokens issued before this UTC instant are rejected (set when an unconfirmed account is confirmed, so a session
+    /// minted at a pre-registration signup dies). Null = no session was ever revoked.
+    /// </summary>
+    public DateTime? SessionsValidAfterUtc { get; set; }
     /// <summary>F-PRF-001 FR-021-1: organization shown beside the sender name; at most 60 chars. PII (TA-9.4).</summary>
     public string? OrgName { get; set; }
     /// <summary>F-PRF-001 FR-021-1: ORG_NAME_MAX_LENGTH — the NVARCHAR width of <see cref="OrgName"/>.</summary>

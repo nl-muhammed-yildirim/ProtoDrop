@@ -13,12 +13,12 @@ public interface ISessionTokenMinter
     string Mint(Guid userId);
 
     /// <summary>
-    /// TA-9.1 PARSE side: decode + verify the signed session token — returns the resolved user id + expiry, or null on
+    /// TA-9.1 PARSE side: decode + verify the signed session token — returns the resolved user id + expiry + issue time, or null on
     /// missing/malformed/tampered/expired (TA-9.1: guest path). The SessionMiddleware is the single read site (T-008-02).
     /// </summary>
     /// <param name="token">Raw cookie value; may be null or empty.</param>
-    /// <returns>The user id and expiry of a valid token, or <see langword="null"/> when it is missing, malformed, tampered with or expired.</returns>
-    (Guid UserId, DateTime ExpUtc)? Parse(string? token);
+    /// <returns>The user id, expiry and issue time of a valid token, or <see langword="null"/> when it is missing, malformed, tampered with or expired.</returns>
+    (Guid UserId, DateTime ExpUtc, DateTime IssuedAtUtc)? Parse(string? token);
 
     /// <summary>
     /// FR-008-2 / TA-9.1 30-day rolling: true when the token has less than RenewRemainingDays remaining — the middleware

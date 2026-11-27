@@ -91,7 +91,9 @@ public sealed class RedeemMagicLinkHandler(
             // by someone else with a password they chose, so confirm it and discard that unverified password (the owner sets a new one via forgot-password).
             if (!existingUser.EmailConfirmed)
             {
-                await _users.ConfirmEmailAndClearPasswordAsync(existingUser.Id, cancellationToken);
+                // One UPDATE: confirm + wipe the password + move the session epoch (kills sessions minted at the pre-registration). 0 rows = deleted in between, so no session.
+                if (!await _users.ConfirmEmailAndClearPasswordAsync(existingUser.Id, _timeProvider.GetUtcNow().UtcDateTime, cancellationToken))
+                    throw LinkExpiredException.ForLinkExpired();
                 existingUser.EmailConfirmed = true;
                 existingUser.PasswordHash = null;
             }

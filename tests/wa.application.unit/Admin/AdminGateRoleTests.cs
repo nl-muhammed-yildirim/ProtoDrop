@@ -92,7 +92,8 @@ public class AdminGateRoleTests
         // T-008-06 D-1 contract: null when unknown OR soft-deleted — /auth/me maps that to 404 NOT_FOUND.
         public Task<AppUser?> GetByIdAsync(Guid userId, CancellationToken ct) => Task.FromResult(userId == UserByEmail?.Id ? UserByEmail : null);
         public Task UpdateProfileAsync(Guid userId, string? displayName, string? theme, CancellationToken ct) => Task.CompletedTask;
-        public Task ConfirmEmailAndClearPasswordAsync(Guid userId, CancellationToken ct) => Task.CompletedTask;
+        public Task<bool> ConfirmEmailAndClearPasswordAsync(Guid userId, DateTime nowUtc, CancellationToken ct) => Task.FromResult(true);
+        public Task<DateTime?> GetSessionsValidAfterUtcAsync(Guid userId, CancellationToken ct) => Task.FromResult<DateTime?>(null);
         public Task<bool> SoftDeleteWithReHomeAsync(Guid userId, DateTime deletedAtUtc, CancellationToken ct) => Task.FromResult(true);
     }
 }

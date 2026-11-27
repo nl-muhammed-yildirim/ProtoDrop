@@ -105,6 +105,21 @@ public class RedeemMagicLinkTests
 
         Assert.NotEmpty(result.SessionToken);
         Assert.Equal([user.Id], _users.ConfirmedAndWiped);
+        Assert.NotNull(_users.LastEpoch); // the session epoch moves in the same call, so sessions minted before this point die
+    }
+
+    [Fact]
+    public async Task Redeem_AccountDeletedBetweenLookupAndConfirm_ThrowsLinkExpired_NoSession()
+    {
+        var user = SeedRealAppUser(Guid.NewGuid(), _plans.Plan.Id);
+        _users.ExistingUser = user;
+        _users.ConfirmResult = false; // 0 rows updated: the row is gone or soft-deleted by now
+        SeedLiveToken("real@example.com");
+
+        await Assert.ThrowsAsync<LinkExpiredException>(async () =>
+            await _handler.Handle(new RedeemMagicLinkCommand(_tokens.Raw!), CancellationToken.None));
+
+        Assert.DoesNotContain(_telemetryLogger.Entries, e => e.RenderedText == TelemetryEvents.LoginSuccess);
     }
 
     [Fact]
@@ -288,11 +303,17 @@ public class RedeemMagicLinkTests
         public Task UpdateProfileAsync(Guid userId, string? displayName, string? theme, CancellationToken ct) => Task.CompletedTask;
         public List<Guid> ConfirmedAndWiped { get; } = [];
 
-        public Task ConfirmEmailAndClearPasswordAsync(Guid userId, CancellationToken ct)
+        public DateTime? LastEpoch { get; private set; }
+        public bool ConfirmResult { get; set; } = true;
+
+        public Task<bool> ConfirmEmailAndClearPasswordAsync(Guid userId, DateTime nowUtc, CancellationToken ct)
         {
             ConfirmedAndWiped.Add(userId);
-            return Task.CompletedTask;
+            LastEpoch = nowUtc;
+            return Task.FromResult(ConfirmResult);
         }
+
+        public Task<DateTime?> GetSessionsValidAfterUtcAsync(Guid userId, CancellationToken ct) => Task.FromResult<DateTime?>(null);
 
         public Task<bool> SoftDeleteWithReHomeAsync(Guid userId, DateTime deletedAtUtc, CancellationToken ct) => Task.FromResult(true);
     }

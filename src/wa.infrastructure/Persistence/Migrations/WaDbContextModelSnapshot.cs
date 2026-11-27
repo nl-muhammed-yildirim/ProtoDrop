@@ -62,6 +62,9 @@ namespace wa.infrastructure.Persistence.Migrations
                     b.Property<Guid>("PlanId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTime?>("SessionsValidAfterUtc")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("Theme")
                         .IsRequired()
                         .ValueGeneratedOnAdd()

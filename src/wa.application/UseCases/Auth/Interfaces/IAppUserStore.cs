@@ -42,10 +42,21 @@ public interface IAppUserStore
     Task<bool> SoftDeleteWithReHomeAsync(Guid userId, DateTime deletedAtUtc, CancellationToken ct);
 
     /// <summary>
-    /// CHORE-staging-blockers: a magic-link redeem proves ownership of the email, so mark it confirmed and discard the password set while it was unverified
-    /// (an attacker may have pre-registered the address). A soft-deleted or unknown id is left alone.
+    /// CHORE-staging-blockers: a magic-link redeem proves ownership of the email, so mark it confirmed, discard the password set while it was unverified
+    /// (an attacker may have pre-registered the address) and move the session epoch to <paramref name="nowUtc"/> so every session minted before this point dies, all in one UPDATE.
+    /// A soft-deleted or unknown id is left alone.
     /// </summary>
     /// <param name="userId">Id of the user whose email was just proven.</param>
+    /// <param name="nowUtc">The instant stored as the new session epoch.</param>
     /// <param name="ct">Token that cancels the operation.</param>
-    Task ConfirmEmailAndClearPasswordAsync(Guid userId, CancellationToken ct);
+    /// <returns><see langword="true"/> when a live row was updated; <see langword="false"/> when the account is gone or soft-deleted.</returns>
+    Task<bool> ConfirmEmailAndClearPasswordAsync(Guid userId, DateTime nowUtc, CancellationToken ct);
+
+    /// <summary>
+    /// TA-9.1: read the account's session epoch (<c>SessionsValidAfterUtc</c>) for the session middleware: one narrow keyed read per authenticated request.
+    /// </summary>
+    /// <param name="userId">Id of the session user.</param>
+    /// <param name="ct">Token that cancels the operation.</param>
+    /// <returns>The epoch, or <see langword="null"/> when none was ever set or the id is unknown.</returns>
+    Task<DateTime?> GetSessionsValidAfterUtcAsync(Guid userId, CancellationToken ct);
 }

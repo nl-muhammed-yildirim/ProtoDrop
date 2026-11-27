@@ -55,12 +55,23 @@ public sealed class AppUserStore(IDbContextFactory<WaDbContext> factory) : IAppU
     }
 
     /// <inheritdoc />
-    public async Task ConfirmEmailAndClearPasswordAsync(Guid userId, CancellationToken ct)
+    public async Task<bool> ConfirmEmailAndClearPasswordAsync(Guid userId, DateTime nowUtc, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);
-        await db.Set<AppUser>()
+        var updated = await db.Set<AppUser>()
             .Where(u => u.Id == userId && u.DeletedAtUtc == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(u => u.EmailConfirmed, true).SetProperty(u => u.PasswordHash, (string?)null), ct);
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(u => u.EmailConfirmed, true)
+                .SetProperty(u => u.PasswordHash, (string?)null)
+                .SetProperty(u => u.SessionsValidAfterUtc, (DateTime?)nowUtc), ct);
+        return updated > 0;
+    }
+
+    /// <inheritdoc />
+    public async Task<DateTime?> GetSessionsValidAfterUtcAsync(Guid userId, CancellationToken ct)
+    {
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        return await db.Set<AppUser>().AsNoTracking().Where(u => u.Id == userId).Select(u => u.SessionsValidAfterUtc).FirstOrDefaultAsync(ct);
     }
 
     /// <inheritdoc />

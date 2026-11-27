@@ -30,22 +30,32 @@ public sealed class SessionMiddleware
     }
 
     /// <summary>Reads the session cookie, publishes the user id for later middleware and endpoints, and renews the cookie when it is close to expiry.</summary>
+    /// <remarks>
+    /// CHORE-staging-blockers r2: a validly signed token is also checked against the account's session epoch (one narrow keyed read per authenticated request;
+    /// no cache, so a revocation takes effect on the very next request). A revoked token is a guest session and is never renewed. This is the single place a session
+    /// becomes a user id, so <c>AdminGate</c> and <c>/auth/me</c> inherit the check through <c>Items[SessionUserIdKey]</c>.
+    /// </remarks>
     /// <param name="context">The current HTTP context.</param>
-    public async Task InvokeAsync(HttpContext context)
+    /// <param name="users">Store used to read the session epoch.</param>
+    public async Task InvokeAsync(HttpContext context, IAppUserStore users)
     {
         var sessionCookie = context.Request.Cookies[CookieName];
 
         // TA-9.1: single parsing site — the middleware owns the read; endpoints 13–15 just read the Items value (T-008-06).
         if (_tokens.Parse(sessionCookie) is { } parsed)
         {
-            var (userId, expUtc) = parsed;
-            context.Items[SessionUserIdKey] = userId;
-
-            // FR-008-2 / TA-9.1 30-day rolling: re-mint when remaining lifetime < RenewRemainingDays (frozen threshold).
-            if (_tokens.NeedsRenewal(expUtc, _timeProvider.GetUtcNow().UtcDateTime))
+            var (userId, expUtc, issuedAtUtc) = parsed;
+            var validAfter = await users.GetSessionsValidAfterUtcAsync(userId, context.RequestAborted);
+            if (!SessionRevocation.IsRevoked(issuedAtUtc, validAfter))
             {
-                var newToken = _tokens.Mint(userId);
-                SetSessionCookie(context, newToken);
+                context.Items[SessionUserIdKey] = userId;
+
+                // FR-008-2 / TA-9.1 30-day rolling: re-mint when remaining lifetime < RenewRemainingDays (frozen threshold).
+                if (_tokens.NeedsRenewal(expUtc, _timeProvider.GetUtcNow().UtcDateTime))
+                {
+                    var newToken = _tokens.Mint(userId);
+                    SetSessionCookie(context, newToken);
+                }
             }
         }
 
