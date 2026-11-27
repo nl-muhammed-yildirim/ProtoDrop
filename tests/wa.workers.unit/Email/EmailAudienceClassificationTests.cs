@@ -1,6 +1,6 @@
-using System.Reflection;
 using Microsoft.Extensions.Logging;
 using Xunit;
+using wa.application.Ports;
 using wa.application.UseCases.Auth;
 using wa.application.UseCases.Billing;
 using wa.application.UseCases.EmailSettings;
@@ -65,6 +65,21 @@ public class EmailAudienceClassificationTests
             .OrderBy(t => t.FullName)
             .ToList();
         Assert.Equal(Handlers.Keys.OrderBy(t => t.FullName), found);
+    }
+
+    [Fact]
+    public void EveryEmailSenderConsumer_IsClassified()
+    {
+        // Catches a future email kind that bypasses IEmailEventHandler (e.g. a timer-driven "transfer expired" taking IEmailSender directly).
+        // Scans wa.application + wa.workers; the IEmailSender implementations and EmailSenderSelector live in wa.infrastructure (not scanned),
+        // and any sender implementation that ever lands in these assemblies is excluded explicitly (it is a sender, not a consumer).
+        var consumers = new[] { typeof(IEmailEventHandler).Assembly, typeof(EmailFunction).Assembly }
+            .SelectMany(a => a.GetTypes())
+            .Where(t => t is { IsClass: true, IsAbstract: false } && !typeof(IEmailSender).IsAssignableFrom(t))
+            .Where(t => t.GetConstructors().Any(c => c.GetParameters().Any(p => p.ParameterType == typeof(IEmailSender))))
+            .OrderBy(t => t.FullName)
+            .ToList();
+        Assert.Equal(Handlers.Keys.OrderBy(t => t.FullName), consumers);
     }
 
     [Fact]
